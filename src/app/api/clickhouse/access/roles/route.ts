@@ -1,9 +1,11 @@
 /**
- * API route for fetching ClickHouse roles
- * GET /api/clickhouse/access/roles
+ * API route for managing ClickHouse roles
+ * GET - List roles
+ * POST - Create role
+ * DELETE - Delete role
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import {
   createClientWithConfig,
@@ -55,4 +57,100 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
         : "Unknown error",
     });
   }
+}
+
+// Create role
+export interface CreateRoleRequest {
+  name: string;
+}
+
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse<{ success: boolean; error?: string }>> {
+  try {
+    const config = await getSessionClickHouseConfig();
+
+    if (!config) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const body: CreateRoleRequest = await request.json();
+
+    if (!body.name) {
+      return NextResponse.json(
+        { success: false, error: "Role name is required" },
+        { status: 400 }
+      );
+    }
+
+    const client = createClientWithConfig(config);
+    await client.command(
+      `CREATE ROLE IF NOT EXISTS ${quoteIdentifier(body.name)}`
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error creating role:", error);
+
+    return NextResponse.json({
+      success: false,
+      error: isClickHouseError(error)
+        ? error.userMessage || error.message
+        : error instanceof Error
+        ? error.message
+        : "Unknown error",
+    });
+  }
+}
+
+// Delete role
+export interface DeleteRoleRequest {
+  name: string;
+}
+
+export async function DELETE(
+  request: NextRequest
+): Promise<NextResponse<{ success: boolean; error?: string }>> {
+  try {
+    const config = await getSessionClickHouseConfig();
+
+    if (!config) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const body: DeleteRoleRequest = await request.json();
+
+    if (!body.name) {
+      return NextResponse.json(
+        { success: false, error: "Role name is required" },
+        { status: 400 }
+      );
+    }
+
+    const client = createClientWithConfig(config);
+    await client.command(`DROP ROLE IF EXISTS ${quoteIdentifier(body.name)}`);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting role:", error);
+
+    return NextResponse.json({
+      success: false,
+      error: isClickHouseError(error)
+        ? error.userMessage || error.message
+        : error instanceof Error
+        ? error.message
+        : "Unknown error",
+    });
+  }
+}
+
+function quoteIdentifier(name: string): string {
+  return `\`${name.replace(/`/g, "``")}\``;
 }

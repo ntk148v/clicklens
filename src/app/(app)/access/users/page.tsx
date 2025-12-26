@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -22,6 +24,26 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Users,
   Shield,
   Key,
@@ -29,6 +51,8 @@ import {
   AlertCircle,
   Loader2,
   User,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import type { SystemUser } from "@/lib/clickhouse";
 import Link from "next/link";
@@ -37,6 +61,20 @@ export default function UsersPage() {
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Create user dialog
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [newUser, setNewUser] = useState({
+    name: "",
+    password: "",
+    confirmPassword: "",
+    defaultDatabase: "",
+  });
+
+  // Delete user
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -59,6 +97,78 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleCreateUser = async () => {
+    setCreateError(null);
+
+    if (!newUser.name.trim()) {
+      setCreateError("Username is required");
+      return;
+    }
+
+    if (newUser.password && newUser.password !== newUser.confirmPassword) {
+      setCreateError("Passwords do not match");
+      return;
+    }
+
+    setCreating(true);
+
+    try {
+      const response = await fetch("/api/clickhouse/access/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newUser.name.trim(),
+          password: newUser.password || undefined,
+          authType: newUser.password ? "sha256_password" : "no_password",
+          defaultDatabase: newUser.defaultDatabase || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCreateOpen(false);
+        setNewUser({
+          name: "",
+          password: "",
+          confirmPassword: "",
+          defaultDatabase: "",
+        });
+        fetchUsers();
+      } else {
+        setCreateError(data.error || "Failed to create user");
+      }
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteUser = async (userName: string) => {
+    setDeleting(userName);
+
+    try {
+      const response = await fetch("/api/clickhouse/access/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: userName }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchUsers();
+      } else {
+        setError(data.error || "Failed to delete user");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -85,18 +195,6 @@ export default function UsersPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={fetchUsers}
-          disabled={loading}
-          className="ml-auto"
-        >
-          <RefreshCw
-            className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </Button>
       </Header>
 
       <div className="flex-1 p-6">
@@ -105,20 +203,19 @@ export default function UsersPage() {
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-destructive/50 bg-destructive/10">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-800">
+              <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="w-5 h-5" />
                 Error Loading Users
               </CardTitle>
-              <CardDescription className="text-red-600">
+              <CardDescription className="text-destructive/80">
                 {error}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Make sure ClickHouse is running and accessible. You may need
-                SELECT permission on system.users.
+                Make sure you have SELECT permission on system.users.
               </p>
             </CardContent>
           </Card>
@@ -128,9 +225,123 @@ export default function UsersPage() {
               <div>
                 <h2 className="text-xl font-semibold">Users</h2>
                 <p className="text-sm text-muted-foreground">
-                  {users.length} user{users.length !== 1 ? "s" : ""} found in
-                  ClickHouse
+                  {users.length} user{users.length !== 1 ? "s" : ""} found
                 </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Create User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create User</DialogTitle>
+                      <DialogDescription>
+                        Create a new ClickHouse user. Leave password empty for
+                        passwordless auth.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      {createError && (
+                        <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          {createError}
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Username *</Label>
+                        <Input
+                          id="name"
+                          placeholder="e.g. analyst"
+                          value={newUser.name}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, name: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder="Leave empty for no password"
+                          value={newUser.password}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, password: e.target.value })
+                          }
+                        />
+                      </div>
+                      {newUser.password && (
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmPassword">
+                            Confirm Password
+                          </Label>
+                          <Input
+                            id="confirmPassword"
+                            type="password"
+                            placeholder="Confirm password"
+                            value={newUser.confirmPassword}
+                            onChange={(e) =>
+                              setNewUser({
+                                ...newUser,
+                                confirmPassword: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="defaultDatabase">
+                          Default Database
+                        </Label>
+                        <Input
+                          id="defaultDatabase"
+                          placeholder="e.g. default"
+                          value={newUser.defaultDatabase}
+                          onChange={(e) =>
+                            setNewUser({
+                              ...newUser,
+                              defaultDatabase: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCreateOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleCreateUser} disabled={creating}>
+                        {creating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create User"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchUsers}
+                  disabled={loading}
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
               </div>
             </div>
 
@@ -144,7 +355,7 @@ export default function UsersPage() {
                       <TableHead>Storage</TableHead>
                       <TableHead>Default Database</TableHead>
                       <TableHead>Default Roles</TableHead>
-                      <TableHead>Host Access</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -185,7 +396,7 @@ export default function UsersPage() {
                             user.default_roles_list.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {user.default_roles_list
-                                .slice(0, 3)
+                                .slice(0, 2)
                                 .map((role) => (
                                   <Badge
                                     key={role}
@@ -195,9 +406,9 @@ export default function UsersPage() {
                                     {role}
                                   </Badge>
                                 ))}
-                              {user.default_roles_list.length > 3 && (
+                              {user.default_roles_list.length > 2 && (
                                 <Badge variant="outline" className="text-xs">
-                                  +{user.default_roles_list.length - 3} more
+                                  +{user.default_roles_list.length - 2}
                                 </Badge>
                               )}
                             </div>
@@ -206,24 +417,41 @@ export default function UsersPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {user.host_ip && user.host_ip.length > 0 ? (
-                            <Badge
-                              variant="outline"
-                              className="text-xs font-mono"
-                            >
-                              {user.host_ip[0]}
-                              {user.host_ip.length > 1 &&
-                                ` +${user.host_ip.length - 1}`}
-                            </Badge>
-                          ) : user.host_names && user.host_names.length > 0 ? (
-                            <Badge variant="outline" className="text-xs">
-                              {user.host_names[0]}
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              Any Host
-                            </Badge>
-                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                disabled={deleting === user.name}
+                              >
+                                {deleting === user.name ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete user{" "}
+                                  <strong>{user.name}</strong>? This action
+                                  cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => handleDeleteUser(user.name)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -231,25 +459,6 @@ export default function UsersPage() {
                 </Table>
               </ScrollArea>
             </Card>
-
-            <div className="p-4 rounded-lg bg-muted border text-sm text-muted-foreground">
-              <p>
-                <strong>Note:</strong> This view is read-only and reflects
-                ClickHouse's native RBAC. To modify users, use SQL commands like{" "}
-                <code className="px-1.5 py-0.5 rounded bg-background border text-xs">
-                  CREATE USER
-                </code>
-                ,{" "}
-                <code className="px-1.5 py-0.5 rounded bg-background border text-xs">
-                  ALTER USER
-                </code>
-                , or{" "}
-                <code className="px-1.5 py-0.5 rounded bg-background border text-xs">
-                  DROP USER
-                </code>{" "}
-                in the SQL Console.
-              </p>
-            </div>
           </div>
         )}
       </div>

@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -21,7 +23,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Users,
   Shield,
@@ -29,16 +50,48 @@ import {
   RefreshCw,
   AlertCircle,
   Loader2,
+  Plus,
+  Trash2,
   Search,
 } from "lucide-react";
 import type { SystemGrant } from "@/lib/clickhouse";
 import Link from "next/link";
+
+// Common access types in ClickHouse
+const ACCESS_TYPES = [
+  "SELECT",
+  "INSERT",
+  "ALTER",
+  "CREATE",
+  "DROP",
+  "TRUNCATE",
+  "OPTIMIZE",
+  "SHOW",
+  "KILL QUERY",
+  "ACCESS MANAGEMENT",
+  "ALL",
+];
 
 export default function GrantsPage() {
   const [grants, setGrants] = useState<SystemGrant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+
+  // Grant dialog
+  const [grantOpen, setGrantOpen] = useState(false);
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState<string | null>(null);
+  const [newGrant, setNewGrant] = useState({
+    accessType: "SELECT",
+    database: "",
+    table: "",
+    granteeType: "user" as "user" | "role",
+    granteeName: "",
+  });
+
+  // Revoke
+  const [revoking, setRevoking] = useState<number | null>(null);
 
   const fetchGrants = async () => {
     setLoading(true);
@@ -61,6 +114,81 @@ export default function GrantsPage() {
   useEffect(() => {
     fetchGrants();
   }, []);
+
+  const handleGrant = async () => {
+    setGrantError(null);
+
+    if (!newGrant.granteeName.trim()) {
+      setGrantError("Grantee name is required");
+      return;
+    }
+
+    setGranting(true);
+
+    try {
+      const response = await fetch("/api/clickhouse/access/grants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessType: newGrant.accessType,
+          database: newGrant.database || undefined,
+          table: newGrant.table || undefined,
+          granteeType: newGrant.granteeType,
+          granteeName: newGrant.granteeName.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setGrantOpen(false);
+        setNewGrant({
+          accessType: "SELECT",
+          database: "",
+          table: "",
+          granteeType: "user",
+          granteeName: "",
+        });
+        fetchGrants();
+      } else {
+        setGrantError(data.error || "Failed to grant permission");
+      }
+    } catch (err) {
+      setGrantError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setGranting(false);
+    }
+  };
+
+  const handleRevoke = async (grant: SystemGrant, index: number) => {
+    setRevoking(index);
+
+    try {
+      const response = await fetch("/api/clickhouse/access/grants", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessType: grant.access_type,
+          database: grant.database || undefined,
+          table: grant.table || undefined,
+          granteeType: grant.user_name ? "user" : "role",
+          granteeName: grant.user_name || grant.role_name,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchGrants();
+      } else {
+        setError(data.error || "Failed to revoke permission");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setRevoking(null);
+    }
+  };
 
   const filteredGrants = grants.filter((grant) => {
     if (!filter) return true;
@@ -99,18 +227,6 @@ export default function GrantsPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={fetchGrants}
-          disabled={loading}
-          className="ml-auto"
-        >
-          <RefreshCw
-            className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </Button>
       </Header>
 
       <div className="flex-1 p-6">
@@ -119,22 +235,16 @@ export default function GrantsPage() {
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-destructive/50 bg-destructive/10">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-800">
+              <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="w-5 h-5" />
                 Error Loading Grants
               </CardTitle>
-              <CardDescription className="text-red-600">
+              <CardDescription className="text-destructive/80">
                 {error}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Make sure ClickHouse is running and accessible. You may need
-                SELECT permission on system.grants.
-              </p>
-            </CardContent>
           </Card>
         ) : (
           <div className="space-y-6">
@@ -143,17 +253,185 @@ export default function GrantsPage() {
                 <h2 className="text-xl font-semibold">Grants</h2>
                 <p className="text-sm text-muted-foreground">
                   {grants.length} permission grant
-                  {grants.length !== 1 ? "s" : ""} in ClickHouse
+                  {grants.length !== 1 ? "s" : ""}
                 </p>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Filter grants..."
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="pl-9"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Filter..."
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Grant
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Grant Permission</DialogTitle>
+                      <DialogDescription>
+                        Grant access to a user or role.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      {grantError && (
+                        <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          {grantError}
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label>Access Type *</Label>
+                        <select
+                          value={newGrant.accessType}
+                          onChange={(e) =>
+                            setNewGrant({
+                              ...newGrant,
+                              accessType: e.target.value,
+                            })
+                          }
+                          className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                        >
+                          {ACCESS_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="database">Database</Label>
+                          <Input
+                            id="database"
+                            placeholder="* (all)"
+                            value={newGrant.database}
+                            onChange={(e) =>
+                              setNewGrant({
+                                ...newGrant,
+                                database: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="table">Table</Label>
+                          <Input
+                            id="table"
+                            placeholder="* (all)"
+                            value={newGrant.table}
+                            onChange={(e) =>
+                              setNewGrant({
+                                ...newGrant,
+                                table: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Grantee Type</Label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="granteeType"
+                              checked={newGrant.granteeType === "user"}
+                              onChange={() =>
+                                setNewGrant({
+                                  ...newGrant,
+                                  granteeType: "user",
+                                })
+                              }
+                              className="accent-primary"
+                            />
+                            <span className="text-sm">User</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="granteeType"
+                              checked={newGrant.granteeType === "role"}
+                              onChange={() =>
+                                setNewGrant({
+                                  ...newGrant,
+                                  granteeType: "role",
+                                })
+                              }
+                              className="accent-primary"
+                            />
+                            <span className="text-sm">Role</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="granteeName">
+                          {newGrant.granteeType === "user"
+                            ? "Username"
+                            : "Role Name"}{" "}
+                          *
+                        </Label>
+                        <Input
+                          id="granteeName"
+                          placeholder={
+                            newGrant.granteeType === "user"
+                              ? "e.g. analyst"
+                              : "e.g. read_only"
+                          }
+                          value={newGrant.granteeName}
+                          onChange={(e) =>
+                            setNewGrant({
+                              ...newGrant,
+                              granteeName: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setGrantOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleGrant} disabled={granting}>
+                        {granting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            Granting...
+                          </>
+                        ) : (
+                          "Grant Permission"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchGrants}
+                  disabled={loading}
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
               </div>
             </div>
 
@@ -163,11 +441,10 @@ export default function GrantsPage() {
                   <TableHeader className="sticky top-0 bg-background">
                     <TableRow>
                       <TableHead className="w-[150px]">Grantee</TableHead>
-                      <TableHead className="w-[180px]">Access Type</TableHead>
+                      <TableHead className="w-[150px]">Access Type</TableHead>
                       <TableHead>Database</TableHead>
                       <TableHead>Table</TableHead>
-                      <TableHead>Column</TableHead>
-                      <TableHead>Options</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -222,20 +499,46 @@ export default function GrantsPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {grant.column ? (
-                            <code className="px-1.5 py-0.5 rounded bg-muted text-xs">
-                              {grant.column}
-                            </code>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {grant.grant_option && (
-                            <Badge variant="outline" className="text-xs">
-                              WITH GRANT OPTION
-                            </Badge>
-                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                disabled={revoking === index}
+                              >
+                                {revoking === index ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Revoke Permission
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Revoke <strong>{grant.access_type}</strong>{" "}
+                                  from{" "}
+                                  <strong>
+                                    {grant.user_name || grant.role_name}
+                                  </strong>
+                                  ?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => handleRevoke(grant, index)}
+                                >
+                                  Revoke
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -249,21 +552,6 @@ export default function GrantsPage() {
                 No grants match "{filter}"
               </div>
             )}
-
-            <div className="p-4 rounded-lg bg-muted border text-sm text-muted-foreground">
-              <p>
-                <strong>Note:</strong> To modify permissions, use SQL commands
-                like{" "}
-                <code className="px-1.5 py-0.5 rounded bg-background border text-xs">
-                  GRANT SELECT ON db.* TO user
-                </code>{" "}
-                or{" "}
-                <code className="px-1.5 py-0.5 rounded bg-background border text-xs">
-                  REVOKE INSERT ON table FROM role
-                </code>{" "}
-                in the SQL Console.
-              </p>
-            </div>
           </div>
         )}
       </div>
