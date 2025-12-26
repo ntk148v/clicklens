@@ -80,9 +80,10 @@ function formatCellValue(value: unknown): string {
 }
 
 function getCellClassName(value: unknown): string {
-  if (value === null || value === undefined) return "text-ch-muted italic";
-  if (typeof value === "number") return "text-right font-mono text-blue-400";
-  if (typeof value === "boolean") return "text-purple-400";
+  if (value === null || value === undefined)
+    return "text-muted-foreground italic";
+  if (typeof value === "number") return "text-right font-mono text-blue-600";
+  if (typeof value === "boolean") return "text-purple-600";
   return "";
 }
 
@@ -105,7 +106,7 @@ export function ResultGrid({
           <span className="font-semibold">{col.name}</span>
           <Badge
             variant="outline"
-            className="text-[10px] px-1 py-0 font-mono text-ch-muted border-ch-border"
+            className="text-[10px] px-1 py-0 font-mono text-muted-foreground"
           >
             {col.type}
           </Badge>
@@ -120,7 +121,7 @@ export function ResultGrid({
             ) : column.getIsSorted() === "desc" ? (
               <ArrowDown className="h-3 w-3" />
             ) : (
-              <ArrowUpDown className="h-3 w-3 text-ch-muted" />
+              <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
             )}
           </Button>
         </div>
@@ -190,7 +191,7 @@ export function ResultGrid({
 
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-ch-muted">
+      <div className="flex items-center justify-center h-32 text-muted-foreground">
         No results
       </div>
     );
@@ -200,28 +201,28 @@ export function ResultGrid({
     <div className={cn("flex flex-col h-full", className)}>
       {/* Statistics bar */}
       {statistics && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-ch-border bg-ch-bg text-xs">
-          <div className="flex items-center gap-4 text-ch-muted">
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30 text-xs">
+          <div className="flex items-center gap-4 text-muted-foreground">
             <span>
-              <strong className="text-ch-text">
+              <strong className="text-foreground">
                 {formatNumber(totalRows ?? data.length)}
               </strong>{" "}
               rows
             </span>
             <span>
-              <strong className="text-ch-text">
+              <strong className="text-foreground">
                 {formatNumber(statistics.rows_read)}
               </strong>{" "}
               rows read
             </span>
             <span>
-              <strong className="text-ch-text">
+              <strong className="text-foreground">
                 {formatBytes(statistics.bytes_read)}
               </strong>{" "}
               read
             </span>
             <span>
-              <strong className="text-ch-text">
+              <strong className="text-foreground">
                 {formatDuration(statistics.elapsed)}
               </strong>
             </span>
@@ -252,16 +253,13 @@ export function ResultGrid({
       {/* Table */}
       <ScrollArea className="flex-1">
         <Table>
-          <TableHeader className="sticky top-0 bg-ch-surface z-10">
+          <TableHeader className="sticky top-0 bg-background z-10">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow
-                key={headerGroup.id}
-                className="border-ch-border hover:bg-transparent"
-              >
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="text-ch-text font-semibold whitespace-nowrap"
+                    className="font-semibold whitespace-nowrap"
                     style={{ width: header.getSize() }}
                   >
                     {header.isPlaceholder
@@ -277,10 +275,7 @@ export function ResultGrid({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="border-ch-border hover:bg-ch-border/30"
-              >
+              <TableRow key={row.id} className="hover:bg-muted/50">
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}
@@ -297,8 +292,8 @@ export function ResultGrid({
       </ScrollArea>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-ch-border bg-ch-bg text-xs">
-        <div className="text-ch-muted">
+      <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/30 text-xs">
+        <div className="text-muted-foreground">
           Page {table.getState().pagination.pageIndex + 1} of{" "}
           {table.getPageCount()}
         </div>

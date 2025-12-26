@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ClickLens - ClickHouse-inspired dark theme */
+/* ClickLens - Light theme (Vercel/Next.js inspired) */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -48,134 +48,106 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-
-  /* ClickHouse custom colors */
-  --color-ch-bg: var(--ch-bg);
-  --color-ch-surface: var(--ch-surface);
-  --color-ch-border: var(--ch-border);
-  --color-ch-yellow: var(--ch-yellow);
-  --color-ch-amber: var(--ch-amber);
-  --color-ch-muted: var(--ch-muted);
-  --color-ch-text: var(--ch-text);
-
-  /* Status colors */
-  --color-status-success: var(--status-success);
-  --color-status-warning: var(--status-warning);
-  --color-status-error: var(--status-error);
-  --color-status-info: var(--status-info);
 }
 
-/* Dark theme is the default for ClickLens */
+/* Light theme (default) - Vercel/Next.js inspired */
 :root {
   --radius: 0.5rem;
 
-  /* ClickHouse-inspired dark palette */
-  --background: #0d0d0d;
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --destructive: #ef4444;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #171717;
+
+  /* Chart colors */
+  --chart-1: #0ea5e9;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #8b5cf6;
+  --chart-5: #ec4899;
+
+  /* Sidebar */
+  --sidebar: #fafafa;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #171717;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #171717;
+}
+
+/* Dark theme */
+.dark {
+  --background: #0a0a0a;
   --foreground: #fafafa;
-  --card: #1a1a1a;
+  --card: #0a0a0a;
   --card-foreground: #fafafa;
-  --popover: #1a1a1a;
+  --popover: #0a0a0a;
   --popover-foreground: #fafafa;
-  --primary: #facc15;           /* ClickHouse yellow */
-  --primary-foreground: #0d0d0d;
+  --primary: #fafafa;
+  --primary-foreground: #171717;
   --secondary: #262626;
   --secondary-foreground: #fafafa;
   --muted: #262626;
-  --muted-foreground: #a1a1aa;
-  --accent: #facc15;
-  --accent-foreground: #0d0d0d;
-  --destructive: #dc2626;
-  --border: #2a2a2a;
-  --input: #2a2a2a;
-  --ring: #facc15;
-
-  /* Chart colors - ClickHouse inspired */
-  --chart-1: #facc15;           /* Yellow */
-  --chart-2: #f59e0b;           /* Amber */
-  --chart-3: #3b82f6;           /* Blue */
-  --chart-4: #22c55e;           /* Green */
-  --chart-5: #8b5cf6;           /* Purple */
-
-  /* Sidebar */
-  --sidebar: #0d0d0d;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+  --destructive: #7f1d1d;
+  --border: #262626;
+  --input: #262626;
+  --ring: #d4d4d4;
+  --chart-1: #2662d9;
+  --chart-2: #2eb88a;
+  --chart-3: #e88c30;
+  --chart-4: #af57db;
+  --chart-5: #e23670;
+  --sidebar: #0a0a0a;
   --sidebar-foreground: #fafafa;
-  --sidebar-primary: #facc15;
-  --sidebar-primary-foreground: #0d0d0d;
-  --sidebar-accent: #1a1a1a;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #171717;
+  --sidebar-accent: #262626;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #facc15;
-
-  /* ClickHouse brand colors */
-  --ch-bg: #0d0d0d;
-  --ch-surface: #1a1a1a;
-  --ch-border: #2a2a2a;
-  --ch-yellow: #facc15;
-  --ch-amber: #f59e0b;
-  --ch-muted: #71717a;
-  --ch-text: #fafafa;
-
-  /* Status colors */
-  --status-success: #22c55e;
-  --status-warning: #eab308;
-  --status-error: #dc2626;
-  --status-info: #3b82f6;
-}
-
-/* Light theme override (rarely used) */
-.light {
-  --background: #ffffff;
-  --foreground: #0d0d0d;
-  --card: #ffffff;
-  --card-foreground: #0d0d0d;
-  --popover: #ffffff;
-  --popover-foreground: #0d0d0d;
-  --primary: #0d0d0d;
-  --primary-foreground: #fafafa;
-  --secondary: #f5f5f5;
-  --secondary-foreground: #0d0d0d;
-  --muted: #f5f5f5;
-  --muted-foreground: #71717a;
-  --accent: #f5f5f5;
-  --accent-foreground: #0d0d0d;
-  --destructive: #dc2626;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #0d0d0d;
-  --chart-1: #facc15;
-  --chart-2: #f59e0b;
-  --chart-3: #3b82f6;
-  --chart-4: #22c55e;
-  --chart-5: #8b5cf6;
-  --sidebar: #f5f5f5;
-  --sidebar-foreground: #0d0d0d;
-  --sidebar-primary: #0d0d0d;
-  --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: #e5e5e5;
-  --sidebar-accent-foreground: #0d0d0d;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #0d0d0d;
+  --sidebar-border: #262626;
+  --sidebar-ring: #d4d4d4;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground antialiased;
   }
 
   /* Monospace font for code/SQL */
-  pre, code, .font-mono {
+  pre,
+  code,
+  .font-mono {
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
   }
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: var(--ch-border) var(--ch-bg);
+    scrollbar-color: var(--border) var(--background);
   }
 
   .scrollbar-thin::-webkit-scrollbar {
@@ -184,15 +156,15 @@
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
-    background: var(--ch-bg);
+    background: var(--background);
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: var(--ch-border);
+    background: var(--border);
     border-radius: 4px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: var(--ch-muted);
+    background: var(--muted-foreground);
   }
 }

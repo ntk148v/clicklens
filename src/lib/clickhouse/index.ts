@@ -1,17 +1,9 @@
-/**
- * ClickHouse client library
- * Re-exports all public APIs
- */
-
-export {
-  ClickHouseClient,
-  createClient,
-  isClickHouseError,
-  getErrorMessage,
-} from "./client";
-export {
-  getClickHouseConfig,
-  getClickHouseUrl,
-  type ClickHouseConfig,
-} from "./config";
+// ClickHouse client library
+export { createClient, createClientWithConfig } from "./client";
+export type { ClickHouseQueryResult, ClickHouseConfig } from "./client";
 export * from "./types";
+export {
+  getDefaultConfig,
+  buildClickHouseUrl,
+  buildAuthHeaders,
+} from "./config";

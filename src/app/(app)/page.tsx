@@ -61,10 +61,10 @@ export default function HomePage() {
       <div className="flex-1 p-6 space-y-8">
         {/* Hero Section */}
         <div className="space-y-4">
-          <h2 className="text-3xl font-bold text-ch-text">
-            Welcome to <span className="text-ch-yellow">ClickLens</span>
+          <h2 className="text-3xl font-bold">
+            Welcome to <span className="text-primary">ClickLens</span>
           </h2>
-          <p className="text-ch-muted max-w-2xl">
+          <p className="text-muted-foreground max-w-2xl">
             A modern, open-source observability and analytics UI for ClickHouse.
             SQL-native, minimal, and fast. No magic metrics — every chart links
             back to its underlying SQL.
@@ -77,22 +77,20 @@ export default function HomePage() {
             const Icon = feature.icon;
             return (
               <Link key={feature.title} href={feature.href}>
-                <Card className="h-full bg-ch-surface border-ch-border hover:border-ch-yellow/50 transition-colors group cursor-pointer">
+                <Card className="h-full hover:border-primary/50 transition-colors group cursor-pointer">
                   <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-ch-yellow/10 text-ch-yellow">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
                         <Icon className="w-5 h-5" />
                       </div>
-                      <CardTitle className="text-ch-text group-hover:text-ch-yellow transition-colors">
+                      <CardTitle className="group-hover:text-primary transition-colors">
                         {feature.title}
                       </CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-ch-muted">
-                      {feature.description}
-                    </CardDescription>
-                    <div className="mt-4 flex items-center text-sm text-ch-yellow opacity-0 group-hover:opacity-100 transition-opacity">
+                    <CardDescription>{feature.description}</CardDescription>
+                    <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                       <span>Get started</span>
                       <ArrowRight className="w-4 h-4 ml-1" />
                     </div>
@@ -104,21 +102,14 @@ export default function HomePage() {
         </div>
 
         {/* Quick Info */}
-        <div className="mt-8 p-4 rounded-lg bg-ch-surface border border-ch-border">
-          <h3 className="text-sm font-medium text-ch-text mb-2">
-            Getting Started
-          </h3>
-          <p className="text-sm text-ch-muted">
-            Configure your ClickHouse connection by setting environment
-            variables:
+        <div className="mt-8 p-4 rounded-lg bg-muted border">
+          <h3 className="text-sm font-medium mb-2">Getting Started</h3>
+          <p className="text-sm text-muted-foreground">
+            You're connected to ClickHouse using your login credentials. Your
+            permissions in this UI are determined by your ClickHouse user's
+            grants and roles. Use the sidebar to navigate between features, or
+            click any card above to get started.
           </p>
-          <pre className="mt-2 p-3 rounded bg-ch-bg font-mono text-xs text-ch-muted overflow-x-auto">
-            {`CLICKHOUSE_HOST=localhost
-CLICKHOUSE_PORT=8123
-CLICKHOUSE_USER=default
-CLICKHOUSE_PASSWORD=your_password
-CLICKHOUSE_DATABASE=default`}
-          </pre>
         </div>
       </div>
     </div>

@@ -62,20 +62,20 @@ export function ConnectionStatus() {
                 flex items-center gap-1.5 px-2 py-1 font-mono text-xs
                 ${
                   status.loading
-                    ? "border-ch-muted text-ch-muted"
+                    ? "border-muted-foreground text-muted-foreground"
                     : status.connected
-                    ? "border-status-success/50 text-status-success"
-                    : "border-status-error/50 text-status-error"
+                    ? "border-green-500/50 text-green-600"
+                    : "border-red-500/50 text-red-600"
                 }
               `}
             >
               <Circle
                 className={`w-2 h-2 ${
                   status.loading
-                    ? "fill-ch-muted text-ch-muted animate-pulse"
+                    ? "fill-muted-foreground text-muted-foreground animate-pulse"
                     : status.connected
-                    ? "fill-status-success text-status-success"
-                    : "fill-status-error text-status-error"
+                    ? "fill-green-500 text-green-500"
+                    : "fill-red-500 text-red-500"
                 }`}
               />
               {status.loading
@@ -87,7 +87,7 @@ export function ConnectionStatus() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-ch-muted hover:text-ch-text"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={checkConnection}
               disabled={status.loading}
             >
@@ -99,12 +99,9 @@ export function ConnectionStatus() {
             </Button>
           </div>
         </TooltipTrigger>
-        <TooltipContent
-          side="bottom"
-          className="bg-ch-surface border-ch-border"
-        >
+        <TooltipContent side="bottom">
           {status.error ? (
-            <p className="text-status-error">{status.error}</p>
+            <p className="text-red-600">{status.error}</p>
           ) : status.connected ? (
             <p>Connected to ClickHouse {status.version}</p>
           ) : (

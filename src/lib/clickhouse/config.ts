@@ -1,6 +1,6 @@
 /**
- * ClickHouse configuration loaded from environment variables
- * Server-side only - never exposed to browser
+ * ClickHouse client configuration
+ * Now uses session-based credentials instead of environment variables
  */
 
 export interface ClickHouseConfig {
@@ -13,18 +13,18 @@ export interface ClickHouseConfig {
 }
 
 /**
- * Get ClickHouse configuration from environment variables
- * This should only be called on the server side
+ * Get default configuration (for fallback when env vars are set)
+ * This is optional - mainly for development/testing
  */
-export function getClickHouseConfig(): ClickHouseConfig {
-  if (typeof window !== "undefined") {
-    throw new Error(
-      "getClickHouseConfig should only be called on the server side"
-    );
+export function getDefaultConfig(): ClickHouseConfig | null {
+  const host = process.env.CLICKHOUSE_HOST;
+
+  if (!host) {
+    return null;
   }
 
   return {
-    host: process.env.CLICKHOUSE_HOST || "localhost",
+    host,
     port: parseInt(process.env.CLICKHOUSE_PORT || "8123", 10),
     username: process.env.CLICKHOUSE_USER || "default",
     password: process.env.CLICKHOUSE_PASSWORD || "",
@@ -34,8 +34,24 @@ export function getClickHouseConfig(): ClickHouseConfig {
 }
 
 /**
- * Build the ClickHouse base URL from config
+ * Build ClickHouse URL from config
  */
-export function getClickHouseUrl(config: ClickHouseConfig): string {
-  return `${config.protocol}://${config.host}:${config.port}`;
+export function buildClickHouseUrl(
+  config: ClickHouseConfig,
+  path: string = ""
+): string {
+  return `${config.protocol}://${config.host}:${config.port}${path}`;
+}
+
+/**
+ * Build auth headers for ClickHouse
+ */
+export function buildAuthHeaders(
+  config: ClickHouseConfig
+): Record<string, string> {
+  return {
+    "X-ClickHouse-User": config.username,
+    "X-ClickHouse-Key": config.password,
+    "X-ClickHouse-Database": config.database,
+  };
 }

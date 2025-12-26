@@ -35,7 +35,7 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
 
   if (history.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-ch-muted p-4">
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
         <Clock className="w-8 h-8 mb-2 opacity-50" />
         <p className="text-sm">No query history</p>
         <p className="text-xs mt-1">Executed queries will appear here</p>
@@ -45,12 +45,12 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-ch-border">
-        <h3 className="text-sm font-medium text-ch-text">Query History</h3>
+      <div className="flex items-center justify-between px-4 py-2 border-b">
+        <h3 className="text-sm font-medium">Query History</h3>
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 text-xs text-ch-muted hover:text-status-error"
+          className="h-7 text-xs text-muted-foreground hover:text-red-600"
           onClick={clearHistory}
         >
           <Trash2 className="w-3 h-3 mr-1" />
@@ -65,23 +65,23 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
               key={entry.id}
               className={cn(
                 "w-full text-left p-3 rounded-md border border-transparent transition-colors",
-                "hover:bg-ch-surface hover:border-ch-border",
-                "focus:outline-none focus:ring-1 focus:ring-ch-yellow"
+                "hover:bg-muted hover:border-border",
+                "focus:outline-none focus:ring-1 focus:ring-ring"
               )}
               onClick={() => handleSelect(entry.sql)}
             >
               <div className="flex items-start justify-between gap-2 mb-1">
-                <span className="text-xs text-ch-muted">
+                <span className="text-xs text-muted-foreground">
                   {formatDate(entry.timestamp)}
                 </span>
                 <div className="flex items-center gap-1">
                   {entry.error ? (
-                    <AlertCircle className="w-3 h-3 text-status-error" />
+                    <AlertCircle className="w-3 h-3 text-red-600" />
                   ) : (
-                    <CheckCircle className="w-3 h-3 text-status-success" />
+                    <CheckCircle className="w-3 h-3 text-green-600" />
                   )}
                   {entry.duration !== undefined && (
-                    <span className="text-xs text-ch-muted">
+                    <span className="text-xs text-muted-foreground">
                       {entry.duration < 1
                         ? `${(entry.duration * 1000).toFixed(0)}ms`
                         : `${entry.duration.toFixed(2)}s`}
@@ -89,11 +89,11 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
                   )}
                 </div>
               </div>
-              <pre className="text-xs font-mono text-ch-text truncate max-w-full overflow-hidden">
+              <pre className="text-xs font-mono truncate max-w-full overflow-hidden">
                 {entry.sql.split("\n")[0].trim()}
               </pre>
               {entry.rowsReturned !== undefined && (
-                <span className="text-xs text-ch-muted mt-1 block">
+                <span className="text-xs text-muted-foreground mt-1 block">
                   {entry.rowsReturned} rows
                 </span>
               )}

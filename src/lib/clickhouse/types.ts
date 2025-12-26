@@ -38,7 +38,19 @@ export type ClickHouseErrorType =
 export interface ClickHouseError {
   code: number;
   message: string;
-  type: ClickHouseErrorType;
+  type: ClickHouseErrorType | string;
+  userMessage?: string;
+}
+
+// Type guard for ClickHouse errors
+export function isClickHouseError(error: unknown): error is ClickHouseError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    "message" in error &&
+    "type" in error
+  );
 }
 
 // Query options

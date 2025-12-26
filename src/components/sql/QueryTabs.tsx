@@ -10,24 +10,24 @@ export function QueryTabs() {
   const { tabs, activeTabId, addTab, removeTab, setActiveTab } = useTabsStore();
 
   return (
-    <div className="flex items-center h-10 bg-ch-bg border-b border-ch-border">
+    <div className="flex items-center h-10 bg-muted/30 border-b">
       <ScrollArea className="flex-1">
         <div className="flex items-center h-10">
           {tabs.map((tab) => (
             <div
               key={tab.id}
               className={cn(
-                "group flex items-center gap-2 h-10 px-4 border-r border-ch-border cursor-pointer transition-colors",
+                "group flex items-center gap-2 h-10 px-4 border-r cursor-pointer transition-colors",
                 tab.id === activeTabId
-                  ? "bg-ch-surface text-ch-text"
-                  : "text-ch-muted hover:text-ch-text hover:bg-ch-surface/50"
+                  ? "bg-background text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
               )}
               onClick={() => setActiveTab(tab.id)}
             >
               <Terminal
                 className={cn(
                   "w-3.5 h-3.5",
-                  tab.isRunning && "animate-pulse text-ch-yellow"
+                  tab.isRunning && "animate-pulse text-blue-600"
                 )}
               />
               <span className="text-sm font-medium whitespace-nowrap max-w-[120px] truncate">
@@ -35,7 +35,7 @@ export function QueryTabs() {
               </span>
               {tabs.length > 1 && (
                 <button
-                  className="opacity-0 group-hover:opacity-100 hover:text-status-error transition-opacity p-0.5 -mr-1"
+                  className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity p-0.5 -mr-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeTab(tab.id);
@@ -53,7 +53,7 @@ export function QueryTabs() {
       <Button
         variant="ghost"
         size="icon"
-        className="h-10 w-10 rounded-none border-l border-ch-border text-ch-muted hover:text-ch-text"
+        className="h-10 w-10 rounded-none border-l text-muted-foreground hover:text-foreground"
         onClick={() => addTab()}
       >
         <Plus className="w-4 h-4" />

@@ -18,14 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Play,
-  Square,
-  FileText,
-  History,
-  AlertCircle,
-  Loader2,
-} from "lucide-react";
+import { Play, FileText, History, AlertCircle, Loader2 } from "lucide-react";
 import type { QueryResponse } from "@/app/api/clickhouse/query/route";
 
 export default function SqlConsolePage() {
@@ -137,7 +130,6 @@ export default function SqlConsolePage() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            className="bg-ch-yellow text-ch-bg hover:bg-ch-amber"
             onClick={handleExecute}
             disabled={!activeTab || activeTab.isRunning}
           >
@@ -154,16 +146,20 @@ export default function SqlConsolePage() {
             )}
           </Button>
 
-          <Separator orientation="vertical" className="h-6 bg-ch-border" />
+          <Separator orientation="vertical" className="h-6" />
 
           <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-ch-muted">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+              >
                 <History className="w-4 h-4 mr-1" />
                 History
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-[400px] bg-ch-bg border-ch-border p-0">
+            <SheetContent className="w-[400px] p-0">
               <SheetHeader className="sr-only">
                 <SheetTitle>Query History</SheetTitle>
               </SheetHeader>
@@ -181,7 +177,7 @@ export default function SqlConsolePage() {
         {activeTab ? (
           <>
             {/* Editor */}
-            <div className="h-[250px] p-4 border-b border-ch-border">
+            <div className="h-[250px] p-4 border-b">
               <SqlEditor
                 value={activeTab.sql}
                 onChange={handleSqlChange}
@@ -193,13 +189,13 @@ export default function SqlConsolePage() {
             {/* Result area */}
             <div className="flex-1 min-h-0">
               {activeTab.error ? (
-                <div className="flex items-start gap-3 p-4 m-4 rounded-md bg-status-error/10 border border-status-error/20">
-                  <AlertCircle className="w-5 h-5 text-status-error flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-4 m-4 rounded-md bg-red-50 border border-red-200">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-status-error">
+                    <p className="font-medium text-red-800">
                       {activeTab.error.userMessage}
                     </p>
-                    <pre className="mt-2 text-xs text-ch-muted font-mono whitespace-pre-wrap break-all overflow-x-auto">
+                    <pre className="mt-2 text-xs text-red-600 font-mono whitespace-pre-wrap break-all overflow-x-auto">
                       {activeTab.error.message}
                     </pre>
                   </div>
@@ -216,16 +212,16 @@ export default function SqlConsolePage() {
                   className="h-full"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-ch-muted">
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <FileText className="w-12 h-12 mb-4 opacity-30" />
                   <p className="text-sm">No results yet</p>
                   <p className="text-xs mt-1">
                     Press{" "}
-                    <kbd className="px-1.5 py-0.5 rounded bg-ch-surface border border-ch-border font-mono text-xs">
+                    <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
                       Ctrl
                     </kbd>
                     +
-                    <kbd className="px-1.5 py-0.5 rounded bg-ch-surface border border-ch-border font-mono text-xs">
+                    <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
                       Enter
                     </kbd>{" "}
                     to run your query
@@ -235,7 +231,7 @@ export default function SqlConsolePage() {
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-ch-muted">
+          <div className="flex items-center justify-center h-full text-muted-foreground">
             <p>No active query tab</p>
           </div>
         )}

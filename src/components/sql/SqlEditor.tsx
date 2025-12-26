@@ -59,56 +59,57 @@ const clickhouseDialect = SQLDialect.define({
   `,
 });
 
-// Dark theme matching ClickLens design
-const clicklensTheme = EditorView.theme(
+// Light theme for SQL editor
+const editorTheme = EditorView.theme(
   {
     "&": {
       height: "100%",
       fontSize: "13px",
-      backgroundColor: "#1a1a1a",
+      backgroundColor: "#fafafa",
     },
     ".cm-content": {
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       padding: "8px 0",
-      caretColor: "#facc15",
+      caretColor: "#171717",
     },
     ".cm-cursor, .cm-dropCursor": {
-      borderLeftColor: "#facc15",
+      borderLeftColor: "#171717",
     },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       {
-        backgroundColor: "#facc1530",
+        backgroundColor: "#d4d4d440",
       },
     ".cm-gutters": {
-      backgroundColor: "#0d0d0d",
-      color: "#71717a",
+      backgroundColor: "#f5f5f5",
+      color: "#737373",
       border: "none",
-      borderRight: "1px solid #2a2a2a",
+      borderRight: "1px solid #e5e5e5",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "#1a1a1a",
+      backgroundColor: "#fafafa",
     },
     ".cm-activeLine": {
-      backgroundColor: "#262626",
+      backgroundColor: "#f5f5f5",
     },
     ".cm-line": {
       padding: "0 8px",
     },
     // Syntax highlighting
-    ".cm-keyword": { color: "#f59e0b" },
-    ".cm-string": { color: "#22c55e" },
-    ".cm-number": { color: "#3b82f6" },
-    ".cm-comment": { color: "#71717a", fontStyle: "italic" },
-    ".cm-operator": { color: "#facc15" },
-    ".cm-punctuation": { color: "#a1a1aa" },
-    ".cm-variableName": { color: "#fafafa" },
-    ".cm-typeName": { color: "#8b5cf6" },
-    ".cm-function": { color: "#22c55e" },
+    ".cm-keyword": { color: "#9333ea" },
+    ".cm-string": { color: "#16a34a" },
+    ".cm-number": { color: "#2563eb" },
+    ".cm-comment": { color: "#737373", fontStyle: "italic" },
+    ".cm-operator": { color: "#0ea5e9" },
+    ".cm-punctuation": { color: "#525252" },
+    ".cm-variableName": { color: "#171717" },
+    ".cm-typeName": { color: "#dc2626" },
+    ".cm-function": { color: "#ea580c" },
     // Autocomplete
     ".cm-tooltip": {
-      backgroundColor: "#1a1a1a",
-      border: "1px solid #2a2a2a",
-      borderRadius: "4px",
+      backgroundColor: "#ffffff",
+      border: "1px solid #e5e5e5",
+      borderRadius: "6px",
+      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
     },
     ".cm-tooltip-autocomplete": {
       "& > ul": {
@@ -116,12 +117,12 @@ const clicklensTheme = EditorView.theme(
         fontSize: "12px",
       },
       "& > ul > li[aria-selected]": {
-        backgroundColor: "#facc1520",
-        color: "#fafafa",
+        backgroundColor: "#f5f5f5",
+        color: "#171717",
       },
     },
   },
-  { dark: true }
+  { dark: false }
 );
 
 interface SqlEditorProps {
@@ -188,7 +189,7 @@ export function SqlEditor({
         autocompletion(),
         sql({ dialect: clickhouseDialect }),
         syntaxHighlighting(defaultHighlightStyle),
-        clicklensTheme,
+        editorTheme,
         executeKeymap,
         keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
@@ -248,7 +249,7 @@ export function SqlEditor({
   return (
     <div
       ref={containerRef}
-      className="h-full w-full overflow-hidden rounded-md border border-ch-border"
+      className="h-full w-full overflow-hidden rounded-md border border-border"
     />
   );
 }

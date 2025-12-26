@@ -15,24 +15,20 @@ export default function QueriesPage() {
 
       <div className="flex-1 p-6">
         <div className="max-w-2xl mx-auto text-center py-16">
-          <div className="w-16 h-16 rounded-full bg-ch-yellow/10 flex items-center justify-center mx-auto mb-6">
-            <Activity className="w-8 h-8 text-ch-yellow" />
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <Activity className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-bold text-ch-text mb-4">
-            Query Monitoring
-          </h2>
-          <p className="text-ch-muted mb-8">
+          <h2 className="text-2xl font-bold mb-4">Query Monitoring</h2>
+          <p className="text-muted-foreground mb-8">
             Monitor running queries, view query history, identify slow queries,
             and analyze resource consumption.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-            <Card className="bg-ch-surface border-ch-border">
+            <Card>
               <CardHeader className="pb-2">
-                <Zap className="w-5 h-5 text-ch-yellow mb-2" />
-                <CardTitle className="text-sm text-ch-text">
-                  Running Queries
-                </CardTitle>
+                <Zap className="w-5 h-5 text-primary mb-2" />
+                <CardTitle className="text-sm">Running Queries</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-xs">
@@ -41,12 +37,10 @@ export default function QueriesPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-ch-surface border-ch-border">
+            <Card>
               <CardHeader className="pb-2">
-                <Clock className="w-5 h-5 text-ch-yellow mb-2" />
-                <CardTitle className="text-sm text-ch-text">
-                  Query History
-                </CardTitle>
+                <Clock className="w-5 h-5 text-primary mb-2" />
+                <CardTitle className="text-sm">Query History</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-xs">
@@ -56,12 +50,10 @@ export default function QueriesPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-ch-surface border-ch-border">
+            <Card>
               <CardHeader className="pb-2">
-                <XOctagon className="w-5 h-5 text-ch-yellow mb-2" />
-                <CardTitle className="text-sm text-ch-text">
-                  Kill Queries
-                </CardTitle>
+                <XOctagon className="w-5 h-5 text-primary mb-2" />
+                <CardTitle className="text-sm">Kill Queries</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-xs">
@@ -71,10 +63,10 @@ export default function QueriesPage() {
             </Card>
           </div>
 
-          <p className="text-xs text-ch-muted mt-8 p-4 rounded-lg bg-ch-surface border border-ch-border">
-            🚧 Coming soon in Phase 4 — Use the SQL Console to query{" "}
-            <code className="text-ch-yellow">system.processes</code> and{" "}
-            <code className="text-ch-yellow">system.query_log</code> directly.
+          <p className="text-xs text-muted-foreground mt-8 p-4 rounded-lg bg-muted border">
+            🚧 Coming soon — Use the SQL Console to query{" "}
+            <code className="text-primary">system.processes</code> and{" "}
+            <code className="text-primary">system.query_log</code> directly.
           </p>
         </div>
       </div>
