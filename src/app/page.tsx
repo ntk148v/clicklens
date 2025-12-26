@@ -1,0 +1,126 @@
+import Link from "next/link";
+import { Header } from "@/components/layout";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import {
+  Terminal,
+  Database,
+  Activity,
+  Server,
+  Users,
+  ArrowRight,
+} from "lucide-react";
+
+const features = [
+  {
+    title: "SQL Console",
+    description:
+      "Execute queries with syntax highlighting, auto-completion, and result exploration.",
+    href: "/sql",
+    icon: Terminal,
+  },
+  {
+    title: "Table Explorer",
+    description:
+      "Browse databases, tables, and parts. View compression ratios and column stats.",
+    href: "/tables",
+    icon: Database,
+  },
+  {
+    title: "Query Monitoring",
+    description:
+      "Monitor running queries, view query history, and analyze top resource consumers.",
+    href: "/monitoring/queries",
+    icon: Activity,
+  },
+  {
+    title: "Cluster Health",
+    description:
+      "CPU, memory, merges, mutations, and Keeper status at a glance.",
+    href: "/monitoring/cluster",
+    icon: Server,
+  },
+  {
+    title: "Access Control",
+    description: "View users, roles, and grants. ClickHouse-native RBAC.",
+    href: "/access/users",
+    icon: Users,
+  },
+];
+
+export default function HomePage() {
+  return (
+    <div className="flex flex-col h-full">
+      <Header title="Dashboard" />
+
+      <div className="flex-1 p-6 space-y-8">
+        {/* Hero Section */}
+        <div className="space-y-4">
+          <h2 className="text-3xl font-bold text-ch-text">
+            Welcome to <span className="text-ch-yellow">ClickLens</span>
+          </h2>
+          <p className="text-ch-muted max-w-2xl">
+            A modern, open-source observability and analytics UI for ClickHouse.
+            SQL-native, minimal, and fast. No magic metrics — every chart links
+            back to its underlying SQL.
+          </p>
+        </div>
+
+        {/* Feature Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {features.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <Link key={feature.title} href={feature.href}>
+                <Card className="h-full bg-ch-surface border-ch-border hover:border-ch-yellow/50 transition-colors group cursor-pointer">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-ch-yellow/10 text-ch-yellow">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <CardTitle className="text-ch-text group-hover:text-ch-yellow transition-colors">
+                        {feature.title}
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-ch-muted">
+                      {feature.description}
+                    </CardDescription>
+                    <div className="mt-4 flex items-center text-sm text-ch-yellow opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span>Get started</span>
+                      <ArrowRight className="w-4 h-4 ml-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Quick Info */}
+        <div className="mt-8 p-4 rounded-lg bg-ch-surface border border-ch-border">
+          <h3 className="text-sm font-medium text-ch-text mb-2">
+            Getting Started
+          </h3>
+          <p className="text-sm text-ch-muted">
+            Configure your ClickHouse connection by setting environment
+            variables:
+          </p>
+          <pre className="mt-2 p-3 rounded bg-ch-bg font-mono text-xs text-ch-muted overflow-x-auto">
+            {`CLICKHOUSE_HOST=localhost
+CLICKHOUSE_PORT=8123
+CLICKHOUSE_USER=default
+CLICKHOUSE_PASSWORD=your_password
+CLICKHOUSE_DATABASE=default`}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
