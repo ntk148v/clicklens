@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
+import { useTheme } from "next-themes";
 import {
   EditorView,
   keymap,
@@ -60,7 +61,7 @@ const clickhouseDialect = SQLDialect.define({
 });
 
 // Light theme for SQL editor
-const editorTheme = EditorView.theme(
+const lightTheme = EditorView.theme(
   {
     "&": {
       height: "100%",
@@ -94,7 +95,6 @@ const editorTheme = EditorView.theme(
     ".cm-line": {
       padding: "0 8px",
     },
-    // Syntax highlighting
     ".cm-keyword": { color: "#9333ea" },
     ".cm-string": { color: "#16a34a" },
     ".cm-number": { color: "#2563eb" },
@@ -104,7 +104,6 @@ const editorTheme = EditorView.theme(
     ".cm-variableName": { color: "#171717" },
     ".cm-typeName": { color: "#dc2626" },
     ".cm-function": { color: "#ea580c" },
-    // Autocomplete
     ".cm-tooltip": {
       backgroundColor: "#ffffff",
       border: "1px solid #e5e5e5",
@@ -123,6 +122,72 @@ const editorTheme = EditorView.theme(
     },
   },
   { dark: false }
+);
+
+// Dark theme for SQL editor - ClickHouse inspired (black + yellow)
+const darkTheme = EditorView.theme(
+  {
+    "&": {
+      height: "100%",
+      fontSize: "13px",
+      backgroundColor: "#141414",
+    },
+    ".cm-content": {
+      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      padding: "8px 0",
+      caretColor: "#facc15",
+    },
+    ".cm-cursor, .cm-dropCursor": {
+      borderLeftColor: "#facc15",
+    },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
+      {
+        backgroundColor: "#facc1530",
+      },
+    ".cm-gutters": {
+      backgroundColor: "#0d0d0d",
+      color: "#737373",
+      border: "none",
+      borderRight: "1px solid #2a2a2a",
+    },
+    ".cm-activeLineGutter": {
+      backgroundColor: "#1f1f1f",
+      color: "#a3a3a3",
+    },
+    ".cm-activeLine": {
+      backgroundColor: "#1f1f1f",
+    },
+    ".cm-line": {
+      padding: "0 8px",
+    },
+    // Bright, readable syntax colors for dark theme
+    ".cm-keyword": { color: "#facc15", fontWeight: "500" }, // Yellow - ClickHouse accent
+    ".cm-string": { color: "#4ade80" }, // Green
+    ".cm-number": { color: "#60a5fa" }, // Blue
+    ".cm-comment": { color: "#737373", fontStyle: "italic" },
+    ".cm-operator": { color: "#f472b6" }, // Pink
+    ".cm-punctuation": { color: "#d4d4d4" }, // Light gray
+    ".cm-variableName": { color: "#e2e8f0" }, // Very light gray
+    ".cm-typeName": { color: "#fb923c" }, // Orange
+    ".cm-function": { color: "#a78bfa" }, // Purple
+    ".cm-tooltip": {
+      backgroundColor: "#1f1f1f",
+      border: "1px solid #2a2a2a",
+      borderRadius: "6px",
+      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.3)",
+    },
+    ".cm-tooltip-autocomplete": {
+      "& > ul": {
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: "12px",
+      },
+      "& > ul > li[aria-selected]": {
+        backgroundColor: "#facc1520",
+        color: "#fafafa",
+      },
+    },
+  },
+  { dark: true }
 );
 
 interface SqlEditorProps {
@@ -145,6 +210,8 @@ export function SqlEditor({
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const readOnlyCompartment = useRef(new Compartment());
+  const themeCompartment = useRef(new Compartment());
+  const { resolvedTheme } = useTheme();
 
   // Handle Ctrl+Enter to execute
   const executeKeymap = keymap.of([
@@ -178,6 +245,8 @@ export function SqlEditor({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const isDark = resolvedTheme === "dark";
+
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -189,7 +258,7 @@ export function SqlEditor({
         autocompletion(),
         sql({ dialect: clickhouseDialect }),
         syntaxHighlighting(defaultHighlightStyle),
-        editorTheme,
+        themeCompartment.current.of(isDark ? darkTheme : lightTheme),
         executeKeymap,
         keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
@@ -216,6 +285,19 @@ export function SqlEditor({
     // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Update theme when it changes
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const isDark = resolvedTheme === "dark";
+    editor.dispatch({
+      effects: themeCompartment.current.reconfigure(
+        isDark ? darkTheme : lightTheme
+      ),
+    });
+  }, [resolvedTheme]);
 
   // Update content when value changes externally
   useEffect(() => {

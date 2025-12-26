@@ -21,7 +21,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import { useAuth } from "@/components/auth";
 
@@ -97,7 +104,7 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    ? "bg-sidebar-accent text-primary"
                     : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
@@ -127,64 +134,49 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* User info and logout */}
+        {/* User dropdown and collapse toggle */}
         <div className="p-2 border-t border-sidebar-border space-y-2">
           {user && !isLoading && (
-            <>
-              {!collapsed ? (
-                <div className="px-3 py-2">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <User className="w-3.5 h-3.5" />
-                    <span className="truncate font-medium">
-                      {user.username}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate mt-0.5">
-                    {user.host}:{user.database}
-                  </div>
-                </div>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center justify-center p-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p className="font-medium">{user.username}</p>
-                    <p className="text-xs text-muted-foreground">{user.host}</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-
-              <Separator className="bg-sidebar-border" />
-
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-full h-9 text-muted-foreground hover:text-red-600"
-                      onClick={logout}
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Logout</TooltipContent>
-                </Tooltip>
-              ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-muted-foreground hover:text-red-600"
+                  className={cn(
+                    "w-full justify-start text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
+                    collapsed && "justify-center px-2"
+                  )}
+                >
+                  <User className="w-4 h-4 flex-shrink-0" />
+                  {!collapsed && (
+                    <span className="ml-2 truncate text-sm">
+                      {user.username}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align={collapsed ? "center" : "start"}
+                side="top"
+                className="w-56"
+              >
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user.username}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user.host} / {user.database}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
                   onClick={logout}
+                  className="text-destructive focus:text-destructive cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
-                </Button>
-              )}
-            </>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           {/* Collapse toggle */}

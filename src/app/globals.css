@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ClickLens - Light theme (Vercel/Next.js inspired) */
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -50,7 +48,7 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-/* Light theme (default) - Vercel/Next.js inspired */
+/* Light theme (default) - Clean and minimal */
 :root {
   --radius: 0.5rem;
 
@@ -91,39 +89,43 @@
   --sidebar-ring: #171717;
 }
 
-/* Dark theme */
+/* Dark theme - ClickHouse inspired (black + yellow) */
 .dark {
-  --background: #0a0a0a;
+  --background: #0d0d0d;
   --foreground: #fafafa;
-  --card: #0a0a0a;
+  --card: #141414;
   --card-foreground: #fafafa;
-  --popover: #0a0a0a;
+  --popover: #141414;
   --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #171717;
-  --secondary: #262626;
+  --primary: #facc15;
+  --primary-foreground: #0d0d0d;
+  --secondary: #1f1f1f;
   --secondary-foreground: #fafafa;
-  --muted: #262626;
+  --muted: #1f1f1f;
   --muted-foreground: #a3a3a3;
-  --accent: #262626;
+  --accent: #1f1f1f;
   --accent-foreground: #fafafa;
-  --destructive: #7f1d1d;
-  --border: #262626;
-  --input: #262626;
-  --ring: #d4d4d4;
-  --chart-1: #2662d9;
-  --chart-2: #2eb88a;
-  --chart-3: #e88c30;
-  --chart-4: #af57db;
-  --chart-5: #e23670;
-  --sidebar: #0a0a0a;
+  --destructive: #dc2626;
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #facc15;
+
+  /* Chart colors */
+  --chart-1: #facc15;
+  --chart-2: #22c55e;
+  --chart-3: #3b82f6;
+  --chart-4: #a855f7;
+  --chart-5: #ec4899;
+
+  /* Sidebar */
+  --sidebar: #0d0d0d;
   --sidebar-foreground: #fafafa;
-  --sidebar-primary: #fafafa;
-  --sidebar-primary-foreground: #171717;
-  --sidebar-accent: #262626;
+  --sidebar-primary: #facc15;
+  --sidebar-primary-foreground: #0d0d0d;
+  --sidebar-accent: #1f1f1f;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #262626;
-  --sidebar-ring: #d4d4d4;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #facc15;
 }
 
 @layer base {

@@ -1,6 +1,7 @@
 "use client";
 
 import { ConnectionStatus } from "./ConnectionStatus";
+import { ThemeToggle } from "@/components/theme";
 
 interface HeaderProps {
   title?: string;
@@ -16,7 +17,8 @@ export function Header({ title, children }: HeaderProps) {
         )}
         {children}
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
         <ConnectionStatus />
       </div>
     </header>
