@@ -39,45 +39,54 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
 
     const client = createClientWithConfig(config);
 
-    // Get databases where user has actual access
-    // First check if user has global access (SELECT on all databases)
-    const globalCheck = await client.query(`
-      SELECT count() as cnt FROM system.grants 
-      WHERE user_name = currentUser() 
-      AND (database IS NULL OR database = '*')
-      AND access_type IN ('SELECT', 'ALL')
-    `);
-
-    const globalData = globalCheck.data as unknown as Array<{ cnt: string }>;
-    const hasGlobalAccess = globalData[0]?.cnt !== "0";
-
-    let result;
-    if (hasGlobalAccess) {
-      // User has global access, show all databases
-      result = await client.query(
-        `SELECT name FROM system.databases ORDER BY name`
-      );
-    } else {
-      // Get specific databases from grants + always include default
-      result = await client.query(`
-        SELECT DISTINCT name FROM (
-          SELECT database as name FROM system.grants 
-          WHERE user_name = currentUser() 
-          AND database IS NOT NULL 
-          AND database != '*'
-          AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-          UNION ALL
-          SELECT 'default' as name
-        ) 
-        WHERE name IN (SELECT name FROM system.databases)
-        ORDER BY name
+    try {
+      // Try to get databases from system tables
+      // This requires access to system database
+      const globalCheck = await client.query(`
+        SELECT count() as cnt FROM system.grants 
+        WHERE user_name = currentUser() 
+        AND (database IS NULL OR database = '*')
+        AND access_type IN ('SELECT', 'ALL')
       `);
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: result.data as unknown as Array<{ name: string }>,
-    });
+      const globalData = globalCheck.data as unknown as Array<{ cnt: string }>;
+      const hasGlobalAccess = globalData[0]?.cnt !== "0";
+
+      let result;
+      if (hasGlobalAccess) {
+        // User has global access, show all databases
+        result = await client.query(
+          `SELECT name FROM system.databases ORDER BY name`
+        );
+      } else {
+        // Get specific databases from grants + always include default
+        result = await client.query(`
+          SELECT DISTINCT name FROM (
+            SELECT database as name FROM system.grants 
+            WHERE user_name = currentUser() 
+            AND database IS NOT NULL 
+            AND database != '*'
+            AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+            UNION ALL
+            SELECT 'default' as name
+          ) 
+          WHERE name IN (SELECT name FROM system.databases)
+          ORDER BY name
+        `);
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: result.data as unknown as Array<{ name: string }>,
+      });
+    } catch {
+      // If system queries fail (no system access), return just default database
+      // The user can type database names manually in queries
+      return NextResponse.json({
+        success: true,
+        data: [{ name: "default" }],
+      });
+    }
   } catch (error) {
     console.error("Databases fetch error:", error);
 
