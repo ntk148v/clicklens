@@ -39,17 +39,14 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
 
     const client = createClientWithConfig(config);
 
-    // Get databases, excluding system databases
-    const result = await client.query(`
-      SELECT name 
-      FROM system.databases 
-      WHERE name NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
-      ORDER BY name
-    `);
+    // Get all databases the user can access
+    const result = await client.query(
+      `SELECT name FROM system.databases ORDER BY name`
+    );
 
     return NextResponse.json({
       success: true,
-      data: result.data as Array<{ name: string }>,
+      data: result.data as unknown as Array<{ name: string }>,
     });
   } catch (error) {
     console.error("Databases fetch error:", error);
