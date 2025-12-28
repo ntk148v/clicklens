@@ -52,8 +52,10 @@ import {
   Loader2,
   Plus,
   Trash2,
+  UserPlus,
+  X,
 } from "lucide-react";
-import type { SystemRole } from "@/lib/clickhouse";
+import type { SystemRole, SystemUser } from "@/lib/clickhouse";
 import Link from "next/link";
 
 interface RoleGrant {
@@ -66,6 +68,7 @@ interface RoleGrant {
 export default function RolesPage() {
   const [roles, setRoles] = useState<SystemRole[]>([]);
   const [roleGrants, setRoleGrants] = useState<RoleGrant[]>([]);
+  const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,17 +81,29 @@ export default function RolesPage() {
   // Delete role
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // Assign role dialog
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assigningRole, setAssigningRole] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState("");
+
+  // Revoke role
+  const [revoking, setRevoking] = useState<string | null>(null);
+
   const fetchRoles = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [rolesRes, grantsRes] = await Promise.all([
+      const [rolesRes, grantsRes, usersRes] = await Promise.all([
         fetch("/api/clickhouse/access/roles"),
         fetch("/api/clickhouse/access/role-grants"),
+        fetch("/api/clickhouse/access/users"),
       ]);
 
       const rolesData = await rolesRes.json();
       const grantsData = await grantsRes.json();
+      const usersData = await usersRes.json();
 
       if (rolesData.success) {
         setRoles(rolesData.data || []);
@@ -99,6 +114,10 @@ export default function RolesPage() {
 
       if (grantsData.success) {
         setRoleGrants(grantsData.data || []);
+      }
+
+      if (usersData.success) {
+        setUsers(usersData.data || []);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
@@ -166,6 +185,81 @@ export default function RolesPage() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const handleAssignRole = async () => {
+    if (!assigningRole || !selectedUser) {
+      setAssignError("Please select a user");
+      return;
+    }
+
+    setAssigning(true);
+    setAssignError(null);
+
+    try {
+      const response = await fetch("/api/clickhouse/access/role-grants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roleName: assigningRole,
+          granteeType: "user",
+          granteeName: selectedUser,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setAssignOpen(false);
+        setAssigningRole(null);
+        setSelectedUser("");
+        fetchRoles();
+      } else {
+        setAssignError(data.error || "Failed to assign role");
+      }
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleRevokeRole = async (
+    roleName: string,
+    userName: string
+  ) => {
+    setRevoking(`${roleName}-${userName}`);
+
+    try {
+      const response = await fetch("/api/clickhouse/access/role-grants", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roleName,
+          granteeType: "user",
+          granteeName: userName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchRoles();
+      } else {
+        setError(data.error || "Failed to revoke role");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setRevoking(null);
+    }
+  };
+
+  const openAssignDialog = (roleName: string) => {
+    setAssigningRole(roleName);
+    setSelectedUser("");
+    setAssignError(null);
+    setAssignOpen(true);
   };
 
   const getRoleAssignees = (roleName: string) => {
@@ -325,32 +419,58 @@ export default function RolesPage() {
                             {role.storage}
                           </TableCell>
                           <TableCell>
-                            {assignees.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {assignees.slice(0, 3).map((a, i) => (
-                                  <Badge
-                                    key={i}
-                                    variant={
-                                      a.type === "user"
-                                        ? "default"
-                                        : "secondary"
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {a.type === "user" ? "👤" : "🛡️"} {a.name}
-                                  </Badge>
-                                ))}
-                                {assignees.length > 3 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{assignees.length - 3}
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                Not assigned
-                              </span>
-                            )}
+                            <div className="flex flex-wrap items-center gap-1">
+                              {assignees.length > 0 ? (
+                                <>
+                                  {assignees.slice(0, 3).map((a, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant={
+                                        a.type === "user"
+                                          ? "default"
+                                          : "secondary"
+                                      }
+                                      className="text-xs group cursor-pointer hover:bg-destructive/80"
+                                      onClick={() =>
+                                        a.type === "user" &&
+                                        a.name &&
+                                        handleRevokeRole(role.name, a.name)
+                                      }
+                                      title={a.type === "user" ? "Click to revoke" : undefined}
+                                    >
+                                      {revoking === `${role.name}-${a.name}` ? (
+                                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                      ) : (
+                                        <>
+                                          {a.type === "user" ? "👤" : "🛡️"} {a.name}
+                                          {a.type === "user" && (
+                                            <X className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100" />
+                                          )}
+                                        </>
+                                      )}
+                                    </Badge>
+                                  ))}
+                                  {assignees.length > 3 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{assignees.length - 3}
+                                    </Badge>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">
+                                  Not assigned
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 ml-1"
+                                onClick={() => openAssignDialog(role.name)}
+                                title="Assign to user"
+                              >
+                                <UserPlus className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <AlertDialog>
@@ -398,6 +518,60 @@ export default function RolesPage() {
                 </Table>
               </ScrollArea>
             </Card>
+
+            {/* Assign Role Dialog */}
+            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Assign Role to User</DialogTitle>
+                  <DialogDescription>
+                    Grant role <strong>{assigningRole}</strong> to a user.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  {assignError && (
+                    <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {assignError}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="assignUser">Select User *</Label>
+                    <select
+                      id="assignUser"
+                      value={selectedUser}
+                      onChange={(e) => setSelectedUser(e.target.value)}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                    >
+                      <option value="">Choose a user...</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.name}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setAssignOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAssignRole} disabled={assigning}>
+                    {assigning ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        Assigning...
+                      </>
+                    ) : (
+                      "Assign Role"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>
