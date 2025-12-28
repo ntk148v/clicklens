@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout";
 import {
   Table,
@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -53,9 +52,12 @@ import {
   Plus,
   Trash2,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { SystemGrant } from "@/lib/clickhouse";
 import Link from "next/link";
+import { useAccessStore } from "@/lib/store/access";
 
 // Common access types in ClickHouse
 const ACCESS_TYPES = [
@@ -72,11 +74,14 @@ const ACCESS_TYPES = [
   "ALL",
 ];
 
+const PAGE_SIZE = 25;
+
 export default function GrantsPage() {
-  const [grants, setGrants] = useState<SystemGrant[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { grants, loading, error, fetchAll, refresh, invalidate } =
+    useAccessStore();
+
   const [filter, setFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Grant dialog
   const [grantOpen, setGrantOpen] = useState(false);
@@ -93,38 +98,50 @@ export default function GrantsPage() {
   // Revoke
   const [revoking, setRevoking] = useState<number | null>(null);
 
-  const fetchGrants = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/clickhouse/access/grants");
-      const data = await response.json();
-      if (data.success) {
-        setGrants(data.data || []);
-      } else {
-        setError(data.error || "Failed to fetch grants");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  // Filtered grants
+  const filteredGrants = useMemo(() => {
+    if (!filter) return grants;
+    const searchLower = filter.toLowerCase();
+    return grants.filter(
+      (grant) =>
+        grant.user_name?.toLowerCase().includes(searchLower) ||
+        grant.role_name?.toLowerCase().includes(searchLower) ||
+        grant.access_type.toLowerCase().includes(searchLower) ||
+        grant.database?.toLowerCase().includes(searchLower) ||
+        grant.table?.toLowerCase().includes(searchLower)
+    );
+  }, [grants, filter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredGrants.length / PAGE_SIZE);
+  const paginatedGrants = useMemo(() => {
+    const start = currentPage * PAGE_SIZE;
+    return filteredGrants.slice(start, start + PAGE_SIZE);
+  }, [filteredGrants, currentPage]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [filter]);
 
   useEffect(() => {
-    fetchGrants();
-  }, []);
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(totalPages - 1);
+    }
+  }, [filteredGrants.length, totalPages, currentPage]);
 
   const handleGrant = async () => {
     setGrantError(null);
-
     if (!newGrant.granteeName.trim()) {
       setGrantError("Grantee name is required");
       return;
     }
 
     setGranting(true);
-
     try {
       const response = await fetch("/api/clickhouse/access/grants", {
         method: "POST",
@@ -137,9 +154,7 @@ export default function GrantsPage() {
           granteeName: newGrant.granteeName.trim(),
         }),
       });
-
       const data = await response.json();
-
       if (data.success) {
         setGrantOpen(false);
         setNewGrant({
@@ -149,7 +164,8 @@ export default function GrantsPage() {
           granteeType: "user",
           granteeName: "",
         });
-        fetchGrants();
+        invalidate();
+        fetchAll();
       } else {
         setGrantError(data.error || "Failed to grant permission");
       }
@@ -162,7 +178,6 @@ export default function GrantsPage() {
 
   const handleRevoke = async (grant: SystemGrant, index: number) => {
     setRevoking(index);
-
     try {
       const response = await fetch("/api/clickhouse/access/grants", {
         method: "DELETE",
@@ -175,32 +190,17 @@ export default function GrantsPage() {
           granteeName: grant.user_name || grant.role_name,
         }),
       });
-
       const data = await response.json();
-
       if (data.success) {
-        fetchGrants();
-      } else {
-        setError(data.error || "Failed to revoke permission");
+        invalidate();
+        fetchAll();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      console.error("Revoke failed:", err);
     } finally {
       setRevoking(null);
     }
   };
-
-  const filteredGrants = grants.filter((grant) => {
-    if (!filter) return true;
-    const searchLower = filter.toLowerCase();
-    return (
-      grant.user_name?.toLowerCase().includes(searchLower) ||
-      grant.role_name?.toLowerCase().includes(searchLower) ||
-      grant.access_type.toLowerCase().includes(searchLower) ||
-      grant.database?.toLowerCase().includes(searchLower) ||
-      grant.table?.toLowerCase().includes(searchLower)
-    );
-  });
 
   return (
     <div className="flex flex-col h-full">
@@ -230,7 +230,7 @@ export default function GrantsPage() {
       </Header>
 
       <div className="flex-1 p-6">
-        {loading ? (
+        {loading && grants.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -252,8 +252,7 @@ export default function GrantsPage() {
               <div>
                 <h2 className="text-xl font-semibold">Grants</h2>
                 <p className="text-sm text-muted-foreground">
-                  {grants.length} permission grant
-                  {grants.length !== 1 ? "s" : ""}
+                  {grants.length} permission grant{grants.length !== 1 ? "s" : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -288,16 +287,12 @@ export default function GrantsPage() {
                           {grantError}
                         </div>
                       )}
-
                       <div className="space-y-2">
                         <Label>Access Type *</Label>
                         <select
                           value={newGrant.accessType}
                           onChange={(e) =>
-                            setNewGrant({
-                              ...newGrant,
-                              accessType: e.target.value,
-                            })
+                            setNewGrant({ ...newGrant, accessType: e.target.value })
                           }
                           className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
                         >
@@ -308,7 +303,6 @@ export default function GrantsPage() {
                           ))}
                         </select>
                       </div>
-
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label htmlFor="database">Database</Label>
@@ -317,10 +311,7 @@ export default function GrantsPage() {
                             placeholder="* (all)"
                             value={newGrant.database}
                             onChange={(e) =>
-                              setNewGrant({
-                                ...newGrant,
-                                database: e.target.value,
-                              })
+                              setNewGrant({ ...newGrant, database: e.target.value })
                             }
                           />
                         </div>
@@ -331,15 +322,11 @@ export default function GrantsPage() {
                             placeholder="* (all)"
                             value={newGrant.table}
                             onChange={(e) =>
-                              setNewGrant({
-                                ...newGrant,
-                                table: e.target.value,
-                              })
+                              setNewGrant({ ...newGrant, table: e.target.value })
                             }
                           />
                         </div>
                       </div>
-
                       <div className="space-y-2">
                         <Label>Grantee Type</Label>
                         <div className="flex gap-4">
@@ -349,10 +336,7 @@ export default function GrantsPage() {
                               name="granteeType"
                               checked={newGrant.granteeType === "user"}
                               onChange={() =>
-                                setNewGrant({
-                                  ...newGrant,
-                                  granteeType: "user",
-                                })
+                                setNewGrant({ ...newGrant, granteeType: "user" })
                               }
                               className="accent-primary"
                             />
@@ -364,10 +348,7 @@ export default function GrantsPage() {
                               name="granteeType"
                               checked={newGrant.granteeType === "role"}
                               onChange={() =>
-                                setNewGrant({
-                                  ...newGrant,
-                                  granteeType: "role",
-                                })
+                                setNewGrant({ ...newGrant, granteeType: "role" })
                               }
                               className="accent-primary"
                             />
@@ -375,36 +356,24 @@ export default function GrantsPage() {
                           </label>
                         </div>
                       </div>
-
                       <div className="space-y-2">
                         <Label htmlFor="granteeName">
-                          {newGrant.granteeType === "user"
-                            ? "Username"
-                            : "Role Name"}{" "}
-                          *
+                          {newGrant.granteeType === "user" ? "Username" : "Role Name"} *
                         </Label>
                         <Input
                           id="granteeName"
                           placeholder={
-                            newGrant.granteeType === "user"
-                              ? "e.g. analyst"
-                              : "e.g. read_only"
+                            newGrant.granteeType === "user" ? "e.g. analyst" : "e.g. read_only"
                           }
                           value={newGrant.granteeName}
                           onChange={(e) =>
-                            setNewGrant({
-                              ...newGrant,
-                              granteeName: e.target.value,
-                            })
+                            setNewGrant({ ...newGrant, granteeName: e.target.value })
                           }
                         />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setGrantOpen(false)}
-                      >
+                      <Button variant="outline" onClick={() => setGrantOpen(false)}>
                         Cancel
                       </Button>
                       <Button onClick={handleGrant} disabled={granting}>
@@ -421,22 +390,15 @@ export default function GrantsPage() {
                   </DialogContent>
                 </Dialog>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchGrants}
-                  disabled={loading}
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`}
-                  />
+                <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+                  <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />
                   Refresh
                 </Button>
               </div>
             </div>
 
             <Card>
-              <ScrollArea className="h-[calc(100vh-320px)]">
+              <ScrollArea className="h-[calc(100vh-360px)]">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
                     <TableRow>
@@ -448,7 +410,7 @@ export default function GrantsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredGrants.map((grant, index) => (
+                    {paginatedGrants.map((grant, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           {grant.user_name ? (
@@ -465,11 +427,7 @@ export default function GrantsPage() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={
-                              grant.is_partial_revoke
-                                ? "destructive"
-                                : "outline"
-                            }
+                            variant={grant.is_partial_revoke ? "destructive" : "outline"}
                             className="text-xs font-mono"
                           >
                             {grant.is_partial_revoke && "¬ "}
@@ -482,9 +440,7 @@ export default function GrantsPage() {
                               {grant.database}
                             </code>
                           ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              *
-                            </Badge>
+                            <Badge variant="secondary" className="text-xs">*</Badge>
                           )}
                         </TableCell>
                         <TableCell>
@@ -493,9 +449,7 @@ export default function GrantsPage() {
                               {grant.table}
                             </code>
                           ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              *
-                            </Badge>
+                            <Badge variant="secondary" className="text-xs">*</Badge>
                           )}
                         </TableCell>
                         <TableCell>
@@ -516,16 +470,10 @@ export default function GrantsPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Revoke Permission
-                                </AlertDialogTitle>
+                                <AlertDialogTitle>Revoke Permission</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Revoke <strong>{grant.access_type}</strong>{" "}
-                                  from{" "}
-                                  <strong>
-                                    {grant.user_name || grant.role_name}
-                                  </strong>
-                                  ?
+                                  Revoke <strong>{grant.access_type}</strong> from{" "}
+                                  <strong>{grant.user_name || grant.role_name}</strong>?
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -545,11 +493,41 @@ export default function GrantsPage() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
+                  <span className="text-muted-foreground">
+                    Page {currentPage + 1} of {totalPages}
+                    {filter && ` (${filteredGrants.length} filtered)`}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                      disabled={currentPage === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={currentPage >= totalPages - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
 
-            {filteredGrants.length === 0 && filter && (
+            {paginatedGrants.length === 0 && filter && (
               <div className="text-center py-8 text-muted-foreground">
-                No grants match "{filter}"
+                No grants match &quot;{filter}&quot;
               </div>
             )}
           </div>

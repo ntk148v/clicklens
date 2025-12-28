@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout";
 import {
   Table,
@@ -53,14 +53,20 @@ import {
   User,
   Plus,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import type { SystemUser } from "@/lib/clickhouse";
 import Link from "next/link";
+import { useAccessStore } from "@/lib/store/access";
+
+const PAGE_SIZE = 25;
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<SystemUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { users, loading, error, fetchAll, refresh, invalidate } =
+    useAccessStore();
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Create user dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -76,27 +82,24 @@ export default function UsersPage() {
   // Delete user
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/clickhouse/access/users");
-      const data = await response.json();
-      if (data.success) {
-        setUsers(data.data || []);
-      } else {
-        setError(data.error || "Failed to fetch users");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch data on mount
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchAll();
+  }, [fetchAll]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(users.length / PAGE_SIZE);
+  const paginatedUsers = useMemo(() => {
+    const start = currentPage * PAGE_SIZE;
+    return users.slice(start, start + PAGE_SIZE);
+  }, [users, currentPage]);
+
+  // Reset to first page when users change
+  useEffect(() => {
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(totalPages - 1);
+    }
+  }, [users.length, totalPages, currentPage]);
 
   const handleCreateUser = async () => {
     setCreateError(null);
@@ -135,7 +138,8 @@ export default function UsersPage() {
           confirmPassword: "",
           defaultDatabase: "",
         });
-        fetchUsers();
+        invalidate();
+        fetchAll();
       } else {
         setCreateError(data.error || "Failed to create user");
       }
@@ -159,12 +163,11 @@ export default function UsersPage() {
       const data = await response.json();
 
       if (data.success) {
-        fetchUsers();
-      } else {
-        setError(data.error || "Failed to delete user");
+        invalidate();
+        fetchAll();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      console.error("Delete failed:", err);
     } finally {
       setDeleting(null);
     }
@@ -198,7 +201,7 @@ export default function UsersPage() {
       </Header>
 
       <div className="flex-1 p-6">
-        {loading ? (
+        {loading && users.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -334,7 +337,7 @@ export default function UsersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={fetchUsers}
+                  onClick={refresh}
                   disabled={loading}
                 >
                   <RefreshCw
@@ -346,7 +349,7 @@ export default function UsersPage() {
             </div>
 
             <Card>
-              <ScrollArea className="h-[calc(100vh-280px)]">
+              <ScrollArea className="h-[calc(100vh-320px)]">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
                     <TableRow>
@@ -359,7 +362,7 @@ export default function UsersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {paginatedUsers.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -458,6 +461,37 @@ export default function UsersPage() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
+                  <span className="text-muted-foreground">
+                    Page {currentPage + 1} of {totalPages}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                      disabled={currentPage === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
+                      }
+                      disabled={currentPage >= totalPages - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         )}

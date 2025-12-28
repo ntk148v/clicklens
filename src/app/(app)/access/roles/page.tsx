@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout";
 import {
   Table,
@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -54,23 +53,20 @@ import {
   Trash2,
   UserPlus,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import type { SystemRole, SystemUser } from "@/lib/clickhouse";
 import Link from "next/link";
+import { useAccessStore } from "@/lib/store/access";
 
-interface RoleGrant {
-  user_name: string | null;
-  role_name: string | null;
-  granted_role_name: string;
-  with_admin_option: boolean;
-}
+const PAGE_SIZE = 25;
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<SystemRole[]>([]);
-  const [roleGrants, setRoleGrants] = useState<RoleGrant[]>([]);
-  const [users, setUsers] = useState<SystemUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { roles, roleGrants, users, loading, error, fetchAll, refresh, invalidate } =
+    useAccessStore();
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Create role dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -91,68 +87,43 @@ export default function RolesPage() {
   // Revoke role
   const [revoking, setRevoking] = useState<string | null>(null);
 
-  const fetchRoles = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [rolesRes, grantsRes, usersRes] = await Promise.all([
-        fetch("/api/clickhouse/access/roles"),
-        fetch("/api/clickhouse/access/role-grants"),
-        fetch("/api/clickhouse/access/users"),
-      ]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
-      const rolesData = await rolesRes.json();
-      const grantsData = await grantsRes.json();
-      const usersData = await usersRes.json();
-
-      if (rolesData.success) {
-        setRoles(rolesData.data || []);
-      } else {
-        setError(rolesData.error || "Failed to fetch roles");
-        return;
-      }
-
-      if (grantsData.success) {
-        setRoleGrants(grantsData.data || []);
-      }
-
-      if (usersData.success) {
-        setUsers(usersData.data || []);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Pagination
+  const totalPages = Math.ceil(roles.length / PAGE_SIZE);
+  const paginatedRoles = useMemo(() => {
+    const start = currentPage * PAGE_SIZE;
+    return roles.slice(start, start + PAGE_SIZE);
+  }, [roles, currentPage]);
 
   useEffect(() => {
-    fetchRoles();
-  }, []);
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(totalPages - 1);
+    }
+  }, [roles.length, totalPages, currentPage]);
 
   const handleCreateRole = async () => {
     setCreateError(null);
-
     if (!newRoleName.trim()) {
       setCreateError("Role name is required");
       return;
     }
 
     setCreating(true);
-
     try {
       const response = await fetch("/api/clickhouse/access/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newRoleName.trim() }),
       });
-
       const data = await response.json();
-
       if (data.success) {
         setCreateOpen(false);
         setNewRoleName("");
-        fetchRoles();
+        invalidate();
+        fetchAll();
       } else {
         setCreateError(data.error || "Failed to create role");
       }
@@ -165,23 +136,19 @@ export default function RolesPage() {
 
   const handleDeleteRole = async (roleName: string) => {
     setDeleting(roleName);
-
     try {
       const response = await fetch("/api/clickhouse/access/roles", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: roleName }),
       });
-
       const data = await response.json();
-
       if (data.success) {
-        fetchRoles();
-      } else {
-        setError(data.error || "Failed to delete role");
+        invalidate();
+        fetchAll();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      console.error("Delete failed:", err);
     } finally {
       setDeleting(null);
     }
@@ -206,14 +173,13 @@ export default function RolesPage() {
           granteeName: selectedUser,
         }),
       });
-
       const data = await response.json();
-
       if (data.success) {
         setAssignOpen(false);
         setAssigningRole(null);
         setSelectedUser("");
-        fetchRoles();
+        invalidate();
+        fetchAll();
       } else {
         setAssignError(data.error || "Failed to assign role");
       }
@@ -224,12 +190,8 @@ export default function RolesPage() {
     }
   };
 
-  const handleRevokeRole = async (
-    roleName: string,
-    userName: string
-  ) => {
+  const handleRevokeRole = async (roleName: string, userName: string) => {
     setRevoking(`${roleName}-${userName}`);
-
     try {
       const response = await fetch("/api/clickhouse/access/role-grants", {
         method: "DELETE",
@@ -240,16 +202,13 @@ export default function RolesPage() {
           granteeName: userName,
         }),
       });
-
       const data = await response.json();
-
       if (data.success) {
-        fetchRoles();
-      } else {
-        setError(data.error || "Failed to revoke role");
+        invalidate();
+        fetchAll();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      console.error("Revoke failed:", err);
     } finally {
       setRevoking(null);
     }
@@ -300,7 +259,7 @@ export default function RolesPage() {
       </Header>
 
       <div className="flex-1 p-6">
-        {loading ? (
+        {loading && roles.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -337,8 +296,7 @@ export default function RolesPage() {
                     <DialogHeader>
                       <DialogTitle>Create Role</DialogTitle>
                       <DialogDescription>
-                        Create a new role. You can assign permissions after
-                        creating.
+                        Create a new role. You can assign permissions after creating.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -359,10 +317,7 @@ export default function RolesPage() {
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setCreateOpen(false)}
-                      >
+                      <Button variant="outline" onClick={() => setCreateOpen(false)}>
                         Cancel
                       </Button>
                       <Button onClick={handleCreateRole} disabled={creating}>
@@ -379,22 +334,15 @@ export default function RolesPage() {
                   </DialogContent>
                 </Dialog>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchRoles}
-                  disabled={loading}
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`}
-                  />
+                <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+                  <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />
                   Refresh
                 </Button>
               </div>
             </div>
 
             <Card>
-              <ScrollArea className="h-[calc(100vh-280px)]">
+              <ScrollArea className="h-[calc(100vh-320px)]">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
                     <TableRow>
@@ -405,7 +353,7 @@ export default function RolesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {roles.map((role) => {
+                    {paginatedRoles.map((role) => {
                       const assignees = getRoleAssignees(role.name);
                       return (
                         <TableRow key={role.id}>
@@ -425,16 +373,10 @@ export default function RolesPage() {
                                   {assignees.slice(0, 3).map((a, i) => (
                                     <Badge
                                       key={i}
-                                      variant={
-                                        a.type === "user"
-                                          ? "default"
-                                          : "secondary"
-                                      }
+                                      variant={a.type === "user" ? "default" : "secondary"}
                                       className="text-xs group cursor-pointer hover:bg-destructive/80"
                                       onClick={() =>
-                                        a.type === "user" &&
-                                        a.name &&
-                                        handleRevokeRole(role.name, a.name)
+                                        a.type === "user" && a.name && handleRevokeRole(role.name, a.name)
                                       }
                                       title={a.type === "user" ? "Click to revoke" : undefined}
                                     >
@@ -457,9 +399,7 @@ export default function RolesPage() {
                                   )}
                                 </>
                               ) : (
-                                <span className="text-muted-foreground text-xs">
-                                  Not assigned
-                                </span>
+                                <span className="text-muted-foreground text-xs">Not assigned</span>
                               )}
                               <Button
                                 variant="ghost"
@@ -490,13 +430,10 @@ export default function RolesPage() {
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Delete Role
-                                  </AlertDialogTitle>
+                                  <AlertDialogTitle>Delete Role</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to delete role{" "}
-                                    <strong>{role.name}</strong>? This will
-                                    remove it from all users.
+                                    Are you sure you want to delete role <strong>{role.name}</strong>?
+                                    This will remove it from all users.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -517,6 +454,35 @@ export default function RolesPage() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
+                  <span className="text-muted-foreground">
+                    Page {currentPage + 1} of {totalPages}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                      disabled={currentPage === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={currentPage >= totalPages - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
 
             {/* Assign Role Dialog */}
@@ -553,10 +519,7 @@ export default function RolesPage() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setAssignOpen(false)}
-                  >
+                  <Button variant="outline" onClick={() => setAssignOpen(false)}>
                     Cancel
                   </Button>
                   <Button onClick={handleAssignRole} disabled={assigning}>
