@@ -62,13 +62,22 @@ const navigation = [
     href: "/access/users",
     icon: Users,
     description: "Users, roles, and grants",
+    permission: "canViewAccess", // Add permission requirement
   },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, permissions } = useAuth(); // Get permissions
+
+  // Filter navigation based on permissions
+  const filteredNavigation = navigation.filter((item) => {
+    if (item.permission === "canViewAccess") {
+      return permissions.canViewAccess;
+    }
+    return true;
+  });
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -94,7 +103,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-1">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
 
@@ -162,9 +171,6 @@ export function Sidebar() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium">{user.username}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {user.host} / {user.database}
-                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

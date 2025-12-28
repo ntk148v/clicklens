@@ -11,13 +11,16 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
-  host: string;
   username: string;
-  database: string;
+}
+
+interface UserPermissions {
+  canViewAccess: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
+  permissions: UserPermissions;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (
@@ -28,13 +31,13 @@ interface AuthContextType {
 }
 
 interface LoginCredentials {
-  host: string;
-  port: number;
   username: string;
   password: string;
-  database?: string;
-  protocol?: "http" | "https";
 }
+
+const defaultPermissions: UserPermissions = {
+  canViewAccess: false,
+};
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -52,6 +55,8 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [permissions, setPermissions] =
+    useState<UserPermissions>(defaultPermissions);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -63,12 +68,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (data.isLoggedIn && data.user) {
         setUser(data.user);
+        if (data.permissions) {
+          setPermissions(data.permissions);
+        } else {
+          setPermissions(defaultPermissions);
+        }
       } else {
         setUser(null);
+        setPermissions(defaultPermissions);
       }
     } catch (error) {
       console.error("Failed to fetch session:", error);
       setUser(null);
+      setPermissions(defaultPermissions);
     } finally {
       setIsLoading(false);
     }
@@ -117,6 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       setUser(null);
+      setPermissions(defaultPermissions);
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -127,6 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider
       value={{
         user,
+        permissions,
         isLoading,
         isAuthenticated: !!user,
         login,
