@@ -466,9 +466,9 @@ export default function UsersPage() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
                   <span className="text-muted-foreground">
-                    Page {currentPage + 1} of {totalPages}
+                    {users.length} users
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="icon"
@@ -478,6 +478,22 @@ export default function UsersPage() {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={currentPage + 1}
+                        onChange={(e) => {
+                          const page = parseInt(e.target.value, 10);
+                          if (page >= 1 && page <= totalPages) {
+                            setCurrentPage(page - 1);
+                          }
+                        }}
+                        className="w-14 h-8 text-center text-sm"
+                      />
+                      <span className="text-muted-foreground">of {totalPages}</span>
+                    </div>
                     <Button
                       variant="outline"
                       size="icon"
