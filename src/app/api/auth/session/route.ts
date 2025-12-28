@@ -9,25 +9,21 @@ import { getSession } from "@/lib/auth";
 export interface SessionResponse {
   isLoggedIn: boolean;
   user?: {
-    host: string;
     username: string;
-    database: string;
   };
 }
 
 export async function GET(): Promise<NextResponse<SessionResponse>> {
   const session = await getSession();
 
-  if (!session.isLoggedIn || !session.clickhouse) {
+  if (!session.isLoggedIn || !session.user) {
     return NextResponse.json({ isLoggedIn: false });
   }
 
   return NextResponse.json({
     isLoggedIn: true,
     user: {
-      host: session.clickhouse.host,
-      username: session.clickhouse.username,
-      database: session.clickhouse.database,
+      username: session.user.username,
     },
   });
 }

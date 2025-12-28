@@ -1,19 +1,18 @@
 /**
  * Session configuration for iron-session
- * Used for storing ClickHouse credentials securely
+ *
+ * Session stores only user credentials (username/password)
+ * Connection details (host, port, protocol) come from environment
  */
 
 import { SessionOptions } from "iron-session";
 
 export interface SessionData {
   isLoggedIn: boolean;
-  clickhouse?: {
-    host: string;
-    port: number;
+  // User credentials only - connection info from env
+  user?: {
     username: string;
     password: string;
-    database: string;
-    protocol: "http" | "https";
   };
 }
 

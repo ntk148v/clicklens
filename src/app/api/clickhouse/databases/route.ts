@@ -1,11 +1,18 @@
 /**
  * API route for listing accessible databases
  * GET /api/clickhouse/databases
+ *
+ * Uses LENS_USER (service account) to query system.grants
+ * and filter databases by current user's permissions.
  */
 
 import { NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { getSession } from "@/lib/auth";
+import {
+  createClientWithConfig,
+  getLensConfig,
+  isLensUserConfigured,
+} from "@/lib/clickhouse";
 
 interface DatabasesResponse {
   success: boolean;
@@ -20,9 +27,9 @@ interface DatabasesResponse {
 
 export async function GET(): Promise<NextResponse<DatabasesResponse>> {
   try {
-    const config = await getSessionClickHouseConfig();
-
-    if (!config) {
+    // Check session
+    const session = await getSession();
+    if (!session.isLoggedIn || !session.user) {
       return NextResponse.json(
         {
           success: false,
@@ -30,21 +37,45 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
             code: 401,
             message: "Not authenticated",
             type: "AUTH_REQUIRED",
-            userMessage: "Please log in to ClickHouse first",
+            userMessage: "Please log in first",
           },
         },
         { status: 401 }
       );
     }
 
-    const client = createClientWithConfig(config);
+    // Check lens user configuration
+    if (!isLensUserConfigured()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 500,
+            message: "Lens user not configured",
+            type: "CONFIG_ERROR",
+            userMessage: "Server not properly configured",
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    const lensConfig = getLensConfig();
+    if (!lensConfig) {
+      return NextResponse.json({
+        success: true,
+        data: [{ name: "default" }],
+      });
+    }
+
+    const client = createClientWithConfig(lensConfig);
+    const currentUser = session.user.username;
 
     try {
-      // Try to get databases from system tables
-      // This requires access to system database
+      // Query grants using lens user to see what databases the current user can access
       const globalCheck = await client.query(`
         SELECT count() as cnt FROM system.grants 
-        WHERE user_name = currentUser() 
+        WHERE user_name = '${currentUser.replace(/'/g, "''")}'
         AND (database IS NULL OR database = '*')
         AND access_type IN ('SELECT', 'ALL')
       `);
@@ -59,11 +90,11 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
           `SELECT name FROM system.databases ORDER BY name`
         );
       } else {
-        // Get specific databases from grants + always include default
+        // Get specific databases from grants
         result = await client.query(`
           SELECT DISTINCT name FROM (
             SELECT database as name FROM system.grants 
-            WHERE user_name = currentUser() 
+            WHERE user_name = '${currentUser.replace(/'/g, "''")}'
             AND database IS NOT NULL 
             AND database != '*'
             AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
@@ -80,8 +111,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
         data: result.data as unknown as Array<{ name: string }>,
       });
     } catch {
-      // If system queries fail (no system access), return just default database
-      // The user can type database names manually in queries
+      // If grants query fails, return just default database
       return NextResponse.json({
         success: true,
         data: [{ name: "default" }],
@@ -89,18 +119,6 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
     }
   } catch (error) {
     console.error("Databases fetch error:", error);
-
-    if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
-        },
-      });
-    }
 
     return NextResponse.json({
       success: false,

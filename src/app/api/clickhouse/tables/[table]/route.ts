@@ -1,11 +1,19 @@
 /**
  * API route for getting table structure and data preview
  * GET /api/clickhouse/tables/[table]?database=xxx&type=structure|data
+ *
+ * - Structure: Uses LENS_USER (metadata from system.columns)
+ * - Data: Uses END_USER (respects user's data access permissions)
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
+import {
+  createClientWithConfig,
+  getLensConfig,
+  isLensUserConfigured,
+  isClickHouseError,
+} from "@/lib/clickhouse";
 
 interface ColumnInfo {
   name: string;
@@ -33,9 +41,9 @@ export async function GET(
   { params }: { params: Promise<{ table: string }> }
 ): Promise<NextResponse<TableDetailResponse>> {
   try {
-    const config = await getSessionClickHouseConfig();
-
-    if (!config) {
+    // Check session
+    const session = await getSession();
+    if (!session.isLoggedIn || !session.user) {
       return NextResponse.json(
         {
           success: false,
@@ -43,7 +51,7 @@ export async function GET(
             code: 401,
             message: "Not authenticated",
             type: "AUTH_REQUIRED",
-            userMessage: "Please log in to ClickHouse first",
+            userMessage: "Please log in first",
           },
         },
         { status: 401 }
@@ -70,12 +78,33 @@ export async function GET(
       );
     }
 
-    const client = createClientWithConfig(config);
     const safeDatabase = database.replace(/'/g, "''");
     const safeTable = table.replace(/'/g, "''");
 
     if (type === "structure") {
-      // Get column structure
+      // Structure query uses LENS_USER (system metadata)
+      if (!isLensUserConfigured()) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 500,
+              message: "Lens user not configured",
+              type: "CONFIG_ERROR",
+              userMessage: "Server not properly configured",
+            },
+          },
+          { status: 500 }
+        );
+      }
+
+      const lensConfig = getLensConfig();
+      if (!lensConfig) {
+        return NextResponse.json({ success: true, columns: [] });
+      }
+
+      const client = createClientWithConfig(lensConfig);
+
       const result = await client.query(`
         SELECT 
           name,
@@ -93,7 +122,25 @@ export async function GET(
         columns: result.data as unknown as ColumnInfo[],
       });
     } else {
-      // Get data preview (first 100 rows)
+      // Data query uses END_USER (respects data access permissions)
+      const userConfig = await getSessionClickHouseConfig();
+      if (!userConfig) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 500,
+              message: "User config not available",
+              type: "CONFIG_ERROR",
+              userMessage: "Session error",
+            },
+          },
+          { status: 500 }
+        );
+      }
+
+      const client = createClientWithConfig(userConfig);
+
       const result = await client.query(
         `SELECT * FROM \`${safeDatabase}\`.\`${safeTable}\` LIMIT 100`
       );

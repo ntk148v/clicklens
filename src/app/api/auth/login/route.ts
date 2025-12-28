@@ -1,20 +1,24 @@
 /**
  * API route for logging in with ClickHouse credentials
  * POST /api/auth/login
+ *
+ * Connection details (host, port, protocol) come from environment.
+ * Only username/password are provided by the user.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
+import {
+  getUserConfig,
+  buildClickHouseUrl,
+  isLensUserConfigured,
+} from "@/lib/clickhouse";
 
 export interface LoginRequest {
-  host: string;
-  port: number;
   username: string;
   password: string;
-  database?: string;
-  protocol?: "http" | "https";
 }
 
 export interface LoginResponse {
@@ -27,29 +31,46 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<LoginResponse>> {
   try {
+    // Check if server is configured
+    if (!isLensUserConfigured()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Server not configured. Please set CLICKHOUSE_HOST and LENS_USER environment variables.",
+        },
+        { status: 500 }
+      );
+    }
+
     const body: LoginRequest = await request.json();
 
     // Validate required fields
-    if (!body.host || !body.username) {
+    if (!body.username) {
       return NextResponse.json(
-        { success: false, error: "Host and username are required" },
+        { success: false, error: "Username is required" },
         { status: 400 }
       );
     }
 
-    const config = {
-      host: body.host,
-      port: body.port || 8123,
+    // Get config with user credentials
+    const config = getUserConfig({
       username: body.username,
       password: body.password || "",
-      database: body.database || "default",
-      protocol: body.protocol || ("http" as const),
-    };
+    });
+
+    if (!config) {
+      return NextResponse.json(
+        { success: false, error: "Server connection not configured" },
+        { status: 500 }
+      );
+    }
 
     // Test connection to ClickHouse
-    const url = `${config.protocol}://${config.host}:${
-      config.port
-    }/?query=${encodeURIComponent("SELECT version()")}`;
+    const url = buildClickHouseUrl(
+      config,
+      `/?query=${encodeURIComponent("SELECT version()")}`
+    );
 
     const response = await fetch(url, {
       method: "GET",
@@ -64,7 +85,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error: errorText || "Failed to connect to ClickHouse",
+          error: errorText || "Invalid credentials",
         },
         { status: 401 }
       );
@@ -72,7 +93,7 @@ export async function POST(
 
     const version = (await response.text()).trim();
 
-    // Store credentials in session
+    // Store only user credentials in session
     const cookieStore = await cookies();
     const session = await getIronSession<SessionData>(
       cookieStore,
@@ -80,7 +101,10 @@ export async function POST(
     );
 
     session.isLoggedIn = true;
-    session.clickhouse = config;
+    session.user = {
+      username: body.username,
+      password: body.password || "",
+    };
     await session.save();
 
     return NextResponse.json({

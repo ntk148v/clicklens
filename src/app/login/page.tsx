@@ -21,12 +21,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    host: "localhost",
-    port: "8123",
     username: "default",
     password: "",
-    database: "default",
-    protocol: "http" as const,
   });
 
   // Check if already logged in
@@ -38,7 +34,7 @@ export default function LoginPage() {
         if (data.isLoggedIn) {
           router.push("/");
         }
-      } catch (err) {
+      } catch {
         // Ignore errors, just show login form
       } finally {
         setIsLoading(false);
@@ -57,12 +53,8 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          host: formData.host,
-          port: parseInt(formData.port, 10),
           username: formData.username,
           password: formData.password,
-          database: formData.database,
-          protocol: formData.protocol,
         }),
       });
 
@@ -82,7 +74,7 @@ export default function LoginPage() {
 
   const handleChange =
     (field: string) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       setFormData((prev) => ({ ...prev, [field]: e.target.value }));
       setError(null);
     };
@@ -97,59 +89,22 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Database className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">ClickLens</CardTitle>
-          <CardDescription>Connect to your ClickHouse database</CardDescription>
+          <CardDescription>Sign in with your ClickHouse credentials</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="flex items-start gap-2 p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+              <div className="flex items-start gap-2 p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm dark:bg-red-950/50 dark:border-red-900 dark:text-red-300">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
-                <Label htmlFor="host">Host</Label>
-                <Input
-                  id="host"
-                  placeholder="localhost"
-                  value={formData.host}
-                  onChange={handleChange("host")}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="port">Port</Label>
-                <Input
-                  id="port"
-                  type="number"
-                  placeholder="8123"
-                  value={formData.port}
-                  onChange={handleChange("port")}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="protocol">Protocol</Label>
-              <select
-                id="protocol"
-                value={formData.protocol}
-                onChange={handleChange("protocol")}
-                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-              >
-                <option value="http">HTTP</option>
-                <option value="https">HTTPS</option>
-              </select>
-            </div>
 
             <div>
               <Label htmlFor="username">Username</Label>
@@ -159,6 +114,7 @@ export default function LoginPage() {
                 value={formData.username}
                 onChange={handleChange("username")}
                 required
+                autoComplete="username"
               />
             </div>
 
@@ -170,16 +126,7 @@ export default function LoginPage() {
                 placeholder="Enter password"
                 value={formData.password}
                 onChange={handleChange("password")}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="database">Database</Label>
-              <Input
-                id="database"
-                placeholder="default"
-                value={formData.database}
-                onChange={handleChange("database")}
+                autoComplete="current-password"
               />
             </div>
 
@@ -190,14 +137,13 @@ export default function LoginPage() {
                   Connecting...
                 </>
               ) : (
-                "Connect"
+                "Sign In"
               )}
             </Button>
           </form>
 
           <p className="mt-4 text-xs text-center text-muted-foreground">
-            Your credentials are used to connect to ClickHouse and are stored
-            securely in an encrypted session cookie.
+            Your credentials are verified against the ClickHouse server and stored securely.
           </p>
         </CardContent>
       </Card>

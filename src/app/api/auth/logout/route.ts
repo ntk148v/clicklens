@@ -20,7 +20,7 @@ export async function POST(): Promise<NextResponse> {
   );
 
   session.isLoggedIn = false;
-  session.clickhouse = undefined;
+  session.user = undefined;
   await session.save();
 
   return NextResponse.json({ success: true });

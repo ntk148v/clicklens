@@ -1,11 +1,18 @@
 /**
  * API route for listing tables in a database
  * GET /api/clickhouse/tables?database=xxx
+ *
+ * Uses LENS_USER for querying system.tables metadata.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { getSession } from "@/lib/auth";
+import {
+  createClientWithConfig,
+  getLensConfig,
+  isLensUserConfigured,
+  isClickHouseError,
+} from "@/lib/clickhouse";
 
 interface TableInfo {
   name: string;
@@ -29,9 +36,9 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<TablesResponse>> {
   try {
-    const config = await getSessionClickHouseConfig();
-
-    if (!config) {
+    // Check session
+    const session = await getSession();
+    if (!session.isLoggedIn || !session.user) {
       return NextResponse.json(
         {
           success: false,
@@ -39,10 +46,26 @@ export async function GET(
             code: 401,
             message: "Not authenticated",
             type: "AUTH_REQUIRED",
-            userMessage: "Please log in to ClickHouse first",
+            userMessage: "Please log in first",
           },
         },
         { status: 401 }
+      );
+    }
+
+    // Check lens user configuration
+    if (!isLensUserConfigured()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 500,
+            message: "Lens user not configured",
+            type: "CONFIG_ERROR",
+            userMessage: "Server not properly configured",
+          },
+        },
+        { status: 500 }
       );
     }
 
@@ -64,9 +87,17 @@ export async function GET(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const lensConfig = getLensConfig();
+    if (!lensConfig) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+      });
+    }
 
-    // Get tables with basic info
+    const client = createClientWithConfig(lensConfig);
+
+    // Get tables with basic info using lens user
     const result = await client.query(`
       SELECT 
         name,
