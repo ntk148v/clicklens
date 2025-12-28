@@ -7,8 +7,12 @@ import {
   ResultGrid,
   QueryTabs,
   QueryHistory,
+  DatabaseSelector,
+  TableSidebar,
+  TablePreview,
 } from "@/components/sql";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
+import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -24,6 +28,7 @@ import type { QueryResponse } from "@/app/api/clickhouse/query/route";
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveTab, addToHistory } =
     useTabsStore();
+  const { selectedTable, selectedDatabase } = useSqlBrowserStore();
   const [historyOpen, setHistoryOpen] = useState(false);
 
   // Initialize tabs on first load
@@ -128,6 +133,10 @@ export default function SqlConsolePage() {
     <div className="flex flex-col h-full">
       <Header title="SQL Console">
         <div className="flex items-center gap-2">
+          <DatabaseSelector />
+
+          <Separator orientation="vertical" className="h-6" />
+
           <Button
             size="sm"
             onClick={handleExecute}
@@ -169,72 +178,88 @@ export default function SqlConsolePage() {
         </div>
       </Header>
 
-      {/* Tabs */}
-      <QueryTabs />
+      {/* Main layout with sidebar */}
+      <div className="flex-1 flex min-h-0">
+        {/* Table sidebar */}
+        <TableSidebar />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {activeTab ? (
-          <>
-            {/* Editor */}
-            <div className="h-[250px] p-4 border-b">
-              <SqlEditor
-                value={activeTab.sql}
-                onChange={handleSqlChange}
-                onExecute={handleExecute}
-                readOnly={activeTab.isRunning}
-              />
-            </div>
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* Query Tabs */}
+          <QueryTabs />
 
-            {/* Result area */}
-            <div className="flex-1 min-h-0">
-              {activeTab.error ? (
-                <div className="flex items-start gap-3 p-4 m-4 rounded-md bg-red-50 border border-red-200">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-red-800">
-                      {activeTab.error.userMessage}
-                    </p>
-                    <pre className="mt-2 text-xs text-red-600 font-mono whitespace-pre-wrap break-all overflow-x-auto">
-                      {activeTab.error.message}
-                    </pre>
-                  </div>
+          {/* Editor + Results or Table Preview */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {selectedTable ? (
+              <TablePreview />
+            ) : activeTab ? (
+              <>
+                {/* Editor */}
+                <div className="h-[200px] p-4 border-b">
+                  <SqlEditor
+                    value={activeTab.sql}
+                    onChange={handleSqlChange}
+                    onExecute={handleExecute}
+                    readOnly={activeTab.isRunning}
+                  />
                 </div>
-              ) : activeTab.result ? (
-                <ResultGrid
-                  data={activeTab.result.data}
-                  meta={activeTab.result.meta}
-                  statistics={activeTab.result.statistics}
-                  totalRows={
-                    activeTab.result.rows_before_limit_at_least ||
-                    activeTab.result.rows
-                  }
-                  className="h-full"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <FileText className="w-12 h-12 mb-4 opacity-30" />
-                  <p className="text-sm">No results yet</p>
-                  <p className="text-xs mt-1">
-                    Press{" "}
-                    <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
-                      Ctrl
-                    </kbd>
-                    +
-                    <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
-                      Enter
-                    </kbd>{" "}
-                    to run your query
-                  </p>
+
+                {/* Result area */}
+                <div className="flex-1 min-h-0">
+                  {activeTab.error ? (
+                    <div className="flex items-start gap-3 p-4 m-4 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-900">
+                      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-red-800 dark:text-red-300">
+                          {activeTab.error.userMessage}
+                        </p>
+                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap break-all overflow-x-auto">
+                          {activeTab.error.message}
+                        </pre>
+                      </div>
+                    </div>
+                  ) : activeTab.result ? (
+                    <ResultGrid
+                      data={activeTab.result.data}
+                      meta={activeTab.result.meta}
+                      statistics={activeTab.result.statistics}
+                      totalRows={
+                        activeTab.result.rows_before_limit_at_least ||
+                        activeTab.result.rows
+                      }
+                      className="h-full"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <FileText className="w-12 h-12 mb-4 opacity-30" />
+                      <p className="text-sm">No results yet</p>
+                      <p className="text-xs mt-1">
+                        Press{" "}
+                        <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
+                          Ctrl
+                        </kbd>
+                        +
+                        <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
+                          Enter
+                        </kbd>{" "}
+                        to run your query
+                      </p>
+                      {selectedDatabase && (
+                        <p className="text-xs mt-2 text-muted-foreground/70">
+                          Database: <code className="text-primary">{selectedDatabase}</code>
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <p>No active query tab</p>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p>No active query tab</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
