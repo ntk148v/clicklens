@@ -5,3 +5,5 @@ export { QueryHistory } from "./QueryHistory";
 export { DatabaseSelector } from "./DatabaseSelector";
 export { TableSidebar } from "./TableSidebar";
 export { TablePreview } from "./TablePreview";
+export { SavedQueries } from "./SavedQueries";
+export { SaveQueryDialog } from "./SaveQueryDialog";
