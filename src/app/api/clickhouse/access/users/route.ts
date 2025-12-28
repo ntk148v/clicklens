@@ -128,11 +128,13 @@ export async function POST(
       sql += ` DEFAULT DATABASE ${quoteIdentifier(body.defaultDatabase)}`;
     }
 
-    // Default roles
+    // Default roles - use NONE by default (principle of least privilege)
     if (body.defaultRoles && body.defaultRoles.length > 0) {
       sql += ` DEFAULT ROLE ${body.defaultRoles
         .map(quoteIdentifier)
         .join(", ")}`;
+    } else {
+      sql += ` DEFAULT ROLE NONE`;
     }
 
     const client = createClientWithConfig(config);
