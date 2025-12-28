@@ -9,7 +9,11 @@ interface QueryHistoryEntry {
   timestamp: number;
   duration?: number;
   rowsReturned?: number;
+  rowsRead?: number;
+  bytesRead?: number;
+  memoryUsage?: number;
   error?: string;
+  user?: string;
 }
 
 interface QueryTab {
@@ -26,6 +30,7 @@ interface QueryTab {
       elapsed: number;
       rows_read: number;
       bytes_read: number;
+      memory_usage?: number;
     };
   } | null;
   isRunning: boolean;
@@ -35,6 +40,7 @@ interface QueryTab {
     type: string;
     userMessage: string;
   } | null;
+  queryId?: string;
 }
 
 interface TableTab {
@@ -239,4 +245,4 @@ export function initializeTabs() {
   }
 }
 
-export type { Tab, QueryTab, TableTab };
+export type { Tab, QueryTab, TableTab, QueryHistoryEntry };

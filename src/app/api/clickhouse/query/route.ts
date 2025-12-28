@@ -12,6 +12,7 @@ import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
 export interface QueryRequest {
   sql: string;
   timeout?: number;
+  query_id?: string;
 }
 
 export interface QueryResponse {
@@ -24,6 +25,7 @@ export interface QueryResponse {
     elapsed: number;
     rows_read: number;
     bytes_read: number;
+    memory_usage?: number;
   };
   error?: {
     code: number;
@@ -73,7 +75,10 @@ export async function POST(
     }
 
     const client = createClientWithConfig(config);
-    const result = await client.query(body.sql, { timeout: body.timeout });
+    const result = await client.query(body.sql, {
+      timeout: body.timeout,
+      query_id: body.query_id,
+    });
 
     return NextResponse.json({
       success: true,
