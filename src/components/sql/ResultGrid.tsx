@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
@@ -294,8 +295,7 @@ export function ResultGrid({
       {/* Pagination */}
       <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/30 text-xs">
         <div className="text-muted-foreground">
-          Page {table.getState().pagination.pageIndex + 1} of{" "}
-          {table.getPageCount()}
+          {formatNumber(totalRows ?? data.length)} rows
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -316,6 +316,22 @@ export function ResultGrid({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
+          <div className="flex items-center gap-1 mx-1">
+            <Input
+              type="number"
+              min={1}
+              max={table.getPageCount()}
+              value={table.getState().pagination.pageIndex + 1}
+              onChange={(e) => {
+                const page = parseInt(e.target.value, 10);
+                if (page >= 1 && page <= table.getPageCount()) {
+                  table.setPageIndex(page - 1);
+                }
+              }}
+              className="w-14 h-7 text-center text-xs"
+            />
+            <span className="text-muted-foreground">of {table.getPageCount()}</span>
+          </div>
           <Button
             variant="ghost"
             size="icon"
