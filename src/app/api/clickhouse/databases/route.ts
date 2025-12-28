@@ -39,10 +39,40 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
 
     const client = createClientWithConfig(config);
 
-    // Get all databases the user can access
-    const result = await client.query(
-      `SELECT name FROM system.databases ORDER BY name`
-    );
+    // Get databases where user has actual access
+    // First check if user has global access (SELECT on all databases)
+    const globalCheck = await client.query(`
+      SELECT count() as cnt FROM system.grants 
+      WHERE user_name = currentUser() 
+      AND (database IS NULL OR database = '*')
+      AND access_type IN ('SELECT', 'ALL')
+    `);
+
+    const globalData = globalCheck.data as unknown as Array<{ cnt: string }>;
+    const hasGlobalAccess = globalData[0]?.cnt !== "0";
+
+    let result;
+    if (hasGlobalAccess) {
+      // User has global access, show all databases
+      result = await client.query(
+        `SELECT name FROM system.databases ORDER BY name`
+      );
+    } else {
+      // Get specific databases from grants + always include default
+      result = await client.query(`
+        SELECT DISTINCT name FROM (
+          SELECT database as name FROM system.grants 
+          WHERE user_name = currentUser() 
+          AND database IS NOT NULL 
+          AND database != '*'
+          AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+          UNION ALL
+          SELECT 'default' as name
+        ) 
+        WHERE name IN (SELECT name FROM system.databases)
+        ORDER BY name
+      `);
+    }
 
     return NextResponse.json({
       success: true,
