@@ -1,8 +1,9 @@
 "use client";
 
-import { useSqlBrowserStore } from "@/lib/store/sql-browser";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,8 +14,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, X, Database, Columns } from "lucide-react";
+import { Loader2, Database, Columns, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface ColumnInfo {
+  name: string;
+  type: string;
+  default_kind: string;
+  default_expression: string;
+  comment: string;
+}
+
+interface TablePreviewProps {
+  database: string;
+  table: string;
+}
+
+const PAGE_SIZE = 100;
 
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
@@ -23,74 +39,88 @@ function formatCellValue(value: unknown): string {
   return String(value);
 }
 
-export function TablePreview() {
-  const {
-    selectedTable,
-    selectedDatabase,
-    tableColumns,
-    tableData,
-    tableMeta,
-    loadingTablePreview,
-    previewTab,
-    setPreviewTab,
-    selectTable,
-  } = useSqlBrowserStore();
+export function TablePreview({ database, table }: TablePreviewProps) {
+  const [previewTab, setPreviewTab] = useState<"data" | "structure">("data");
+  const [loading, setLoading] = useState(false);
+  const [columns, setColumns] = useState<ColumnInfo[]>([]);
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [meta, setMeta] = useState<Array<{ name: string; type: string }>>([]);
+  const [currentPage, setCurrentPage] = useState(0);
 
-  if (!selectedTable) {
-    return null;
-  }
+  useEffect(() => {
+    fetchData(previewTab);
+  }, [database, table, previewTab]);
+
+  const fetchData = async (type: "data" | "structure") => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/clickhouse/tables/${encodeURIComponent(table)}?database=${encodeURIComponent(database)}&type=${type}`
+      );
+      const result = await res.json();
+      if (result.success) {
+        if (type === "structure" && result.columns) {
+          setColumns(result.columns);
+        } else if (type === "data" && result.data) {
+          setData(result.data);
+          setMeta(result.meta || []);
+          setCurrentPage(0);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching table data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalPages = Math.ceil(data.length / PAGE_SIZE);
+  const paginatedData = data.slice(
+    currentPage * PAGE_SIZE,
+    (currentPage + 1) * PAGE_SIZE
+  );
 
   return (
-    <Card className="flex flex-col h-full border-t-0 rounded-t-none">
+    <Card className="flex flex-col h-full border-0 rounded-none">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
         <div className="flex items-center gap-2">
           <Database className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">
-            {selectedDatabase}.{selectedTable}
+            {database}.{table}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-md border overflow-hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-7 rounded-none text-xs",
-                previewTab === "data" && "bg-accent"
-              )}
-              onClick={() => setPreviewTab("data")}
-            >
-              <Database className="w-3 h-3 mr-1" />
-              Data
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-7 rounded-none text-xs border-l",
-                previewTab === "structure" && "bg-accent"
-              )}
-              onClick={() => setPreviewTab("structure")}
-            >
-              <Columns className="w-3 h-3 mr-1" />
-              Structure
-            </Button>
-          </div>
+        <div className="flex rounded-md border overflow-hidden">
           <Button
             variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => selectTable(null)}
+            size="sm"
+            className={cn(
+              "h-7 rounded-none text-xs",
+              previewTab === "data" && "bg-accent"
+            )}
+            onClick={() => setPreviewTab("data")}
           >
-            <X className="w-3.5 h-3.5" />
+            <Database className="w-3 h-3 mr-1" />
+            Data
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-7 rounded-none text-xs border-l",
+              previewTab === "structure" && "bg-accent"
+            )}
+            onClick={() => setPreviewTab("structure")}
+          >
+            <Columns className="w-3 h-3 mr-1" />
+            Structure
           </Button>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 min-h-0">
-        {loadingTablePreview ? (
+        {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
@@ -106,7 +136,7 @@ export function TablePreview() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tableColumns.map((col) => (
+                {columns.map((col) => (
                   <TableRow key={col.name}>
                     <TableCell className="font-mono font-medium">
                       {col.name}
@@ -138,7 +168,7 @@ export function TablePreview() {
             <Table>
               <TableHeader className="sticky top-0 bg-background">
                 <TableRow>
-                  {tableMeta.map((col) => (
+                  {meta.map((col) => (
                     <TableHead key={col.name} className="whitespace-nowrap">
                       {col.name}
                     </TableHead>
@@ -146,9 +176,9 @@ export function TablePreview() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tableData.map((row, i) => (
+                {paginatedData.map((row, i) => (
                   <TableRow key={i}>
-                    {tableMeta.map((col) => (
+                    {meta.map((col) => (
                       <TableCell
                         key={col.name}
                         className="font-mono text-xs max-w-[200px] truncate"
@@ -166,10 +196,50 @@ export function TablePreview() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-1.5 border-t text-xs text-muted-foreground bg-muted/30">
-        {previewTab === "data"
-          ? `${tableData.length} rows (preview limited to 100)`
-          : `${tableColumns.length} columns`}
+      <div className="flex items-center justify-between px-4 py-1.5 border-t text-xs text-muted-foreground bg-muted/30">
+        <span>
+          {previewTab === "data"
+            ? `${data.length} rows (preview limited to 100)`
+            : `${columns.length} columns`}
+        </span>
+        {previewTab === "data" && totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={currentPage + 1}
+                onChange={(e) => {
+                  const page = parseInt(e.target.value, 10);
+                  if (page >= 1 && page <= totalPages) {
+                    setCurrentPage(page - 1);
+                  }
+                }}
+                className="w-12 h-6 text-center text-xs"
+              />
+              <span>of {totalPages}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage >= totalPages - 1}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
     </Card>
   );

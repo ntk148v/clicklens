@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Plus, X, Terminal } from "lucide-react";
+import { Plus, X, Terminal, Table2 } from "lucide-react";
 import { useTabsStore } from "@/lib/store/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
@@ -24,13 +24,17 @@ export function QueryTabs() {
               )}
               onClick={() => setActiveTab(tab.id)}
             >
-              <Terminal
-                className={cn(
-                  "w-3.5 h-3.5",
-                  tab.isRunning && "animate-pulse text-blue-600"
-                )}
-              />
-              <span className="text-sm font-medium whitespace-nowrap max-w-[120px] truncate">
+              {tab.type === "table" ? (
+                <Table2 className="w-3.5 h-3.5 text-blue-500" />
+              ) : (
+                <Terminal
+                  className={cn(
+                    "w-3.5 h-3.5",
+                    tab.isRunning && "animate-pulse text-blue-600"
+                  )}
+                />
+              )}
+              <span className="text-sm font-medium whitespace-nowrap max-w-[150px] truncate">
                 {tab.name}
               </span>
               {tabs.length > 1 && (
@@ -55,6 +59,7 @@ export function QueryTabs() {
         size="icon"
         className="h-10 w-10 rounded-none border-l text-muted-foreground hover:text-foreground"
         onClick={() => addTab()}
+        title="New query tab"
       >
         <Plus className="w-4 h-4" />
       </Button>

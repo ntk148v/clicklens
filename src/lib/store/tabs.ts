@@ -12,8 +12,9 @@ interface QueryHistoryEntry {
   error?: string;
 }
 
-interface Tab {
+interface QueryTab {
   id: string;
+  type: "query";
   name: string;
   sql: string;
   result: {
@@ -36,6 +37,16 @@ interface Tab {
   } | null;
 }
 
+interface TableTab {
+  id: string;
+  type: "table";
+  name: string;
+  database: string;
+  table: string;
+}
+
+type Tab = QueryTab | TableTab;
+
 interface TabsState {
   tabs: Tab[];
   activeTabId: string | null;
@@ -43,11 +54,13 @@ interface TabsState {
   maxHistorySize: number;
 
   // Actions
-  addTab: (tab?: Partial<Tab>) => string;
+  addTab: (tab?: Partial<QueryTab>) => string;
+  addTableTab: (database: string, table: string) => string;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
-  updateTab: (id: string, updates: Partial<Tab>) => void;
+  updateTab: (id: string, updates: Partial<QueryTab>) => void;
   getActiveTab: () => Tab | undefined;
+  getActiveQueryTab: () => QueryTab | undefined;
 
   // History actions
   addToHistory: (entry: Omit<QueryHistoryEntry, "id" | "timestamp">) => void;
@@ -59,7 +72,10 @@ function generateId(): string {
 }
 
 function generateTabName(existingTabs: Tab[]): string {
-  const existingNumbers = existingTabs
+  const queryTabs = existingTabs.filter(
+    (t) => t.type === "query"
+  ) as QueryTab[];
+  const existingNumbers = queryTabs
     .map((t) => {
       const match = t.name.match(/^Query (\d+)$/);
       return match ? parseInt(match[1], 10) : 0;
@@ -83,13 +99,45 @@ export const useTabsStore = create<TabsState>()(
       addTab: (tabData) => {
         const id = generateId();
         const { tabs } = get();
-        const newTab: Tab = {
+        const newTab: QueryTab = {
           id,
+          type: "query",
           name: tabData?.name || generateTabName(tabs),
           sql: tabData?.sql || "SELECT 1",
           result: tabData?.result || null,
           isRunning: false,
           error: null,
+        };
+
+        set((state) => ({
+          tabs: [...state.tabs, newTab],
+          activeTabId: id,
+        }));
+
+        return id;
+      },
+
+      addTableTab: (database: string, table: string) => {
+        const { tabs, setActiveTab } = get();
+
+        // Check if table tab already exists
+        const existing = tabs.find(
+          (t) =>
+            t.type === "table" && t.database === database && t.table === table
+        );
+
+        if (existing) {
+          setActiveTab(existing.id);
+          return existing.id;
+        }
+
+        const id = generateId();
+        const newTab: TableTab = {
+          id,
+          type: "table",
+          name: `${database}.${table}`,
+          database,
+          table,
         };
 
         set((state) => ({
@@ -128,7 +176,7 @@ export const useTabsStore = create<TabsState>()(
       updateTab: (id, updates) => {
         set((state) => ({
           tabs: state.tabs.map((tab) =>
-            tab.id === id ? { ...tab, ...updates } : tab
+            tab.id === id && tab.type === "query" ? { ...tab, ...updates } : tab
           ),
         }));
       },
@@ -136,6 +184,12 @@ export const useTabsStore = create<TabsState>()(
       getActiveTab: () => {
         const { tabs, activeTabId } = get();
         return tabs.find((t) => t.id === activeTabId);
+      },
+
+      getActiveQueryTab: () => {
+        const { tabs, activeTabId } = get();
+        const tab = tabs.find((t) => t.id === activeTabId);
+        return tab?.type === "query" ? tab : undefined;
       },
 
       addToHistory: (entry) => {
@@ -160,12 +214,14 @@ export const useTabsStore = create<TabsState>()(
     {
       name: "clicklens-tabs",
       partialize: (state) => ({
-        tabs: state.tabs.map((t) => ({
-          ...t,
-          result: null, // Don't persist results
-          isRunning: false,
-          error: null,
-        })),
+        tabs: state.tabs
+          .filter((t) => t.type === "query") // Only persist query tabs
+          .map((t) => ({
+            ...t,
+            result: null,
+            isRunning: false,
+            error: null,
+          })),
         activeTabId: state.activeTabId,
         history: state.history,
       }),
@@ -182,3 +238,5 @@ export function initializeTabs() {
     });
   }
 }
+
+export type { Tab, QueryTab, TableTab };

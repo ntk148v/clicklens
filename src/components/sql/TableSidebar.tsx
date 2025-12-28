@@ -1,6 +1,7 @@
 "use client";
 
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
+import { useTabsStore } from "@/lib/store/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -30,12 +31,22 @@ export function TableSidebar() {
   const {
     tables,
     loadingTables,
-    selectedTable,
-    selectTable,
     sidebarCollapsed,
     toggleSidebar,
     selectedDatabase,
   } = useSqlBrowserStore();
+  
+  const { addTableTab, tabs, activeTabId } = useTabsStore();
+
+  // Find if current active tab is a table tab
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeTableName = activeTab?.type === "table" ? activeTab.table : null;
+
+  const handleTableClick = (tableName: string) => {
+    if (selectedDatabase) {
+      addTableTab(selectedDatabase, tableName);
+    }
+  };
 
   if (sidebarCollapsed) {
     return (
@@ -88,10 +99,10 @@ export function TableSidebar() {
             {tables.map((table) => (
               <button
                 key={table.name}
-                onClick={() => selectTable(table.name)}
+                onClick={() => handleTableClick(table.name)}
                 className={cn(
                   "w-full text-left px-3 py-1.5 text-sm hover:bg-accent/50 transition-colors",
-                  selectedTable === table.name && "bg-accent"
+                  activeTableName === table.name && "bg-accent"
                 )}
               >
                 <div className="flex items-center gap-2">
