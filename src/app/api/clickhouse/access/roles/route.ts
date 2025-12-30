@@ -19,6 +19,7 @@ import {
   isFeatureRole,
   isRestrictedDatabase,
   getFeatureRole,
+  checkConfiguredFeature,
   FEATURE_ROLE_PREFIX,
   type DataPrivilege,
   type DataPrivilegeType,
@@ -34,6 +35,7 @@ export interface RoleWithPrivileges extends SystemRole {
   inheritedRoles?: string[]; // Child roles (including feature roles)
   dataPrivileges?: DataPrivilege[];
   grants?: SystemGrant[];
+  effectiveFeatureRoles?: string[];
 }
 
 export interface RolesResponse {
@@ -200,6 +202,18 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
           grants,
           inheritedRoles: roleInheritedMap.get(role.name) || [],
           dataPrivileges: extractDataPrivileges(grants),
+          effectiveFeatureRoles: !isFr
+            ? FEATURE_ROLES.filter((fr) =>
+                checkConfiguredFeature(
+                  fr.id,
+                  grants.map((g) => ({
+                    access_type: g.access_type,
+                    database: g.database || undefined,
+                    table: g.table || undefined,
+                  }))
+                )
+              ).map((fr) => fr.id)
+            : undefined,
         };
       }
     );

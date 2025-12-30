@@ -144,3 +144,56 @@ export function isRestrictedDatabase(database: string): boolean {
   const restricted = ["system", "information_schema", "INFORMATION_SCHEMA"];
   return restricted.includes(database);
 }
+
+/**
+ * Check if a list of grants satisfies a feature role's requirements
+ * This helps identify "effective" feature roles for custom roles that don't explicitly inherit them.
+ */
+export function checkConfiguredFeature(
+  featureId: string,
+  grants: {
+    access_type: string;
+    database?: string;
+    table?: string;
+  }[]
+): boolean {
+  // Define criteria for each feature role
+  const criteria: Record<
+    string,
+    (g: { access_type: string; database?: string; table?: string }) => boolean
+  > = {
+    clicklens_table_explorer: (g) =>
+      // Needs SHOW tables/databases OR SELECT on system schema
+      (g.access_type === "SHOW" && (!g.database || g.database === "*")) ||
+      (g.access_type === "SELECT" &&
+        g.database === "system" &&
+        g.table === "tables"),
+
+    clicklens_query_monitor: (g) =>
+      // Needs KILL QUERY or SELECT on processes
+      (g.access_type === "KILL QUERY" && (!g.database || g.database === "*")) ||
+      (g.access_type === "SELECT" &&
+        g.database === "system" &&
+        g.table === "processes"),
+
+    clicklens_cluster_monitor: (g) =>
+      // Needs SELECT on system cluster tables
+      g.access_type === "SELECT" &&
+      g.database === "system" &&
+      ["clusters", "replicas", "disks"].includes(g.table || ""),
+
+    clicklens_user_admin: (g) =>
+      // Needs ACCESS MANAGEMENT
+      g.access_type === "ACCESS MANAGEMENT",
+
+    clicklens_table_admin: (g) =>
+      // Needs generic table DDL
+      ["CREATE TABLE", "DROP TABLE", "ALTER TABLE"].includes(g.access_type) &&
+      (!g.database || g.database === "*"),
+  };
+
+  const check = criteria[featureId];
+  if (!check) return false;
+
+  return grants.some(check);
+}

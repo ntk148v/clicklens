@@ -5,6 +5,7 @@ export {
   getFeatureRole,
   isFeatureRole,
   isRestrictedDatabase,
+  checkConfiguredFeature,
   type FeatureRole,
   type DataPrivilege,
   type DataPrivilegeType,

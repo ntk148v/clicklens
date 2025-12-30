@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Header } from "@/components/layout";
+import { useAuth } from "@/components/auth";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -32,6 +34,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,6 +108,7 @@ interface RoleWithPrivileges extends SystemRole {
     details: string;
   };
   inheritedRoles?: string[];
+  effectiveFeatureRoles?: string[];
   dataPrivileges?: DataPrivilege[];
 }
 
@@ -113,9 +122,18 @@ interface TableInfo {
 }
 
 export default function RolesPage() {
+  const { permissions, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [roles, setRoles] = useState<RoleWithPrivileges[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Protect route
+  useEffect(() => {
+    if (!authLoading && !permissions?.canManageUsers) {
+      router.push("/");
+    }
+  }, [authLoading, permissions, router]);
 
   // Database/table cache
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
@@ -405,6 +423,14 @@ export default function RolesPage() {
   const featureRoles = roles.filter((r) => r.isFeatureRole);
   const userRoles = roles.filter((r) => !r.isFeatureRole);
 
+  if (authLoading || (!permissions?.canManageUsers && !authLoading)) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Access Control">
@@ -562,6 +588,54 @@ export default function RolesPage() {
                                       >
                                         {frInfo?.name || ir}
                                       </Badge>
+                                    );
+                                  })}
+                                  {role.effectiveFeatureRoles?.map((efr) => {
+                                    const frInfo = getFeatureRole(efr);
+                                    if (role.inheritedRoles?.includes(efr))
+                                      return null; // Don't show duplicate
+                                    return (
+                                      <Tooltip key={efr}>
+                                        <TooltipTrigger asChild>
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs border-dashed border-primary/50 opacity-80"
+                                          >
+                                            {frInfo?.name || efr}*
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>
+                                            Implicitly grants this feature via
+                                            privileges
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </div>
+                              ) : role.effectiveFeatureRoles &&
+                                role.effectiveFeatureRoles.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {role.effectiveFeatureRoles.map((efr) => {
+                                    const frInfo = getFeatureRole(efr);
+                                    return (
+                                      <Tooltip key={efr}>
+                                        <TooltipTrigger asChild>
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs border-dashed border-primary/50 opacity-80"
+                                          >
+                                            {frInfo?.name || efr}*
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>
+                                            Implicitly grants this feature via
+                                            privileges
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     );
                                   })}
                                 </div>

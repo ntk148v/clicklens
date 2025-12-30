@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Header } from "@/components/layout";
+import { useAuth } from "@/components/auth";
 import {
   Card,
   CardHeader,
@@ -54,6 +57,19 @@ const features = [
 ];
 
 export default function HomePage() {
+  const { permissions } = useAuth();
+
+  const displayedFeatures = features.filter((feature) => {
+    if (feature.title === "Access Control") {
+      return permissions?.canManageUsers;
+    }
+    if (feature.title === "Query Monitoring") {
+      // Align with sidebar logic
+      return permissions?.canViewProcesses;
+    }
+    return true;
+  });
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Dashboard" />
@@ -73,7 +89,7 @@ export default function HomePage() {
 
         {/* Feature Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((feature) => {
+          {displayedFeatures.map((feature) => {
             const Icon = feature.icon;
             return (
               <Link key={feature.title} href={feature.href}>
