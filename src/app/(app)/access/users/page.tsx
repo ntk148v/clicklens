@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Header } from "@/components/layout";
 import {
   Table,
@@ -30,7 +30,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -44,113 +43,165 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Users,
   Shield,
-  Key,
   RefreshCw,
   AlertCircle,
   Loader2,
   User,
   Plus,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
+import type { SystemUser, SystemRole } from "@/lib/clickhouse";
 import Link from "next/link";
-import { useAccessStore } from "@/lib/store/access";
 
-const PAGE_SIZE = 25;
+interface UserWithRoles extends SystemUser {
+  assigned_roles?: string[];
+}
 
 export default function UsersPage() {
-  const { users, loading, error, fetchAll, refresh, invalidate } =
-    useAccessStore();
+  const [users, setUsers] = useState<UserWithRoles[]>([]);
+  const [roles, setRoles] = useState<SystemRole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(0);
-
-  // Create user dialog
-  const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({
+  // Create/Edit user dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
     name: "",
     password: "",
     confirmPassword: "",
-    defaultDatabase: "",
+    selectedRoles: [] as string[],
   });
 
   // Delete user
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Fetch data on mount
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [usersRes, rolesRes] = await Promise.all([
+        fetch("/api/clickhouse/access/users"),
+        fetch("/api/clickhouse/access/roles"),
+      ]);
 
-  // Pagination calculations
-  const totalPages = Math.ceil(users.length / PAGE_SIZE);
-  const paginatedUsers = useMemo(() => {
-    const start = currentPage * PAGE_SIZE;
-    return users.slice(start, start + PAGE_SIZE);
-  }, [users, currentPage]);
+      const usersData = await usersRes.json();
+      const rolesData = await rolesRes.json();
 
-  // Reset to first page when users change
-  useEffect(() => {
-    if (currentPage >= totalPages && totalPages > 0) {
-      setCurrentPage(totalPages - 1);
+      if (usersData.success) {
+        setUsers(usersData.data || []);
+      } else {
+        setError(usersData.error || "Failed to fetch users");
+        return;
+      }
+
+      if (rolesData.success) {
+        setRoles(rolesData.data || []);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setLoading(false);
     }
-  }, [users.length, totalPages, currentPage]);
+  }, []);
 
-  const handleCreateUser = async () => {
-    setCreateError(null);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-    if (!newUser.name.trim()) {
-      setCreateError("Username is required");
+  const openCreateDialog = () => {
+    setIsEditing(false);
+    setFormData({
+      name: "",
+      password: "",
+      confirmPassword: "",
+      selectedRoles: [],
+    });
+    setDialogError(null);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (user: UserWithRoles) => {
+    setIsEditing(true);
+    setFormData({
+      name: user.name,
+      password: "",
+      confirmPassword: "",
+      selectedRoles: user.assigned_roles || [],
+    });
+    setDialogError(null);
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    setDialogError(null);
+
+    if (!isEditing && !formData.name.trim()) {
+      setDialogError("Username is required");
       return;
     }
 
-    if (newUser.password && newUser.password !== newUser.confirmPassword) {
-      setCreateError("Passwords do not match");
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      setDialogError("Passwords do not match");
       return;
     }
 
-    setCreating(true);
+    setSaving(true);
 
     try {
-      const response = await fetch("/api/clickhouse/access/users", {
-        method: "POST",
+      const endpoint = "/api/clickhouse/access/users";
+      const method = isEditing ? "PUT" : "POST";
+
+      const body = isEditing
+        ? {
+            name: formData.name,
+            newPassword: formData.password || undefined,
+            roles: formData.selectedRoles,
+          }
+        : {
+            name: formData.name.trim(),
+            password: formData.password || undefined,
+            roles: formData.selectedRoles,
+          };
+
+      const response = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newUser.name.trim(),
-          password: newUser.password || undefined,
-          authType: newUser.password ? "sha256_password" : "no_password",
-          defaultDatabase: newUser.defaultDatabase || undefined,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setCreateOpen(false);
-        setNewUser({
-          name: "",
-          password: "",
-          confirmPassword: "",
-          defaultDatabase: "",
-        });
-        invalidate();
-        fetchAll();
+        setDialogOpen(false);
+        fetchData();
       } else {
-        setCreateError(data.error || "Failed to create user");
+        setDialogError(
+          data.error || `Failed to ${isEditing ? "update" : "create"} user`
+        );
       }
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Network error");
+      setDialogError(err instanceof Error ? err.message : "Network error");
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
-  const handleDeleteUser = async (userName: string) => {
+  const handleDelete = async (userName: string) => {
     setDeleting(userName);
 
     try {
@@ -163,14 +214,24 @@ export default function UsersPage() {
       const data = await response.json();
 
       if (data.success) {
-        invalidate();
-        fetchAll();
+        fetchData();
+      } else {
+        setError(data.error || "Failed to delete user");
       }
     } catch (err) {
-      console.error("Delete failed:", err);
+      setError(err instanceof Error ? err.message : "Network error");
     } finally {
       setDeleting(null);
     }
+  };
+
+  const toggleRole = (roleName: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedRoles: prev.selectedRoles.includes(roleName)
+        ? prev.selectedRoles.filter((r) => r !== roleName)
+        : [...prev.selectedRoles, roleName],
+    }));
   };
 
   return (
@@ -190,18 +251,12 @@ export default function UsersPage() {
                 Roles
               </Link>
             </TabsTrigger>
-            <TabsTrigger value="grants" className="text-xs" asChild>
-              <Link href="/access/grants">
-                <Key className="w-3.5 h-3.5 mr-1" />
-                Grants
-              </Link>
-            </TabsTrigger>
           </TabsList>
         </Tabs>
       </Header>
 
       <div className="flex-1 p-6">
-        {loading && users.length === 0 ? (
+        {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -218,7 +273,7 @@ export default function UsersPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Make sure you have SELECT permission on system.users.
+                You may need ACCESS MANAGEMENT privileges to view users.
               </p>
             </CardContent>
           </Card>
@@ -228,116 +283,19 @@ export default function UsersPage() {
               <div>
                 <h2 className="text-xl font-semibold">Users</h2>
                 <p className="text-sm text-muted-foreground">
-                  {users.length} user{users.length !== 1 ? "s" : ""} found
+                  {users.length} user{users.length !== 1 ? "s" : ""} • Users are
+                  assigned roles only
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Create User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create User</DialogTitle>
-                      <DialogDescription>
-                        Create a new ClickHouse user. Leave password empty for
-                        passwordless auth.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      {createError && (
-                        <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          {createError}
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Username *</Label>
-                        <Input
-                          id="name"
-                          placeholder="e.g. analyst"
-                          value={newUser.name}
-                          onChange={(e) =>
-                            setNewUser({ ...newUser, name: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="Leave empty for no password"
-                          value={newUser.password}
-                          onChange={(e) =>
-                            setNewUser({ ...newUser, password: e.target.value })
-                          }
-                        />
-                      </div>
-                      {newUser.password && (
-                        <div className="space-y-2">
-                          <Label htmlFor="confirmPassword">
-                            Confirm Password
-                          </Label>
-                          <Input
-                            id="confirmPassword"
-                            type="password"
-                            placeholder="Confirm password"
-                            value={newUser.confirmPassword}
-                            onChange={(e) =>
-                              setNewUser({
-                                ...newUser,
-                                confirmPassword: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Label htmlFor="defaultDatabase">
-                          Default Database
-                        </Label>
-                        <Input
-                          id="defaultDatabase"
-                          placeholder="e.g. default"
-                          value={newUser.defaultDatabase}
-                          onChange={(e) =>
-                            setNewUser({
-                              ...newUser,
-                              defaultDatabase: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setCreateOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleCreateUser} disabled={creating}>
-                        {creating ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          "Create User"
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
+                <Button size="sm" onClick={openCreateDialog}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Create User
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={refresh}
+                  onClick={fetchData}
                   disabled={loading}
                 >
                   <RefreshCw
@@ -349,20 +307,18 @@ export default function UsersPage() {
             </div>
 
             <Card>
-              <ScrollArea className="h-[calc(100vh-320px)]">
+              <ScrollArea className="h-[calc(100vh-280px)]">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
                     <TableRow>
                       <TableHead className="w-[200px]">Name</TableHead>
                       <TableHead>Auth Type</TableHead>
-                      <TableHead>Storage</TableHead>
-                      <TableHead>Default Database</TableHead>
-                      <TableHead>Default Roles</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
+                      <TableHead>Assigned Roles</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedUsers.map((user) => (
+                    {users.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -378,140 +334,223 @@ export default function UsersPage() {
                             {user.auth_type}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {user.storage}
-                        </TableCell>
                         <TableCell>
-                          {user.default_database ? (
-                            <code className="px-1.5 py-0.5 rounded bg-muted text-xs">
-                              {user.default_database}
-                            </code>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {user.default_roles_all ? (
-                            <Badge variant="secondary" className="text-xs">
-                              All Roles
-                            </Badge>
-                          ) : user.default_roles_list &&
-                            user.default_roles_list.length > 0 ? (
+                          {user.assigned_roles &&
+                          user.assigned_roles.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {user.default_roles_list
-                                .slice(0, 2)
-                                .map((role) => (
-                                  <Badge
-                                    key={role}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {role}
-                                  </Badge>
-                                ))}
-                              {user.default_roles_list.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{user.default_roles_list.length - 2}
+                              {user.assigned_roles.map((role) => (
+                                <Badge
+                                  key={role}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  {role}
                                 </Badge>
-                              )}
+                              ))}
                             </div>
                           ) : (
-                            <span className="text-muted-foreground">None</span>
+                            <span className="text-muted-foreground text-sm">
+                              No roles assigned
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                disabled={deleting === user.name}
-                              >
-                                {deleting === user.name ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete user{" "}
-                                  <strong>{user.name}</strong>? This action
-                                  cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  onClick={() => handleDeleteUser(user.name)}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  disabled={deleting === user.name}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  {deleting === user.name ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Delete User
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete user{" "}
+                                    <strong>{user.name}</strong>? This action
+                                    cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleDelete(user.name)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </ScrollArea>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
-                  <span className="text-muted-foreground">
-                    {users.length} users
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                      disabled={currentPage === 0}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={totalPages}
-                        value={currentPage + 1}
-                        onChange={(e) => {
-                          const page = parseInt(e.target.value, 10);
-                          if (page >= 1 && page <= totalPages) {
-                            setCurrentPage(page - 1);
-                          }
-                        }}
-                        className="w-14 h-8 text-center text-sm"
-                      />
-                      <span className="text-muted-foreground">of {totalPages}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
-                      }
-                      disabled={currentPage >= totalPages - 1}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
             </Card>
           </div>
         )}
       </div>
+
+      {/* Create/Edit User Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Edit User" : "Create User"}</DialogTitle>
+            <DialogDescription>
+              {isEditing
+                ? "Update user password and role assignments."
+                : "Create a new user and assign roles. Privileges are managed at the role level."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {dialogError && (
+              <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {dialogError}
+              </div>
+            )}
+
+            {!isEditing && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Username *</Label>
+                <Input
+                  id="name"
+                  placeholder="e.g. analyst"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                {isEditing
+                  ? "New Password (leave empty to keep current)"
+                  : "Password"}
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder={
+                  isEditing ? "Leave empty to keep current" : "Enter password"
+                }
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+              />
+            </div>
+
+            {formData.password && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Confirm password"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Roles</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Select roles to assign. Privileges are defined at the role
+                level.
+              </p>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    {formData.selectedRoles.length > 0
+                      ? `${formData.selectedRoles.length} role(s) selected`
+                      : "Select roles..."}
+                    <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[300px]">
+                  <DropdownMenuLabel>Available Roles</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {roles.length === 0 ? (
+                    <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      No roles available. Create roles first.
+                    </div>
+                  ) : (
+                    roles.map((role) => (
+                      <DropdownMenuCheckboxItem
+                        key={role.name}
+                        checked={formData.selectedRoles.includes(role.name)}
+                        onCheckedChange={() => toggleRole(role.name)}
+                      >
+                        <Shield className="w-3.5 h-3.5 mr-2" />
+                        {role.name}
+                      </DropdownMenuCheckboxItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {formData.selectedRoles.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {formData.selectedRoles.map((role) => (
+                    <Badge key={role} variant="secondary" className="text-xs">
+                      {role}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  {isEditing ? "Saving..." : "Creating..."}
+                </>
+              ) : isEditing ? (
+                "Save Changes"
+              ) : (
+                "Create User"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

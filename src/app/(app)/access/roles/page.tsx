@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Header } from "@/components/layout";
 import {
   Table,
@@ -12,16 +12,18 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +31,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -43,193 +44,366 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import {
   Users,
   Shield,
-  Key,
   RefreshCw,
   AlertCircle,
   Loader2,
   Plus,
   Trash2,
-  UserPlus,
-  X,
-  ChevronLeft,
-  ChevronRight,
+  Pencil,
+  Database,
+  Eye,
+  Lock,
+  ChevronDown,
+  Check,
 } from "lucide-react";
+import {
+  FEATURE_ROLES,
+  DATA_PRIVILEGES,
+  getFeatureRole,
+  isRestrictedDatabase,
+  isFeatureRole,
+  type DataPrivilege,
+  type DataPrivilegeType,
+} from "@/lib/rbac";
+import type { SystemRole } from "@/lib/clickhouse";
 import Link from "next/link";
-import { useAccessStore } from "@/lib/store/access";
+import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 25;
+interface RoleWithPrivileges extends SystemRole {
+  isFeatureRole: boolean;
+  featureRoleInfo?: {
+    name: string;
+    description: string;
+    details: string;
+  };
+  inheritedRoles?: string[];
+  dataPrivileges?: DataPrivilege[];
+}
+
+interface DatabaseInfo {
+  name: string;
+}
+
+interface TableInfo {
+  database: string;
+  name: string;
+}
 
 export default function RolesPage() {
-  const { roles, roleGrants, users, loading, error, fetchAll, refresh, invalidate } =
-    useAccessStore();
+  const [roles, setRoles] = useState<RoleWithPrivileges[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(0);
+  // Database/table cache
+  const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
+  const [tables, setTables] = useState<TableInfo[]>([]);
+  const [loadingSchema, setLoadingSchema] = useState(false);
 
-  // Create role dialog
-  const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [newRoleName, setNewRoleName] = useState("");
+  // Create/Edit role dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isViewing, setIsViewing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    inheritedRoles: [] as string[],
+    dataPrivileges: [] as DataPrivilege[],
+  });
+
+  // New data privilege form
+  const [newDataPriv, setNewDataPriv] = useState({
+    database: "*",
+    table: "*",
+    privileges: [] as DataPrivilegeType[],
+  });
+
+  // Table search popover
+  const [tablePopoverOpen, setTablePopoverOpen] = useState(false);
+
+  // Current viewing role (for view mode)
+  const [viewingRole, setViewingRole] = useState<RoleWithPrivileges | null>(
+    null
+  );
 
   // Delete role
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Assign role dialog
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assigningRole, setAssigningRole] = useState<string | null>(null);
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState("");
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/clickhouse/access/roles");
+      const data = await response.json();
 
-  // Revoke role
-  const [revoking, setRevoking] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
-  // Pagination
-  const totalPages = Math.ceil(roles.length / PAGE_SIZE);
-  const paginatedRoles = useMemo(() => {
-    const start = currentPage * PAGE_SIZE;
-    return roles.slice(start, start + PAGE_SIZE);
-  }, [roles, currentPage]);
-
-  useEffect(() => {
-    if (currentPage >= totalPages && totalPages > 0) {
-      setCurrentPage(totalPages - 1);
+      if (data.success) {
+        setRoles(data.data || []);
+      } else {
+        setError(data.error || "Failed to fetch roles");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setLoading(false);
     }
-  }, [roles.length, totalPages, currentPage]);
+  }, []);
 
-  const handleCreateRole = async () => {
-    setCreateError(null);
-    if (!newRoleName.trim()) {
-      setCreateError("Role name is required");
+  // Fetch databases and tables once for dropdowns
+  const fetchSchema = useCallback(async () => {
+    if (databases.length > 0) return; // Already loaded
+
+    setLoadingSchema(true);
+    try {
+      // Fetch databases
+      const dbResponse = await fetch("/api/clickhouse/databases");
+      const dbData = await dbResponse.json();
+      if (dbData.success && dbData.data) {
+        // Filter out restricted databases
+        const filteredDbs = dbData.data.filter(
+          (db: DatabaseInfo) => !isRestrictedDatabase(db.name)
+        );
+        setDatabases(filteredDbs);
+
+        // Fetch tables for all databases in parallel
+        const allTables: TableInfo[] = [];
+        const tablePromises = filteredDbs.map(async (db: DatabaseInfo) => {
+          try {
+            const tablesResponse = await fetch(
+              `/api/clickhouse/tables?database=${encodeURIComponent(db.name)}`
+            );
+            const tablesData = await tablesResponse.json();
+            if (tablesData.success && tablesData.data) {
+              return tablesData.data.map((t: { name: string }) => ({
+                database: db.name,
+                name: t.name,
+              }));
+            }
+          } catch {
+            // Ignore individual database errors
+          }
+          return [];
+        });
+
+        const results = await Promise.all(tablePromises);
+        for (const tables of results) {
+          allTables.push(...tables);
+        }
+        setTables(allTables);
+      }
+    } catch (err) {
+      console.error("Failed to fetch schema:", err);
+    } finally {
+      setLoadingSchema(false);
+    }
+  }, [databases.length]);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
+
+  // Get all available roles for inheritance (both feature roles and user roles)
+  const availableRolesForInheritance = useMemo(() => {
+    return roles.map((r) => ({
+      id: r.name,
+      name: r.featureRoleInfo?.name || r.name,
+      description: r.featureRoleInfo?.description || "",
+      isFeatureRole: r.isFeatureRole,
+    }));
+  }, [roles]);
+
+  const openCreateDialog = () => {
+    setIsEditing(false);
+    setIsViewing(false);
+    setViewingRole(null);
+    setFormData({
+      name: "",
+      inheritedRoles: [],
+      dataPrivileges: [],
+    });
+    setNewDataPriv({ database: "*", table: "*", privileges: [] });
+    setDialogError(null);
+    setDialogOpen(true);
+    fetchSchema();
+  };
+
+  const openEditDialog = (role: RoleWithPrivileges) => {
+    setIsEditing(true);
+    setIsViewing(false);
+    setViewingRole(null);
+    setFormData({
+      name: role.name,
+      inheritedRoles: role.inheritedRoles || [],
+      dataPrivileges: role.dataPrivileges || [],
+    });
+    setNewDataPriv({ database: "*", table: "*", privileges: [] });
+    setDialogError(null);
+    setDialogOpen(true);
+    fetchSchema();
+  };
+
+  const openViewDialog = (role: RoleWithPrivileges) => {
+    setIsEditing(false);
+    setIsViewing(true);
+    setViewingRole(role);
+    setFormData({
+      name: role.name,
+      inheritedRoles: role.inheritedRoles || [],
+      dataPrivileges: role.dataPrivileges || [],
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    setDialogError(null);
+
+    if (!isEditing && !formData.name.trim()) {
+      setDialogError("Role name is required");
       return;
     }
 
-    setCreating(true);
+    setSaving(true);
+
     try {
-      const response = await fetch("/api/clickhouse/access/roles", {
-        method: "POST",
+      const endpoint = "/api/clickhouse/access/roles";
+      const method = isEditing ? "PUT" : "POST";
+
+      const response = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newRoleName.trim() }),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          inheritedRoles: formData.inheritedRoles,
+          dataPrivileges: formData.dataPrivileges,
+        }),
       });
+
       const data = await response.json();
+
       if (data.success) {
-        setCreateOpen(false);
-        setNewRoleName("");
-        invalidate();
-        fetchAll();
+        setDialogOpen(false);
+        fetchRoles();
       } else {
-        setCreateError(data.error || "Failed to create role");
+        setDialogError(
+          data.error || `Failed to ${isEditing ? "update" : "create"} role`
+        );
       }
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Network error");
+      setDialogError(err instanceof Error ? err.message : "Network error");
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
-  const handleDeleteRole = async (roleName: string) => {
+  const handleDelete = async (roleName: string) => {
     setDeleting(roleName);
+
     try {
       const response = await fetch("/api/clickhouse/access/roles", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: roleName }),
       });
+
       const data = await response.json();
+
       if (data.success) {
-        invalidate();
-        fetchAll();
+        fetchRoles();
+      } else {
+        setError(data.error || "Failed to delete role");
       }
     } catch (err) {
-      console.error("Delete failed:", err);
+      setError(err instanceof Error ? err.message : "Network error");
     } finally {
       setDeleting(null);
     }
   };
 
-  const handleAssignRole = async () => {
-    if (!assigningRole || !selectedUser) {
-      setAssignError("Please select a user");
+  const toggleInheritedRole = (roleId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      inheritedRoles: prev.inheritedRoles.includes(roleId)
+        ? prev.inheritedRoles.filter((r) => r !== roleId)
+        : [...prev.inheritedRoles, roleId],
+    }));
+  };
+
+  const toggleDataPrivilege = (priv: DataPrivilegeType) => {
+    setNewDataPriv((prev) => ({
+      ...prev,
+      privileges: prev.privileges.includes(priv)
+        ? prev.privileges.filter((p) => p !== priv)
+        : [...prev.privileges, priv],
+    }));
+  };
+
+  const addDataPrivilege = () => {
+    if (newDataPriv.privileges.length === 0) return;
+
+    // Validate not restricted database
+    if (
+      newDataPriv.database !== "*" &&
+      isRestrictedDatabase(newDataPriv.database)
+    ) {
+      setDialogError(
+        `Cannot grant privileges on '${newDataPriv.database}' database`
+      );
       return;
     }
 
-    setAssigning(true);
-    setAssignError(null);
+    setFormData((prev) => ({
+      ...prev,
+      dataPrivileges: [
+        ...prev.dataPrivileges,
+        {
+          database: newDataPriv.database || "*",
+          table: newDataPriv.table || "*",
+          privileges: [...newDataPriv.privileges],
+        },
+      ],
+    }));
 
-    try {
-      const response = await fetch("/api/clickhouse/access/role-grants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roleName: assigningRole,
-          granteeType: "user",
-          granteeName: selectedUser,
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setAssignOpen(false);
-        setAssigningRole(null);
-        setSelectedUser("");
-        invalidate();
-        fetchAll();
-      } else {
-        setAssignError(data.error || "Failed to assign role");
-      }
-    } catch (err) {
-      setAssignError(err instanceof Error ? err.message : "Network error");
-    } finally {
-      setAssigning(false);
-    }
+    setNewDataPriv({ database: "*", table: "*", privileges: [] });
   };
 
-  const handleRevokeRole = async (roleName: string, userName: string) => {
-    setRevoking(`${roleName}-${userName}`);
-    try {
-      const response = await fetch("/api/clickhouse/access/role-grants", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roleName,
-          granteeType: "user",
-          granteeName: userName,
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        invalidate();
-        fetchAll();
-      }
-    } catch (err) {
-      console.error("Revoke failed:", err);
-    } finally {
-      setRevoking(null);
-    }
+  const removeDataPrivilege = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      dataPrivileges: prev.dataPrivileges.filter((_, i) => i !== index),
+    }));
   };
 
-  const openAssignDialog = (roleName: string) => {
-    setAssigningRole(roleName);
-    setSelectedUser("");
-    setAssignError(null);
-    setAssignOpen(true);
-  };
+  // Get tables filtered by selected database
+  const filteredTables = useMemo(() => {
+    if (newDataPriv.database === "*") return tables;
+    return tables.filter((t) => t.database === newDataPriv.database);
+  }, [newDataPriv.database, tables]);
 
-  const getRoleAssignees = (roleName: string) => {
-    return roleGrants
-      .filter((g) => g.granted_role_name === roleName)
-      .map((g) => ({
-        name: g.user_name || g.role_name,
-        type: g.user_name ? "user" : "role",
-        withAdmin: g.with_admin_option,
-      }));
-  };
+  // Feature roles and user roles
+  const featureRoles = roles.filter((r) => r.isFeatureRole);
+  const userRoles = roles.filter((r) => !r.isFeatureRole);
 
   return (
     <div className="flex flex-col h-full">
@@ -248,18 +422,12 @@ export default function RolesPage() {
                 Roles
               </Link>
             </TabsTrigger>
-            <TabsTrigger value="grants" className="text-xs" asChild>
-              <Link href="/access/grants">
-                <Key className="w-3.5 h-3.5 mr-1" />
-                Grants
-              </Link>
-            </TabsTrigger>
           </TabsList>
         </Tabs>
       </Header>
 
-      <div className="flex-1 p-6">
-        {loading && roles.length === 0 ? (
+      <div className="flex-1 p-6 space-y-6">
+        {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -276,284 +444,536 @@ export default function RolesPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Roles</h2>
-                <p className="text-sm text-muted-foreground">
-                  {roles.length} role{roles.length !== 1 ? "s" : ""} defined
-                </p>
-              </div>
+          <>
+            {/* Feature Roles Section */}
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Create Role
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create Role</DialogTitle>
-                      <DialogDescription>
-                        Create a new role. You can assign permissions after creating.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      {createError && (
-                        <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          {createError}
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Label htmlFor="roleName">Role Name *</Label>
-                        <Input
-                          id="roleName"
-                          placeholder="e.g. read_only"
-                          value={newRoleName}
-                          onChange={(e) => setNewRoleName(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleCreateRole} disabled={creating}>
-                        {creating ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          "Create Role"
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-                  <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">Feature Roles</h2>
+                <Badge variant="secondary" className="text-xs">
+                  {featureRoles.length} roles
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                System-managed roles that enable UI features. View only.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {featureRoles.map((role) => (
+                  <Card
+                    key={role.id}
+                    className="cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => openViewDialog(role)}
+                  >
+                    <CardHeader className="py-3 px-4">
+                      <CardTitle className="text-sm flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-primary" />
+                          {role.featureRoleInfo?.name || role.name}
+                        </span>
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {role.featureRoleInfo?.description}
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))}
               </div>
             </div>
 
-            <Card>
-              <ScrollArea className="h-[calc(100vh-320px)]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow>
-                      <TableHead className="w-[200px]">Role Name</TableHead>
-                      <TableHead>Storage</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedRoles.map((role) => {
-                      const assignees = getRoleAssignees(role.name);
-                      return (
-                        <TableRow key={role.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <Shield className="w-4 h-4 text-muted-foreground" />
-                              {role.name}
-                            </div>
+            <Separator />
+
+            {/* User Roles Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Custom Roles</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {userRoles.length} role{userRoles.length !== 1 ? "s" : ""} •
+                    Inherit from feature roles and have data privileges
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={openCreateDialog}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Create Role
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchRoles}
+                    disabled={loading}
+                  >
+                    <RefreshCw
+                      className={`w-4 h-4 mr-1 ${
+                        loading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              <Card>
+                <ScrollArea className="h-[calc(100vh-480px)]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead className="w-[180px]">Role Name</TableHead>
+                        <TableHead>Inherited Roles</TableHead>
+                        <TableHead>Data Access</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {userRoles.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            className="text-center text-muted-foreground py-8"
+                          >
+                            No custom roles yet. Create one to get started.
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {role.storage}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap items-center gap-1">
-                              {assignees.length > 0 ? (
-                                <>
-                                  {assignees.slice(0, 3).map((a, i) => (
+                        </TableRow>
+                      ) : (
+                        userRoles.map((role) => (
+                          <TableRow key={role.id}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-muted-foreground" />
+                                {role.name}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {role.inheritedRoles &&
+                              role.inheritedRoles.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {role.inheritedRoles.map((ir) => {
+                                    const frInfo = getFeatureRole(ir);
+                                    return (
+                                      <Badge
+                                        key={ir}
+                                        variant={
+                                          isFeatureRole(ir)
+                                            ? "default"
+                                            : "outline"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {frInfo?.name || ir}
+                                      </Badge>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">
+                                  None
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {role.dataPrivileges &&
+                              role.dataPrivileges.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {role.dataPrivileges
+                                    .slice(0, 2)
+                                    .map((dp, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="secondary"
+                                        className="text-xs font-mono"
+                                      >
+                                        {dp.privileges.join(",")} on{" "}
+                                        {dp.database}.{dp.table}
+                                      </Badge>
+                                    ))}
+                                  {role.dataPrivileges.length > 2 && (
                                     <Badge
-                                      key={i}
-                                      variant={a.type === "user" ? "default" : "secondary"}
-                                      className="text-xs group cursor-pointer hover:bg-destructive/80"
-                                      onClick={() =>
-                                        a.type === "user" && a.name && handleRevokeRole(role.name, a.name)
-                                      }
-                                      title={a.type === "user" ? "Click to revoke" : undefined}
+                                      variant="outline"
+                                      className="text-xs"
                                     >
-                                      {revoking === `${role.name}-${a.name}` ? (
-                                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                      ) : (
-                                        <>
-                                          {a.type === "user" ? "👤" : "🛡️"} {a.name}
-                                          {a.type === "user" && (
-                                            <X className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100" />
-                                          )}
-                                        </>
-                                      )}
-                                    </Badge>
-                                  ))}
-                                  {assignees.length > 3 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{assignees.length - 3}
+                                      +{role.dataPrivileges.length - 2} more
                                     </Badge>
                                   )}
-                                </>
+                                </div>
                               ) : (
-                                <span className="text-muted-foreground text-xs">Not assigned</span>
+                                <span className="text-muted-foreground text-sm">
+                                  None
+                                </span>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 ml-1"
-                                onClick={() => openAssignDialog(role.name)}
-                                title="Assign to user"
-                              >
-                                <UserPlus className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  disabled={deleting === role.name}
+                                  className="h-8 w-8"
+                                  onClick={() => openEditDialog(role)}
                                 >
-                                  {deleting === role.name ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-4 h-4" />
-                                  )}
+                                  <Pencil className="w-4 h-4" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Role</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete role <strong>{role.name}</strong>?
-                                    This will remove it from all users.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    onClick={() => handleDeleteRole(role.name)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
-                  <span className="text-muted-foreground">
-                    {roles.length} roles
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                      disabled={currentPage === 0}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={totalPages}
-                        value={currentPage + 1}
-                        onChange={(e) => {
-                          const page = parseInt(e.target.value, 10);
-                          if (page >= 1 && page <= totalPages) {
-                            setCurrentPage(page - 1);
-                          }
-                        }}
-                        className="w-14 h-8 text-center text-sm"
-                      />
-                      <span className="text-muted-foreground">of {totalPages}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-                      disabled={currentPage >= totalPages - 1}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            {/* Assign Role Dialog */}
-            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Assign Role to User</DialogTitle>
-                  <DialogDescription>
-                    Grant role <strong>{assigningRole}</strong> to a user.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  {assignError && (
-                    <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      {assignError}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="assignUser">Select User *</Label>
-                    <select
-                      id="assignUser"
-                      value={selectedUser}
-                      onChange={(e) => setSelectedUser(e.target.value)}
-                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                    >
-                      <option value="">Choose a user...</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.name}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setAssignOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAssignRole} disabled={assigning}>
-                    {assigning ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                        Assigning...
-                      </>
-                    ) : (
-                      "Assign Role"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      disabled={deleting === role.name}
+                                    >
+                                      {deleting === role.name ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Delete Role
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete role{" "}
+                                        <strong>{role.name}</strong>?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        onClick={() => handleDelete(role.name)}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </Card>
+            </div>
+          </>
         )}
       </div>
+
+      {/* Create/Edit/View Role Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {isViewing
+                ? viewingRole?.featureRoleInfo?.name || viewingRole?.name
+                : isEditing
+                ? "Edit Role"
+                : "Create Role"}
+            </DialogTitle>
+            <DialogDescription>
+              {isViewing
+                ? viewingRole?.featureRoleInfo?.description
+                : isEditing
+                ? "Update role inheritance and data privileges."
+                : "Create a new role with inherited roles and data access."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isViewing && viewingRole ? (
+            // View mode for feature roles
+            <div className="space-y-4 py-4">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <p className="text-sm">
+                  {viewingRole.featureRoleInfo?.details}
+                </p>
+              </div>
+              <div>
+                <Label className="text-base">Role Name</Label>
+                <p className="text-sm font-mono text-muted-foreground mt-1">
+                  {viewingRole.name}
+                </p>
+              </div>
+            </div>
+          ) : (
+            // Edit/Create mode
+            <div className="space-y-6 py-4">
+              {dialogError && (
+                <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {dialogError}
+                </div>
+              )}
+
+              {!isEditing && (
+                <div className="space-y-2">
+                  <Label htmlFor="name">Role Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g. analyst_role"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                  />
+                </div>
+              )}
+
+              {/* Inherited Roles */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-base">Inherited Roles</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select roles to inherit privileges from.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                  {availableRolesForInheritance
+                    .filter((r) => r.id !== formData.name)
+                    .map((role) => (
+                      <div
+                        key={role.id}
+                        className={cn(
+                          "flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm",
+                          formData.inheritedRoles.includes(role.id)
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-muted-foreground/50"
+                        )}
+                        onClick={() => toggleInheritedRole(role.id)}
+                      >
+                        <Checkbox
+                          checked={formData.inheritedRoles.includes(role.id)}
+                          onCheckedChange={() => toggleInheritedRole(role.id)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium flex items-center gap-1">
+                            {role.name}
+                            {role.isFeatureRole && (
+                              <Lock className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          {role.description && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {role.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Data Privileges */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-base">Data Privileges</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Grant access to specific databases and tables.
+                  </p>
+                </div>
+
+                {/* Existing data privileges */}
+                {formData.dataPrivileges.length > 0 && (
+                  <div className="space-y-2">
+                    {formData.dataPrivileges.map((dp, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Database className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-mono text-sm">
+                            {dp.privileges.join(", ")} on {dp.database}.
+                            {dp.table}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeDataPrivilege(index)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new data privilege */}
+                <div className="p-3 rounded-lg border border-dashed space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Database</Label>
+                      <Select
+                        value={newDataPriv.database}
+                        onValueChange={(value) =>
+                          setNewDataPriv({
+                            ...newDataPriv,
+                            database: value,
+                            table: "*",
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select database" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="*">* (all databases)</SelectItem>
+                          {loadingSchema ? (
+                            <SelectItem value="_loading" disabled>
+                              Loading...
+                            </SelectItem>
+                          ) : (
+                            databases.map((db) => (
+                              <SelectItem key={db.name} value={db.name}>
+                                {db.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Table</Label>
+                      <Popover
+                        open={tablePopoverOpen}
+                        onOpenChange={setTablePopoverOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="h-9 w-full justify-between font-normal"
+                          >
+                            {newDataPriv.table === "*"
+                              ? "* (all tables)"
+                              : newDataPriv.table}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search tables..." />
+                            <CommandList>
+                              <CommandEmpty>No tables found.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="all-tables"
+                                  keywords={["all", "tables", "*"]}
+                                  onSelect={() => {
+                                    setNewDataPriv({
+                                      ...newDataPriv,
+                                      table: "*",
+                                    });
+                                    setTablePopoverOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      newDataPriv.table === "*"
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  * (all tables)
+                                </CommandItem>
+                                {filteredTables.map((t) => (
+                                  <CommandItem
+                                    key={`${t.database}.${t.name}`}
+                                    value={`${t.database}-${t.name}`}
+                                    keywords={[t.name, t.database]}
+                                    onSelect={() => {
+                                      setNewDataPriv({
+                                        ...newDataPriv,
+                                        table: t.name,
+                                      });
+                                      setTablePopoverOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        newDataPriv.table === t.name
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {t.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {DATA_PRIVILEGES.map((priv) => (
+                      <Badge
+                        key={priv.id}
+                        variant={
+                          newDataPriv.privileges.includes(priv.id)
+                            ? "default"
+                            : "outline"
+                        }
+                        className="cursor-pointer"
+                        onClick={() => toggleDataPrivilege(priv.id)}
+                      >
+                        {priv.name}
+                      </Badge>
+                    ))}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={addDataPrivilege}
+                    disabled={newDataPriv.privileges.length === 0}
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Add Data Access
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {isViewing ? (
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      {isEditing ? "Saving..." : "Creating..."}
+                    </>
+                  ) : isEditing ? (
+                    "Save Changes"
+                  ) : (
+                    "Create Role"
+                  )}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
