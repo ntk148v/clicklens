@@ -32,51 +32,55 @@ import {
 import { useState } from "react";
 import { useAuth } from "@/components/auth";
 
+// Navigation items with permission requirements
 const navigation = [
   {
     name: "SQL Console",
     href: "/sql",
     icon: Terminal,
     description: "Execute SQL queries",
+    requiresPermission: null, // Always visible
   },
   {
     name: "Tables",
     href: "/tables",
     icon: Database,
     description: "Browse databases and tables",
+    requiresPermission: null,
   },
   {
     name: "Queries",
     href: "/monitoring/queries",
     icon: Activity,
     description: "Monitor running queries",
+    requiresPermission: "canViewProcesses" as const,
   },
   {
     name: "Cluster",
     href: "/monitoring/cluster",
     icon: Server,
     description: "Cluster health and metrics",
+    requiresPermission: null,
   },
   {
     name: "Access",
     href: "/access/users",
     icon: Users,
     description: "Users, roles, and grants",
-    permission: "canViewAccess", // Add permission requirement
+    requiresPermission: "canManageUsers" as const,
   },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout, isLoading, permissions } = useAuth(); // Get permissions
+  const { user, permissions, logout, isLoading } = useAuth();
 
   // Filter navigation based on permissions
-  const filteredNavigation = navigation.filter((item) => {
-    if (item.permission === "canViewAccess") {
-      return permissions.canViewAccess;
-    }
-    return true;
+  const visibleNavigation = navigation.filter((item) => {
+    if (!item.requiresPermission) return true;
+    if (!permissions) return false;
+    return permissions[item.requiresPermission];
   });
 
   return (
@@ -103,7 +107,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-1">
-          {filteredNavigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
 
@@ -171,6 +175,9 @@ export function Sidebar() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium">{user.username}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user.host} / {user.database}
+                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
