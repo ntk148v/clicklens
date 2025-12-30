@@ -251,30 +251,60 @@ export async function PUT(
         (r) => r.granted_role_name
       );
 
+      const newRoles = body.roles;
+
       // Revoke removed roles
       for (const role of currentRoles) {
-        if (!body.roles.includes(role)) {
-          await client.command(
-            `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`
-          );
+        if (!newRoles.includes(role)) {
+          try {
+            await client.command(
+              `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`
+            );
+          } catch (e) {
+            console.error(
+              `Failed to revoke role ${role} from user ${body.name}:`,
+              e
+            );
+          }
         }
       }
 
       // Grant new roles
-      for (const role of body.roles) {
+      for (const role of newRoles) {
         if (!currentRoles.includes(role)) {
-          await client.command(
-            `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`
-          );
+          try {
+            await client.command(
+              `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`
+            );
+          } catch (e) {
+            console.error(
+              `Failed to grant role ${role} to user ${body.name}:`,
+              e
+            );
+          }
         }
       }
 
-      // Set default roles
-      if (body.roles.length > 0) {
-        const roleList = body.roles.map(quoteIdentifier).join(", ");
-        await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
+      // Set default roles - ALWAYS update this to match the new roles
+      if (newRoles.length > 0) {
+        const roleList = newRoles.map(quoteIdentifier).join(", ");
+        try {
+          await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
+        } catch (e) {
+          console.error(
+            `Failed to set default roles for user ${body.name}:`,
+            e
+          );
+        }
       } else {
-        await client.command(`SET DEFAULT ROLE NONE TO ${quotedUser}`);
+        try {
+          await client.command(`SET DEFAULT ROLE NONE TO ${quotedUser}`);
+        } catch (e) {
+          console.error(
+            `Failed to clear default roles for user ${body.name}:`,
+            e
+          );
+        }
       }
     }
 
