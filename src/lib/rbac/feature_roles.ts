@@ -116,20 +116,6 @@ export function isFeatureRole(roleName: string): boolean {
 }
 
 /**
- * Filter out feature roles from a list of role names
- */
-export function filterOutFeatureRoles(roleNames: string[]): string[] {
-  return roleNames.filter((name) => !isFeatureRole(name));
-}
-
-/**
- * Get only feature roles from a list of role names
- */
-export function getFeatureRolesFromList(roleNames: string[]): string[] {
-  return roleNames.filter((name) => isFeatureRole(name));
-}
-
-/**
  * Data privilege types for database/table access
  */
 export const DATA_PRIVILEGES = [

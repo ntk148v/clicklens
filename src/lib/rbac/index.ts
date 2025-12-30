@@ -4,10 +4,8 @@ export {
   DATA_PRIVILEGES,
   getFeatureRole,
   isFeatureRole,
-  filterOutFeatureRoles,
-  getFeatureRolesFromList,
   isRestrictedDatabase,
   type FeatureRole,
   type DataPrivilege,
   type DataPrivilegeType,
-} from "./capabilities";
+} from "./feature_roles";
