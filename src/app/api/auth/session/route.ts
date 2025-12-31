@@ -5,14 +5,12 @@
 
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getUserPermissions, UserPermissions } from "@/lib/auth/permissions";
 
 export interface SessionResponse {
   isLoggedIn: boolean;
   user?: {
     username: string;
   };
-  permissions?: UserPermissions;
 }
 
 export async function GET(): Promise<NextResponse<SessionResponse>> {
@@ -22,14 +20,10 @@ export async function GET(): Promise<NextResponse<SessionResponse>> {
     return NextResponse.json({ isLoggedIn: false });
   }
 
-  // Get permissions for the user
-  const permissions = await getUserPermissions(session.user.username);
-
   return NextResponse.json({
     isLoggedIn: true,
     user: {
       username: session.user.username,
     },
-    permissions,
   });
 }

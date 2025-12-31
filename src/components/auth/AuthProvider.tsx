@@ -11,16 +11,21 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
+  host: string;
   username: string;
+  database: string;
 }
 
-interface UserPermissions {
-  canViewAccess: boolean;
+interface Permissions {
+  canManageUsers: boolean;
+  canViewProcesses: boolean;
+  canKillQueries: boolean;
+  canViewCluster: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  permissions: UserPermissions;
+  permissions: Permissions | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (
@@ -31,13 +36,13 @@ interface AuthContextType {
 }
 
 interface LoginCredentials {
+  host: string;
+  port: number;
   username: string;
   password: string;
+  database?: string;
+  protocol?: "http" | "https";
 }
-
-const defaultPermissions: UserPermissions = {
-  canViewAccess: false,
-};
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -55,11 +60,28 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [permissions, setPermissions] =
-    useState<UserPermissions>(defaultPermissions);
+  const [permissions, setPermissions] = useState<Permissions | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+
+  const fetchPermissions = useCallback(async () => {
+    try {
+      const response = await fetch("/api/auth/permissions");
+      const data = await response.json();
+
+      if (data.success && data.permissions) {
+        setPermissions({
+          canManageUsers: data.permissions.canManageUsers,
+          canViewProcesses: data.permissions.canViewProcesses,
+          canKillQueries: data.permissions.canKillQueries,
+          canViewCluster: data.permissions.canViewCluster,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch permissions:", error);
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -68,23 +90,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (data.isLoggedIn && data.user) {
         setUser(data.user);
-        if (data.permissions) {
-          setPermissions(data.permissions);
-        } else {
-          setPermissions(defaultPermissions);
-        }
+        // Fetch permissions after session is confirmed
+        await fetchPermissions();
       } else {
         setUser(null);
-        setPermissions(defaultPermissions);
+        setPermissions(null);
       }
     } catch (error) {
       console.error("Failed to fetch session:", error);
       setUser(null);
-      setPermissions(defaultPermissions);
+      setPermissions(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchPermissions]);
 
   useEffect(() => {
     refresh();
@@ -129,7 +148,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       setUser(null);
-      setPermissions(defaultPermissions);
+      setPermissions(null);
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
