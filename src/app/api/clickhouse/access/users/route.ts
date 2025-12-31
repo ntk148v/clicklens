@@ -20,14 +20,7 @@ export interface UsersResponse {
   error?: string;
 }
 
-// Helper functions
-function quoteIdentifier(name: string): string {
-  return `\`${name.replace(/`/g, "``")}\``;
-}
-
-function escapeString(str: string): string {
-  return str.replace(/'/g, "''").replace(/\\/g, "\\\\");
-}
+import { quoteIdentifier, escapeString } from "@/lib/clickhouse/utils";
 
 // GET: List all users with their assigned roles
 export async function GET(): Promise<NextResponse<UsersResponse>> {

@@ -13,6 +13,7 @@ interface PermissionsResponse {
     canManageUsers: boolean;
     canViewProcesses: boolean;
     canKillQueries: boolean;
+    canViewCluster: boolean;
     username: string;
   };
   error?: string;
@@ -31,46 +32,46 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
 
     const client = createClientWithConfig(config);
 
-    // Get current user's grants to strictly check permissions
-    const grantsResult = await client.query<{ grant: string }>(
-      "SHOW GRANTS FOR CURRENT_USER"
-    );
-    const grantStrings = grantsResult.data.map((r) => r.grant);
+    // Run permission probes in parallel to reduce latency
+    const [grantsResult, featuresResult] = await Promise.allSettled([
+      // 1. Get Grants strict check
+      client.query<{ grant: string }>("SHOW GRANTS FOR CURRENT_USER"),
+      // 2. Run probes
+      Promise.allSettled([
+        // manage users probe
+        client.query("SHOW CREATE USER CURRENT_USER"),
+        // view processes probe
+        client.query("SELECT 1 FROM system.processes LIMIT 1"),
+        // view cluster probe (system.metrics)
+        client.query("SELECT 1 FROM system.metrics LIMIT 1"),
+      ]),
+    ]);
 
-    // Check for ACCESS MANAGEMENT
-    // Grants look like: GRANT ACCESS MANAGEMENT ON *.* TO user
-    // or GRANT ALL ON *.* TO user (ALL usually includes it? No, ALL is usually strictly data/ddl)
-    // Actually, ALL usually implies full control.
-    // Check for system.processes access or monitoring roles
-    // Use probes to determine capabilities since parsing SHOW GRANTS
-    // is unreliable for roles (e.g. default_role).
+    // Process Grants
+    const grantStrings =
+      grantsResult.status === "fulfilled"
+        ? grantsResult.value.data.map((r) => r.grant)
+        : [];
 
-    // Check Access Management (can we show user creation?)
-    // Check Access Management (can we show user creation?)
+    // Process Probes
     let canManageUsers = false;
-    try {
-      await client.query("SHOW CREATE USER CURRENT_USER");
-      canManageUsers = true;
-    } catch (e) {
-      // Ignored
-    }
-
-    // Check Query Monitoring (can we read system.processes?)
     let canViewProcesses = false;
-    try {
-      await client.query("SELECT 1 FROM system.processes LIMIT 1");
-      canViewProcesses = true;
-    } catch (e) {
-      // Ignored
+    let canViewCluster = false;
+
+    if (featuresResult.status === "fulfilled") {
+      const results = featuresResult.value;
+
+      // Index 0: canManageUsers
+      if (results[0].status === "fulfilled") canManageUsers = true;
+
+      // Index 1: canViewProcesses
+      if (results[1].status === "fulfilled") canViewProcesses = true;
+
+      // Index 2: canViewCluster
+      if (results[2].status === "fulfilled") canViewCluster = true;
     }
 
-    // Check Kill Query (hard to probe without side effects, so we fallback
-    // to optimistic true if canViewProcesses is true, or rely on specific grant if visible?
-    // Actually, let's keep it strictly based on GRANTs or assume false?
-    // User hasn't complained about Kill yet. But let's check grants for explicit KILL or ALL.
-    // However, GRANTs doesn't show inherited.
-    // Better to allow UI to show it if canViewProcesses, and let action fail.
-    // But for now, let's be conservative. If canManageUsers (Admin), likely can Kill?
+    // Check Kill Query (fallback to strict grants or admin status)
     const canKillQueries =
       canManageUsers ||
       grantStrings.some(
@@ -83,6 +84,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canManageUsers,
         canViewProcesses,
         canKillQueries,
+        canViewCluster,
         username: config.username,
       },
     });

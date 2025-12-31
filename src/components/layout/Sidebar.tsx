@@ -60,7 +60,7 @@ const navigation = [
     href: "/monitoring/cluster",
     icon: Server,
     description: "Cluster health and metrics",
-    requiresPermission: null,
+    requiresPermission: "canViewCluster" as const,
   },
   {
     name: "Access",

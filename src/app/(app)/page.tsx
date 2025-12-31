@@ -67,6 +67,9 @@ export default function HomePage() {
       // Align with sidebar logic
       return permissions?.canViewProcesses;
     }
+    if (feature.title === "Cluster Health") {
+      return permissions?.canViewCluster;
+    }
     return true;
   });
 

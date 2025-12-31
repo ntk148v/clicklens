@@ -20,6 +20,7 @@ interface Permissions {
   canManageUsers: boolean;
   canViewProcesses: boolean;
   canKillQueries: boolean;
+  canViewCluster: boolean;
 }
 
 interface AuthContextType {
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           canManageUsers: data.permissions.canManageUsers,
           canViewProcesses: data.permissions.canViewProcesses,
           canKillQueries: data.permissions.canKillQueries,
+          canViewCluster: data.permissions.canViewCluster,
         });
       }
     } catch (error) {

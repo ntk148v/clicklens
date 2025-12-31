@@ -44,10 +44,7 @@ export interface RolesResponse {
   error?: string;
 }
 
-// Helper functions
-function quoteIdentifier(name: string): string {
-  return `\`${name.replace(/`/g, "``")}\``;
-}
+import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 // Ensure feature roles exist (auto-create on first access)
 async function ensureFeatureRoles(
