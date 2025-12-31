@@ -194,6 +194,8 @@ interface SqlEditorProps {
   value: string;
   onChange: (value: string) => void;
   onExecute?: () => void;
+  onExecuteAtCursor?: () => void;
+  onCursorChange?: (position: number) => void;
   onExplain?: () => void;
   placeholder?: string;
   readOnly?: boolean;
@@ -203,6 +205,8 @@ export function SqlEditor({
   value,
   onChange,
   onExecute,
+  onExecuteAtCursor,
+  onCursorChange,
   onExplain,
   placeholder = "Enter SQL query...",
   readOnly = false,
@@ -213,13 +217,32 @@ export function SqlEditor({
   const themeCompartment = useRef(new Compartment());
   const { resolvedTheme } = useTheme();
 
-  // Handle Ctrl+Enter to execute
+  // Store callbacks in refs so keymap always has latest values
+  const onExecuteRef = useRef(onExecute);
+  const onExecuteAtCursorRef = useRef(onExecuteAtCursor);
+  const onExplainRef = useRef(onExplain);
+
+  // Keep refs updated with latest props
+  useEffect(() => {
+    onExecuteRef.current = onExecute;
+    onExecuteAtCursorRef.current = onExecuteAtCursor;
+    onExplainRef.current = onExplain;
+  }, [onExecute, onExecuteAtCursor, onExplain]);
+
+  // Handle Ctrl+Enter to execute, Shift+Enter for execute at cursor
   const executeKeymap = keymap.of([
     {
       key: "Ctrl-Enter",
       mac: "Cmd-Enter",
       run: () => {
-        onExecute?.();
+        onExecuteRef.current?.();
+        return true;
+      },
+    },
+    {
+      key: "Shift-Enter",
+      run: () => {
+        onExecuteAtCursorRef.current?.();
         return true;
       },
     },
@@ -227,19 +250,28 @@ export function SqlEditor({
       key: "Ctrl-Shift-e",
       mac: "Cmd-Shift-e",
       run: () => {
-        onExplain?.();
+        onExplainRef.current?.();
         return true;
       },
     },
   ]);
 
   const updateListener = useCallback(
-    (update: { docChanged: boolean; state: EditorState }) => {
+    (update: {
+      docChanged: boolean;
+      state: EditorState;
+      selectionSet: boolean;
+    }) => {
       if (update.docChanged) {
         onChange(update.state.doc.toString());
       }
+      // Report cursor position changes
+      if (update.selectionSet || update.docChanged) {
+        const pos = update.state.selection.main.head;
+        onCursorChange?.(pos);
+      }
     },
-    [onChange]
+    [onChange, onCursorChange]
   );
 
   useEffect(() => {

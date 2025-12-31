@@ -33,7 +33,14 @@ import {
   Square,
   Bookmark,
   Save,
+  ChevronDown,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { QueryResponse } from "@/app/api/clickhouse/query/route";
 
 export default function SqlConsolePage() {
@@ -43,6 +50,7 @@ export default function SqlConsolePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   // Initialize tabs on first load
   useEffect(() => {
@@ -245,6 +253,99 @@ export default function SqlConsolePage() {
     [activeTabId, activeQueryTab, updateTab]
   );
 
+  const handleCursorChange = useCallback((position: number) => {
+    setCursorPosition(position);
+  }, []);
+
+  const handleExecuteAtCursor = useCallback(async () => {
+    const tab = getActiveQueryTab();
+    if (!tab || tab.isRunning) return;
+
+    const sql = tab.sql.trim();
+    if (!sql) return;
+
+    const { findStatementAtPosition } = await import("@/lib/sql");
+    const statement = findStatementAtPosition(tab.sql, cursorPosition);
+
+    if (!statement) return;
+
+    const queryId = crypto.randomUUID();
+    updateTab(tab.id, { isRunning: true, error: null, queryId });
+
+    try {
+      const response = await fetch("/api/clickhouse/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql: statement, query_id: queryId }),
+      });
+
+      const data: QueryResponse = await response.json();
+
+      const currentTab = getActiveQueryTab();
+      if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning)
+        return;
+
+      if (data.success && data.data && data.meta && data.statistics) {
+        updateTab(tab.id, {
+          isRunning: false,
+          result: {
+            data: data.data as Record<string, unknown>[],
+            meta: data.meta,
+            rows: data.rows!,
+            rows_before_limit_at_least: data.rows_before_limit_at_least,
+            statistics: data.statistics,
+          },
+          error: null,
+          queryId: undefined,
+        });
+
+        addToHistory({
+          sql: statement,
+          duration: data.statistics.elapsed,
+          rowsReturned: data.rows,
+          rowsRead: data.statistics.rows_read,
+          bytesRead: data.statistics.bytes_read,
+          memoryUsage: data.statistics.memory_usage,
+          user: user?.username,
+        });
+      } else {
+        updateTab(tab.id, {
+          isRunning: false,
+          result: null,
+          error: data.error || {
+            code: 0,
+            message: "Unknown error",
+            type: "unknown",
+            userMessage: "An unexpected error occurred",
+          },
+          queryId: undefined,
+        });
+
+        addToHistory({
+          sql: statement,
+          error: data.error?.userMessage || "Error",
+        });
+      }
+    } catch (error) {
+      updateTab(tab.id, {
+        isRunning: false,
+        result: null,
+        error: {
+          code: 0,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "network",
+          userMessage: "Failed to connect to server",
+        },
+        queryId: undefined,
+      });
+
+      addToHistory({
+        sql: statement,
+        error: "Network error",
+      });
+    }
+  }, [getActiveQueryTab, updateTab, addToHistory, user, cursorPosition]);
+
   const handleHistorySelect = useCallback(
     (sql: string) => {
       if (activeTabId && activeQueryTab) {
@@ -285,23 +386,53 @@ export default function SqlConsolePage() {
 
           <Separator orientation="vertical" className="h-6" />
 
-          <Button
-            size="sm"
-            onClick={handleExecute}
-            disabled={!activeQueryTab || activeQueryTab.isRunning}
-          >
-            {activeQueryTab?.isRunning ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                Running...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 mr-1" />
-                Run
-              </>
-            )}
-          </Button>
+          <div className="flex items-center">
+            <Button
+              size="sm"
+              onClick={handleExecute}
+              disabled={!activeQueryTab || activeQueryTab.isRunning}
+              className="rounded-r-none"
+            >
+              {activeQueryTab?.isRunning ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-1" />
+                  Run
+                </>
+              )}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  disabled={!activeQueryTab || activeQueryTab.isRunning}
+                  className="rounded-l-none border-l-0 px-2"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExecute}>
+                  <Play className="w-4 h-4 mr-2" />
+                  Run All
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    Ctrl+Enter
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExecuteAtCursor}>
+                  <Play className="w-4 h-4 mr-2" />
+                  Run at Cursor
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    Shift+Enter
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
           {activeQueryTab?.isRunning && (
             <Button
@@ -389,6 +520,8 @@ export default function SqlConsolePage() {
                     value={activeQueryTab.sql}
                     onChange={handleSqlChange}
                     onExecute={handleExecute}
+                    onExecuteAtCursor={handleExecuteAtCursor}
+                    onCursorChange={handleCursorChange}
                     readOnly={activeQueryTab.isRunning}
                   />
                 </div>

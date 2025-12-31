@@ -1,1 +1,1 @@
-export { splitSqlStatements } from "./splitter";
+export { splitSqlStatements, findStatementAtPosition } from "./splitter";

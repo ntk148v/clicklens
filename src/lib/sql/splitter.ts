@@ -103,3 +103,105 @@ export function splitSqlStatements(sql: string): string[] {
 
   return statements;
 }
+
+/**
+ * Find the statement that contains the given cursor position
+ * @param sql The full SQL text
+ * @param cursorPosition The character offset of the cursor (0-indexed)
+ * @returns The statement at cursor, or null if none found
+ */
+export function findStatementAtPosition(
+  sql: string,
+  cursorPosition: number
+): string | null {
+  let current = "";
+  let statementStart = 0;
+  let i = 0;
+
+  while (i < sql.length) {
+    const char = sql[i];
+    const nextChar = sql[i + 1];
+
+    // Check for single-line comment (--)
+    if (char === "-" && nextChar === "-") {
+      const endOfLine = sql.indexOf("\n", i);
+      if (endOfLine === -1) {
+        current += sql.slice(i);
+        break;
+      }
+      current += sql.slice(i, endOfLine + 1);
+      i = endOfLine + 1;
+      continue;
+    }
+
+    // Check for multi-line comment
+    if (char === "/" && nextChar === "*") {
+      const endComment = sql.indexOf("*/", i + 2);
+      if (endComment === -1) {
+        current += sql.slice(i);
+        break;
+      }
+      current += sql.slice(i, endComment + 2);
+      i = endComment + 2;
+      continue;
+    }
+
+    // Check for string literals
+    if (char === "'" || char === '"') {
+      const quote = char;
+      current += char;
+      i++;
+
+      while (i < sql.length) {
+        const c = sql[i];
+        current += c;
+
+        if (c === quote) {
+          if (sql[i + 1] === quote) {
+            current += sql[i + 1];
+            i += 2;
+            continue;
+          }
+          i++;
+          break;
+        }
+
+        if (c === "\\" && i + 1 < sql.length) {
+          current += sql[i + 1];
+          i += 2;
+          continue;
+        }
+
+        i++;
+      }
+      continue;
+    }
+
+    // Check for statement terminator
+    if (char === ";") {
+      const statementEnd = i; // Position of the semicolon
+
+      // Check if cursor is within this statement
+      if (cursorPosition >= statementStart && cursorPosition <= statementEnd) {
+        const trimmed = current.trim();
+        return trimmed || null;
+      }
+
+      current = "";
+      statementStart = i + 1;
+      i++;
+      continue;
+    }
+
+    current += char;
+    i++;
+  }
+
+  // Check if cursor is in the last statement (no trailing semicolon)
+  if (cursorPosition >= statementStart) {
+    const trimmed = current.trim();
+    return trimmed || null;
+  }
+
+  return null;
+}
