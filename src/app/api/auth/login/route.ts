@@ -12,9 +12,10 @@ import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
 import {
   getUserConfig,
-  buildClickHouseUrl,
+  buildConnectionUrl,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
+import https from "https";
 
 export interface LoginRequest {
   username: string;
@@ -66,11 +67,16 @@ export async function POST(
       );
     }
 
-    // Test connection to ClickHouse
-    const url = buildClickHouseUrl(
-      config,
-      `/?query=${encodeURIComponent("SELECT version()")}`
-    );
+    // Build connection URL and test connection
+    const baseUrl = buildConnectionUrl(config);
+    const url = `${baseUrl}/?query=${encodeURIComponent("SELECT version()")}`;
+
+    // Configure fetch options for SSL
+    const fetchOptions: RequestInit = {};
+    if (config.secure && !config.verifySsl) {
+      // @ts-expect-error - Node.js specific option
+      fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
+    }
 
     const response = await fetch(url, {
       method: "GET",
@@ -78,6 +84,7 @@ export async function POST(
         "X-ClickHouse-User": config.username,
         "X-ClickHouse-Key": config.password,
       },
+      ...fetchOptions,
     });
 
     if (!response.ok) {

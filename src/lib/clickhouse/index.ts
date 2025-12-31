@@ -11,7 +11,7 @@ export {
   getDefaultConfig,
   getLensConfig,
   getUserConfig,
-  buildClickHouseUrl,
+  buildConnectionUrl,
   buildAuthHeaders,
   isLensUserConfigured,
 } from "./config";

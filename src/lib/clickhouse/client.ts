@@ -1,38 +1,36 @@
 /**
  * ClickHouse Client Factory
- * Creates either Native or HTTP client based on configuration
+ * Creates a ClickHouse client using @clickhouse/client (HTTP interface)
  */
 
 import { type ClickHouseConfig, getLensConfig } from "./config";
 import { type ClickHouseClient } from "./clients/types";
-import { NativeClient } from "./clients/native";
-import { HttpClient } from "./clients/http";
+import { ClickHouseClientImpl } from "./clients/client";
 
 // Re-export types
 export * from "./clients/types";
-export { NativeClient } from "./clients/native";
-export { HttpClient } from "./clients/http";
+export { ClickHouseClientImpl } from "./clients/client";
 
 /**
  * Create a ClickHouse client
  *
  * @param config - ClickHouse configuration. If not provided, uses environment variables via getLensConfig()
- * @returns ClickHouseClient instance (either NativeClient or HttpClient based on config.clientType)
+ * @returns ClickHouseClient instance using @clickhouse/client (HTTP interface)
  *
  * @example
  * // With explicit config
  * const client = createClient({
  *   host: "localhost",
  *   port: 8123,
- *   protocol: "http",
+ *   secure: false,
+ *   verifySsl: true,
  *   username: "default",
  *   password: "",
  *   database: "default",
- *   clientType: "native", // or "http"
  * });
  *
  * @example
- * // Using environment variables (CLICKHOUSE_HOST, LENS_USER, etc.)
+ * // Using environment variables
  * const client = createClient();
  */
 export function createClient(config?: ClickHouseConfig): ClickHouseClient {
@@ -45,17 +43,7 @@ export function createClient(config?: ClickHouseConfig): ClickHouseClient {
     );
   }
 
-  // Determine client type: explicit config > env var > default to "native"
-  const clientType =
-    resolvedConfig.clientType ||
-    (process.env.CLICKHOUSE_CLIENT_TYPE as "native" | "http") ||
-    "native";
-
-  if (clientType === "http") {
-    return new HttpClient(resolvedConfig);
-  }
-
-  return new NativeClient(resolvedConfig);
+  return new ClickHouseClientImpl(resolvedConfig);
 }
 
 /**

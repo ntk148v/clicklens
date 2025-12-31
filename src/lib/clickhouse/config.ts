@@ -1,43 +1,65 @@
 /**
  * ClickHouse client configuration
  *
- * Architecture:
- * - Server connection (host, port, protocol) from environment variables
- * - Lens user (for metadata queries) from environment variables
- * - End user credentials from session (for data queries)
+ * Environment Variables:
+ * - CLICKHOUSE_HOST: ClickHouse server hostname
+ * - CLICKHOUSE_PORT: ClickHouse HTTP port (default: 8123, or 8443 for HTTPS)
+ * - CLICKHOUSE_SECURE: "true" or "false" (default: "false") - use HTTPS
+ * - CLICKHOUSE_VERIFY: "true" or "false" (default: "true") - verify SSL certificate
+ * - LENS_USER: Service user for metadata queries
+ * - LENS_PASSWORD: Service user password
+ *
+ * Note: ClickLens uses ClickHouse HTTP interface (ports 8123/8443).
+ * The native TCP protocol (ports 9000/9440) is NOT supported.
  */
 
 export interface ClickHouseConfig {
   host: string;
   port: number;
+  /** Use secure connection (HTTPS) */
+  secure: boolean;
+  /** Verify SSL certificate */
+  verifySsl: boolean;
   username: string;
   password: string;
   database: string;
-  protocol: "http" | "https";
-  /** Client implementation: 'native' uses @clickhouse/client, 'http' uses fetch API */
-  clientType?: "native" | "http";
 }
 
 /**
  * Get server connection config from environment
- * This is the base config without user credentials
  */
-function getServerConnection(): {
-  host: string;
-  port: number;
-  protocol: "http" | "https";
-} | null {
+function getServerConnection(): Omit<
+  ClickHouseConfig,
+  "username" | "password" | "database"
+> | null {
   const host = process.env.CLICKHOUSE_HOST;
 
   if (!host) {
     return null;
   }
 
+  const secure = process.env.CLICKHOUSE_SECURE === "true";
+  const verifySsl = process.env.CLICKHOUSE_VERIFY !== "false"; // Default to true
+
+  // Default ports for HTTP interface
+  const defaultPort = secure ? 8443 : 8123;
+
   return {
     host,
-    port: parseInt(process.env.CLICKHOUSE_PORT || "8123", 10),
-    protocol: (process.env.CLICKHOUSE_PROTOCOL as "http" | "https") || "http",
+    port: parseInt(process.env.CLICKHOUSE_PORT || String(defaultPort), 10),
+    secure,
+    verifySsl,
   };
+}
+
+/**
+ * Build connection URL from config
+ */
+export function buildConnectionUrl(
+  config: Omit<ClickHouseConfig, "username" | "password" | "database">
+): string {
+  const scheme = config.secure ? "https" : "http";
+  return `${scheme}://${config.host}:${config.port}`;
 }
 
 /**
@@ -90,17 +112,7 @@ export function getDefaultConfig(): ClickHouseConfig | null {
 }
 
 /**
- * Build ClickHouse URL from config
- */
-export function buildClickHouseUrl(
-  config: ClickHouseConfig,
-  path: string = ""
-): string {
-  return `${config.protocol}://${config.host}:${config.port}${path}`;
-}
-
-/**
- * Build auth headers for ClickHouse
+ * Build auth headers for ClickHouse HTTP interface
  */
 export function buildAuthHeaders(
   config: ClickHouseConfig

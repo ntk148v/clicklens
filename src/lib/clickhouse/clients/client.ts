@@ -1,25 +1,27 @@
 import {
   createClient,
-  type ClickHouseClient as NativeClickHouseClient,
+  type ClickHouseClient as OfficialClickHouseClient,
 } from "@clickhouse/client";
-import { type ClickHouseConfig, buildClickHouseUrl } from "../config";
+import { type ClickHouseConfig, buildConnectionUrl } from "../config";
 import { type ClickHouseClient, type ClickHouseQueryResult } from "./types";
 
 /**
- * Native ClickHouse Client Wrapper
- * Uses @clickhouse/client for communication
+ * ClickHouse Client Implementation
+ * Uses @clickhouse/client (HTTP interface) for communication
  */
-export class NativeClient implements ClickHouseClient {
-  private client: NativeClickHouseClient;
+export class ClickHouseClientImpl implements ClickHouseClient {
+  private client: OfficialClickHouseClient;
 
   constructor(config: ClickHouseConfig) {
     this.client = createClient({
-      url: buildClickHouseUrl(config),
+      url: buildConnectionUrl(config),
       username: config.username,
       password: config.password,
       database: config.database,
       request_timeout: 300_000, // Default 300s
       application: "ClickLens",
+      // Note: @clickhouse/client automatically uses TLS when URL starts with https://
+      // For self-signed certificates, set NODE_TLS_REJECT_UNAUTHORIZED=0 in env
     });
   }
 
