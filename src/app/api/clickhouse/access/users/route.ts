@@ -151,15 +151,44 @@ export async function POST(
 
     await client.command(sql);
 
+    const errors: string[] = [];
+
     // Grant roles to user (not direct privileges!)
     if (body.roles && body.roles.length > 0) {
       for (const role of body.roles) {
-        await client.command(`GRANT ${quoteIdentifier(role)} TO ${quotedUser}`);
+        try {
+          await client.command(
+            `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`
+          );
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(
+            `Failed to grant role ${role} to user ${body.name}:`,
+            msg
+          );
+          errors.push(`Failed to grant role ${role}: ${msg}`);
+        }
       }
 
       // Set as default roles
       const roleList = body.roles.map(quoteIdentifier).join(", ");
-      await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
+      try {
+        await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(
+          `Failed to set default roles for user ${body.name}:`,
+          msg
+        );
+        errors.push(`Failed to set default roles: ${msg}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `User created but with errors: ${errors.join("; ")}`,
+      });
     }
 
     return NextResponse.json({ success: true });
@@ -230,6 +259,8 @@ export async function PUT(
       }
     }
 
+    const errors: string[] = [];
+
     // Update roles if provided
     if (body.roles !== undefined) {
       // Get current roles
@@ -254,10 +285,12 @@ export async function PUT(
               `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`
             );
           } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             console.error(
               `Failed to revoke role ${role} from user ${body.name}:`,
-              e
+              msg
             );
+            errors.push(`Failed to revoke role ${role}: ${msg}`);
           }
         }
       }
@@ -270,10 +303,12 @@ export async function PUT(
               `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`
             );
           } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             console.error(
               `Failed to grant role ${role} to user ${body.name}:`,
-              e
+              msg
             );
+            errors.push(`Failed to grant role ${role}: ${msg}`);
           }
         }
       }
@@ -284,21 +319,32 @@ export async function PUT(
         try {
           await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
         } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
           console.error(
             `Failed to set default roles for user ${body.name}:`,
-            e
+            msg
           );
+          errors.push(`Failed to set default roles: ${msg}`);
         }
       } else {
         try {
           await client.command(`SET DEFAULT ROLE NONE TO ${quotedUser}`);
         } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
           console.error(
             `Failed to clear default roles for user ${body.name}:`,
-            e
+            msg
           );
+          errors.push(`Failed to clear default roles: ${msg}`);
         }
       }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json({
+        success: false, // Mark as failed so UI shows the error
+        error: `Update completed with errors: ${errors.join("; ")}`,
+      });
     }
 
     return NextResponse.json({ success: true });

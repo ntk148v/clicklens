@@ -84,18 +84,20 @@ function extractDataPrivileges(grants: SystemGrant[]): DataPrivilege[] {
   const dataPrivileges: DataPrivilege[] = [];
   const dataPrivMap = new Map<string, Set<DataPrivilegeType>>();
 
-  const dataPrivTypes = ["SELECT", "INSERT", "ALTER", "CREATE", "DROP"];
+  const dataPrivTypes = ["SELECT", "INSERT", "ALTER", "CREATE", "DROP TABLE"];
 
   for (const grant of grants) {
     // Skip system database grants
     if (grant.database && isRestrictedDatabase(grant.database)) continue;
 
-    if (dataPrivTypes.includes(grant.access_type)) {
+    const accessType = grant.access_type.toUpperCase();
+
+    if (dataPrivTypes.includes(accessType)) {
       const key = `${grant.database || "*"}:${grant.table || "*"}`;
       if (!dataPrivMap.has(key)) {
         dataPrivMap.set(key, new Set());
       }
-      dataPrivMap.get(key)!.add(grant.access_type as DataPrivilegeType);
+      dataPrivMap.get(key)!.add(accessType as DataPrivilegeType);
     }
   }
 
@@ -301,13 +303,17 @@ export async function POST(
     // Create the role
     await client.command(`CREATE ROLE IF NOT EXISTS ${quotedRole}`);
 
+    const errors: string[] = [];
+
     // Grant inherited roles
     if (body.inheritedRoles && body.inheritedRoles.length > 0) {
       for (const ir of body.inheritedRoles) {
         try {
           await client.command(`GRANT ${quoteIdentifier(ir)} TO ${quotedRole}`);
         } catch (e) {
-          console.warn(`Failed to grant role ${ir}:`, e);
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(`Failed to grant role ${ir}:`, msg);
+          errors.push(`Failed to grant role ${ir}: ${msg}`);
         }
       }
     }
@@ -326,10 +332,19 @@ export async function POST(
           try {
             await client.command(`GRANT ${priv} ON ${target} TO ${quotedRole}`);
           } catch (e) {
-            console.warn(`Failed to grant ${priv} on ${target}:`, e);
+            const msg = e instanceof Error ? e.message : String(e);
+            console.warn(`Failed to grant ${priv} on ${target}:`, msg);
+            errors.push(`Failed to grant ${priv} on ${target}: ${msg}`);
           }
         }
       }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `Role created but with errors: ${errors.join("; ")}`,
+      });
     }
 
     return NextResponse.json({ success: true });
@@ -416,6 +431,8 @@ export async function PUT(
     );
     const newInherited = body.inheritedRoles || [];
 
+    const errors: string[] = [];
+
     // Revoke removed roles
     for (const ir of currentInherited) {
       if (!newInherited.includes(ir)) {
@@ -424,7 +441,9 @@ export async function PUT(
             `REVOKE ${quoteIdentifier(ir)} FROM ${quotedRole}`
           );
         } catch (e) {
-          console.warn(`Failed to revoke role ${ir}:`, e);
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(`Failed to revoke role ${ir}:`, msg);
+          errors.push(`Failed to revoke role ${ir}: ${msg}`);
         }
       }
     }
@@ -435,7 +454,9 @@ export async function PUT(
         try {
           await client.command(`GRANT ${quoteIdentifier(ir)} TO ${quotedRole}`);
         } catch (e) {
-          console.warn(`Failed to grant role ${ir}:`, e);
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(`Failed to grant role ${ir}:`, msg);
+          errors.push(`Failed to grant role ${ir}: ${msg}`);
         }
       }
     }
@@ -444,7 +465,9 @@ export async function PUT(
     try {
       await client.command(`REVOKE ALL ON *.* FROM ${quotedRole}`);
     } catch (e) {
-      console.warn("Could not revoke all privileges:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn("Could not revoke all privileges:", msg);
+      errors.push(`Could not revoke all privileges: ${msg}`);
     }
 
     // Re-grant data privileges
@@ -461,10 +484,19 @@ export async function PUT(
           try {
             await client.command(`GRANT ${priv} ON ${target} TO ${quotedRole}`);
           } catch (e) {
-            console.warn(`Failed to grant ${priv} on ${target}:`, e);
+            const msg = e instanceof Error ? e.message : String(e);
+            console.warn(`Failed to grant ${priv} on ${target}:`, msg);
+            errors.push(`Failed to grant ${priv} on ${target}: ${msg}`);
           }
         }
       }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `Role updated but with errors: ${errors.join("; ")}`,
+      });
     }
 
     return NextResponse.json({ success: true });

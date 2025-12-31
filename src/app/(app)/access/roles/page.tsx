@@ -154,7 +154,7 @@ export default function RolesPage() {
 
   // New data privilege form
   const [newDataPriv, setNewDataPriv] = useState({
-    database: "*",
+    database: "",
     table: "*",
     privileges: [] as DataPrivilegeType[],
   });
@@ -261,7 +261,7 @@ export default function RolesPage() {
       inheritedRoles: [],
       dataPrivileges: [],
     });
-    setNewDataPriv({ database: "*", table: "*", privileges: [] });
+    setNewDataPriv({ database: "", table: "*", privileges: [] });
     setDialogError(null);
     setDialogOpen(true);
     fetchSchema();
@@ -276,7 +276,7 @@ export default function RolesPage() {
       inheritedRoles: role.inheritedRoles || [],
       dataPrivileges: role.dataPrivileges || [],
     });
-    setNewDataPriv({ database: "*", table: "*", privileges: [] });
+    setNewDataPriv({ database: "", table: "*", privileges: [] });
     setDialogError(null);
     setDialogOpen(true);
     fetchSchema();
@@ -403,7 +403,7 @@ export default function RolesPage() {
       ],
     }));
 
-    setNewDataPriv({ database: "*", table: "*", privileges: [] });
+    setNewDataPriv({ database: "", table: "*", privileges: [] });
   };
 
   const removeDataPrivilege = (index: number) => {
@@ -900,7 +900,6 @@ export default function RolesPage() {
                           <SelectValue placeholder="Select database" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="*">* (all databases)</SelectItem>
                           {loadingSchema ? (
                             <SelectItem value="_loading" disabled>
                               Loading...

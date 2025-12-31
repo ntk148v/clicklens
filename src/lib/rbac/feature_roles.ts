@@ -123,7 +123,7 @@ export const DATA_PRIVILEGES = [
   { id: "INSERT", name: "INSERT", description: "Insert data" },
   { id: "ALTER", name: "ALTER", description: "Modify schema" },
   { id: "CREATE", name: "CREATE", description: "Create tables" },
-  { id: "DROP", name: "DROP", description: "Drop tables" },
+  { id: "DROP TABLE", name: "DROP TABLE", description: "Drop tables" },
 ] as const;
 
 export type DataPrivilegeType = (typeof DATA_PRIVILEGES)[number]["id"];
