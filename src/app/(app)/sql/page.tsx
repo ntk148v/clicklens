@@ -24,7 +24,16 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Play, FileText, History, AlertCircle, Loader2, Square, Bookmark, Save } from "lucide-react";
+import {
+  Play,
+  FileText,
+  History,
+  AlertCircle,
+  Loader2,
+  Square,
+  Bookmark,
+  Save,
+} from "lucide-react";
 import type { QueryResponse } from "@/app/api/clickhouse/query/route";
 
 export default function SqlConsolePage() {
@@ -50,31 +59,92 @@ export default function SqlConsolePage() {
     const sql = tab.sql.trim();
     if (!sql) return;
 
+    // Import splitter dynamically to avoid SSR issues
+    const { splitSqlStatements } = await import("@/lib/sql");
+    const statements = splitSqlStatements(sql);
+
+    if (statements.length === 0) return;
+
     const queryId = crypto.randomUUID();
     updateTab(tab.id, { isRunning: true, error: null, queryId });
 
+    let lastSelectResult: QueryResponse | null = null;
+    let executedCount = 0;
+    let totalElapsed = 0;
+
     try {
-      const response = await fetch("/api/clickhouse/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql, query_id: queryId }),
-      });
+      for (const statement of statements) {
+        // Check if cancelled
+        const currentTab = getActiveQueryTab();
+        if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning) {
+          return;
+        }
 
-      const data: QueryResponse = await response.json();
+        const response = await fetch("/api/clickhouse/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sql: statement, query_id: queryId }),
+        });
 
-      // Check if tab is still running (wasn't cancelled)
+        const data: QueryResponse = await response.json();
+
+        if (!data.success) {
+          // Statement failed, show error and stop
+          updateTab(tab.id, {
+            isRunning: false,
+            result: null,
+            error: data.error || {
+              code: 0,
+              message: `Failed at statement ${executedCount + 1}`,
+              type: "unknown",
+              userMessage: `Statement ${executedCount + 1} failed`,
+            },
+            queryId: undefined,
+          });
+
+          addToHistory({
+            sql: statement,
+            error: data.error?.userMessage || "Error",
+          });
+          return;
+        }
+
+        executedCount++;
+        if (data.statistics) {
+          totalElapsed += data.statistics.elapsed;
+        }
+
+        // Check if this is a SELECT (has data)
+        if (data.data && data.data.length > 0) {
+          lastSelectResult = data;
+        }
+      }
+
+      // All statements succeeded
       const currentTab = getActiveQueryTab();
-      if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning) return;
+      if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning) {
+        return;
+      }
 
-      if (data.success && data.data && data.meta && data.statistics) {
+      if (
+        lastSelectResult &&
+        lastSelectResult.data &&
+        lastSelectResult.meta &&
+        lastSelectResult.statistics
+      ) {
+        // Show result of last SELECT
         updateTab(tab.id, {
           isRunning: false,
           result: {
-            data: data.data as Record<string, unknown>[],
-            meta: data.meta,
-            rows: data.rows!,
-            rows_before_limit_at_least: data.rows_before_limit_at_least,
-            statistics: data.statistics,
+            data: lastSelectResult.data as Record<string, unknown>[],
+            meta: lastSelectResult.meta,
+            rows: lastSelectResult.rows!,
+            rows_before_limit_at_least:
+              lastSelectResult.rows_before_limit_at_least,
+            statistics: {
+              ...lastSelectResult.statistics,
+              elapsed: totalElapsed,
+            },
           },
           error: null,
           queryId: undefined,
@@ -82,29 +152,42 @@ export default function SqlConsolePage() {
 
         addToHistory({
           sql,
-          duration: data.statistics.elapsed,
-          rowsReturned: data.rows,
-          rowsRead: data.statistics.rows_read,
-          bytesRead: data.statistics.bytes_read,
-          memoryUsage: data.statistics.memory_usage,
+          duration: totalElapsed,
+          rowsReturned: lastSelectResult.rows,
+          rowsRead: lastSelectResult.statistics.rows_read,
+          bytesRead: lastSelectResult.statistics.bytes_read,
+          memoryUsage: lastSelectResult.statistics.memory_usage,
           user: user?.username,
         });
       } else {
+        // No SELECT results, show success message
         updateTab(tab.id, {
           isRunning: false,
-          result: null,
-          error: data.error || {
-            code: 0,
-            message: "Unknown error",
-            type: "unknown",
-            userMessage: "An unexpected error occurred",
+          result: {
+            data: [
+              {
+                message: `${executedCount} statement(s) executed successfully`,
+              },
+            ],
+            meta: [{ name: "message", type: "String" }],
+            rows: 1,
+            statistics: {
+              elapsed: totalElapsed,
+              rows_read: 0,
+              bytes_read: 0,
+            },
           },
+          error: null,
           queryId: undefined,
         });
 
         addToHistory({
           sql,
-          error: data.error?.userMessage || "Error",
+          duration: totalElapsed,
+          rowsReturned: 0,
+          rowsRead: 0,
+          bytesRead: 0,
+          user: user?.username,
         });
       }
     } catch (error) {
@@ -191,13 +274,13 @@ export default function SqlConsolePage() {
           </Button>
 
           <Button
-             size="sm"
-             variant="ghost"
-             onClick={() => setSavedQueriesOpen(true)}
-             className="text-muted-foreground"
+            size="sm"
+            variant="ghost"
+            onClick={() => setSavedQueriesOpen(true)}
+            className="text-muted-foreground"
           >
-             <Bookmark className="w-4 h-4 mr-1" />
-             Saved
+            <Bookmark className="w-4 h-4 mr-1" />
+            Saved
           </Button>
 
           <Separator orientation="vertical" className="h-6" />
@@ -269,13 +352,13 @@ export default function SqlConsolePage() {
             </SheetContent>
           </Sheet>
 
-          <SaveQueryDialog 
-            open={saveDialogOpen} 
+          <SaveQueryDialog
+            open={saveDialogOpen}
             onOpenChange={setSaveDialogOpen}
             sql={activeQueryTab?.sql || ""}
             onSaved={() => {
-                // Refresh saved queries list if needed, or rely on component re-mount/focus
-                // Since SavedQueries component fetches on mount, reopening it will refresh
+              // Refresh saved queries list if needed, or rely on component re-mount/focus
+              // Since SavedQueries component fetches on mount, reopening it will refresh
             }}
           />
         </div>
