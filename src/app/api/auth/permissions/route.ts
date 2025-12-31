@@ -19,6 +19,65 @@ interface PermissionsResponse {
   error?: string;
 }
 
+/**
+ * Recursively resolve all effective roles for a user, including inherited roles.
+ */
+async function getEffectiveRoles(
+  client: ReturnType<typeof createClientWithConfig>,
+  username: string
+): Promise<Set<string>> {
+  const effectiveRoles = new Set<string>();
+
+  // Get all role grants (both user->role and role->role)
+  const allGrantsResult = await client.query<{
+    user_name: string | null;
+    role_name: string | null;
+    granted_role_name: string;
+  }>(`
+    SELECT user_name, role_name, granted_role_name
+    FROM system.role_grants
+  `);
+
+  // Build maps for efficient lookup
+  const userRoles = new Map<string, string[]>(); // user -> direct roles
+  const roleInheritance = new Map<string, string[]>(); // role -> child roles
+
+  for (const grant of allGrantsResult.data) {
+    if (grant.user_name) {
+      // User -> Role grant
+      if (!userRoles.has(grant.user_name)) {
+        userRoles.set(grant.user_name, []);
+      }
+      userRoles.get(grant.user_name)!.push(grant.granted_role_name);
+    } else if (grant.role_name) {
+      // Role -> Role inheritance
+      if (!roleInheritance.has(grant.role_name)) {
+        roleInheritance.set(grant.role_name, []);
+      }
+      roleInheritance.get(grant.role_name)!.push(grant.granted_role_name);
+    }
+  }
+
+  // Recursively collect all roles
+  function collectRoles(roleName: string) {
+    if (effectiveRoles.has(roleName)) return; // Avoid cycles
+    effectiveRoles.add(roleName);
+
+    const children = roleInheritance.get(roleName) || [];
+    for (const child of children) {
+      collectRoles(child);
+    }
+  }
+
+  // Start from user's direct roles
+  const directRoles = userRoles.get(username) || [];
+  for (const role of directRoles) {
+    collectRoles(role);
+  }
+
+  return effectiveRoles;
+}
+
 export async function GET(): Promise<NextResponse<PermissionsResponse>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -32,10 +91,10 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
 
     const client = createClientWithConfig(config);
 
-    // Run permission probes in parallel to reduce latency
-    const [grantsResult, featuresResult] = await Promise.allSettled([
-      // 1. Get Grants strict check
-      client.query<{ grant: string }>("SHOW GRANTS FOR CURRENT_USER"),
+    // Run permission probes and role resolution in parallel
+    const [effectiveRolesResult, featuresResult] = await Promise.allSettled([
+      // 1. Get all effective roles (including inherited)
+      getEffectiveRoles(client, config.username),
       // 2. Run probes
       Promise.allSettled([
         // manage users probe
@@ -47,13 +106,11 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       ]),
     ]);
 
-    // Process Grants
-    const grantStrings =
-      grantsResult.status === "fulfilled" && grantsResult.value?.data
-        ? grantsResult.value.data
-            .map((r) => r.grant)
-            .filter((g): g is string => typeof g === "string")
-        : [];
+    // Get effective roles
+    const effectiveRoles =
+      effectiveRolesResult.status === "fulfilled"
+        ? effectiveRolesResult.value
+        : new Set<string>();
 
     // Process Probes
     let canManageUsers = false;
@@ -73,43 +130,25 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       if (results[2].status === "fulfilled") canViewCluster = true;
     }
 
-    // Check Kill Query (fallback to strict grants or admin status)
-    const canKillQueries =
-      canManageUsers ||
-      grantStrings.some(
-        (g) => g.includes("KILL QUERY") || g.includes("GRANT ALL ON *.*")
-      );
-
-    // Robustify checks with fallbacks (Direct grants or Feature Roles)
-    // This handles cases where probes fail but permissions exist via roles
-
-    // 1. User Admin Fallback
+    // Check permissions based on effective roles (including inherited)
+    // 1. User Admin: via clicklens_user_admin role
     if (!canManageUsers) {
-      canManageUsers = grantStrings.some(
-        (g) =>
-          g.includes("ACCESS MANAGEMENT") || g.includes("clicklens_user_admin")
-      );
+      canManageUsers = effectiveRoles.has("clicklens_user_admin");
     }
 
-    // 2. Process View Fallback
+    // 2. Query Monitor: via clicklens_query_monitor role
     if (!canViewProcesses) {
-      canViewProcesses = grantStrings.some(
-        (g) =>
-          (g.includes("SELECT") && g.includes("system.processes")) ||
-          g.includes("clicklens_query_monitor") ||
-          g.includes("GRANT ALL ON *.*")
-      );
+      canViewProcesses = effectiveRoles.has("clicklens_query_monitor");
     }
 
-    // 3. Cluster View Fallback
+    // 3. Cluster Monitor: via clicklens_cluster_monitor role
     if (!canViewCluster) {
-      canViewCluster = grantStrings.some(
-        (g) =>
-          (g.includes("SELECT") && g.includes("system.metrics")) ||
-          g.includes("clicklens_cluster_monitor") ||
-          g.includes("GRANT ALL ON *.*")
-      );
+      canViewCluster = effectiveRoles.has("clicklens_cluster_monitor");
     }
+
+    // Check Kill Query
+    const canKillQueries =
+      canManageUsers || effectiveRoles.has("clicklens_query_monitor");
 
     return NextResponse.json({
       success: true,
