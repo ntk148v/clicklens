@@ -49,8 +49,10 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
 
     // Process Grants
     const grantStrings =
-      grantsResult.status === "fulfilled"
-        ? grantsResult.value.data.map((r) => r.grant)
+      grantsResult.status === "fulfilled" && grantsResult.value?.data
+        ? grantsResult.value.data
+            .map((r) => r.grant)
+            .filter((g): g is string => typeof g === "string")
         : [];
 
     // Process Probes
@@ -77,6 +79,37 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       grantStrings.some(
         (g) => g.includes("KILL QUERY") || g.includes("GRANT ALL ON *.*")
       );
+
+    // Robustify checks with fallbacks (Direct grants or Feature Roles)
+    // This handles cases where probes fail but permissions exist via roles
+
+    // 1. User Admin Fallback
+    if (!canManageUsers) {
+      canManageUsers = grantStrings.some(
+        (g) =>
+          g.includes("ACCESS MANAGEMENT") || g.includes("clicklens_user_admin")
+      );
+    }
+
+    // 2. Process View Fallback
+    if (!canViewProcesses) {
+      canViewProcesses = grantStrings.some(
+        (g) =>
+          (g.includes("SELECT") && g.includes("system.processes")) ||
+          g.includes("clicklens_query_monitor") ||
+          g.includes("GRANT ALL ON *.*")
+      );
+    }
+
+    // 3. Cluster View Fallback
+    if (!canViewCluster) {
+      canViewCluster = grantStrings.some(
+        (g) =>
+          (g.includes("SELECT") && g.includes("system.metrics")) ||
+          g.includes("clicklens_cluster_monitor") ||
+          g.includes("GRANT ALL ON *.*")
+      );
+    }
 
     return NextResponse.json({
       success: true,
