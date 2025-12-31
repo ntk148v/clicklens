@@ -14,6 +14,8 @@ export interface ClickHouseConfig {
   password: string;
   database: string;
   protocol: "http" | "https";
+  /** Client implementation: 'native' uses @clickhouse/client, 'http' uses fetch API */
+  clientType?: "native" | "http";
 }
 
 /**

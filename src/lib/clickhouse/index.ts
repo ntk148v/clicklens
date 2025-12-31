@@ -1,6 +1,11 @@
 // ClickHouse client library
 export { createClient, createClientWithConfig } from "./client";
-export type { ClickHouseQueryResult, ClickHouseConfig } from "./client";
+export type {
+  ClickHouseQueryResult,
+  ClickHouseClient,
+  ClickHouseStatistics,
+} from "./clients/types";
+export type { ClickHouseConfig } from "./config";
 export * from "./types";
 export {
   getDefaultConfig,
