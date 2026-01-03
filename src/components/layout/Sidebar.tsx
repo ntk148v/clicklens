@@ -77,6 +77,12 @@ const monitoringItems = [
     icon: HeartPulse,
     description: "Health checks",
   },
+  {
+    name: "Keeper",
+    href: "/monitoring/keeper",
+    icon: Database,
+    description: "ZooKeeper/Keeper status",
+  },
 ];
 
 // Main navigation items with permission requirements

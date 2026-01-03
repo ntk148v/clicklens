@@ -8,8 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Circle, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Circle } from "lucide-react";
 
 interface ConnectionStatus {
   connected: boolean;
@@ -46,58 +45,41 @@ export function ConnectionStatus() {
 
   useEffect(() => {
     checkConnection();
-    // Check connection every 30 seconds
-    const interval = setInterval(checkConnection, 30000);
-    return () => clearInterval(interval);
+    // No auto-refresh - individual pages handle their own refresh
   }, []);
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={`
-                flex items-center gap-1.5 px-2 py-1 font-mono text-xs
-                ${
-                  status.loading
-                    ? "border-muted-foreground text-muted-foreground"
-                    : status.connected
-                    ? "border-green-500/50 text-green-600"
-                    : "border-red-500/50 text-red-600"
-                }
-              `}
-            >
-              <Circle
-                className={`w-2 h-2 ${
-                  status.loading
-                    ? "fill-muted-foreground text-muted-foreground animate-pulse"
-                    : status.connected
-                    ? "fill-green-500 text-green-500"
-                    : "fill-red-500 text-red-500"
-                }`}
-              />
-              {status.loading
-                ? "Connecting..."
-                : status.connected
-                ? `v${status.version}`
-                : "Disconnected"}
-            </Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={checkConnection}
-              disabled={status.loading}
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  status.loading ? "animate-spin" : ""
-                }`}
-              />
-            </Button>
-          </div>
+          <Badge
+            variant="outline"
+            className={`
+              flex items-center gap-1.5 px-2 py-1 font-mono text-xs cursor-default
+              ${
+                status.loading
+                  ? "border-muted-foreground text-muted-foreground"
+                  : status.connected
+                  ? "border-green-500/50 text-green-600"
+                  : "border-red-500/50 text-red-600"
+              }
+            `}
+          >
+            <Circle
+              className={`w-2 h-2 ${
+                status.loading
+                  ? "fill-muted-foreground text-muted-foreground animate-pulse"
+                  : status.connected
+                  ? "fill-green-500 text-green-500"
+                  : "fill-red-500 text-red-500"
+              }`}
+            />
+            {status.loading
+              ? "Connecting..."
+              : status.connected
+              ? `v${status.version}`
+              : "Disconnected"}
+          </Badge>
         </TooltipTrigger>
         <TooltipContent side="bottom">
           {status.error ? (

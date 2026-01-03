@@ -13,3 +13,4 @@ export { ReplicationTab } from "./replication-tab";
 export { OperationsTab } from "./operations-tab";
 export { HealthTab } from "./health-tab";
 export { DisksTab } from "./disks-tab";
+export { KeeperTab } from "./keeper-tab";

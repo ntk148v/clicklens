@@ -2,10 +2,10 @@
 
 import { useState, useCallback } from "react";
 import { Header } from "@/components/layout";
-import { OverviewTab } from "@/components/monitoring";
+import { KeeperTab } from "@/components/monitoring";
 import { RefreshControl } from "@/components/monitoring";
 
-export default function MonitoringOverviewPage() {
+export default function MonitoringKeeperPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleRefresh = useCallback(() => {
@@ -15,7 +15,7 @@ export default function MonitoringOverviewPage() {
   return (
     <div className="flex flex-col h-full">
       <Header
-        title="Cluster Overview"
+        title="ZooKeeper / Keeper"
         actions={
           <RefreshControl
             onRefresh={handleRefresh}
@@ -26,7 +26,7 @@ export default function MonitoringOverviewPage() {
       />
 
       <div className="flex-1 p-6 overflow-auto">
-        <OverviewTab key={`overview-${refreshKey}`} refreshInterval={30000} />
+        <KeeperTab key={`keeper-${refreshKey}`} refreshInterval={30000} />
       </div>
     </div>
   );

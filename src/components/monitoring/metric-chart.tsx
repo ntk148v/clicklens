@@ -33,6 +33,7 @@ export function MetricChart({
   loading = false,
 }: MetricChartProps) {
   const formatValue = (value: number) => {
+    if (value == null || !isFinite(value)) return "0";
     if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
     if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
@@ -40,9 +41,16 @@ export function MetricChart({
   };
 
   const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
   };
+
+  // Generate a unique ID for this chart's gradient
+  const gradientId = `gradient-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
     <Card className={cn(className)}>
@@ -69,7 +77,7 @@ export function MetricChart({
               margin={{ top: 5, right: 5, left: showAxis ? 30 : 5, bottom: 5 }}
             >
               <defs>
-                <linearGradient id={`gradient-${title}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={color} stopOpacity={0.3} />
                   <stop offset="100%" stopColor={color} stopOpacity={0.05} />
                 </linearGradient>
@@ -80,16 +88,18 @@ export function MetricChart({
                     dataKey="timestamp"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10 }}
                     tickFormatter={formatTime}
                     minTickGap={30}
+                    stroke="hsl(var(--muted-foreground))"
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10 }}
                     tickFormatter={formatValue}
                     width={35}
+                    stroke="hsl(var(--muted-foreground))"
                   />
                 </>
               )}
@@ -99,6 +109,13 @@ export function MetricChart({
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "6px",
                   fontSize: "12px",
+                  color: "hsl(var(--popover-foreground))",
+                }}
+                labelStyle={{
+                  color: "hsl(var(--popover-foreground))",
+                }}
+                itemStyle={{
+                  color: "hsl(var(--popover-foreground))",
                 }}
                 labelFormatter={formatTime}
                 formatter={(value) => {
@@ -111,7 +128,7 @@ export function MetricChart({
                 dataKey="value"
                 stroke={color}
                 strokeWidth={2}
-                fill={`url(#gradient-${title})`}
+                fill={`url(#${gradientId})`}
               />
             </AreaChart>
           </ResponsiveContainer>

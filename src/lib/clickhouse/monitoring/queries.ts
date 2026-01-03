@@ -4,9 +4,72 @@
  */
 
 // =============================================================================
-// Overview Queries
+// Overview Queries - Categorized metrics
 // =============================================================================
 
+// Server category: basic server info
+export const SERVER_INFO_QUERY = `
+SELECT
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'Uptime') AS uptime,
+  (SELECT version()) AS version,
+  (SELECT value FROM system.metrics WHERE metric = 'TCPConnection') AS tcp_connections,
+  (SELECT value FROM system.metrics WHERE metric = 'HTTPConnection') AS http_connections,
+  (SELECT hostName()) AS hostname
+`;
+
+// Query category: query-related metrics
+export const QUERY_METRICS_QUERY = `
+SELECT
+  (SELECT value FROM system.metrics WHERE metric = 'Query') AS running_queries,
+  (SELECT value FROM system.metrics WHERE metric = 'QueryThread') AS query_threads,
+  (SELECT value FROM system.metrics WHERE metric = 'QueryPreempted') AS preempted_queries,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event IN ('Query', 'SelectQuery', 'InsertQuery')) AS total_queries,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'FailedQuery') AS failed_queries,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'SelectQuery') AS select_queries,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'InsertQuery') AS insert_queries
+`;
+
+// Memory category: memory-related metrics
+export const MEMORY_METRICS_QUERY = `
+SELECT
+  (SELECT value FROM system.metrics WHERE metric = 'MemoryTracking') AS memory_used,
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'OSMemoryTotal') AS memory_total,
+  (SELECT value FROM system.metrics WHERE metric = 'MergesMutationsMemoryTracking') AS merge_memory,
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'MemoryResident') AS memory_resident,
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'MemoryShared') AS memory_shared
+`;
+
+// Merge & Parts category
+export const MERGE_METRICS_QUERY = `
+SELECT
+  (SELECT value FROM system.metrics WHERE metric = 'Merge') AS running_merges,
+  (SELECT value FROM system.metrics WHERE metric = 'PartMutation') AS running_mutations,
+  (SELECT value FROM system.metrics WHERE metric = 'BackgroundMergesAndMutationsPoolTask') AS background_pool_tasks,
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'MaxPartCountForPartition') AS max_parts_per_partition,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'MergedRows') AS merged_rows,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'MergedUncompressedBytes') AS merged_bytes
+`;
+
+// Throughput category: rows/bytes per second
+export const THROUGHPUT_METRICS_QUERY = `
+SELECT
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'InsertedRows') AS inserted_rows,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'InsertedBytes') AS inserted_bytes,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'SelectedRows') AS selected_rows,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'SelectedBytes') AS selected_bytes
+`;
+
+// CPU & IO category
+export const CPU_IO_METRICS_QUERY = `
+SELECT
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'OSUserTimeCPU') AS cpu_user,
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'OSSystemTimeCPU') AS cpu_system,
+  (SELECT value FROM system.asynchronous_metrics WHERE metric = 'OSIOWaitTimeCPU') AS io_wait,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'ReadBufferFromFileDescriptorReadBytes') AS disk_read_bytes,
+  (SELECT coalesce(sum(value), 0) FROM system.events WHERE event = 'WriteBufferFromFileDescriptorWriteBytes') AS disk_write_bytes
+`;
+
+// Combined overview query for dashboard
 export const OVERVIEW_QUERY = `
 SELECT
   (SELECT value FROM system.asynchronous_metrics WHERE metric = 'Uptime') AS uptime,
@@ -19,6 +82,77 @@ SELECT
   (SELECT value FROM system.metrics WHERE metric = 'ReadonlyReplica') AS readonly_replicas,
   (SELECT value FROM system.asynchronous_metrics WHERE metric = 'MaxPartCountForPartition') AS max_parts_per_partition,
   (SELECT value FROM system.metrics WHERE metric = 'BackgroundMergesAndMutationsPoolTask') AS background_pool_tasks
+`;
+
+// =============================================================================
+// Time Series Queries for Charts
+// =============================================================================
+
+// Query throughput over time (queries per minute)
+export const getQueriesPerMinuteQuery = (intervalMinutes: number = 60) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  count() AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+`;
+
+// Inserted rows per minute
+export const getInsertedRowsPerMinuteQuery = (intervalMinutes: number = 60) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  sum(written_rows) AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+`;
+
+// Selected bytes per minute
+export const getSelectedBytesPerMinuteQuery = (intervalMinutes: number = 60) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  sum(read_bytes) AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+`;
+
+// Memory usage over time (peak per minute)
+export const getMemoryUsageHistoryQuery = (intervalMinutes: number = 60) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  max(memory_usage) AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+`;
+
+// Query duration percentiles over time
+export const getQueryDurationHistoryQuery = (intervalMinutes: number = 60) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  avg(query_duration_ms) AS avg_duration,
+  quantile(0.95)(query_duration_ms) AS p95_duration,
+  quantile(0.99)(query_duration_ms) AS p99_duration
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
 `;
 
 // =============================================================================
@@ -193,7 +327,6 @@ WHERE NOT is_done
 
 // =============================================================================
 // Health Check Queries
-// Note: All values are cast to Float64 to ensure consistent types in UNION ALL
 // =============================================================================
 
 export const HEALTH_CHECKS_QUERY = `
@@ -297,6 +430,38 @@ FROM system.disks
 `;
 
 // =============================================================================
+// ZooKeeper/Keeper Queries
+// =============================================================================
+
+export const KEEPER_METRICS_QUERY = `
+SELECT
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperSession') AS sessions,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperWatch') AS watches,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperRequest') AS pending_requests,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperHardwareExceptions') AS hardware_exceptions,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperUserExceptions') AS user_exceptions,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperInit') AS total_inits,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperTransactions') AS total_transactions,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperCreate') AS total_creates,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperRemove') AS total_removes,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperGet') AS total_gets,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperSet') AS total_sets,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperExists') AS total_exists,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperList') AS total_lists,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperMulti') AS total_multi,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperWaitMicroseconds') AS wait_microseconds
+`;
+
+// Get ZooKeeper health status
+export const KEEPER_HEALTH_QUERY = `
+SELECT
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperSession') > 0 AS is_connected,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperHardwareExceptions') AS hardware_exceptions,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperWaitMicroseconds') / 
+    nullIf((SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperTransactions'), 0) AS avg_latency_us
+`;
+
+// =============================================================================
 // Query Performance Queries
 // =============================================================================
 
@@ -315,27 +480,5 @@ WHERE
   AND type = 'QueryFinish'
 `;
 
-// Time series query for charts
-export const getQueryThroughputHistoryQuery = (intervalMinutes: number = 60) => `
-SELECT
-  toStartOfMinute(event_time) AS timestamp,
-  count() AS value
-FROM system.query_log
-WHERE
-  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
-  AND type = 'QueryFinish'
-GROUP BY timestamp
-ORDER BY timestamp
-`;
-
-export const getMemoryUsageHistoryQuery = (intervalMinutes: number = 60) => `
-SELECT
-  toStartOfMinute(event_time) AS timestamp,
-  max(memory_usage) AS value
-FROM system.query_log
-WHERE
-  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
-  AND type = 'QueryFinish'
-GROUP BY timestamp
-ORDER BY timestamp
-`;
+// Legacy aliases for backward compatibility
+export const getQueryThroughputHistoryQuery = getQueriesPerMinuteQuery;

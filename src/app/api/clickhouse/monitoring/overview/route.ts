@@ -1,12 +1,23 @@
 /**
- * API route for cluster overview metrics
+ * API route for cluster overview metrics with time-series data
  * GET /api/clickhouse/monitoring/overview
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
-import { OVERVIEW_QUERY, type ClusterOverview, type MonitoringApiResponse } from "@/lib/clickhouse/monitoring";
+import {
+  OVERVIEW_QUERY,
+  QUERY_METRICS_QUERY,
+  MEMORY_METRICS_QUERY,
+  MERGE_METRICS_QUERY,
+  THROUGHPUT_METRICS_QUERY,
+  getQueriesPerMinuteQuery,
+  getInsertedRowsPerMinuteQuery,
+  getSelectedBytesPerMinuteQuery,
+  getMemoryUsageHistoryQuery,
+  type MonitoringApiResponse,
+} from "@/lib/clickhouse/monitoring";
 
 interface OverviewRow {
   uptime: number;
@@ -21,7 +32,90 @@ interface OverviewRow {
   background_pool_tasks: number;
 }
 
-export async function GET(): Promise<NextResponse<MonitoringApiResponse<ClusterOverview>>> {
+interface QueryMetricsRow {
+  running_queries: number;
+  query_threads: number;
+  preempted_queries: number;
+  total_queries: number;
+  failed_queries: number;
+  select_queries: number;
+  insert_queries: number;
+}
+
+interface MemoryMetricsRow {
+  memory_used: number;
+  memory_total: number;
+  merge_memory: number;
+  memory_resident: number;
+  memory_shared: number;
+}
+
+interface MergeMetricsRow {
+  running_merges: number;
+  running_mutations: number;
+  background_pool_tasks: number;
+  max_parts_per_partition: number;
+  merged_rows: number;
+  merged_bytes: number;
+}
+
+interface ThroughputMetricsRow {
+  inserted_rows: number;
+  inserted_bytes: number;
+  selected_rows: number;
+  selected_bytes: number;
+}
+
+interface TimeSeriesPoint {
+  timestamp: string;
+  value: number;
+}
+
+interface DashboardOverview {
+  server: {
+    uptime: number;
+    version: string;
+    tcpConnections: number;
+    httpConnections: number;
+  };
+  queries: {
+    running: number;
+    threads: number;
+    total: number;
+    failed: number;
+    selects: number;
+    inserts: number;
+  };
+  memory: {
+    used: number;
+    total: number;
+    percentage: number;
+    mergeMemory: number;
+  };
+  merges: {
+    running: number;
+    mutations: number;
+    backgroundTasks: number;
+    maxPartsPerPartition: number;
+    mergedRows: number;
+  };
+  throughput: {
+    insertedRows: number;
+    insertedBytes: number;
+    selectedRows: number;
+    selectedBytes: number;
+  };
+  timeSeries: {
+    queriesPerMinute: TimeSeriesPoint[];
+    insertedRowsPerMinute: TimeSeriesPoint[];
+    selectedBytesPerMinute: TimeSeriesPoint[];
+    memoryUsage: TimeSeriesPoint[];
+  };
+}
+
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<MonitoringApiResponse<DashboardOverview>>> {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -40,48 +134,93 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<ClusterO
       );
     }
 
+    // Get time range from query params (default 60 minutes)
+    const searchParams = request.nextUrl.searchParams;
+    const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
+
     const client = createClientWithConfig(config);
-    const result = await client.query<OverviewRow>(OVERVIEW_QUERY);
 
-    if (result.data.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 500,
-          message: "No data returned",
-          type: "NO_DATA",
-          userMessage: "Could not fetch cluster overview",
-        },
-      });
-    }
+    // Fetch all metrics in parallel
+    const [
+      overviewResult,
+      queryMetricsResult,
+      memoryMetricsResult,
+      mergeMetricsResult,
+      throughputResult,
+      queriesHistoryResult,
+      insertedHistoryResult,
+      selectedHistoryResult,
+      memoryHistoryResult,
+    ] = await Promise.all([
+      client.query<OverviewRow>(OVERVIEW_QUERY),
+      client.query<QueryMetricsRow>(QUERY_METRICS_QUERY),
+      client.query<MemoryMetricsRow>(MEMORY_METRICS_QUERY),
+      client.query<MergeMetricsRow>(MERGE_METRICS_QUERY),
+      client.query<ThroughputMetricsRow>(THROUGHPUT_METRICS_QUERY),
+      client.query<TimeSeriesPoint>(getQueriesPerMinuteQuery(timeRange)),
+      client.query<TimeSeriesPoint>(getInsertedRowsPerMinuteQuery(timeRange)),
+      client.query<TimeSeriesPoint>(getSelectedBytesPerMinuteQuery(timeRange)),
+      client.query<TimeSeriesPoint>(getMemoryUsageHistoryQuery(timeRange)),
+    ]);
 
-    const row = result.data[0];
-    const memoryPercentage = row.memory_total > 0 
-      ? Math.round((row.memory_used / row.memory_total) * 100) 
-      : 0;
+    const overview = overviewResult.data[0];
+    const queryMetrics = queryMetricsResult.data[0];
+    const memoryMetrics = memoryMetricsResult.data[0];
+    const mergeMetrics = mergeMetricsResult.data[0];
+    const throughput = throughputResult.data[0];
 
-    const overview: ClusterOverview = {
-      uptime: row.uptime,
-      version: row.version,
-      activeQueries: row.active_queries,
-      connections: {
-        tcp: row.tcp_connections,
-        http: row.http_connections,
-        total: row.tcp_connections + row.http_connections,
+    const memoryPercentage =
+      memoryMetrics?.memory_total > 0
+        ? Math.round(
+            (memoryMetrics.memory_used / memoryMetrics.memory_total) * 100
+          )
+        : 0;
+
+    const dashboard: DashboardOverview = {
+      server: {
+        uptime: overview?.uptime || 0,
+        version: overview?.version || "unknown",
+        tcpConnections: overview?.tcp_connections || 0,
+        httpConnections: overview?.http_connections || 0,
+      },
+      queries: {
+        running: queryMetrics?.running_queries || 0,
+        threads: queryMetrics?.query_threads || 0,
+        total: queryMetrics?.total_queries || 0,
+        failed: queryMetrics?.failed_queries || 0,
+        selects: queryMetrics?.select_queries || 0,
+        inserts: queryMetrics?.insert_queries || 0,
       },
       memory: {
-        used: row.memory_used,
-        total: row.memory_total,
+        used: memoryMetrics?.memory_used || 0,
+        total: memoryMetrics?.memory_total || 0,
         percentage: memoryPercentage,
+        mergeMemory: memoryMetrics?.merge_memory || 0,
       },
-      readonlyReplicas: row.readonly_replicas,
-      maxPartsPerPartition: row.max_parts_per_partition,
-      backgroundPoolTasks: row.background_pool_tasks,
+      merges: {
+        running: mergeMetrics?.running_merges || 0,
+        mutations: mergeMetrics?.running_mutations || 0,
+        backgroundTasks: mergeMetrics?.background_pool_tasks || 0,
+        maxPartsPerPartition: mergeMetrics?.max_parts_per_partition || 0,
+        mergedRows: mergeMetrics?.merged_rows || 0,
+      },
+      throughput: {
+        insertedRows: throughput?.inserted_rows || 0,
+        insertedBytes: throughput?.inserted_bytes || 0,
+        selectedRows: throughput?.selected_rows || 0,
+        selectedBytes: throughput?.selected_bytes || 0,
+      },
+      timeSeries: {
+        queriesPerMinute: queriesHistoryResult.data,
+        insertedRowsPerMinute: insertedHistoryResult.data,
+        selectedBytesPerMinute: selectedHistoryResult.data,
+        memoryUsage: memoryHistoryResult.data,
+      },
     };
 
     return NextResponse.json({
       success: true,
-      data: overview,
+      data: dashboard,
     });
   } catch (error) {
     console.error("Monitoring overview error:", error);
