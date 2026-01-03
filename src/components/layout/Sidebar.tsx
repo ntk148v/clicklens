@@ -72,12 +72,6 @@ const monitoringItems = [
     description: "Disk space and usage",
   },
   {
-    name: "Health",
-    href: "/monitoring/health",
-    icon: HeartPulse,
-    description: "Health checks",
-  },
-  {
     name: "Keeper",
     href: "/monitoring/keeper",
     icon: Database,

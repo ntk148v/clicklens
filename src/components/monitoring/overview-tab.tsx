@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,6 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { StatCard } from "@/components/monitoring";
 import { MetricChart } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
@@ -90,6 +98,7 @@ export function OverviewTab({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState(initialTimeRange);
+  const [healthExpanded, setHealthExpanded] = useState(false);
 
   // Health checks data
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({ refreshInterval });
@@ -184,12 +193,8 @@ export function OverviewTab({
         </Select>
       </div>
 
-      {/* Health Summary - At the top */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <HeartPulse className="w-5 h-5" />
-          Health Status
-        </h2>
+      {/* Health Summary - Collapsible */}
+      <Collapsible open={healthExpanded} onOpenChange={setHealthExpanded}>
         <Card
           className={
             healthData?.overallStatus === "ok"
@@ -201,61 +206,99 @@ export function OverviewTab({
                   : ""
           }
         >
-          <CardContent className="p-4">
-            {healthLoading ? (
-              <div className="flex items-center gap-4">
-                <div className="h-8 w-24 bg-muted animate-pulse rounded" />
-                <div className="h-4 w-48 bg-muted animate-pulse rounded" />
-              </div>
-            ) : healthData ? (
-              <div className="flex flex-wrap items-center gap-4">
-                <StatusBadge
-                  status={healthData.overallStatus}
-                  label={healthData.overallStatus.toUpperCase()}
-                  size="lg"
-                />
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    {healthData.okCount} OK
-                  </span>
-                  {healthData.warningCount > 0 && (
-                    <span className="flex items-center gap-1">
-                      <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                      {healthData.warningCount} Warnings
-                    </span>
-                  )}
-                  {healthData.criticalCount > 0 && (
-                    <span className="flex items-center gap-1">
-                      <XCircle className="w-4 h-4 text-red-500" />
-                      {healthData.criticalCount} Critical
-                    </span>
-                  )}
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-3 cursor-pointer transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <HeartPulse className="w-5 h-5" />
+                  Health Status
+                </CardTitle>
+                <div className="flex items-center gap-3">
+                  {healthLoading ? (
+                    <div className="h-6 w-20 bg-muted animate-pulse rounded" />
+                  ) : healthData ? (
+                    <>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          {healthData.okCount}
+                        </span>
+                        {healthData.warningCount > 0 && (
+                          <span className="flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                            {healthData.warningCount}
+                          </span>
+                        )}
+                        {healthData.criticalCount > 0 && (
+                          <span className="flex items-center gap-1">
+                            <XCircle className="w-4 h-4 text-red-500" />
+                            {healthData.criticalCount}
+                          </span>
+                        )}
+                      </div>
+                      <StatusBadge
+                        status={healthData.overallStatus}
+                        label={healthData.overallStatus.toUpperCase()}
+                        size="sm"
+                      />
+                    </>
+                  ) : null}
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    {healthExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
-            ) : null}
-            {/* Show failed checks inline */}
-            {healthData && (healthData.warningCount > 0 || healthData.criticalCount > 0) && (
-              <div className="mt-3 pt-3 border-t border-border">
-                <div className="flex flex-wrap gap-2">
-                  {healthData.checks
-                    .filter((c) => c.status !== "ok")
-                    .map((check) => (
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {healthData && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {healthData.checks.map((check) => (
                       <div
                         key={check.id}
-                        className="flex items-center gap-2 px-2 py-1 rounded bg-muted text-sm"
+                        className={`flex items-center justify-between p-3 rounded-lg border ${
+                          check.status === "ok"
+                            ? "bg-green-500/5 border-green-500/20"
+                            : check.status === "warning"
+                              ? "bg-yellow-500/5 border-yellow-500/20"
+                              : check.status === "critical"
+                                ? "bg-red-500/5 border-red-500/20"
+                                : "bg-muted"
+                        }`}
                       >
-                        {getHealthIcon(check.status)}
-                        <span>{check.name}</span>
-                        <span className="text-muted-foreground">({check.value})</span>
+                        <div className="flex items-center gap-2">
+                          {getHealthIcon(check.status)}
+                          <div>
+                            <div className="text-sm font-medium">{check.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {check.description}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-mono">{check.value}</div>
+                          {check.threshold && (
+                            <div className="text-xs text-muted-foreground">
+                              {check.threshold.warning && `warn: ${check.threshold.warning}`}
+                              {check.threshold.critical && ` / crit: ${check.threshold.critical}`}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
+              )}
+            </CardContent>
+          </CollapsibleContent>
         </Card>
-      </section>
+      </Collapsible>
 
       {/* Server Section */}
       <section className="space-y-3">
