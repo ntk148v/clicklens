@@ -17,6 +17,7 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -90,6 +91,15 @@ interface DashboardOverview {
     insertedRowsPerMinute: TimeSeriesPoint[];
     selectedBytesPerMinute: TimeSeriesPoint[];
     memoryUsage: TimeSeriesPoint[];
+  };
+  cluster?: {
+    name: string;
+    totalNodes: number;
+    activeNodes: number;
+    inactiveNodes: number;
+    totalShards: number;
+    maxReplicas: number;
+    totalErrors: number;
   };
 }
 
@@ -249,7 +259,7 @@ export function OverviewTab({
                       <StatusBadge
                         status={healthData.overallStatus}
                         label={healthData.overallStatus.toUpperCase()}
-                        size="sm"
+                        size="lg"
                       />
                     </>
                   ) : null}
@@ -313,6 +323,52 @@ export function OverviewTab({
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+      {/* Cluster Section - Only show if cluster data is available */}
+      {data?.cluster && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Layers className="w-5 h-5" />
+            Cluster: {data.cluster.name}
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <StatCard
+              title="Total Nodes"
+              value={data.cluster.totalNodes}
+              icon={Server}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Active Nodes"
+              value={data.cluster.activeNodes}
+              status={data.cluster.inactiveNodes > 0 ? "warning" : "ok"}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Inactive Nodes"
+              value={data.cluster.inactiveNodes}
+              status={data.cluster.inactiveNodes > 0 ? "critical" : "ok"}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Shards"
+              value={data.cluster.totalShards}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Max Replicas"
+              value={data.cluster.maxReplicas}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Node Errors"
+              value={data.cluster.totalErrors}
+              status={data.cluster.totalErrors > 0 ? "warning" : "ok"}
+              loading={isLoading}
+            />
+          </div>
+        </section>
+      )}
 
       {/* Server Section */}
       <section className="space-y-3">
@@ -391,7 +447,6 @@ export function OverviewTab({
         <MetricChart
           title="Queries per Minute"
           data={data?.timeSeries.queriesPerMinute || []}
-          color="hsl(var(--chart-1))"
           height={150}
           showAxis
           loading={isLoading}
@@ -430,7 +485,6 @@ export function OverviewTab({
           <MetricChart
             title="Inserted Rows / Minute"
             data={data?.timeSeries.insertedRowsPerMinute || []}
-            color="hsl(var(--chart-2))"
             height={150}
             showAxis
             loading={isLoading}
@@ -439,7 +493,6 @@ export function OverviewTab({
             title="Selected Bytes / Minute"
             data={data?.timeSeries.selectedBytesPerMinute || []}
             isBytes
-            color="hsl(var(--chart-3))"
             height={150}
             showAxis
             loading={isLoading}
@@ -485,7 +538,6 @@ export function OverviewTab({
           title="Memory Usage (Peak)"
           data={data?.timeSeries.memoryUsage || []}
           isBytes
-          color="hsl(var(--chart-4))"
           height={150}
           showAxis
           loading={isLoading}

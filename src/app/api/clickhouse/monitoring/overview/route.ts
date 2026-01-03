@@ -1,6 +1,11 @@
 /**
  * API route for cluster overview metrics with time-series data
  * GET /api/clickhouse/monitoring/overview
+ * 
+ * Supports cluster-aware queries when a cluster is detected.
+ * Query params:
+ *   - timeRange: number (minutes, default 60)
+ *   - cluster: string (optional, auto-detects if not provided)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,6 +17,8 @@ import {
   MEMORY_METRICS_QUERY,
   MERGE_METRICS_QUERY,
   THROUGHPUT_METRICS_QUERY,
+  CLUSTERS_LIST_QUERY,
+  CLUSTER_SUMMARY_QUERY,
   getQueriesPerMinuteQuery,
   getInsertedRowsPerMinuteQuery,
   getSelectedBytesPerMinuteQuery,
@@ -71,6 +78,20 @@ interface TimeSeriesPoint {
   value: number;
 }
 
+interface ClusterRow {
+  cluster: string;
+}
+
+interface ClusterSummaryRow {
+  total_nodes: number;
+  active_nodes: number;
+  inactive_nodes: number;
+  total_shards: number;
+  max_replicas: number;
+  total_errors: number;
+  cluster_count: number;
+}
+
 interface DashboardOverview {
   server: {
     uptime: number;
@@ -111,6 +132,15 @@ interface DashboardOverview {
     selectedBytesPerMinute: TimeSeriesPoint[];
     memoryUsage: TimeSeriesPoint[];
   };
+  cluster?: {
+    name: string;
+    totalNodes: number;
+    activeNodes: number;
+    inactiveNodes: number;
+    totalShards: number;
+    maxReplicas: number;
+    totalErrors: number;
+  };
 }
 
 export async function GET(
@@ -134,13 +164,40 @@ export async function GET(
       );
     }
 
-    // Get time range from query params (default 60 minutes)
+    // Get params
     const searchParams = request.nextUrl.searchParams;
     const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
+    let clusterName = searchParams.get("cluster") || undefined;
 
     const client = createClientWithConfig(config);
 
-    // Fetch all metrics in parallel
+    // Auto-detect cluster if not specified
+    if (!clusterName) {
+      try {
+        const clustersResult = await client.query<ClusterRow>(CLUSTERS_LIST_QUERY);
+        if (clustersResult.data.length > 0) {
+          // Use 'default' cluster if available, otherwise use first one
+          const defaultCluster = clustersResult.data.find(c => c.cluster === 'default');
+          clusterName = defaultCluster?.cluster || clustersResult.data[0].cluster;
+        }
+      } catch {
+        // Ignore cluster detection errors, proceed with single-node mode
+        clusterName = undefined;
+      }
+    }
+
+    // Fetch cluster summary if we have a cluster
+    let clusterSummary: ClusterSummaryRow | null = null;
+    if (clusterName) {
+      try {
+        const summaryResult = await client.query<ClusterSummaryRow>(CLUSTER_SUMMARY_QUERY);
+        clusterSummary = summaryResult.data[0] || null;
+      } catch {
+        // Ignore cluster summary errors
+      }
+    }
+
+    // Fetch all metrics in parallel (use cluster-aware queries if cluster is available)
     const [
       overviewResult,
       queryMetricsResult,
@@ -152,15 +209,17 @@ export async function GET(
       selectedHistoryResult,
       memoryHistoryResult,
     ] = await Promise.all([
+      // Always use local node for real-time metrics (time-series are cluster-aware)
       client.query<OverviewRow>(OVERVIEW_QUERY),
       client.query<QueryMetricsRow>(QUERY_METRICS_QUERY),
       client.query<MemoryMetricsRow>(MEMORY_METRICS_QUERY),
       client.query<MergeMetricsRow>(MERGE_METRICS_QUERY),
       client.query<ThroughputMetricsRow>(THROUGHPUT_METRICS_QUERY),
-      client.query<TimeSeriesPoint>(getQueriesPerMinuteQuery(timeRange)),
-      client.query<TimeSeriesPoint>(getInsertedRowsPerMinuteQuery(timeRange)),
-      client.query<TimeSeriesPoint>(getSelectedBytesPerMinuteQuery(timeRange)),
-      client.query<TimeSeriesPoint>(getMemoryUsageHistoryQuery(timeRange)),
+      // Time series queries with cluster awareness
+      client.query<TimeSeriesPoint>(getQueriesPerMinuteQuery(timeRange, clusterName)),
+      client.query<TimeSeriesPoint>(getInsertedRowsPerMinuteQuery(timeRange, clusterName)),
+      client.query<TimeSeriesPoint>(getSelectedBytesPerMinuteQuery(timeRange, clusterName)),
+      client.query<TimeSeriesPoint>(getMemoryUsageHistoryQuery(timeRange, clusterName)),
     ]);
 
     const overview = overviewResult.data[0];
@@ -217,6 +276,19 @@ export async function GET(
         memoryUsage: memoryHistoryResult.data,
       },
     };
+
+    // Add cluster info if available
+    if (clusterName && clusterSummary) {
+      dashboard.cluster = {
+        name: clusterName,
+        totalNodes: clusterSummary.total_nodes,
+        activeNodes: clusterSummary.active_nodes,
+        inactiveNodes: clusterSummary.inactive_nodes,
+        totalShards: clusterSummary.total_shards,
+        maxReplicas: clusterSummary.max_replicas,
+        totalErrors: clusterSummary.total_errors,
+      };
+    }
 
     return NextResponse.json({
       success: true,
