@@ -1,10 +1,22 @@
 /**
  * ClickHouse Monitoring SQL Queries
  * Pre-built queries for fetching monitoring data from system tables
+ * 
+ * Cluster-aware queries use clusterAllReplicas() to aggregate data from all nodes.
+ * Single-node queries are also available as fallback.
  */
 
 // =============================================================================
-// Overview Queries - Categorized metrics
+// Cluster Detection
+// =============================================================================
+
+// Get available clusters
+export const CLUSTERS_LIST_QUERY = `
+SELECT DISTINCT cluster FROM system.clusters ORDER BY cluster
+`;
+
+// =============================================================================
+// Overview Queries - Categorized metrics (single node)
 // =============================================================================
 
 // Server category: basic server info
@@ -85,11 +97,33 @@ SELECT
 `;
 
 // =============================================================================
-// Time Series Queries for Charts
+// Cluster-Aware Overview Queries
 // =============================================================================
 
-// Query throughput over time (queries per minute)
-export const getQueriesPerMinuteQuery = (intervalMinutes: number = 60) => `
+// Note: Cluster-wide metrics are aggregated via time-series queries.
+// For real-time metrics, we query the local node only.
+
+// =============================================================================
+// Time Series Queries for Charts (Cluster-Aware)
+// =============================================================================
+
+// Query throughput over time - cluster-aware
+export const getQueriesPerMinuteQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+  if (clusterName) {
+    return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  count() AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   count() AS value
@@ -100,9 +134,25 @@ WHERE
 GROUP BY timestamp
 ORDER BY timestamp
 `;
+};
 
-// Inserted rows per minute
-export const getInsertedRowsPerMinuteQuery = (intervalMinutes: number = 60) => `
+// Inserted rows per minute - cluster-aware
+export const getInsertedRowsPerMinuteQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+  if (clusterName) {
+    return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  sum(written_rows) AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   sum(written_rows) AS value
@@ -113,9 +163,25 @@ WHERE
 GROUP BY timestamp
 ORDER BY timestamp
 `;
+};
 
-// Selected bytes per minute
-export const getSelectedBytesPerMinuteQuery = (intervalMinutes: number = 60) => `
+// Selected bytes per minute - cluster-aware
+export const getSelectedBytesPerMinuteQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+  if (clusterName) {
+    return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  sum(read_bytes) AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   sum(read_bytes) AS value
@@ -126,9 +192,25 @@ WHERE
 GROUP BY timestamp
 ORDER BY timestamp
 `;
+};
 
-// Memory usage over time (peak per minute)
-export const getMemoryUsageHistoryQuery = (intervalMinutes: number = 60) => `
+// Memory usage over time - cluster-aware
+export const getMemoryUsageHistoryQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+  if (clusterName) {
+    return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  sum(memory_usage) AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   max(memory_usage) AS value
@@ -139,9 +221,28 @@ WHERE
 GROUP BY timestamp
 ORDER BY timestamp
 `;
+};
 
-// Query duration percentiles over time
-export const getQueryDurationHistoryQuery = (intervalMinutes: number = 60) => `
+
+// Query duration percentiles over time - cluster-aware
+export const getQueryDurationHistoryQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+  if (clusterName) {
+    return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  avg(query_duration_ms) AS avg_duration,
+  quantile(0.95)(query_duration_ms) AS p95_duration,
+  quantile(0.99)(query_duration_ms) AS p99_duration
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp
+ORDER BY timestamp
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   avg(query_duration_ms) AS avg_duration,
@@ -154,6 +255,7 @@ WHERE
 GROUP BY timestamp
 ORDER BY timestamp
 `;
+};
 
 // =============================================================================
 // Metrics Queries
@@ -238,12 +340,12 @@ SELECT
   inserts_in_queue AS insertsInQueue,
   merges_in_queue AS mergesInQueue,
   part_mutations_in_queue AS partMutationsInQueue,
-  toString(queue_oldest_time) AS queueOldestTime,
-  toString(inserts_oldest_time) AS insertsOldestTime,
-  toString(merges_oldest_time) AS mergesOldestTime,
+  queue_oldest_time AS queueOldestTime,
+  inserts_oldest_time AS insertsOldestTime,
+  merges_oldest_time AS mergesOldestTime,
   log_max_index AS logMaxIndex,
   log_pointer AS logPointer,
-  toString(last_queue_update) AS lastQueueUpdate,
+  last_queue_update AS lastQueueUpdate,
   absolute_delay AS absoluteDelay,
   total_replicas AS totalReplicas,
   active_replicas AS activeReplicas
@@ -254,16 +356,41 @@ ORDER BY database, table
 export const REPLICA_SUMMARY_QUERY = `
 SELECT
   count() AS totalTables,
-  countIf(NOT is_readonly AND absolute_delay < 10) AS healthyTables,
-  countIf(is_readonly) AS readonlyTables,
-  countIf(absolute_delay >= 10) AS tablesWithDelay,
-  max(absolute_delay) AS maxDelay
+  countIf(is_leader) AS leaderCount,
+  countIf(is_readonly) AS readonlyCount,
+  countIf(absolute_delay > 0) AS delayedCount,
+  max(absolute_delay) AS maxDelay,
+  sum(queue_size) AS totalQueueSize
 FROM system.replicas
 `;
 
 // =============================================================================
-// Operations Queries (Merges & Mutations)
+// Running Queries & Operations
 // =============================================================================
+
+export const RUNNING_QUERIES_QUERY = `
+SELECT
+  query_id,
+  user,
+  query,
+  elapsed,
+  read_rows,
+  read_bytes,
+  written_rows,
+  written_bytes,
+  memory_usage,
+  peak_memory_usage,
+  query_kind,
+  is_initial_query,
+  client_name,
+  formatReadableTimeDelta(elapsed) AS elapsed_readable,
+  formatReadableSize(memory_usage) AS memory_readable,
+  formatReadableSize(read_bytes) AS read_bytes_readable,
+  formatReadableQuantity(read_rows) AS read_rows_readable
+FROM system.processes
+WHERE is_cancelled = 0
+ORDER BY elapsed DESC
+`;
 
 export const MERGES_QUERY = `
 SELECT
@@ -271,22 +398,18 @@ SELECT
   table,
   elapsed,
   progress,
-  num_parts AS numParts,
-  source_part_names AS sourcePartNames,
-  result_part_name AS resultPartName,
-  source_part_paths AS sourcePartPaths,
-  result_part_path AS resultPartPath,
-  partition_id AS partitionId,
-  is_mutation AS isMutation,
-  total_size_bytes_compressed AS totalSizeBytesCompressed,
-  bytes_read_uncompressed AS bytesReadUncompressed,
-  rows_read AS rowsRead,
-  bytes_written_uncompressed AS bytesWrittenUncompressed,
-  rows_written AS rowsWritten,
-  memory_usage AS memoryUsage,
-  thread_id AS threadId,
-  merge_type AS mergeType,
-  merge_algorithm AS mergeAlgorithm
+  num_parts,
+  source_part_names,
+  result_part_name,
+  total_size_bytes_compressed,
+  bytes_read_uncompressed,
+  bytes_written_uncompressed,
+  rows_read,
+  rows_written,
+  memory_usage,
+  merge_type,
+  formatReadableSize(total_size_bytes_compressed) AS size_readable,
+  formatReadableTimeDelta(elapsed) AS elapsed_readable
 FROM system.merges
 ORDER BY elapsed DESC
 `;
@@ -297,112 +420,105 @@ SELECT
   table,
   mutation_id AS mutationId,
   command,
-  toString(create_time) AS createTime,
-  parts_to_do_names AS partsToDo,
+  create_time AS createTime,
   is_done AS isDone,
   latest_failed_part AS latestFailedPart,
-  toString(latest_fail_time) AS latestFailTime,
-  latest_fail_reason AS latestFailReason
+  latest_fail_time AS latestFailTime,
+  latest_fail_reason AS latestFailReason,
+  parts_to_do AS partsToDo,
+  formatReadableTimeDelta(dateDiff('second', create_time, now())) AS elapsed_readable
 FROM system.mutations
 WHERE NOT is_done
 ORDER BY create_time DESC
 `;
 
+// Merge summary for operations dashboard
 export const MERGE_SUMMARY_QUERY = `
 SELECT
   count() AS activeMerges,
-  sum(total_size_bytes_compressed) AS totalBytesProcessing,
-  avg(progress) AS avgProgress
+  coalesce(sum(total_size_bytes_compressed), 0) AS totalBytesProcessing,
+  coalesce(avg(progress), 0) AS avgProgress
 FROM system.merges
 `;
 
+// Mutation summary for operations dashboard
 export const MUTATION_SUMMARY_QUERY = `
 SELECT
-  countIf(NOT is_done) AS activeMutations,
+  count() AS activeMutations,
   countIf(latest_fail_reason != '') AS failedMutations,
   sum(length(parts_to_do_names)) AS totalPartsToDo
 FROM system.mutations
 WHERE NOT is_done
 `;
 
+
 // =============================================================================
 // Health Check Queries
 // =============================================================================
 
 export const HEALTH_CHECKS_QUERY = `
-SELECT
-  'server_responsive' AS id,
-  'Server Responsive' AS name,
-  'ClickHouse server is responding to queries' AS description,
-  toFloat64(1) AS value,
-  '' AS message
+SELECT 'Uptime' AS name,
+       'Server uptime in seconds' AS description,
+       toString(toUInt64(value)) AS value,
+       'seconds' AS unit
+FROM system.asynchronous_metrics
+WHERE metric = 'Uptime'
 
 UNION ALL
 
-SELECT
-  'readonly_replicas' AS id,
-  'Readonly Replicas' AS name,
-  'Number of replicas in readonly mode' AS description,
-  toFloat64(coalesce((SELECT value FROM system.metrics WHERE metric = 'ReadonlyReplica'), 0)) AS value,
-  '' AS message
+SELECT 'Active Queries' AS name,
+       'Currently running queries' AS description,
+       toString(value) AS value,
+       '' AS unit
+FROM system.metrics
+WHERE metric = 'Query'
 
 UNION ALL
 
-SELECT
-  'max_parts_per_partition' AS id,
-  'Max Parts per Partition' AS name,
-  'Maximum number of parts in any partition (should be < 300)' AS description,
-  toFloat64(coalesce((SELECT value FROM system.asynchronous_metrics WHERE metric = 'MaxPartCountForPartition'), 0)) AS value,
-  '' AS message
+SELECT 'Memory Usage' AS name,
+       'Current tracked memory usage' AS description,
+       formatReadableSize(value) AS value,
+       '' AS unit
+FROM system.metrics
+WHERE metric = 'MemoryTracking'
 
 UNION ALL
 
-SELECT
-  'delayed_inserts' AS id,
-  'Delayed Inserts' AS name,
-  'Number of INSERT queries waiting due to high parts count' AS description,
-  toFloat64(coalesce((SELECT value FROM system.metrics WHERE metric = 'DelayedInserts'), 0)) AS value,
-  '' AS message
+SELECT 'Readonly Replicas' AS name,
+       'Number of readonly replicas' AS description,
+       toString(value) AS value,
+       '' AS unit
+FROM system.metrics
+WHERE metric = 'ReadonlyReplica'
 
 UNION ALL
 
-SELECT
-  'rejected_inserts' AS id,
-  'Rejected Inserts' AS name,
-  'Number of INSERT queries rejected due to too many parts' AS description,
-  toFloat64(coalesce((SELECT value FROM system.events WHERE event = 'RejectedInserts'), 0)) AS value,
-  '' AS message
+SELECT 'Parts to Check' AS name,
+       'Number of parts requiring validation' AS description,
+       toString(coalesce(sum(parts_to_check), 0)) AS value,
+       '' AS unit
+FROM system.replicas
 
 UNION ALL
 
-SELECT
-  'zookeeper_exceptions' AS id,
-  'ZooKeeper Exceptions' AS name,
-  'Number of ZooKeeper hardware exceptions' AS description,
-  toFloat64(coalesce((SELECT value FROM system.events WHERE event = 'ZooKeeperHardwareExceptions'), 0)) AS value,
-  '' AS message
+SELECT 'Replication Delay' AS name,
+       'Maximum replication delay' AS description,
+       toString(coalesce(max(absolute_delay), 0)) AS value,
+       'seconds' AS unit
+FROM system.replicas
 
 UNION ALL
 
-SELECT
-  'distributed_files_to_insert' AS id,
-  'Distributed Queue' AS name,
-  'Files pending in distributed send queue' AS description,
-  toFloat64(coalesce((SELECT value FROM system.metrics WHERE metric = 'DistributedFilesToInsert'), 0)) AS value,
-  '' AS message
-
-UNION ALL
-
-SELECT
-  'replicated_data_loss' AS id,
-  'Replicated Data Loss' AS name,
-  'Data loss events in replicated tables' AS description,
-  toFloat64(coalesce((SELECT value FROM system.events WHERE event = 'ReplicatedDataLoss'), 0)) AS value,
-  '' AS message
+SELECT 'Max Parts Per Partition' AS name,
+       'Maximum parts count in any partition' AS description,
+       toString(toUInt64(value)) AS value,
+       '' AS unit
+FROM system.asynchronous_metrics
+WHERE metric = 'MaxPartCountForPartition'
 `;
 
 // =============================================================================
-// Disk Queries
+// Disk & Storage Queries
 // =============================================================================
 
 export const DISKS_QUERY = `
@@ -412,41 +528,65 @@ SELECT
   free_space AS freeSpace,
   total_space AS totalSpace,
   (total_space - free_space) AS usedSpace,
-  round((total_space - free_space) * 100.0 / nullIf(total_space, 0), 2) AS usedPercentage,
+  round((total_space - free_space) * 100 / total_space, 2) AS usedPercentage,
   keep_free_space AS keepFreeSpace,
   type
 FROM system.disks
 ORDER BY name
 `;
 
+// Disk summary for storage overview
 export const DISK_SUMMARY_QUERY = `
 SELECT
   count() AS totalDisks,
   sum(total_space) AS totalSpace,
-  sum(total_space - free_space) AS totalUsed,
-  sum(free_space) AS totalFree,
-  round(sum(total_space - free_space) * 100.0 / nullIf(sum(total_space), 0), 2) AS overallUsedPercentage
+  sum(total_space - free_space) AS usedSpace,
+  sum(free_space) AS freeSpace,
+  round(sum(total_space - free_space) * 100 / sum(total_space), 2) AS usedPercentage
 FROM system.disks
+`;
+
+export const PARTS_BY_TABLE_QUERY = `
+SELECT
+  database,
+  table,
+  count() AS parts_count,
+  sum(rows) AS total_rows,
+  sum(bytes_on_disk) AS total_bytes,
+  min(min_date) AS min_date,
+  max(max_date) AS max_date
+FROM system.parts
+WHERE active
+GROUP BY database, table
+ORDER BY total_bytes DESC
+LIMIT 100
 `;
 
 // =============================================================================
 // ZooKeeper/Keeper Queries
 // =============================================================================
 
+// Get basic ZooKeeper metrics
 export const KEEPER_METRICS_QUERY = `
 SELECT
   (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperSession') AS sessions,
   (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperWatch') AS watches,
-  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperRequest') AS pending_requests,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperRequest') AS requests,
   (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperHardwareExceptions') AS hardware_exceptions,
-  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperUserExceptions') AS user_exceptions,
-  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperInit') AS total_inits,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperSoftwareExceptions') AS software_exceptions,
+  (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperUserExceptions') AS user_exceptions
+`;
+
+// Get ZooKeeper event counts
+export const KEEPER_EVENTS_QUERY = `
+SELECT
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperInit') AS total_init,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperTransactions') AS total_transactions,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperCreate') AS total_creates,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperRemove') AS total_removes,
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperExists') AS total_exists,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperGet') AS total_gets,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperSet') AS total_sets,
-  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperExists') AS total_exists,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperList') AS total_lists,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperMulti') AS total_multi,
   (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperWaitMicroseconds') AS wait_microseconds
@@ -482,3 +622,57 @@ WHERE
 
 // Legacy aliases for backward compatibility
 export const getQueryThroughputHistoryQuery = getQueriesPerMinuteQuery;
+
+// =============================================================================
+// Cluster Nodes Queries
+// =============================================================================
+
+// Get all cluster nodes with status
+export const CLUSTER_NODES_QUERY = `
+SELECT
+  cluster,
+  shard_num,
+  replica_num,
+  host_name,
+  host_address,
+  port,
+  is_local,
+  coalesce(is_active, 1) AS is_active,
+  errors_count,
+  slowdowns_count,
+  estimated_recovery_time
+FROM system.clusters
+ORDER BY cluster, shard_num, replica_num
+`;
+
+// Get cluster summary
+export const CLUSTER_SUMMARY_QUERY = `
+SELECT
+  count() AS total_nodes,
+  countIf(coalesce(is_active, 1) = 1) AS active_nodes,
+  countIf(coalesce(is_active, 0) = 0) AS inactive_nodes,
+  max(shard_num) AS total_shards,
+  max(replica_num) AS max_replicas,
+  sum(errors_count) AS total_errors,
+  countDistinct(cluster) AS cluster_count
+FROM system.clusters
+`;
+
+// Get nodes by cluster name
+export const getClusterNodesQuery = (clusterName: string) => `
+SELECT
+  cluster,
+  shard_num,
+  replica_num,
+  host_name,
+  host_address,
+  port,
+  is_local,
+  coalesce(is_active, 1) AS is_active,
+  errors_count,
+  slowdowns_count,
+  estimated_recovery_time
+FROM system.clusters
+WHERE cluster = '${clusterName}'
+ORDER BY shard_num, replica_num
+`;

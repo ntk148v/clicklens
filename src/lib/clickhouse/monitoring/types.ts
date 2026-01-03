@@ -249,3 +249,41 @@ export interface QueryPerformanceMetrics {
   selectedRowsPerSecond: number;
   failedQueriesCount: number;
 }
+
+// =============================================================================
+// Cluster Node Types
+// =============================================================================
+
+export interface ClusterNode {
+  cluster: string;
+  shardNum: number;
+  replicaNum: number;
+  hostName: string;
+  hostAddress: string;
+  port: number;
+  isLocal: boolean;
+  isActive: boolean;
+  errorsCount: number;
+  slowdownsCount: number;
+  estimatedRecoveryTime: number;
+}
+
+export interface ClusterSummary {
+  totalNodes: number;
+  activeNodes: number;
+  inactiveNodes: number;
+  totalShards: number;
+  maxReplicas: number;
+  totalErrors: number;
+  clusterCount: number;
+}
+
+export interface ClusterInfo {
+  name: string;
+  nodes: ClusterNode[];
+  shards: number;
+  replicas: number;
+  activeNodes: number;
+  totalNodes: number;
+}
+
