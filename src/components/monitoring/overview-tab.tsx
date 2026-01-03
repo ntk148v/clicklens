@@ -35,8 +35,16 @@ import {
 import { StatCard } from "@/components/monitoring";
 import { MetricChart } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
-import { formatUptime, formatBytes, formatNumber, useHealthChecks } from "@/lib/hooks/use-monitoring";
-import type { MonitoringApiResponse, HealthStatus } from "@/lib/clickhouse/monitoring";
+import {
+  formatUptime,
+  formatBytes,
+  formatNumber,
+  useHealthChecks,
+} from "@/lib/hooks/use-monitoring";
+import type {
+  MonitoringApiResponse,
+  HealthStatus,
+} from "@/lib/clickhouse/monitoring";
 
 interface TimeSeriesPoint {
   timestamp: string;
@@ -90,9 +98,9 @@ interface OverviewTabProps {
   timeRange?: number;
 }
 
-export function OverviewTab({ 
+export function OverviewTab({
   refreshInterval = 30000,
-  timeRange: initialTimeRange = 60 
+  timeRange: initialTimeRange = 60,
 }: OverviewTabProps) {
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,7 +109,9 @@ export function OverviewTab({
   const [healthExpanded, setHealthExpanded] = useState(false);
 
   // Health checks data
-  const { data: healthData, isLoading: healthLoading } = useHealthChecks({ refreshInterval });
+  const { data: healthData, isLoading: healthLoading } = useHealthChecks({
+    refreshInterval,
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -200,10 +210,10 @@ export function OverviewTab({
             healthData?.overallStatus === "ok"
               ? "border-green-500/50 bg-green-500/5"
               : healthData?.overallStatus === "warning"
-                ? "border-yellow-500/50 bg-yellow-500/5"
-                : healthData?.overallStatus === "critical"
-                  ? "border-red-500/50 bg-red-500/5"
-                  : ""
+              ? "border-yellow-500/50 bg-yellow-500/5"
+              : healthData?.overallStatus === "critical"
+              ? "border-red-500/50 bg-red-500/5"
+              : ""
           }
         >
           <CollapsibleTrigger asChild>
@@ -266,16 +276,18 @@ export function OverviewTab({
                           check.status === "ok"
                             ? "bg-green-500/5 border-green-500/20"
                             : check.status === "warning"
-                              ? "bg-yellow-500/5 border-yellow-500/20"
-                              : check.status === "critical"
-                                ? "bg-red-500/5 border-red-500/20"
-                                : "bg-muted"
+                            ? "bg-yellow-500/5 border-yellow-500/20"
+                            : check.status === "critical"
+                            ? "bg-red-500/5 border-red-500/20"
+                            : "bg-muted"
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           {getHealthIcon(check.status)}
                           <div>
-                            <div className="text-sm font-medium">{check.name}</div>
+                            <div className="text-sm font-medium">
+                              {check.name}
+                            </div>
                             <div className="text-xs text-muted-foreground">
                               {check.description}
                             </div>
@@ -285,8 +297,10 @@ export function OverviewTab({
                           <div className="text-sm font-mono">{check.value}</div>
                           {check.threshold && (
                             <div className="text-xs text-muted-foreground">
-                              {check.threshold.warning && `warn: ${check.threshold.warning}`}
-                              {check.threshold.critical && ` / crit: ${check.threshold.critical}`}
+                              {check.threshold.warning &&
+                                `warn: ${check.threshold.warning}`}
+                              {check.threshold.critical &&
+                                ` / crit: ${check.threshold.critical}`}
                             </div>
                           )}
                         </div>
@@ -424,7 +438,7 @@ export function OverviewTab({
           <MetricChart
             title="Selected Bytes / Minute"
             data={data?.timeSeries.selectedBytesPerMinute || []}
-            unit=" B"
+            isBytes
             color="hsl(var(--chart-3))"
             height={150}
             showAxis
@@ -443,7 +457,9 @@ export function OverviewTab({
           <StatCard
             title="Used"
             value={data ? formatBytes(data.memory.used) : "-"}
-            description={data ? `${data.memory.percentage}% of total` : undefined}
+            description={
+              data ? `${data.memory.percentage}% of total` : undefined
+            }
             status={getMemoryStatus()}
             icon={MemoryStick}
             loading={isLoading}
@@ -468,7 +484,7 @@ export function OverviewTab({
         <MetricChart
           title="Memory Usage (Peak)"
           data={data?.timeSeries.memoryUsage || []}
-          unit=" B"
+          isBytes
           color="hsl(var(--chart-4))"
           height={150}
           showAxis
@@ -514,17 +530,16 @@ export function OverviewTab({
       </section>
 
       {/* Info footer */}
-      <Card className="bg-muted">
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground">
-            Data sourced from <code className="text-primary">system.metrics</code>,{" "}
-            <code className="text-primary">system.asynchronous_metrics</code>,{" "}
-            <code className="text-primary">system.events</code>, and{" "}
-            <code className="text-primary">system.query_log</code>. Charts show data for
-            the selected time range. Metrics refresh every {refreshInterval / 1000}s.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="p-4 rounded-lg bg-muted border">
+        <p className="text-xs text-muted-foreground">
+          Data sourced from <code className="text-primary">system.metrics</code>
+          , <code className="text-primary">system.asynchronous_metrics</code>,{" "}
+          <code className="text-primary">system.events</code>, and{" "}
+          <code className="text-primary">system.query_log</code>. Charts show
+          data for the selected time range. Metrics refresh every{" "}
+          {refreshInterval / 1000}s.
+        </p>
+      </div>
     </div>
   );
 }

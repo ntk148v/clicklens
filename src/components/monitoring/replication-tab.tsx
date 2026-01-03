@@ -17,7 +17,9 @@ interface ReplicationTabProps {
   refreshInterval?: number;
 }
 
-export function ReplicationTab({ refreshInterval = 30000 }: ReplicationTabProps) {
+export function ReplicationTab({
+  refreshInterval = 30000,
+}: ReplicationTabProps) {
   const { data, isLoading, error } = useReplicas({ refreshInterval });
 
   if (error) {
@@ -39,7 +41,9 @@ export function ReplicationTab({ refreshInterval = 30000 }: ReplicationTabProps)
     if (seconds === 0) return "0s";
     if (seconds < 60) return `${seconds}s`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor(
+      (seconds % 3600) / 60
+    )}m`;
   };
 
   // If no replicas found
@@ -81,9 +85,7 @@ export function ReplicationTab({ refreshInterval = 30000 }: ReplicationTabProps)
         <StatCard
           title="Readonly"
           value={data?.summary.readonlyTables ?? "-"}
-          status={
-            data && data.summary.readonlyTables > 0 ? "critical" : "ok"
-          }
+          status={data && data.summary.readonlyTables > 0 ? "critical" : "ok"}
           loading={isLoading}
         />
         <StatCard
@@ -111,91 +113,95 @@ export function ReplicationTab({ refreshInterval = 30000 }: ReplicationTabProps)
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <div className="h-3 w-3 bg-muted animate-pulse rounded-full" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-8 bg-muted animate-pulse rounded mx-auto" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-8 bg-muted animate-pulse rounded mx-auto" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              data?.replicas.map((r) => {
-                const replicaStatus = r.isReadonly
-                  ? "critical"
-                  : r.absoluteDelay >= 10
+            {isLoading
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <div className="h-3 w-3 bg-muted animate-pulse rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-8 bg-muted animate-pulse rounded mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-8 bg-muted animate-pulse rounded mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              : data?.replicas.map((r) => {
+                  const replicaStatus = r.isReadonly
+                    ? "critical"
+                    : r.absoluteDelay >= 10
                     ? "warning"
                     : "ok";
 
-                return (
-                  <TableRow key={`${r.database}.${r.table}`}>
-                    <TableCell>
-                      <StatusDot status={replicaStatus} />
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {r.database}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {r.table}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {r.isLeader ? (
-                        <span className="text-green-600 dark:text-green-400">✓</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {r.isReadonly ? (
-                        <StatusBadge status="critical" label="Yes" size="sm" />
-                      ) : (
-                        <span className="text-muted-foreground">No</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatNumber(r.queueSize)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span
-                        className={
-                          r.absoluteDelay >= 60
-                            ? "text-red-600 dark:text-red-400 font-medium"
-                            : r.absoluteDelay >= 10
+                  return (
+                    <TableRow key={`${r.database}.${r.table}`}>
+                      <TableCell>
+                        <StatusDot status={replicaStatus} />
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {r.database}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {r.table}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {r.isLeader ? (
+                          <span className="text-green-600 dark:text-green-400">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {r.isReadonly ? (
+                          <StatusBadge
+                            status="critical"
+                            label="Yes"
+                            size="sm"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">No</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatNumber(r.queueSize)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={
+                            r.absoluteDelay >= 60
+                              ? "text-red-600 dark:text-red-400 font-medium"
+                              : r.absoluteDelay >= 10
                               ? "text-yellow-600 dark:text-yellow-400"
                               : ""
-                        }
-                      >
-                        {formatDelay(r.absoluteDelay)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {r.activeReplicas}/{r.totalReplicas}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
+                          }
+                        >
+                          {formatDelay(r.absoluteDelay)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {r.activeReplicas}/{r.totalReplicas}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
           </TableBody>
         </Table>
       </div>

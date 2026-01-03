@@ -10,11 +10,14 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/hooks/use-monitoring";
 
 export interface MetricChartProps {
   title: string;
   data: Array<{ timestamp: string; value: number }>;
   unit?: string;
+  /** If true, values are bytes and will be formatted as KB/MB/GB */
+  isBytes?: boolean;
   color?: string;
   height?: number;
   showAxis?: boolean;
@@ -23,7 +26,7 @@ export interface MetricChartProps {
 }
 
 // Define chart colors that work well in both light and dark themes
-const CHART_COLORS = {
+const CHART_COLORS: Record<string, string> = {
   "hsl(var(--chart-1))": "#22c55e", // green-500
   "hsl(var(--chart-2))": "#3b82f6", // blue-500
   "hsl(var(--chart-3))": "#a855f7", // purple-500
@@ -36,6 +39,7 @@ export function MetricChart({
   title,
   data,
   unit = "",
+  isBytes = false,
   color = "hsl(var(--chart-1))",
   height = 120,
   showAxis = false,
@@ -43,10 +47,16 @@ export function MetricChart({
   loading = false,
 }: MetricChartProps) {
   // Resolve the color - use a fallback for CSS variables
-  const resolvedColor = CHART_COLORS[color as keyof typeof CHART_COLORS] || color;
+  const resolvedColor = CHART_COLORS[color] || color;
 
-  const formatValue = (value: number) => {
+  // Format value - use bytes formatting if isBytes is true
+  const formatValue = (value: number): string => {
     if (value == null || !isFinite(value)) return "0";
+
+    if (isBytes) {
+      return formatBytes(value);
+    }
+
     if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
     if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
@@ -56,14 +66,19 @@ export function MetricChart({
   const formatTime = (timestamp: string) => {
     try {
       const date = new Date(timestamp);
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch {
       return "";
     }
   };
 
   // Generate a unique ID for this chart's gradient
-  const gradientId = `gradient-${title.replace(/\s+/g, "-").toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
+  const gradientId = `gradient-${title
+    .replace(/\s+/g, "-")
+    .toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
     <Card className={cn(className)}>
@@ -87,12 +102,20 @@ export function MetricChart({
           <ResponsiveContainer width="100%" height={height}>
             <AreaChart
               data={data}
-              margin={{ top: 5, right: 5, left: showAxis ? 30 : 5, bottom: 5 }}
+              margin={{ top: 5, right: 5, left: showAxis ? 35 : 5, bottom: 5 }}
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={resolvedColor} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={resolvedColor} stopOpacity={0.1} />
+                  <stop
+                    offset="0%"
+                    stopColor={resolvedColor}
+                    stopOpacity={0.4}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={resolvedColor}
+                    stopOpacity={0.1}
+                  />
                 </linearGradient>
               </defs>
               {showAxis && (
@@ -110,7 +133,7 @@ export function MetricChart({
                     tickLine={false}
                     tick={{ fontSize: 10, fill: "#9ca3af" }}
                     tickFormatter={formatValue}
-                    width={35}
+                    width={40}
                   />
                 </>
               )}
@@ -127,7 +150,13 @@ export function MetricChart({
                 labelFormatter={formatTime}
                 formatter={(value) => {
                   const numValue = typeof value === "number" ? value : 0;
-                  return [`${formatValue(numValue)}${unit}`, title];
+                  // For bytes, formatValue already includes the unit
+                  const formatted = formatValue(numValue);
+                  // Only add unit suffix if not bytes (bytes already has unit in formatted string)
+                  const displayValue = isBytes
+                    ? formatted
+                    : `${formatted}${unit}`;
+                  return [displayValue, title];
                 }}
               />
               <Area
@@ -158,7 +187,7 @@ export function Sparkline({
   height?: number;
 }) {
   const gradientId = `sparkline-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   return (
     <ResponsiveContainer width={width} height={height}>
       <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>

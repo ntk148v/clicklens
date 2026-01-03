@@ -268,16 +268,14 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
       </section>
 
       {/* Info */}
-      <Card className="bg-muted">
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground">
-            Data sourced from <code className="text-primary">system.metrics</code> and{" "}
-            <code className="text-primary">system.events</code> tables. ZooKeeper/Keeper
-            is used for distributed coordination in ClickHouse cluster. High latency or
-            exceptions may indicate cluster coordination issues.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="p-4 rounded-lg bg-muted border">
+        <p className="text-xs text-muted-foreground">
+          Data sourced from <code className="text-primary">system.metrics</code> and{" "}
+          <code className="text-primary">system.events</code> tables. ZooKeeper/Keeper is
+          used for distributed coordination in ClickHouse cluster. High latency or
+          exceptions may indicate cluster coordination issues.
+        </p>
+      </div>
     </div>
   );
 }
