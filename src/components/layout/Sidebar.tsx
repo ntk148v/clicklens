@@ -159,10 +159,9 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {visibleNavigation.map((item) => {
-            const isActive =
-              item.subItems
-                ? pathname.startsWith(item.href) && !pathname.includes("/queries")
-                : pathname.startsWith(item.href);
+            const isActive = item.subItems
+              ? pathname.startsWith(item.href) && !pathname.includes("/queries")
+              : pathname.startsWith(item.href);
             const Icon = item.icon;
             const hasSubItems = item.subItems && item.subItems.length > 0;
 
@@ -197,7 +196,11 @@ export function Sidebar() {
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                    <DropdownMenuContent side="right" align="start" className="w-48">
+                    <DropdownMenuContent
+                      side="right"
+                      align="start"
+                      className="w-48"
+                    >
                       <DropdownMenuLabel>{item.name}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       {item.subItems?.map((subItem) => (
