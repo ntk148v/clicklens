@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   Area,
   AreaChart,
@@ -25,29 +26,23 @@ export interface MetricChartProps {
   loading?: boolean;
 }
 
-// Define chart colors that work well in both light and dark themes
-const CHART_COLORS: Record<string, string> = {
-  "hsl(var(--chart-1))": "#22c55e", // green-500
-  "hsl(var(--chart-2))": "#3b82f6", // blue-500
-  "hsl(var(--chart-3))": "#a855f7", // purple-500
-  "hsl(var(--chart-4))": "#f59e0b", // amber-500
-  "hsl(var(--chart-5))": "#ef4444", // red-500
-  "hsl(var(--primary))": "#3b82f6", // blue-500
-};
+// Standard chart color - green for consistency
+const CHART_COLOR = "#22c55e";
 
 export function MetricChart({
   title,
   data,
   unit = "",
   isBytes = false,
-  color = "hsl(var(--chart-1))",
+  color = CHART_COLOR,
   height = 120,
   showAxis = false,
   className,
   loading = false,
 }: MetricChartProps) {
-  // Resolve the color - use a fallback for CSS variables
-  const resolvedColor = CHART_COLORS[color] || color;
+  // Use React useId for stable gradient ID (prevents collision between charts)
+  const id = useId();
+  const gradientId = `gradient-${id}`;
 
   // Format value - use bytes formatting if isBytes is true
   const formatValue = (value: number): string => {
@@ -75,11 +70,6 @@ export function MetricChart({
     }
   };
 
-  // Generate a unique ID for this chart's gradient
-  const gradientId = `gradient-${title
-    .replace(/\s+/g, "-")
-    .toLowerCase()}-${Math.random().toString(36).substr(2, 9)}`;
-
   return (
     <Card className={cn(className)}>
       <CardHeader className="pb-2">
@@ -106,16 +96,8 @@ export function MetricChart({
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor={resolvedColor}
-                    stopOpacity={0.4}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={resolvedColor}
-                    stopOpacity={0.1}
-                  />
+                  <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               {showAxis && (
@@ -150,9 +132,7 @@ export function MetricChart({
                 labelFormatter={formatTime}
                 formatter={(value) => {
                   const numValue = typeof value === "number" ? value : 0;
-                  // For bytes, formatValue already includes the unit
                   const formatted = formatValue(numValue);
-                  // Only add unit suffix if not bytes (bytes already has unit in formatted string)
                   const displayValue = isBytes
                     ? formatted
                     : `${formatted}${unit}`;
@@ -162,7 +142,7 @@ export function MetricChart({
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke={resolvedColor}
+                stroke={color}
                 strokeWidth={2}
                 fill={`url(#${gradientId})`}
               />
@@ -177,7 +157,7 @@ export function MetricChart({
 // Sparkline variant for inline display
 export function Sparkline({
   data,
-  color = "#3b82f6",
+  color = CHART_COLOR,
   width = 100,
   height = 30,
 }: {
@@ -186,7 +166,8 @@ export function Sparkline({
   width?: number;
   height?: number;
 }) {
-  const gradientId = `sparkline-${Math.random().toString(36).substr(2, 9)}`;
+  const id = useId();
+  const gradientId = `sparkline-${id}`;
 
   return (
     <ResponsiveContainer width={width} height={height}>
