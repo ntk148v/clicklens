@@ -90,8 +90,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-4">
-            <Database className="w-6 h-6 text-primary" />
+          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="ClickLens Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
           <CardTitle className="text-2xl">ClickLens</CardTitle>
           <CardDescription>

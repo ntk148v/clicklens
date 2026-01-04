@@ -145,9 +145,8 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
           <Link href="/" className="flex items-center gap-2 overflow-hidden">
-            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Database className="w-5 h-5 text-primary-foreground" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg" />
             {!collapsed && (
               <span className="font-semibold text-sidebar-foreground whitespace-nowrap">
                 ClickLens
