@@ -60,7 +60,14 @@ export function MetricChart({
 
   const formatTime = (timestamp: string) => {
     try {
-      const date = new Date(timestamp);
+      // Parse timestamp as local time (ClickHouse returns server local time)
+      // Replace space with 'T' and don't add 'Z' to treat as local
+      const localTimestamp = timestamp.replace(" ", "T");
+      const date = new Date(localTimestamp);
+      // If invalid, try parsing directly
+      if (isNaN(date.getTime())) {
+        return timestamp.slice(11, 16) || "";
+      }
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -261,7 +268,14 @@ export function MultiSeriesChart({
 
   const formatTime = (timestamp: string) => {
     try {
-      const date = new Date(timestamp);
+      // Parse timestamp as local time (ClickHouse returns server local time)
+      // Replace space with 'T' and don't add 'Z' to treat as local
+      const localTimestamp = timestamp.replace(" ", "T");
+      const date = new Date(localTimestamp);
+      // If invalid, try parsing directly
+      if (isNaN(date.getTime())) {
+        return timestamp.slice(11, 16) || "";
+      }
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",

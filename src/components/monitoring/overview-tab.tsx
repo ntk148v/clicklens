@@ -3,21 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Server,
-  Activity,
-  MemoryStick,
-  GitMerge,
-  ArrowUpDown,
   Clock,
-  AlertCircle,
-  Network,
-  Zap,
-  HeartPulse,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   ChevronDown,
   ChevronUp,
   Layers,
+  Activity,
+  Cpu,
+  HardDrive,
+  Network,
+  Database,
+  HeartPulse,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,74 +37,41 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { StatCard, StatusDot, MultiSeriesChart } from "@/components/monitoring";
-import { MetricChart } from "@/components/monitoring";
-import { StatusBadge } from "@/components/monitoring";
+import { Button } from "@/components/ui/button";
 import {
-  formatUptime,
-  formatBytes,
-  formatNumber,
-  useHealthChecks,
-} from "@/lib/hooks/use-monitoring";
+  StatusDot,
+  MultiSeriesChart,
+  MetricChart,
+} from "@/components/monitoring";
+import { StatusBadge } from "@/components/monitoring";
+import { formatUptime, useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type {
   MonitoringApiResponse,
   HealthStatus,
-  ClusterInfo,
-  ClusterSummary,
-  ClusterNode,
 } from "@/lib/clickhouse/monitoring";
 
 interface TimeSeriesPoint {
-  timestamp: string;
+  t: string;
+  node: string;
   value: number;
 }
 
-interface DashboardOverview {
+interface ClusterNode {
+  hostName: string;
+  hostAddress: string;
+  port: number;
+  shardNum: number;
+  replicaNum: number;
+  isLocal: boolean;
+  isActive: boolean;
+  errorsCount: number;
+}
+
+interface DashboardData {
   server: {
     uptime: number;
     version: string;
-    tcpConnections: number;
-    httpConnections: number;
-  };
-  queries: {
-    running: number;
-    threads: number;
-    total: number;
-    failed: number;
-    selects: number;
-    inserts: number;
-  };
-  memory: {
-    used: number;
-    total: number;
-    percentage: number;
-    mergeMemory: number;
-  };
-  merges: {
-    running: number;
-    mutations: number;
-    backgroundTasks: number;
-    maxPartsPerPartition: number;
-    mergedRows: number;
-  };
-  throughput: {
-    insertedRows: number;
-    insertedBytes: number;
-    selectedRows: number;
-    selectedBytes: number;
-  };
-  timeSeries: {
-    queriesPerMinute: TimeSeriesPoint[];
-    insertedRowsPerMinute: TimeSeriesPoint[];
-    selectedBytesPerMinute: TimeSeriesPoint[];
-    memoryUsage: TimeSeriesPoint[];
-  };
-  perNodeTimeSeries?: {
-    queries: PerNodePoint[];
-    memory: PerNodePoint[];
-    insertedRows: PerNodePoint[];
-    selectedBytes: PerNodePoint[];
-    nodes: string[];
+    hostname: string;
   };
   cluster?: {
     name: string;
@@ -115,15 +79,24 @@ interface DashboardOverview {
     activeNodes: number;
     inactiveNodes: number;
     totalShards: number;
-    maxReplicas: number;
-    totalErrors: number;
+    nodes: ClusterNode[];
   };
-}
-
-interface PerNodePoint {
-  timestamp: string;
-  node: string;
-  value: number;
+  clickhouse: {
+    queriesPerSec: TimeSeriesPoint[];
+    queriesRunning: TimeSeriesPoint[];
+    mergesRunning: TimeSeriesPoint[];
+    selectedRowsPerSec: TimeSeriesPoint[];
+    insertedRowsPerSec: TimeSeriesPoint[];
+    maxPartsPerPartition: TimeSeriesPoint[];
+  };
+  systemHealth: {
+    memoryTracked: TimeSeriesPoint[];
+    cpuUsage: TimeSeriesPoint[];
+    ioWait: TimeSeriesPoint[];
+    filesystemUsed: TimeSeriesPoint[];
+    networkReceived: TimeSeriesPoint[];
+  };
+  nodes: string[];
 }
 
 interface OverviewTabProps {
@@ -131,27 +104,37 @@ interface OverviewTabProps {
   timeRange?: number;
 }
 
+// Transform per-node data for charts
+function transformToChartData(data: TimeSeriesPoint[]) {
+  return data.map((p) => ({
+    timestamp: p.t,
+    node: p.node,
+    value: p.value,
+  }));
+}
+
+// For single line charts (when only 1 node)
+function transformToSingleSeries(data: TimeSeriesPoint[]) {
+  return data.map((p) => ({
+    timestamp: p.t,
+    value: p.value,
+  }));
+}
+
 export function OverviewTab({
   refreshInterval = 30000,
   timeRange: initialTimeRange = 60,
 }: OverviewTabProps) {
-  const [data, setData] = useState<DashboardOverview | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState(initialTimeRange);
   const [healthExpanded, setHealthExpanded] = useState(false);
-  const [perNodeView, setPerNodeView] = useState(false); // Toggle for per-node charts
 
-  // Health checks data
+  // Health checks
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({
-    refreshInterval: 0, // Controlled by parent RefreshControl
+    refreshInterval: 0,
   });
-
-  // Cluster nodes data
-  const [clusterData, setClusterData] = useState<{
-    clusters: ClusterInfo[];
-    summary: ClusterSummary;
-  } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -159,28 +142,15 @@ export function OverviewTab({
       setError(null);
 
       const response = await fetch(
-        `/api/clickhouse/monitoring/overview?timeRange=${timeRange}`
+        `/api/clickhouse/monitoring/dashboard?timeRange=${timeRange}`
       );
-      const result: MonitoringApiResponse<DashboardOverview> =
+      const result: MonitoringApiResponse<DashboardData> =
         await response.json();
 
       if (result.success && result.data) {
         setData(result.data);
       } else if (result.error) {
         setError(result.error.userMessage || result.error.message);
-      }
-
-      // Also fetch cluster nodes for detailed topology
-      try {
-        const clusterResponse = await fetch(
-          "/api/clickhouse/monitoring/cluster"
-        );
-        const clusterResult = await clusterResponse.json();
-        if (clusterResult.success && clusterResult.data) {
-          setClusterData(clusterResult.data);
-        }
-      } catch {
-        // Cluster data is optional, ignore errors
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -193,32 +163,6 @@ export function OverviewTab({
     fetchData();
   }, [fetchData]);
 
-  // Note: Component does NOT have internal refresh timer
-  // Refresh is controlled by parent page via RefreshControl
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center p-8 text-destructive">
-        <AlertCircle className="w-5 h-5 mr-2" />
-        <span>{error}</span>
-      </div>
-    );
-  }
-
-  const getPartsStatus = () => {
-    if (!data) return undefined;
-    if (data.merges.maxPartsPerPartition >= 500) return "critical" as const;
-    if (data.merges.maxPartsPerPartition >= 300) return "warning" as const;
-    return "ok" as const;
-  };
-
-  const getMemoryStatus = () => {
-    if (!data) return undefined;
-    if (data.memory.percentage >= 90) return "critical" as const;
-    if (data.memory.percentage >= 75) return "warning" as const;
-    return "ok" as const;
-  };
-
   const getHealthIcon = (status: HealthStatus) => {
     switch (status) {
       case "ok":
@@ -228,31 +172,73 @@ export function OverviewTab({
       case "critical":
         return <XCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
+        return <Activity className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
+  // Determine if we should show multi-node charts
+  const isMultiNode = data && data.nodes.length > 1;
+
+  // Render chart - automatically handles single vs multi-node
+  const renderChart = (
+    title: string,
+    chartData: TimeSeriesPoint[],
+    options: { isBytes?: boolean; unit?: string } = {}
+  ) => {
+    const transformedData = transformToChartData(chartData);
+    const nodes = data?.nodes || [];
+
+    if (isMultiNode) {
+      return (
+        <MultiSeriesChart
+          title={title}
+          data={transformedData}
+          nodes={nodes}
+          isBytes={options.isBytes}
+          unit={options.unit}
+          height={140}
+          showAxis
+          loading={isLoading}
+        />
+      );
+    }
+
+    return (
+      <MetricChart
+        title={title}
+        data={transformToSingleSeries(chartData)}
+        isBytes={options.isBytes}
+        unit={options.unit}
+        height={140}
+        showAxis
+        loading={isLoading}
+      />
+    );
+  };
+
+  if (error) {
+    return (
+      <Card className="border-red-500/30">
+        <CardContent className="py-8 text-center">
+          <XCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <p className="text-red-500 font-medium">{error}</p>
+          <Button variant="outline" className="mt-4" onClick={fetchData}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Time Range Selector & Per-Node Toggle */}
-      <div className="flex justify-end gap-2">
-        {/* Per-node toggle - only show when cluster has multiple nodes */}
-        {data?.perNodeTimeSeries && data.perNodeTimeSeries.nodes.length > 1 && (
-          <Button
-            variant={perNodeView ? "default" : "outline"}
-            size="sm"
-            onClick={() => setPerNodeView(!perNodeView)}
-            className="text-xs"
-          >
-            <Server className="w-3 h-3 mr-1" />
-            {perNodeView ? "Per Node" : "Aggregated"}
-          </Button>
-        )}
+      {/* Time Range Selector */}
+      <div className="flex justify-end">
         <Select
           value={String(timeRange)}
           onValueChange={(v) => setTimeRange(Number(v))}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[160px]">
             <Clock className="w-4 h-4 mr-2" />
             <SelectValue />
           </SelectTrigger>
@@ -264,6 +250,110 @@ export function OverviewTab({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Cluster Info + Nodes */}
+      {data?.cluster && (
+        <TooltipProvider>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Layers className="w-4 h-4" />
+                  Cluster: {data.cluster.name}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    {data.cluster.activeNodes}/{data.cluster.totalNodes} active
+                  </Badge>
+                  <Badge variant="outline">
+                    {data.cluster.totalShards} shard
+                    {data.cluster.totalShards > 1 ? "s" : ""}
+                  </Badge>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {data.cluster.nodes.map((node) => (
+                  <Tooltip key={`${node.hostName}-${node.port}`}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`
+                          flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer
+                          transition-colors hover:bg-muted/50
+                          ${
+                            !node.isActive
+                              ? "border-red-500/50 bg-red-500/5"
+                              : node.errorsCount > 0
+                              ? "border-yellow-500/50 bg-yellow-500/5"
+                              : "border-green-500/50 bg-green-500/5"
+                          }
+                        `}
+                      >
+                        {node.isActive ? (
+                          node.errorsCount > 0 ? (
+                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          )
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-500" />
+                        )}
+                        <span className="text-sm font-mono">
+                          {node.hostName}
+                        </span>
+                        {node.isLocal && (
+                          <Badge variant="secondary" className="text-xs">
+                            local
+                          </Badge>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <span className="text-muted-foreground">Address:</span>
+                        <span className="font-mono">
+                          {node.hostAddress}:{node.port}
+                        </span>
+                        <span className="text-muted-foreground">Shard:</span>
+                        <span>{node.shardNum}</span>
+                        <span className="text-muted-foreground">Replica:</span>
+                        <span>{node.replicaNum}</span>
+                        <span className="text-muted-foreground">Errors:</span>
+                        <span
+                          className={
+                            node.errorsCount > 0 ? "text-yellow-500" : ""
+                          }
+                        >
+                          {node.errorsCount}
+                        </span>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TooltipProvider>
+      )}
+
+      {/* Single Node Info */}
+      {!data?.cluster && data && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Server className="w-4 h-4" />
+              {data.server.hostname}
+              <Badge variant="outline" className="ml-auto">
+                v{data.server.version}
+              </Badge>
+              <Badge variant="outline">
+                Uptime: {formatUptime(data.server.uptime)}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Health Summary - Collapsible */}
       <Collapsible open={healthExpanded} onOpenChange={setHealthExpanded}>
@@ -279,95 +369,45 @@ export function OverviewTab({
           }
         >
           <CollapsibleTrigger asChild>
-            <CardHeader className="pb-3 cursor-pointer transition-colors">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                  <HeartPulse className="w-5 h-5" />
+            <CardHeader className="cursor-pointer transition-colors py-3">
+              <CardTitle className="flex items-center gap-2 justify-between">
+                <span className="flex items-center gap-2">
+                  <HeartPulse className="w-4 h-4" />
                   Health Status
-                </CardTitle>
-                <div className="flex items-center gap-3">
+                </span>
+                <div className="flex items-center gap-2">
                   {healthLoading ? (
-                    <div className="h-6 w-20 bg-muted animate-pulse rounded" />
-                  ) : healthData ? (
-                    <>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          {healthData.okCount}
-                        </span>
-                        {healthData.warningCount > 0 && (
-                          <span className="flex items-center gap-1">
-                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                            {healthData.warningCount}
-                          </span>
-                        )}
-                        {healthData.criticalCount > 0 && (
-                          <span className="flex items-center gap-1">
-                            <XCircle className="w-4 h-4 text-red-500" />
-                            {healthData.criticalCount}
-                          </span>
-                        )}
-                      </div>
-                      <StatusBadge
-                        status={healthData.overallStatus}
-                        label={healthData.overallStatus.toUpperCase()}
-                        size="lg"
-                      />
-                    </>
-                  ) : null}
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    {healthExpanded ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
+                    <span className="text-muted-foreground text-xs">
+                      Loading...
+                    </span>
+                  ) : (
+                    <StatusBadge
+                      status={healthData?.overallStatus || "unknown"}
+                      size="lg"
+                    />
+                  )}
+                  {healthExpanded ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
                 </div>
-              </div>
+              </CardTitle>
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="pt-0">
-              {healthData && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {healthData.checks.map((check) => (
-                      <div
-                        className={`flex items-center justify-between p-3 rounded-lg border ${
-                          check.status === "ok"
-                            ? "bg-green-500/5 border-green-500/20"
-                            : check.status === "warning"
-                            ? "bg-yellow-500/5 border-yellow-500/20"
-                            : check.status === "critical"
-                            ? "bg-red-500/5 border-red-500/20"
-                            : "bg-muted"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {getHealthIcon(check.status)}
-                          <div>
-                            <div className="text-sm font-medium">
-                              {check.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {check.description}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-mono">{check.value}</div>
-                          {check.threshold && (
-                            <div className="text-xs text-muted-foreground">
-                              {check.threshold.warning &&
-                                `warn: ${check.threshold.warning}`}
-                              {check.threshold.critical &&
-                                ` / crit: ${check.threshold.critical}`}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {healthData?.checks && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {healthData.checks.map((check) => (
+                    <div
+                      key={check.name}
+                      className="flex items-center gap-2 text-sm p-2 rounded-md"
+                    >
+                      {getHealthIcon(check.status)}
+                      <span className="truncate">{check.name}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -375,396 +415,74 @@ export function OverviewTab({
         </Card>
       </Collapsible>
 
-      {/* Cluster Section - Show node topology if cluster data available */}
-      {clusterData && clusterData.clusters.length > 0 && (
-        <TooltipProvider>
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Layers className="w-5 h-5" />
-                Cluster Topology
-              </h2>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="outline">
-                  {clusterData.summary.activeNodes}/
-                  {clusterData.summary.totalNodes} active
-                </Badge>
-                <Badge variant="outline">
-                  {clusterData.summary.totalShards} shard
-                  {clusterData.summary.totalShards > 1 ? "s" : ""}
-                </Badge>
-              </div>
-            </div>
-
-            {clusterData.clusters.map((cluster) => {
-              // Group nodes by shard
-              const shards = new Map<number, ClusterNode[]>();
-              cluster.nodes.forEach((node) => {
-                const existing = shards.get(node.shardNum) || [];
-                existing.push(node);
-                shards.set(node.shardNum, existing);
-              });
-              const shardEntries = Array.from(shards.entries()).sort(
-                (a, b) => a[0] - b[0]
-              );
-
-              const getNodeStatus = (node: ClusterNode) => {
-                if (!node.isActive) return "critical" as const;
-                if (node.errorsCount > 0) return "warning" as const;
-                return "ok" as const;
-              };
-
-              return (
-                <Card key={cluster.name}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center justify-between">
-                      <span>{cluster.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {cluster.activeNodes}/{cluster.totalNodes} nodes
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {shardEntries.map(([shardNum, nodes]) => (
-                        <div key={shardNum} className="space-y-2">
-                          <div className="text-xs font-medium text-muted-foreground">
-                            Shard {shardNum}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {nodes
-                              .sort((a, b) => a.replicaNum - b.replicaNum)
-                              .map((node) => (
-                                <Tooltip key={`${node.hostName}-${node.port}`}>
-                                  <TooltipTrigger asChild>
-                                    <div
-                                      className={`
-                                        flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer
-                                        transition-colors hover:bg-muted/50
-                                        ${
-                                          !node.isActive
-                                            ? "border-red-500/50 bg-red-500/5"
-                                            : node.errorsCount > 0
-                                            ? "border-yellow-500/50 bg-yellow-500/5"
-                                            : "border-green-500/30 bg-green-500/5"
-                                        }
-                                      `}
-                                    >
-                                      {node.isActive ? (
-                                        node.errorsCount > 0 ? (
-                                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                                        ) : (
-                                          <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                        )
-                                      ) : (
-                                        <XCircle className="w-4 h-4 text-red-500" />
-                                      )}
-                                      <div className="flex flex-col">
-                                        <span className="text-sm font-mono">
-                                          {node.hostName}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                          Replica {node.replicaNum}
-                                          {node.isLocal && " (local)"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom">
-                                    <div className="space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <span className="font-medium">
-                                          {node.hostName}
-                                        </span>
-                                        <StatusDot
-                                          status={getNodeStatus(node)}
-                                        />
-                                      </div>
-                                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                                        <span className="text-muted-foreground">
-                                          Address:
-                                        </span>
-                                        <span className="font-mono">
-                                          {node.hostAddress}:{node.port}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                          Shard:
-                                        </span>
-                                        <span>{node.shardNum}</span>
-                                        <span className="text-muted-foreground">
-                                          Replica:
-                                        </span>
-                                        <span>{node.replicaNum}</span>
-                                        <span className="text-muted-foreground">
-                                          Active:
-                                        </span>
-                                        <span>
-                                          {node.isActive ? "Yes" : "No"}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                          Errors:
-                                        </span>
-                                        <span
-                                          className={
-                                            node.errorsCount > 0
-                                              ? "text-yellow-500"
-                                              : ""
-                                          }
-                                        >
-                                          {node.errorsCount}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                          Slowdowns:
-                                        </span>
-                                        <span>{node.slowdownsCount}</span>
-                                      </div>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </section>
-        </TooltipProvider>
-      )}
-
-      {/* Server Section */}
-      <section className="space-y-3">
+      {/* ClickHouse Specific Metrics */}
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Server className="w-5 h-5" />
-          Server
+          <Database className="w-5 h-5" />
+          ClickHouse Metrics
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            title="Uptime"
-            value={data ? formatUptime(data.server.uptime) : "-"}
-            icon={Clock}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Version"
-            value={data?.server.version || "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="TCP Connections"
-            value={data ? formatNumber(data.server.tcpConnections) : "-"}
-            icon={Network}
-            loading={isLoading}
-          />
-          <StatCard
-            title="HTTP Connections"
-            value={data ? formatNumber(data.server.httpConnections) : "-"}
-            icon={Network}
-            loading={isLoading}
-          />
-        </div>
-      </section>
-
-      {/* Queries Section */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          Queries
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <StatCard
-            title="Running"
-            value={data ? formatNumber(data.queries.running) : "-"}
-            icon={Zap}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Threads"
-            value={data ? formatNumber(data.queries.threads) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Total"
-            value={data ? formatNumber(data.queries.total) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Failed"
-            value={data ? formatNumber(data.queries.failed) : "-"}
-            status={data && data.queries.failed > 0 ? "warning" : "ok"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Selects"
-            value={data ? formatNumber(data.queries.selects) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Inserts"
-            value={data ? formatNumber(data.queries.inserts) : "-"}
-            loading={isLoading}
-          />
-        </div>
-        {/* Queries per minute chart - conditional per-node view */}
-        {perNodeView && data?.perNodeTimeSeries ? (
-          <MultiSeriesChart
-            title="Queries per Minute (by Node)"
-            data={data.perNodeTimeSeries.queries}
-            nodes={data.perNodeTimeSeries.nodes}
-            height={150}
-            showAxis
-            loading={isLoading}
-          />
-        ) : (
-          <MetricChart
-            title="Queries per Minute"
-            data={data?.timeSeries.queriesPerMinute || []}
-            height={150}
-            showAxis
-            loading={isLoading}
-          />
-        )}
-      </section>
-
-      {/* Throughput Section */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <ArrowUpDown className="w-5 h-5" />
-          Throughput
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            title="Inserted Rows"
-            value={data ? formatNumber(data.throughput.insertedRows) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Inserted Bytes"
-            value={data ? formatBytes(data.throughput.insertedBytes) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Selected Rows"
-            value={data ? formatNumber(data.throughput.selectedRows) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Selected Bytes"
-            value={data ? formatBytes(data.throughput.selectedBytes) : "-"}
-            loading={isLoading}
-          />
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <MetricChart
-            title="Inserted Rows / Minute"
-            data={data?.timeSeries.insertedRowsPerMinute || []}
-            height={150}
-            showAxis
-            loading={isLoading}
-          />
-          <MetricChart
-            title="Selected Bytes / Minute"
-            data={data?.timeSeries.selectedBytesPerMinute || []}
-            isBytes
-            height={150}
-            showAxis
-            loading={isLoading}
-          />
+          {renderChart("Queries/sec", data?.clickhouse.queriesPerSec || [], {
+            unit: "/s",
+          })}
+          {renderChart(
+            "Queries Running",
+            data?.clickhouse.queriesRunning || []
+          )}
+          {renderChart(
+            "Selected Rows/sec",
+            data?.clickhouse.selectedRowsPerSec || [],
+            { unit: "/s" }
+          )}
+          {renderChart(
+            "Inserted Rows/sec",
+            data?.clickhouse.insertedRowsPerSec || [],
+            { unit: "/s" }
+          )}
+          {renderChart("Merges Running", data?.clickhouse.mergesRunning || [])}
+          {renderChart(
+            "Max Parts/Partition",
+            data?.clickhouse.maxPartsPerPartition || []
+          )}
         </div>
       </section>
 
-      {/* Memory Section */}
-      <section className="space-y-3">
+      {/* System Health Specific Metrics */}
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <MemoryStick className="w-5 h-5" />
-          Memory
+          <Cpu className="w-5 h-5" />
+          System Health
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            title="Used"
-            value={data ? formatBytes(data.memory.used) : "-"}
-            description={
-              data ? `${data.memory.percentage}% of total` : undefined
-            }
-            status={getMemoryStatus()}
-            icon={MemoryStick}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Total"
-            value={data ? formatBytes(data.memory.total) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Merge Memory"
-            value={data ? formatBytes(data.memory.mergeMemory) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Usage %"
-            value={data ? `${data.memory.percentage}%` : "-"}
-            status={getMemoryStatus()}
-            loading={isLoading}
-          />
-        </div>
-        <MetricChart
-          title="Memory Usage (Peak)"
-          data={data?.timeSeries.memoryUsage || []}
-          isBytes
-          height={150}
-          showAxis
-          loading={isLoading}
-        />
-      </section>
-
-      {/* Merges & Parts Section */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <GitMerge className="w-5 h-5" />
-          Merges & Parts
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard
-            title="Running Merges"
-            value={data ? formatNumber(data.merges.running) : "-"}
-            icon={GitMerge}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Mutations"
-            value={data ? formatNumber(data.merges.mutations) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Background Tasks"
-            value={data ? formatNumber(data.merges.backgroundTasks) : "-"}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Max Parts/Partition"
-            value={data ? formatNumber(data.merges.maxPartsPerPartition) : "-"}
-            status={getPartsStatus()}
-            loading={isLoading}
-          />
-          <StatCard
-            title="Merged Rows"
-            value={data ? formatNumber(data.merges.mergedRows) : "-"}
-            loading={isLoading}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {renderChart(
+            "Memory (tracked)",
+            data?.systemHealth.memoryTracked || [],
+            { isBytes: true }
+          )}
+          {renderChart("CPU Usage", data?.systemHealth.cpuUsage || [])}
+          {renderChart("IO Wait", data?.systemHealth.ioWait || [], {
+            unit: "s",
+          })}
+          {renderChart(
+            "Filesystem Used",
+            data?.systemHealth.filesystemUsed || [],
+            { isBytes: true }
+          )}
+          {renderChart(
+            "Network Received",
+            data?.systemHealth.networkReceived || [],
+            { isBytes: true }
+          )}
         </div>
       </section>
 
       {/* Info footer */}
       <div className="p-4 rounded-lg bg-muted border">
         <p className="text-xs text-muted-foreground">
-          Data sourced from <code className="text-primary">system.metrics</code>
-          , <code className="text-primary">system.asynchronous_metrics</code>,{" "}
-          <code className="text-primary">system.events</code>, and{" "}
-          <code className="text-primary">system.query_log</code>. Charts show
-          data for the selected time range. Metrics refresh every{" "}
-          {refreshInterval / 1000}s.
+          Data from <code className="text-primary">system.metric_log</code>,{" "}
+          <code className="text-primary">system.asynchronous_metric_log</code>,
+          and <code className="text-primary">system.query_log</code>.
+          {isMultiNode && " Per-node metrics shown for cluster mode."}
         </p>
       </div>
     </div>

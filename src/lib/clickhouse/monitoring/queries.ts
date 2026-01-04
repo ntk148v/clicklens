@@ -585,19 +585,81 @@ WHERE metric = 'MaxPartCountForPartition'
 // Disk & Storage Queries
 // =============================================================================
 
+// Single node disks query
 export const DISKS_QUERY = `
 SELECT
+  hostName() AS node,
   name,
   path,
   free_space AS freeSpace,
   total_space AS totalSpace,
   (total_space - free_space) AS usedSpace,
-  round((total_space - free_space) * 100 / total_space, 2) AS usedPercentage,
-  keep_free_space AS keepFreeSpace,
+  round((total_space - free_space) * 100 / nullIf(total_space, 0), 2) AS usedPercentage,
+  unreserved_space AS unreservedSpace,
   type
 FROM system.disks
-ORDER BY name
+ORDER BY node, name
 `;
+
+// Cluster-aware disks query
+export const getDashboardDisksQuery = (clusterName?: string) => {
+  if (clusterName) {
+    return `
+SELECT
+  hostname() AS node,
+  name,
+  path,
+  free_space AS freeSpace,
+  total_space AS totalSpace,
+  (total_space - free_space) AS usedSpace,
+  round((total_space - free_space) * 100 / nullIf(total_space, 0), 2) AS usedPercentage,
+  unreserved_space AS unreservedSpace,
+  type
+FROM clusterAllReplicas('${clusterName}', system.disks)
+ORDER BY node, name
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return DISKS_QUERY;
+};
+
+// Parts summary by disk (for compression info) - cluster aware
+export const getDisksWithPartsQuery = (clusterName?: string) => {
+  const singleNode = `
+SELECT
+  hostName() AS node,
+  disk_name AS diskName,
+  count() AS partsCount,
+  sum(rows) AS totalRows,
+  sum(bytes_on_disk) AS bytesOnDisk,
+  sum(data_compressed_bytes) AS compressedBytes,
+  sum(data_uncompressed_bytes) AS uncompressedBytes,
+  round(sum(data_compressed_bytes) / nullIf(sum(data_uncompressed_bytes), 0), 4) AS compressionRatio
+FROM system.parts
+WHERE active = 1
+GROUP BY node, diskName
+ORDER BY node, diskName
+`;
+  if (clusterName) {
+    return `
+SELECT
+  hostname() AS node,
+  disk_name AS diskName,
+  count() AS partsCount,
+  sum(rows) AS totalRows,
+  sum(bytes_on_disk) AS bytesOnDisk,
+  sum(data_compressed_bytes) AS compressedBytes,
+  sum(data_uncompressed_bytes) AS uncompressedBytes,
+  round(sum(data_compressed_bytes) / nullIf(sum(data_uncompressed_bytes), 0), 4) AS compressionRatio
+FROM clusterAllReplicas('${clusterName}', system.parts)
+WHERE active = 1
+GROUP BY node, diskName
+ORDER BY node, diskName
+SETTINGS skip_unavailable_shards = 1
+`;
+  }
+  return singleNode;
+};
 
 // Disk summary for storage overview
 export const DISK_SUMMARY_QUERY = `
@@ -606,7 +668,7 @@ SELECT
   sum(total_space) AS totalSpace,
   sum(total_space - free_space) AS usedSpace,
   sum(free_space) AS freeSpace,
-  round(sum(total_space - free_space) * 100 / sum(total_space), 2) AS usedPercentage
+  round(sum(total_space - free_space) * 100 / nullIf(sum(total_space), 0), 2) AS usedPercentage
 FROM system.disks
 `;
 
@@ -740,3 +802,322 @@ FROM system.clusters
 WHERE cluster = '${clusterName}'
 ORDER BY shard_num, replica_num
 `;
+
+// =============================================================================
+// Dashboard Time-Series Queries (ClickHouse Cloud Style)
+// These queries support both single-node and cluster modes.
+// For clusters, they return per-node data with hostname().
+// =============================================================================
+
+// Helper to create single-node or cluster query
+const createDashboardQuery = (
+  singleNodeQuery: string,
+  clusterQuery: (cluster: string) => string,
+  clusterName?: string
+) => (clusterName ? clusterQuery(clusterName) : singleNodeQuery);
+
+// --- ClickHouse Specific Metrics ---
+
+// Queries per second
+export const getDashboardQueriesPerSecQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  count() / 60 AS value
+FROM system.query_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  count() / 60 AS value
+FROM clusterAllReplicas('${c}', system.query_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Queries running (from metric_log if available, fallback to query_log)
+export const getDashboardQueriesRunningQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(CurrentMetric_Query) AS value
+FROM system.metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(CurrentMetric_Query) AS value
+FROM clusterAllReplicas('${c}', system.metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Merges running
+export const getDashboardMergesRunningQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(CurrentMetric_Merge) AS value
+FROM system.metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(CurrentMetric_Merge) AS value
+FROM clusterAllReplicas('${c}', system.metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Selected rows per second
+export const getDashboardSelectedRowsQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  sum(read_rows) / 60 AS value
+FROM system.query_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  sum(read_rows) / 60 AS value
+FROM clusterAllReplicas('${c}', system.query_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Inserted rows per second
+export const getDashboardInsertedRowsQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  sum(written_rows) / 60 AS value
+FROM system.query_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  sum(written_rows) / 60 AS value
+FROM clusterAllReplicas('${c}', system.query_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Max parts per partition
+export const getDashboardMaxPartsQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  max(value) AS value
+FROM system.asynchronous_metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'MaxPartCountForPartition'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  max(value) AS value
+FROM clusterAllReplicas('${c}', system.asynchronous_metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'MaxPartCountForPartition'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// --- System Health Specific Metrics ---
+
+// Memory tracked (bytes)
+export const getDashboardMemoryQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(CurrentMetric_MemoryTracking) AS value
+FROM system.metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(CurrentMetric_MemoryTracking) AS value
+FROM clusterAllReplicas('${c}', system.metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// CPU usage (user + system time, normalized to cores)
+export const getDashboardCPUQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(value) AS value
+FROM system.asynchronous_metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'OSUserTimeNormalized'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(value) AS value
+FROM clusterAllReplicas('${c}', system.asynchronous_metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'OSUserTimeNormalized'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// IO Wait
+export const getDashboardIOWaitQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(value) AS value
+FROM system.asynchronous_metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'OSIOWaitTimeCPU'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(value) AS value
+FROM clusterAllReplicas('${c}', system.asynchronous_metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'OSIOWaitTimeCPU'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Filesystem used (bytes)
+export const getDashboardFilesystemQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(value) AS value
+FROM system.asynchronous_metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric LIKE 'FilesystemMainPathUsedBytes'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(value) AS value
+FROM clusterAllReplicas('${c}', system.asynchronous_metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric LIKE 'FilesystemMainPathUsedBytes'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};
+
+// Network received bytes/sec
+export const getDashboardNetworkQuery = (minutes: number = 60, clusterName?: string) => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostName() AS node,
+  avg(value) AS value
+FROM system.asynchronous_metric_log
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'NetworkReceiveBytes_default'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
+  hostname() AS node,
+  avg(value) AS value
+FROM clusterAllReplicas('${c}', system.asynchronous_metric_log)
+WHERE event_time > now() - INTERVAL ${minutes} MINUTE
+  AND metric = 'NetworkReceiveBytes_default'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(singleNode, cluster, clusterName);
+};

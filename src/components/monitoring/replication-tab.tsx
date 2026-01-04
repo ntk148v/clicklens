@@ -9,9 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatCard } from "@/components/monitoring";
+import {
+  StatCard,
+  PaginationControls,
+  TruncatedCell,
+} from "@/components/monitoring";
 import { StatusBadge, StatusDot } from "@/components/monitoring";
 import { useReplicas, formatNumber } from "@/lib/hooks/use-monitoring";
+import { useState, useMemo } from "react";
+
+const PAGE_SIZE = 20;
 
 interface ReplicationTabProps {
   refreshInterval?: number;
@@ -21,6 +28,19 @@ export function ReplicationTab({
   refreshInterval = 30000,
 }: ReplicationTabProps) {
   const { data, isLoading, error } = useReplicas({ refreshInterval });
+  const [page, setPage] = useState(1);
+
+  // Paginate replicas
+  const paginatedReplicas = useMemo(() => {
+    if (!data?.replicas) return [];
+    const start = (page - 1) * PAGE_SIZE;
+    return data.replicas.slice(start, start + PAGE_SIZE);
+  }, [data?.replicas, page]);
+
+  const totalPages = useMemo(() => {
+    if (!data?.replicas) return 0;
+    return Math.ceil(data.replicas.length / PAGE_SIZE);
+  }, [data?.replicas]);
 
   if (error) {
     return (
@@ -142,7 +162,7 @@ export function ReplicationTab({
                     </TableCell>
                   </TableRow>
                 ))
-              : data?.replicas.map((r) => {
+              : paginatedReplicas.map((r) => {
                   const replicaStatus = r.isReadonly
                     ? "critical"
                     : r.absoluteDelay >= 10
@@ -155,10 +175,10 @@ export function ReplicationTab({
                         <StatusDot status={replicaStatus} />
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {r.database}
+                        <TruncatedCell value={r.database} maxWidth={150} />
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {r.table}
+                        <TruncatedCell value={r.table} maxWidth={200} />
                       </TableCell>
                       <TableCell className="text-center">
                         {r.isLeader ? (
@@ -204,6 +224,13 @@ export function ReplicationTab({
                 })}
           </TableBody>
         </Table>
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          totalItems={data?.replicas.length || 0}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* Info */}

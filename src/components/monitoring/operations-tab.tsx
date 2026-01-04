@@ -16,11 +16,20 @@ import {
   formatBytes,
   formatDuration,
 } from "@/lib/hooks/use-monitoring";
+import { TruncatedCell } from "@/components/monitoring";
 
 // Progress bar component
-function ProgressBar({ value, className }: { value: number; className?: string }) {
+function ProgressBar({
+  value,
+  className,
+}: {
+  value: number;
+  className?: string;
+}) {
   return (
-    <div className={`h-2 w-full bg-muted rounded-full overflow-hidden ${className}`}>
+    <div
+      className={`h-2 w-full bg-muted rounded-full overflow-hidden ${className}`}
+    >
       <div
         className="h-full bg-primary transition-all duration-300"
         style={{ width: `${Math.min(100, value)}%` }}
@@ -68,7 +77,9 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
           }
           description={
             data && data.mergeSummary.totalBytesProcessing > 0
-              ? `Processing ${formatBytes(data.mergeSummary.totalBytesProcessing)}`
+              ? `Processing ${formatBytes(
+                  data.mergeSummary.totalBytesProcessing
+                )}`
               : undefined
           }
           loading={isLoading}
@@ -83,9 +94,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
           title="Failed Mutations"
           value={data?.mutationSummary.failedMutations ?? "-"}
           status={
-            data && data.mutationSummary.failedMutations > 0
-              ? "critical"
-              : "ok"
+            data && data.mutationSummary.failedMutations > 0 ? "critical" : "ok"
           }
           loading={isLoading}
         />
@@ -128,15 +137,25 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
                 {data?.merges.map((m, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-mono text-sm">
-                      {m.database}.{m.table}
+                      <TruncatedCell
+                        value={`${m.database}.${m.table}`}
+                        maxWidth={200}
+                      />
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {m.resultPartName}
+                    <TableCell>
+                      <TruncatedCell
+                        value={m.resultPartName}
+                        maxWidth={150}
+                        className="text-muted-foreground"
+                      />
                     </TableCell>
                     <TableCell className="text-center">{m.numParts}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <ProgressBar value={m.progress * 100} className="flex-1" />
+                        <ProgressBar
+                          value={m.progress * 100}
+                          className="flex-1"
+                        />
                         <span className="text-xs font-mono w-10 text-right">
                           {Math.round(m.progress * 100)}%
                         </span>
@@ -182,20 +201,31 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
                 {data?.mutations.map((m, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-mono text-sm">
-                      {m.database}.{m.table}
+                      <TruncatedCell
+                        value={`${m.database}.${m.table}`}
+                        maxWidth={200}
+                      />
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {m.mutationId}
+                    <TableCell>
+                      <TruncatedCell value={m.mutationId} maxWidth={120} />
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      {m.command}
+                    <TableCell>
+                      <TruncatedCell
+                        value={m.command}
+                        maxWidth={200}
+                        className="text-muted-foreground"
+                      />
                     </TableCell>
                     <TableCell className="text-center font-mono">
                       {m.partsToDo}
                     </TableCell>
                     <TableCell className="text-center">
                       {m.latestFailReason ? (
-                        <StatusBadge status="critical" label="Failed" size="sm" />
+                        <StatusBadge
+                          status="critical"
+                          label="Failed"
+                          size="sm"
+                        />
                       ) : (
                         <StatusBadge status="ok" label="Running" size="sm" />
                       )}
@@ -233,11 +263,10 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
       {/* Info */}
       <div className="p-4 rounded-lg bg-muted border">
         <p className="text-xs text-muted-foreground">
-          Data sourced from{" "}
-          <code className="text-primary">system.merges</code> and{" "}
-          <code className="text-primary">system.mutations</code>. Merges combine
-          smaller parts into larger ones for efficient storage. Mutations are
-          ALTER TABLE operations that modify data.
+          Data sourced from <code className="text-primary">system.merges</code>{" "}
+          and <code className="text-primary">system.mutations</code>. Merges
+          combine smaller parts into larger ones for efficient storage.
+          Mutations are ALTER TABLE operations that modify data.
         </p>
       </div>
     </div>

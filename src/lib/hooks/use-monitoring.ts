@@ -136,9 +136,23 @@ export function useHealthChecks(options?: UseMonitoringDataOptions) {
   );
 }
 
-// Disks data type
+// Disks data type (enhanced for cluster awareness)
 export interface DisksData {
-  disks: DiskInfo[];
+  disks: Array<{
+    node: string;
+    name: string;
+    path: string;
+    freeSpace: number;
+    totalSpace: number;
+    usedSpace: number;
+    usedPercentage: number;
+    unreservedSpace?: number;
+    type: string;
+    partsCount?: number;
+    compressedBytes?: number;
+    uncompressedBytes?: number;
+    compressionRatio?: number;
+  }>;
   summary: {
     totalDisks: number;
     totalSpace: number;
@@ -146,6 +160,8 @@ export interface DisksData {
     totalFree: number;
     overallUsedPercentage: number;
   };
+  nodes?: string[];
+  clusterName?: string;
 }
 
 export function useDisks(options?: UseMonitoringDataOptions) {
