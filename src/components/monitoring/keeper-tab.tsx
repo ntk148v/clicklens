@@ -107,8 +107,8 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
       <Card
         className={
           data?.isConnected
-            ? "border-green-500/50 bg-green-500/5"
-            : "border-red-500/50 bg-red-500/5"
+            ? "border-status-ok bg-status-ok"
+            : "border-status-critical bg-status-critical"
         }
       >
         <CardHeader className="pb-3">

@@ -731,23 +731,10 @@ SELECT
 // Query Performance Queries
 // =============================================================================
 
-export const QUERY_PERFORMANCE_QUERY = `
-SELECT
-  count() / 60 AS queriesPerSecond,
-  avg(query_duration_ms) AS avgDurationMs,
-  quantile(0.95)(query_duration_ms) AS p95DurationMs,
-  quantile(0.99)(query_duration_ms) AS p99DurationMs,
-  sum(written_rows) / 60 AS insertedRowsPerSecond,
-  sum(read_rows) / 60 AS selectedRowsPerSecond,
-  countIf(exception_code != 0) AS failedQueriesCount
-FROM system.query_log
-WHERE
-  event_time > now() - INTERVAL 1 MINUTE
-  AND type = 'QueryFinish'
-`;
+
 
 // Legacy aliases for backward compatibility
-export const getQueryThroughputHistoryQuery = getQueriesPerMinuteQuery;
+
 
 // =============================================================================
 // Cluster Nodes Queries

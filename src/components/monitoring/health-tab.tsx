@@ -18,9 +18,9 @@ interface HealthTabProps {
 }
 
 const statusIcons: Record<HealthStatus, React.ReactNode> = {
-  ok: <CheckCircle2 className="w-5 h-5 text-green-500" />,
-  warning: <AlertTriangle className="w-5 h-5 text-yellow-500" />,
-  critical: <XCircle className="w-5 h-5 text-red-500" />,
+  ok: <CheckCircle2 className="w-5 h-5 status-ok" />,
+  warning: <AlertTriangle className="w-5 h-5 status-warning" />,
+  critical: <XCircle className="w-5 h-5 status-critical" />,
   unknown: <AlertCircle className="w-5 h-5 text-gray-500" />,
 };
 

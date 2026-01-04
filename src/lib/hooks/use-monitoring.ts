@@ -89,12 +89,7 @@ function useMonitoringData<T>(
 // Specific monitoring hooks
 // =============================================================================
 
-export function useClusterOverview(options?: UseMonitoringDataOptions) {
-  return useMonitoringData<ClusterOverview>(
-    "/api/clickhouse/monitoring/overview",
-    options
-  );
-}
+
 
 export function useMetrics(
   params?: { category?: string; type?: string },
@@ -175,24 +170,7 @@ export function useDisks(options?: UseMonitoringDataOptions) {
 // Utility hooks
 // =============================================================================
 
-/**
- * Hook for managing auto-refresh state
- */
-export function useAutoRefresh(defaultInterval: number = 30000) {
-  const [interval, setIntervalValue] = useState(defaultInterval);
-  const [isPaused, setIsPaused] = useState(false);
 
-  const effectiveInterval = isPaused ? 0 : interval;
-
-  return {
-    interval: effectiveInterval,
-    setInterval: setIntervalValue,
-    isPaused,
-    togglePause: () => setIsPaused((p) => !p),
-    pause: () => setIsPaused(true),
-    resume: () => setIsPaused(false),
-  };
-}
 
 // =============================================================================
 // Format utilities

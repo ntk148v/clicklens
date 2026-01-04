@@ -31,15 +31,15 @@ export function StatCard({
   loading = false,
 }: StatCardProps) {
   const statusColors = {
-    ok: "text-green-500",
-    warning: "text-yellow-500",
-    critical: "text-red-500",
+    ok: "status-ok",
+    warning: "status-warning",
+    critical: "status-critical",
   };
 
   const statusBgColors = {
-    ok: "bg-green-500/10",
-    warning: "bg-yellow-500/10",
-    critical: "bg-red-500/10",
+    ok: "bg-status-ok",
+    warning: "bg-status-warning",
+    critical: "bg-status-critical",
   };
 
   return (
@@ -64,9 +64,7 @@ export function StatCard({
                   <span
                     className={cn(
                       "text-xs font-medium",
-                      trend.direction === "up"
-                        ? "text-green-500"
-                        : "text-red-500"
+                      trend.direction === "up" ? "status-ok" : "status-critical"
                     )}
                   >
                     {trend.direction === "up" ? "↑" : "↓"} {trend.value}%

@@ -166,11 +166,11 @@ export function OverviewTab({
   const getHealthIcon = (status: HealthStatus) => {
     switch (status) {
       case "ok":
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+        return <CheckCircle2 className="w-4 h-4 status-ok" />;
       case "warning":
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+        return <AlertTriangle className="w-4 h-4 status-warning" />;
       case "critical":
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 status-critical" />;
       default:
         return <Activity className="w-4 h-4 text-muted-foreground" />;
     }
@@ -292,12 +292,12 @@ export function OverviewTab({
                       >
                         {node.isActive ? (
                           node.errorsCount > 0 ? (
-                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                            <AlertTriangle className="w-4 h-4 status-warning" />
                           ) : (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            <CheckCircle2 className="w-4 h-4 status-ok" />
                           )
                         ) : (
-                          <XCircle className="w-4 h-4 text-red-500" />
+                          <XCircle className="w-4 h-4 status-critical" />
                         )}
                         <span className="text-sm font-mono">
                           {node.hostName}

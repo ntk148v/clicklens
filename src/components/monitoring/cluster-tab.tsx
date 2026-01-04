@@ -88,11 +88,10 @@ export function ClusterTab({ refreshInterval = 30000 }: ClusterTabProps) {
 
   const getNodeStatusIcon = (node: ClusterNode) => {
     const status = getNodeStatus(node);
-    if (status === "critical")
-      return <XCircle className="w-4 h-4 text-red-500" />;
+    return <XCircle className="w-4 h-4 status-critical" />;
     if (status === "warning")
-      return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
-    return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      return <AlertTriangle className="w-4 h-4 status-warning" />;
+    return <CheckCircle2 className="w-4 h-4 status-ok" />;
   };
 
   // Group nodes by shard for visualization
@@ -203,10 +202,10 @@ export function ClusterTab({ refreshInterval = 30000 }: ClusterTabProps) {
                                     transition-colors hover:bg-muted/50
                                     ${
                                       !node.isActive
-                                        ? "border-red-500/50 bg-red-500/5"
+                                        ? "border-status-critical bg-status-critical"
                                         : node.errorsCount > 0
-                                        ? "border-yellow-500/50 bg-yellow-500/5"
-                                        : "border-green-500/30 bg-green-500/5"
+                                        ? "border-status-warning bg-status-warning"
+                                        : "border-status-ok bg-status-ok"
                                     }
                                   `}
                                 >
