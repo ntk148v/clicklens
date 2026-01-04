@@ -23,6 +23,10 @@ import {
   getInsertedRowsPerMinuteQuery,
   getSelectedBytesPerMinuteQuery,
   getMemoryUsageHistoryQuery,
+  getPerNodeQueriesQuery,
+  getPerNodeMemoryQuery,
+  getPerNodeInsertedRowsQuery,
+  getPerNodeSelectedBytesQuery,
   type MonitoringApiResponse,
 } from "@/lib/clickhouse/monitoring";
 
@@ -75,6 +79,12 @@ interface ThroughputMetricsRow {
 
 interface TimeSeriesPoint {
   timestamp: string;
+  value: number;
+}
+
+interface PerNodeTimeSeriesPoint {
+  timestamp: string;
+  node: string;
   value: number;
 }
 
@@ -131,6 +141,13 @@ interface DashboardOverview {
     insertedRowsPerMinute: TimeSeriesPoint[];
     selectedBytesPerMinute: TimeSeriesPoint[];
     memoryUsage: TimeSeriesPoint[];
+  };
+  perNodeTimeSeries?: {
+    queries: PerNodeTimeSeriesPoint[];
+    memory: PerNodeTimeSeriesPoint[];
+    insertedRows: PerNodeTimeSeriesPoint[];
+    selectedBytes: PerNodeTimeSeriesPoint[];
+    nodes: string[]; // List of unique node names
   };
   cluster?: {
     name: string;
@@ -288,6 +305,36 @@ export async function GET(
         maxReplicas: clusterSummary.max_replicas,
         totalErrors: clusterSummary.total_errors,
       };
+
+      // Fetch per-node time series data for multi-line charts
+      try {
+        const [
+          perNodeQueriesResult,
+          perNodeMemoryResult,
+          perNodeInsertedResult,
+          perNodeSelectedResult,
+        ] = await Promise.all([
+          client.query<PerNodeTimeSeriesPoint>(getPerNodeQueriesQuery(timeRange, clusterName)),
+          client.query<PerNodeTimeSeriesPoint>(getPerNodeMemoryQuery(timeRange, clusterName)),
+          client.query<PerNodeTimeSeriesPoint>(getPerNodeInsertedRowsQuery(timeRange, clusterName)),
+          client.query<PerNodeTimeSeriesPoint>(getPerNodeSelectedBytesQuery(timeRange, clusterName)),
+        ]);
+
+        // Extract unique node names from all per-node data
+        const nodeSet = new Set<string>();
+        perNodeQueriesResult.data.forEach(p => nodeSet.add(p.node));
+        perNodeMemoryResult.data.forEach(p => nodeSet.add(p.node));
+
+        dashboard.perNodeTimeSeries = {
+          queries: perNodeQueriesResult.data,
+          memory: perNodeMemoryResult.data,
+          insertedRows: perNodeInsertedResult.data,
+          selectedBytes: perNodeSelectedResult.data,
+          nodes: Array.from(nodeSet).sort(),
+        };
+      } catch {
+        // Per-node data is optional, ignore errors
+      }
     }
 
     return NextResponse.json({

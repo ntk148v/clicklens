@@ -223,6 +223,70 @@ ORDER BY timestamp
 `;
 };
 
+// =============================================================================
+// Per-Node Time Series Queries (for multi-line charts)
+// =============================================================================
+
+// Per-node queries per minute
+export const getPerNodeQueriesQuery = (intervalMinutes: number = 60, clusterName: string) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostname() AS node,
+  count() AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+SETTINGS skip_unavailable_shards = 1
+`;
+
+// Per-node memory usage
+export const getPerNodeMemoryQuery = (intervalMinutes: number = 60, clusterName: string) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostname() AS node,
+  max(memory_usage) AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+SETTINGS skip_unavailable_shards = 1
+`;
+
+// Per-node inserted rows
+export const getPerNodeInsertedRowsQuery = (intervalMinutes: number = 60, clusterName: string) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostname() AS node,
+  sum(written_rows) AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+SETTINGS skip_unavailable_shards = 1
+`;
+
+// Per-node selected bytes
+export const getPerNodeSelectedBytesQuery = (intervalMinutes: number = 60, clusterName: string) => `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostname() AS node,
+  sum(read_bytes) AS value
+FROM clusterAllReplicas('${clusterName}', system.query_log)
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+SETTINGS skip_unavailable_shards = 1
+`;
+
 
 // Query duration percentiles over time - cluster-aware
 export const getQueryDurationHistoryQuery = (intervalMinutes: number = 60, clusterName?: string) => {

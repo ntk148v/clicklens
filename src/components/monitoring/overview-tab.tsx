@@ -40,7 +40,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { StatCard, StatusDot } from "@/components/monitoring";
+import { StatCard, StatusDot, MultiSeriesChart } from "@/components/monitoring";
 import { MetricChart } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
 import {
@@ -102,6 +102,13 @@ interface DashboardOverview {
     selectedBytesPerMinute: TimeSeriesPoint[];
     memoryUsage: TimeSeriesPoint[];
   };
+  perNodeTimeSeries?: {
+    queries: PerNodePoint[];
+    memory: PerNodePoint[];
+    insertedRows: PerNodePoint[];
+    selectedBytes: PerNodePoint[];
+    nodes: string[];
+  };
   cluster?: {
     name: string;
     totalNodes: number;
@@ -111,6 +118,12 @@ interface DashboardOverview {
     maxReplicas: number;
     totalErrors: number;
   };
+}
+
+interface PerNodePoint {
+  timestamp: string;
+  node: string;
+  value: number;
 }
 
 interface OverviewTabProps {
@@ -127,6 +140,7 @@ export function OverviewTab({
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState(initialTimeRange);
   const [healthExpanded, setHealthExpanded] = useState(false);
+  const [perNodeView, setPerNodeView] = useState(false); // Toggle for per-node charts
 
   // Health checks data
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({
@@ -220,8 +234,20 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
-      {/* Time Range Selector */}
-      <div className="flex justify-end">
+      {/* Time Range Selector & Per-Node Toggle */}
+      <div className="flex justify-end gap-2">
+        {/* Per-node toggle - only show when cluster has multiple nodes */}
+        {data?.perNodeTimeSeries && data.perNodeTimeSeries.nodes.length > 1 && (
+          <Button
+            variant={perNodeView ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPerNodeView(!perNodeView)}
+            className="text-xs"
+          >
+            <Server className="w-3 h-3 mr-1" />
+            {perNodeView ? "Per Node" : "Aggregated"}
+          </Button>
+        )}
         <Select
           value={String(timeRange)}
           onValueChange={(v) => setTimeRange(Number(v))}
@@ -581,14 +607,25 @@ export function OverviewTab({
             loading={isLoading}
           />
         </div>
-        {/* Queries per minute chart */}
-        <MetricChart
-          title="Queries per Minute"
-          data={data?.timeSeries.queriesPerMinute || []}
-          height={150}
-          showAxis
-          loading={isLoading}
-        />
+        {/* Queries per minute chart - conditional per-node view */}
+        {perNodeView && data?.perNodeTimeSeries ? (
+          <MultiSeriesChart
+            title="Queries per Minute (by Node)"
+            data={data.perNodeTimeSeries.queries}
+            nodes={data.perNodeTimeSeries.nodes}
+            height={150}
+            showAxis
+            loading={isLoading}
+          />
+        ) : (
+          <MetricChart
+            title="Queries per Minute"
+            data={data?.timeSeries.queriesPerMinute || []}
+            height={150}
+            showAxis
+            loading={isLoading}
+          />
+        )}
       </section>
 
       {/* Throughput Section */}

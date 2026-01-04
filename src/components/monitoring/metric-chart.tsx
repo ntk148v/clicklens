@@ -189,3 +189,192 @@ export function Sparkline({
     </ResponsiveContainer>
   );
 }
+
+// Color palette for multi-node charts
+const NODE_COLORS = [
+  "#22c55e", // green
+  "#3b82f6", // blue
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // purple
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#84cc16", // lime
+];
+
+export interface PerNodeDataPoint {
+  timestamp: string;
+  node: string;
+  value: number;
+}
+
+export interface MultiSeriesChartProps {
+  title: string;
+  data: PerNodeDataPoint[];
+  nodes: string[];
+  unit?: string;
+  isBytes?: boolean;
+  height?: number;
+  showAxis?: boolean;
+  className?: string;
+  loading?: boolean;
+}
+
+/**
+ * Multi-series chart for displaying per-node metrics with separate lines
+ */
+export function MultiSeriesChart({
+  title,
+  data,
+  nodes,
+  unit = "",
+  isBytes = false,
+  height = 160,
+  showAxis = true,
+  className,
+  loading = false,
+}: MultiSeriesChartProps) {
+  // Pivot data: from [{timestamp, node, value}] to [{timestamp, node1: v1, node2: v2}]
+  const pivotedData = React.useMemo(() => {
+    const byTimestamp = new Map<string, Record<string, number | string>>();
+
+    data.forEach(({ timestamp, node, value }) => {
+      if (!byTimestamp.has(timestamp)) {
+        byTimestamp.set(timestamp, { timestamp });
+      }
+      byTimestamp.get(timestamp)![node] = value;
+    });
+
+    return Array.from(byTimestamp.values()).sort((a, b) =>
+      String(a.timestamp).localeCompare(String(b.timestamp))
+    );
+  }, [data]);
+
+  const formatValue = (value: number): string => {
+    if (value == null || !isFinite(value)) return "0";
+    if (isBytes) return formatBytes(value);
+    if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+    return value.toFixed(0);
+  };
+
+  const formatTime = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  // Get color for node
+  const getNodeColor = (index: number) =>
+    NODE_COLORS[index % NODE_COLORS.length];
+
+  return (
+    <Card className={cn(className)}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-2">
+            {nodes.map((node, i) => (
+              <div key={node} className="flex items-center gap-1 text-xs">
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: getNodeColor(i) }}
+                />
+                <span
+                  className="text-muted-foreground truncate max-w-[80px]"
+                  title={node}
+                >
+                  {node}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-4">
+        {loading ? (
+          <div
+            className="animate-pulse bg-muted rounded"
+            style={{ height: `${height}px` }}
+          />
+        ) : pivotedData.length === 0 ? (
+          <div
+            className="flex items-center justify-center text-muted-foreground text-sm"
+            style={{ height: `${height}px` }}
+          >
+            No data available
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={height}>
+            <AreaChart
+              data={pivotedData}
+              margin={{ top: 5, right: 5, left: showAxis ? 35 : 5, bottom: 5 }}
+            >
+              {showAxis && (
+                <>
+                  <XAxis
+                    dataKey="timestamp"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    tickFormatter={formatTime}
+                    minTickGap={30}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    tickFormatter={formatValue}
+                    width={40}
+                  />
+                </>
+              )}
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#1f2937",
+                  border: "1px solid #374151",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  color: "#f9fafb",
+                }}
+                labelStyle={{ color: "#9ca3af" }}
+                labelFormatter={formatTime}
+                formatter={(value, name) => {
+                  const numValue = typeof value === "number" ? value : 0;
+                  const formatted = formatValue(numValue);
+                  const displayValue = isBytes
+                    ? formatted
+                    : `${formatted}${unit}`;
+                  return [displayValue, name];
+                }}
+              />
+              {nodes.map((node, i) => (
+                <Area
+                  key={node}
+                  type="monotone"
+                  dataKey={node}
+                  stroke={getNodeColor(i)}
+                  strokeWidth={2}
+                  fill="none"
+                  dot={false}
+                  connectNulls
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Import React for useMemo
+import React from "react";
