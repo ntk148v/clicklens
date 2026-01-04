@@ -35,6 +35,7 @@ import {
   Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PaginationControls, TruncatedCell } from "@/components/monitoring";
 
 interface ColumnMeta {
   name: string;
@@ -130,14 +131,10 @@ export function ResultGrid({
       cell: ({ getValue }) => {
         const value = getValue();
         return (
-          <span
-            className={cn(
-              "truncate block max-w-[300px]",
-              getCellClassName(value)
-            )}
-          >
-            {formatCellValue(value)}
-          </span>
+          <TruncatedCell
+            value={formatCellValue(value)}
+            className={getCellClassName(value)}
+          />
         );
       },
       size: 150,
@@ -293,65 +290,13 @@ export function ResultGrid({
       </ScrollArea>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/30 text-xs">
-        <div className="text-muted-foreground">
-          {formatNumber(totalRows ?? data.length)} rows
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => table.setPageIndex(0)}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-1 mx-1">
-            <Input
-              type="number"
-              min={1}
-              max={table.getPageCount()}
-              value={table.getState().pagination.pageIndex + 1}
-              onChange={(e) => {
-                const page = parseInt(e.target.value, 10);
-                if (page >= 1 && page <= table.getPageCount()) {
-                  table.setPageIndex(page - 1);
-                }
-              }}
-              className="w-14 h-7 text-center text-xs"
-            />
-            <span className="text-muted-foreground">of {table.getPageCount()}</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-            disabled={!table.getCanNextPage()}
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <PaginationControls
+        page={table.getState().pagination.pageIndex + 1}
+        totalPages={table.getPageCount()}
+        totalItems={totalRows ?? data.length}
+        pageSize={table.getState().pagination.pageSize}
+        onPageChange={(page) => table.setPageIndex(page - 1)}
+      />
     </div>
   );
 }

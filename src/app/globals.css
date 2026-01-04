@@ -141,7 +141,8 @@
   pre,
   code,
   .font-mono {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace,
+      monospace;
   }
 }
 
@@ -168,5 +169,40 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
+  }
+
+  /* Status Colors theme */
+  .status-ok {
+    @apply text-green-500;
+  }
+  .bg-status-ok {
+    @apply bg-green-500/10;
+  }
+  .border-status-ok {
+    @apply border-green-500/50;
+  }
+
+  .status-warning {
+    @apply text-yellow-500;
+  }
+  .bg-status-warning {
+    @apply bg-yellow-500/10;
+  }
+  .border-status-warning {
+    @apply border-yellow-500/50;
+  }
+
+  .status-critical {
+    @apply text-red-500;
+  }
+  .bg-status-critical {
+    @apply bg-red-500/10;
+  }
+  .border-status-critical {
+    @apply border-red-500/50;
+  }
+
+  .monitor-card {
+    @apply p-4 rounded-lg bg-card border shadow-sm;
   }
 }

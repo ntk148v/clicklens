@@ -6,9 +6,10 @@ import { ThemeToggle } from "@/components/theme";
 interface HeaderProps {
   title?: string;
   children?: React.ReactNode;
+  actions?: React.ReactNode;
 }
 
-export function Header({ title, children }: HeaderProps) {
+export function Header({ title, children, actions }: HeaderProps) {
   return (
     <header className="flex items-center justify-between h-14 px-6 border-b border-border bg-background">
       <div className="flex items-center gap-4">
@@ -18,6 +19,7 @@ export function Header({ title, children }: HeaderProps) {
         {children}
       </div>
       <div className="flex items-center gap-2">
+        {actions}
         <ThemeToggle />
         <ConnectionStatus />
       </div>
