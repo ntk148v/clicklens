@@ -33,7 +33,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { StatCard } from "@/components/monitoring";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { StatCard, StatusDot } from "@/components/monitoring";
 import { MetricChart } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
 import {
@@ -45,6 +52,9 @@ import {
 import type {
   MonitoringApiResponse,
   HealthStatus,
+  ClusterInfo,
+  ClusterSummary,
+  ClusterNode,
 } from "@/lib/clickhouse/monitoring";
 
 interface TimeSeriesPoint {
@@ -120,8 +130,14 @@ export function OverviewTab({
 
   // Health checks data
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({
-    refreshInterval,
+    refreshInterval: 0, // Controlled by parent RefreshControl
   });
+
+  // Cluster nodes data
+  const [clusterData, setClusterData] = useState<{
+    clusters: ClusterInfo[];
+    summary: ClusterSummary;
+  } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -139,6 +155,19 @@ export function OverviewTab({
       } else if (result.error) {
         setError(result.error.userMessage || result.error.message);
       }
+
+      // Also fetch cluster nodes for detailed topology
+      try {
+        const clusterResponse = await fetch(
+          "/api/clickhouse/monitoring/cluster"
+        );
+        const clusterResult = await clusterResponse.json();
+        if (clusterResult.success && clusterResult.data) {
+          setClusterData(clusterResult.data);
+        }
+      } catch {
+        // Cluster data is optional, ignore errors
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
@@ -150,11 +179,8 @@ export function OverviewTab({
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    if (refreshInterval <= 0) return;
-    const interval = window.setInterval(fetchData, refreshInterval);
-    return () => window.clearInterval(interval);
-  }, [refreshInterval, fetchData]);
+  // Note: Component does NOT have internal refresh timer
+  // Refresh is controlled by parent page via RefreshControl
 
   if (error) {
     return (
@@ -281,7 +307,6 @@ export function OverviewTab({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {healthData.checks.map((check) => (
                       <div
-                        key={check.id}
                         className={`flex items-center justify-between p-3 rounded-lg border ${
                           check.status === "ok"
                             ? "bg-green-500/5 border-green-500/20"
@@ -324,50 +349,163 @@ export function OverviewTab({
         </Card>
       </Collapsible>
 
-      {/* Cluster Section - Only show if cluster data is available */}
-      {data?.cluster && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Layers className="w-5 h-5" />
-            Cluster: {data.cluster.name}
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <StatCard
-              title="Total Nodes"
-              value={data.cluster.totalNodes}
-              icon={Server}
-              loading={isLoading}
-            />
-            <StatCard
-              title="Active Nodes"
-              value={data.cluster.activeNodes}
-              status={data.cluster.inactiveNodes > 0 ? "warning" : "ok"}
-              loading={isLoading}
-            />
-            <StatCard
-              title="Inactive Nodes"
-              value={data.cluster.inactiveNodes}
-              status={data.cluster.inactiveNodes > 0 ? "critical" : "ok"}
-              loading={isLoading}
-            />
-            <StatCard
-              title="Shards"
-              value={data.cluster.totalShards}
-              loading={isLoading}
-            />
-            <StatCard
-              title="Max Replicas"
-              value={data.cluster.maxReplicas}
-              loading={isLoading}
-            />
-            <StatCard
-              title="Node Errors"
-              value={data.cluster.totalErrors}
-              status={data.cluster.totalErrors > 0 ? "warning" : "ok"}
-              loading={isLoading}
-            />
-          </div>
-        </section>
+      {/* Cluster Section - Show node topology if cluster data available */}
+      {clusterData && clusterData.clusters.length > 0 && (
+        <TooltipProvider>
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Layers className="w-5 h-5" />
+                Cluster Topology
+              </h2>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline">
+                  {clusterData.summary.activeNodes}/
+                  {clusterData.summary.totalNodes} active
+                </Badge>
+                <Badge variant="outline">
+                  {clusterData.summary.totalShards} shard
+                  {clusterData.summary.totalShards > 1 ? "s" : ""}
+                </Badge>
+              </div>
+            </div>
+
+            {clusterData.clusters.map((cluster) => {
+              // Group nodes by shard
+              const shards = new Map<number, ClusterNode[]>();
+              cluster.nodes.forEach((node) => {
+                const existing = shards.get(node.shardNum) || [];
+                existing.push(node);
+                shards.set(node.shardNum, existing);
+              });
+              const shardEntries = Array.from(shards.entries()).sort(
+                (a, b) => a[0] - b[0]
+              );
+
+              const getNodeStatus = (node: ClusterNode) => {
+                if (!node.isActive) return "critical" as const;
+                if (node.errorsCount > 0) return "warning" as const;
+                return "ok" as const;
+              };
+
+              return (
+                <Card key={cluster.name}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center justify-between">
+                      <span>{cluster.name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {cluster.activeNodes}/{cluster.totalNodes} nodes
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {shardEntries.map(([shardNum, nodes]) => (
+                        <div key={shardNum} className="space-y-2">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Shard {shardNum}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {nodes
+                              .sort((a, b) => a.replicaNum - b.replicaNum)
+                              .map((node) => (
+                                <Tooltip key={`${node.hostName}-${node.port}`}>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className={`
+                                        flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer
+                                        transition-colors hover:bg-muted/50
+                                        ${
+                                          !node.isActive
+                                            ? "border-red-500/50 bg-red-500/5"
+                                            : node.errorsCount > 0
+                                            ? "border-yellow-500/50 bg-yellow-500/5"
+                                            : "border-green-500/30 bg-green-500/5"
+                                        }
+                                      `}
+                                    >
+                                      {node.isActive ? (
+                                        node.errorsCount > 0 ? (
+                                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                                        ) : (
+                                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                        )
+                                      ) : (
+                                        <XCircle className="w-4 h-4 text-red-500" />
+                                      )}
+                                      <div className="flex flex-col">
+                                        <span className="text-sm font-mono">
+                                          {node.hostName}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          Replica {node.replicaNum}
+                                          {node.isLocal && " (local)"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-medium">
+                                          {node.hostName}
+                                        </span>
+                                        <StatusDot
+                                          status={getNodeStatus(node)}
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                        <span className="text-muted-foreground">
+                                          Address:
+                                        </span>
+                                        <span className="font-mono">
+                                          {node.hostAddress}:{node.port}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          Shard:
+                                        </span>
+                                        <span>{node.shardNum}</span>
+                                        <span className="text-muted-foreground">
+                                          Replica:
+                                        </span>
+                                        <span>{node.replicaNum}</span>
+                                        <span className="text-muted-foreground">
+                                          Active:
+                                        </span>
+                                        <span>
+                                          {node.isActive ? "Yes" : "No"}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          Errors:
+                                        </span>
+                                        <span
+                                          className={
+                                            node.errorsCount > 0
+                                              ? "text-yellow-500"
+                                              : ""
+                                          }
+                                        >
+                                          {node.errorsCount}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          Slowdowns:
+                                        </span>
+                                        <span>{node.slowdownsCount}</span>
+                                      </div>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+        </TooltipProvider>
       )}
 
       {/* Server Section */}
