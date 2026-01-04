@@ -27,7 +27,7 @@ interface ReplicationTabProps {
 export function ReplicationTab({
   refreshInterval = 30000,
 }: ReplicationTabProps) {
-  const { data, isLoading, error } = useReplicas({ refreshInterval });
+  const { data, isLoading, error, refetch } = useReplicas({ refreshInterval });
   const [page, setPage] = useState(1);
 
   // Paginate replicas

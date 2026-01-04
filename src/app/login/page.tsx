@@ -73,8 +73,7 @@ export default function LoginPage() {
   };
 
   const handleChange =
-    (field: string) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
       setFormData((prev) => ({ ...prev, [field]: e.target.value }));
       setError(null);
     };
@@ -95,7 +94,9 @@ export default function LoginPage() {
             <Database className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">ClickLens</CardTitle>
-          <CardDescription>Sign in with your ClickHouse credentials</CardDescription>
+          <CardDescription>
+            Sign in with your ClickHouse credentials
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,7 +144,8 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-4 text-xs text-center text-muted-foreground">
-            Your credentials are verified against the ClickHouse server and stored securely.
+            Your credentials are verified against the ClickHouse server and
+            stored securely.
           </p>
         </CardContent>
       </Card>

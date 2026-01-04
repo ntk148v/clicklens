@@ -144,11 +144,15 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
               <div className="text-2xl font-bold">
                 {isLoading ? "-" : formatNumber(data?.pendingRequests || 0)}
               </div>
-              <div className="text-xs text-muted-foreground">Pending Requests</div>
+              <div className="text-xs text-muted-foreground">
+                Pending Requests
+              </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
-                {isLoading ? "-" : formatLatency(data?.latency.avgLatencyUs || 0)}
+                {isLoading
+                  ? "-"
+                  : formatLatency(data?.latency.avgLatencyUs || 0)}
               </div>
               <div className="text-xs text-muted-foreground">Avg Latency</div>
             </div>
@@ -258,8 +262,8 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
               data && data.latency.avgLatencyUs > 100000
                 ? "warning"
                 : data && data.latency.avgLatencyUs > 1000000
-                  ? "critical"
-                  : "ok"
+                ? "critical"
+                : "ok"
             }
             icon={Clock}
             loading={isLoading}
@@ -270,10 +274,11 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
       {/* Info */}
       <div className="p-4 rounded-lg bg-muted border">
         <p className="text-xs text-muted-foreground">
-          Data sourced from <code className="text-primary">system.metrics</code> and{" "}
-          <code className="text-primary">system.events</code> tables. ZooKeeper/Keeper is
-          used for distributed coordination in ClickHouse cluster. High latency or
-          exceptions may indicate cluster coordination issues.
+          Data sourced from <code className="text-primary">system.metrics</code>{" "}
+          and <code className="text-primary">system.events</code> tables.
+          ZooKeeper/Keeper is used for distributed coordination in ClickHouse
+          cluster. High latency or exceptions may indicate cluster coordination
+          issues.
         </p>
       </div>
     </div>

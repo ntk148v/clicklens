@@ -52,7 +52,7 @@ interface DisksTabProps {
 }
 
 export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
-  const { data, isLoading, error } = useDisks({ refreshInterval });
+  const { data, isLoading, error, refetch } = useDisks({ refreshInterval });
   const [page, setPage] = useState(1);
 
   // Paginate disks

@@ -43,7 +43,9 @@ interface OperationsTabProps {
 }
 
 export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
-  const { data, isLoading, error } = useOperations({ refreshInterval });
+  const { data, isLoading, error, refetch } = useOperations({
+    refreshInterval,
+  });
 
   if (error) {
     return (

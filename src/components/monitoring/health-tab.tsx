@@ -25,7 +25,9 @@ const statusIcons: Record<HealthStatus, React.ReactNode> = {
 };
 
 export function HealthTab({ refreshInterval = 30000 }: HealthTabProps) {
-  const { data, isLoading, error } = useHealthChecks({ refreshInterval });
+  const { data, isLoading, error, refetch } = useHealthChecks({
+    refreshInterval,
+  });
 
   if (error) {
     return (
@@ -57,10 +59,10 @@ export function HealthTab({ refreshInterval = 30000 }: HealthTabProps) {
           data?.overallStatus === "critical"
             ? "border-red-500/50 bg-red-500/5"
             : data?.overallStatus === "warning"
-              ? "border-yellow-500/50 bg-yellow-500/5"
-              : data?.overallStatus === "ok"
-                ? "border-green-500/50 bg-green-500/5"
-                : ""
+            ? "border-yellow-500/50 bg-yellow-500/5"
+            : data?.overallStatus === "ok"
+            ? "border-green-500/50 bg-green-500/5"
+            : ""
         }
       >
         <CardHeader className="pb-3">
@@ -149,8 +151,8 @@ function HealthCheckCard({ check }: { check: HealthCheck }) {
         check.status === "critical"
           ? "border-red-500/30"
           : check.status === "warning"
-            ? "border-yellow-500/30"
-            : ""
+          ? "border-yellow-500/30"
+          : ""
       }
     >
       <CardContent className="p-4">
