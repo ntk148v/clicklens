@@ -58,7 +58,17 @@ export interface ClickHouseClient {
   killQuery(queryId: string): Promise<void>;
 
   /**
-   * Explain a query
+   * Execute a query and return a streamable result set
    */
+  queryStream(
+    sql: string,
+    options?: {
+      timeout?: number;
+      query_id?: string;
+      format?: string;
+      clickhouse_settings?: Record<string, unknown>;
+    }
+  ): Promise<any>; // returning any to avoid deep type dependencies for now, or use complex type
+
   explain(sql: string): Promise<string[]>;
 }

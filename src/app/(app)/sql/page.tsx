@@ -41,7 +41,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { QueryResponse } from "@/app/api/clickhouse/query/route";
+import { toast } from "sonner";
+// import type { QueryResponse } from "@/app/api/clickhouse/query/route"; // Removed
+
+interface QueryResult {
+  data: any[]; // Can be Record<string, unknown>[] or any[][]
+  meta: Array<{ name: string; type: string }>;
+  rows: number;
+  rows_before_limit_at_least?: number;
+  statistics: {
+    elapsed: number;
+    rows_read: number;
+    bytes_read: number;
+    memory_usage?: number;
+  };
+}
 
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory } =
@@ -76,7 +90,7 @@ export default function SqlConsolePage() {
     const queryId = crypto.randomUUID();
     updateTab(tab.id, { isRunning: true, error: null, queryId });
 
-    let lastSelectResult: QueryResponse | null = null;
+    let lastSelectResult: QueryResult | null = null;
     let executedCount = 0;
     let totalElapsed = 0;
 
@@ -94,37 +108,123 @@ export default function SqlConsolePage() {
           body: JSON.stringify({ sql: statement, query_id: queryId }),
         });
 
-        const data: QueryResponse = await response.json();
+        if (!response.ok || !response.body) {
+          throw new Error("Failed to start query execution");
+        }
 
-        if (!data.success) {
-          // Statement failed, show error and stop
-          updateTab(tab.id, {
-            isRunning: false,
-            result: null,
-            error: data.error || {
-              code: 0,
-              message: `Failed at statement ${executedCount + 1}`,
-              type: "unknown",
-              userMessage: `Statement ${executedCount + 1} failed`,
-            },
-            queryId: undefined,
-          });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-          addToHistory({
-            sql: statement,
-            error: data.error?.userMessage || "Error",
-          });
-          return;
+        // Initialize incremental result for this statement
+        let currentMeta: Array<{ name: string; type: string }> = [];
+        let currentData: Record<string, unknown>[] = [];
+        let currentStatistics = {
+          elapsed: 0,
+          rows_read: 0,
+          bytes_read: 0,
+        };
+        let limitReached = false;
+        let queryError = null;
+        let isSelect = false;
+        let lastUpdate = 0;
+
+        let buffer = "";
+        // Process stream
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const event = JSON.parse(line);
+
+              if (event.type === "meta") {
+                currentMeta = event.data;
+                isSelect = true; // If we get meta, it's a SELECT-like query
+                // Update tab immediately to show headers?
+                // Optionally we can update UI here to show empty table with headers
+              } else if (event.type === "data") {
+                // event.data is an array of rows [ [val1, val2], ... ]
+                // Optimization: Store raw arrays to save memory. ResultGrid now supports this via accessorFn.
+
+                // details: event.data is array of arrays (rows).
+                // Just push them directly.
+                currentData.push(...event.data);
+
+                // Throttle UI updates to avoid freezing
+                const now = Date.now();
+                if (now - lastUpdate > 200) {
+                  updateTab(tab.id, {
+                    isRunning: true,
+                    result: {
+                      data: [...currentData], // Create copy for React state only on render
+                      meta: currentMeta,
+                      rows: currentData.length,
+                      statistics: {
+                        ...currentStatistics,
+                        rows_read: event.rows_count,
+                      },
+                    },
+                  });
+                  lastUpdate = now;
+                }
+              } else if (event.type === "progress") {
+                // Update statistics
+                currentStatistics.rows_read = event.rows_read;
+                updateTab(tab.id, {
+                  result: {
+                    data: currentData, // Keep existing
+                    meta: currentMeta,
+                    rows: currentData.length,
+                    statistics: currentStatistics,
+                  } as any, // partial update workaround
+                });
+              } else if (event.type === "done") {
+                limitReached = event.limit_reached;
+                if (event.statistics) {
+                  currentStatistics = {
+                    ...currentStatistics,
+                    ...event.statistics,
+                  };
+                }
+              } else if (event.type === "error") {
+                queryError = event.error;
+              }
+            } catch (e) {
+              console.error("Error parsing chunk", e);
+            }
+          }
+        }
+
+        if (queryError) {
+          throw new Error(queryError.message || "Query failed");
         }
 
         executedCount++;
-        if (data.statistics) {
-          totalElapsed += data.statistics.elapsed;
-        }
+        totalElapsed += currentStatistics.elapsed;
 
-        // Check if this is a SELECT (has data)
-        if (data.data && data.data.length > 0) {
-          lastSelectResult = data;
+        if (isSelect) {
+          lastSelectResult = {
+            data: currentData,
+            meta: currentMeta,
+            rows: currentData.length,
+            statistics: currentStatistics,
+            rows_before_limit_at_least: limitReached ? 500000 : undefined, // Just a hint
+          };
+
+          if (limitReached) {
+            toast.warning("Row limit reached", {
+              description:
+                "This query returns more than the maximum allowable results in the SQL console (500000 rows). Result set has been automatically limited.",
+              duration: 5000,
+            });
+          }
         }
       }
 
@@ -134,26 +234,11 @@ export default function SqlConsolePage() {
         return;
       }
 
-      if (
-        lastSelectResult &&
-        lastSelectResult.data &&
-        lastSelectResult.meta &&
-        lastSelectResult.statistics
-      ) {
-        // Show result of last SELECT
+      if (lastSelectResult) {
+        // Final update
         updateTab(tab.id, {
           isRunning: false,
-          result: {
-            data: lastSelectResult.data as Record<string, unknown>[],
-            meta: lastSelectResult.meta,
-            rows: lastSelectResult.rows!,
-            rows_before_limit_at_least:
-              lastSelectResult.rows_before_limit_at_least,
-            statistics: {
-              ...lastSelectResult.statistics,
-              elapsed: totalElapsed,
-            },
-          },
+          result: lastSelectResult,
           error: null,
           queryId: undefined,
         });
@@ -279,53 +364,116 @@ export default function SqlConsolePage() {
         body: JSON.stringify({ sql: statement, query_id: queryId }),
       });
 
-      const data: QueryResponse = await response.json();
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to start query execution");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let currentMeta: Array<{ name: string; type: string }> = [];
+      let currentData: Record<string, unknown>[] = [];
+      let currentStatistics = {
+        elapsed: 0,
+        rows_read: 0,
+        bytes_read: 0,
+      };
+      let limitReached = false;
+      let queryError = null;
+      let lastUpdate = 0;
+
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep the last part in buffer as it might be incomplete
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            if (event.type === "meta") {
+              currentMeta = event.data;
+            } else if (event.type === "data") {
+              currentData.push(...event.data);
+
+              // Throttle UI updates
+              const now = Date.now();
+              if (now - lastUpdate > 200) {
+                updateTab(tab.id, {
+                  isRunning: true,
+                  result: {
+                    data: [...currentData],
+                    meta: currentMeta,
+                    rows: currentData.length,
+                    statistics: {
+                      ...currentStatistics,
+                      rows_read: event.rows_count,
+                    },
+                  },
+                });
+                lastUpdate = now;
+              }
+            } else if (event.type === "done") {
+              limitReached = event.limit_reached;
+              if (event.statistics) {
+                currentStatistics = {
+                  ...currentStatistics,
+                  ...event.statistics,
+                };
+              }
+            } else if (event.type === "error") {
+              queryError = event.error;
+            }
+          } catch (e) {
+            console.error("Error parsing chunk", e, line);
+          }
+        }
+      }
+
+      if (queryError) {
+        throw new Error(queryError.message || "Query failed");
+      }
 
       const currentTab = getActiveQueryTab();
       if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning)
         return;
 
-      if (data.success && data.data && data.meta && data.statistics) {
-        updateTab(tab.id, {
-          isRunning: false,
-          result: {
-            data: data.data as Record<string, unknown>[],
-            meta: data.meta,
-            rows: data.rows!,
-            rows_before_limit_at_least: data.rows_before_limit_at_least,
-            statistics: data.statistics,
-          },
-          error: null,
-          queryId: undefined,
-        });
-
-        addToHistory({
-          sql: statement,
-          duration: data.statistics.elapsed,
-          rowsReturned: data.rows,
-          rowsRead: data.statistics.rows_read,
-          bytesRead: data.statistics.bytes_read,
-          memoryUsage: data.statistics.memory_usage,
-          user: user?.username,
-        });
-      } else {
-        updateTab(tab.id, {
-          isRunning: false,
-          result: null,
-          error: data.error || {
-            code: 0,
-            message: "Unknown error",
-            type: "unknown",
-            userMessage: "An unexpected error occurred",
-          },
-          queryId: undefined,
-        });
-
-        addToHistory({
-          sql: statement,
-          error: data.error?.userMessage || "Error",
+      if (limitReached) {
+        toast.warning("Row limit reached", {
+          description:
+            "This query returns more than the maximum allowable results in the SQL console (500000 rows). Result set has been automatically limited.",
+          duration: 5000,
         });
       }
+
+      updateTab(tab.id, {
+        isRunning: false,
+        result: {
+          data: currentData,
+          meta: currentMeta,
+          rows: currentData.length,
+          rows_before_limit_at_least: limitReached ? 500000 : undefined,
+          statistics: currentStatistics,
+        },
+        error: null,
+        queryId: undefined,
+      });
+
+      addToHistory({
+        sql: statement,
+        duration: currentStatistics.elapsed,
+        rowsReturned: currentData.length,
+        rowsRead: currentStatistics.rows_read,
+        bytesRead: currentStatistics.bytes_read,
+        memoryUsage: 0,
+        user: user?.username,
+      });
     } catch (error) {
       updateTab(tab.id, {
         isRunning: false,

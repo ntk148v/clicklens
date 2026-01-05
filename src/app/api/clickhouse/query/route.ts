@@ -1,45 +1,13 @@
-/**
- * API route for executing ClickHouse queries
- * POST /api/clickhouse/query
- *
- * Uses session credentials for authentication
- */
-
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClientWithConfig } from "@/lib/clickhouse";
 
-export interface QueryRequest {
-  sql: string;
-  timeout?: number;
-  query_id?: string;
-}
+export const runtime = "nodejs";
 
-export interface QueryResponse {
-  success: boolean;
-  data?: Record<string, unknown>[];
-  meta?: Array<{ name: string; type: string }>;
-  rows?: number;
-  rows_before_limit_at_least?: number;
-  statistics?: {
-    elapsed: number;
-    rows_read: number;
-    bytes_read: number;
-    memory_usage?: number;
-  };
-  error?: {
-    code: number;
-    message: string;
-    type: string;
-    userMessage: string;
-  };
-}
+const MAX_ROWS = 500000;
 
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse<QueryResponse>> {
+export async function POST(request: NextRequest) {
   try {
-    // Get credentials from session
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -57,7 +25,7 @@ export async function POST(
       );
     }
 
-    const body: QueryRequest = await request.json();
+    const body = await request.json();
 
     if (!body.sql || typeof body.sql !== "string") {
       return NextResponse.json(
@@ -75,42 +43,142 @@ export async function POST(
     }
 
     const client = createClientWithConfig(config);
-    const result = await client.query(body.sql, {
+
+    // Get the ClickHouse stream
+    const resultSet = await client.queryStream(body.sql, {
       timeout: body.timeout,
       query_id: body.query_id,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: result.data,
-      meta: result.meta,
-      rows: result.rows,
-      rows_before_limit_at_least: result.rows_before_limit_at_least,
-      statistics: result.statistics,
-    });
-  } catch (error) {
-    console.error("Query error:", error);
-
-    if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
-        },
-      });
-    }
-
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "An unexpected error occurred",
+      format: "JSONCompactEachRowWithNamesAndTypes",
+      clickhouse_settings: {
+        max_result_rows: MAX_ROWS + 1,
+        result_overflow_mode: "break",
       },
     });
+
+    const stream = resultSet.stream();
+    let rowsRead = 0;
+    let limitReached = false;
+    let meta: { name: string; type: string }[] = [];
+
+    // Create a new stream that transforms ClickHouse output to our NDJSON format
+    const customStream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+
+        // Helper to push JSON
+        const push = (data: any) => {
+          controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+        };
+
+        try {
+          let lineCount = 0;
+          let colNames: string[] = [];
+
+          // @ts-ignore
+          for await (const chunk of stream) {
+            const items = Array.isArray(chunk) ? chunk : [chunk];
+
+            for (const item of items) {
+              // Helper to handle ClickHouse stream chunks which might be wrapped in { text: "..." }
+              // or just be the data itself (though Client usually returns objects)
+              let data = item;
+              if (
+                data &&
+                typeof data === "object" &&
+                typeof data.text === "string"
+              ) {
+                try {
+                  data = JSON.parse(data.text);
+                } catch (e) {
+                  // keep as is if parse fails
+                }
+              }
+
+              if (lineCount === 0) {
+                // Column Names
+                colNames = data as string[];
+                lineCount++;
+              } else if (lineCount === 1) {
+                // Column Types
+                const colTypes = data as string[];
+                meta = colNames.map((name, i) => ({
+                  name: String(name),
+                  type: String(colTypes[i]),
+                }));
+
+                // Send Schema
+                push({ type: "meta", data: meta, rows: 0 }); // Initial meta
+                lineCount++;
+              } else {
+                // Data Row
+                // Backpressure handling
+                if (
+                  controller.desiredSize !== null &&
+                  controller.desiredSize <= 0
+                ) {
+                  await new Promise((resolve) => setTimeout(resolve, 0));
+                }
+
+                if (rowsRead >= MAX_ROWS) {
+                  limitReached = true;
+                  break;
+                }
+
+                rowsRead++;
+
+                // Send row data
+                push({ type: "data", data: [data], rows_count: rowsRead });
+
+                // Send progress occasionally
+                if (rowsRead % 1000 === 0) {
+                  push({ type: "progress", rows_read: rowsRead });
+                }
+              }
+            }
+            if (limitReached) break;
+          }
+
+          if (limitReached) {
+            // If we stopped early
+          } else {
+            // We finished naturally
+          }
+
+          push({
+            type: "done",
+            limit_reached: limitReached,
+            statistics: {
+              elapsed: 0, // Not easily available in stream
+              rows_read: rowsRead,
+              bytes_read: 0,
+            },
+          });
+        } catch (err) {
+          console.error("Stream processing error", err);
+          push({
+            type: "error",
+            error: {
+              message: err instanceof Error ? err.message : String(err),
+            },
+          });
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(customStream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (error) {
+    console.error("API Error", error);
+    return NextResponse.json(
+      { success: false, error: { message: "Internal server error" } },
+      { status: 500 }
+    );
   }
 }

@@ -94,4 +94,28 @@ export class ClickHouseClientImpl implements ClickHouseClient {
     const result = await this.query<{ explain: string }>(`EXPLAIN ${sql}`);
     return result.data.map((row) => row.explain);
   }
+  async queryStream(
+    sql: string,
+    options?: {
+      timeout?: number;
+      query_id?: string;
+      format?: string;
+      clickhouse_settings?: Record<string, unknown>;
+    }
+  ): Promise<any> {
+    const settings: Record<string, unknown> = {
+      ...(options?.clickhouse_settings || {}),
+    };
+
+    if (options?.timeout) {
+      settings.max_execution_time = options.timeout;
+    }
+
+    return this.client.query({
+      query: sql,
+      format: (options?.format as any) || "JSON",
+      query_id: options?.query_id,
+      clickhouse_settings: settings as any,
+    });
+  }
 }
