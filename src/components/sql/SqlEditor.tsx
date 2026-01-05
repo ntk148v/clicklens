@@ -135,17 +135,17 @@ const darkTheme = EditorView.theme(
     ".cm-content": {
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       padding: "8px 0",
-      caretColor: "#facc15",
+      caretColor: "#faff69",
     },
     ".cm-cursor, .cm-dropCursor": {
-      borderLeftColor: "#facc15",
+      borderLeftColor: "#faff69",
     },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       {
-        backgroundColor: "#facc1530",
+        backgroundColor: "#faff6930",
       },
     ".cm-gutters": {
-      backgroundColor: "#0d0d0d",
+      backgroundColor: "#1d1d1d",
       color: "#737373",
       border: "none",
       borderRight: "1px solid #2a2a2a",
@@ -161,7 +161,7 @@ const darkTheme = EditorView.theme(
       padding: "0 8px",
     },
     // Bright, readable syntax colors for dark theme
-    ".cm-keyword": { color: "#facc15", fontWeight: "500" }, // Yellow - ClickHouse accent
+    ".cm-keyword": { color: "#faff69", fontWeight: "500" }, // Yellow - ClickHouse accent
     ".cm-string": { color: "#4ade80" }, // Green
     ".cm-number": { color: "#60a5fa" }, // Blue
     ".cm-comment": { color: "#737373", fontStyle: "italic" },
@@ -182,7 +182,7 @@ const darkTheme = EditorView.theme(
         fontSize: "12px",
       },
       "& > ul > li[aria-selected]": {
-        backgroundColor: "#facc1520",
+        backgroundColor: "#faff6920",
         color: "#fafafa",
       },
     },

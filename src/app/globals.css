@@ -91,14 +91,14 @@
 
 /* Dark theme - ClickHouse inspired (black + yellow) */
 .dark {
-  --background: #0d0d0d;
+  --background: #1d1d1d;
   --foreground: #fafafa;
   --card: #141414;
   --card-foreground: #fafafa;
   --popover: #141414;
   --popover-foreground: #fafafa;
-  --primary: #facc15;
-  --primary-foreground: #0d0d0d;
+  --primary: #faff69;
+  --primary-foreground: #1d1d1d;
   --secondary: #1f1f1f;
   --secondary-foreground: #fafafa;
   --muted: #1f1f1f;
@@ -108,24 +108,24 @@
   --destructive: #dc2626;
   --border: #2a2a2a;
   --input: #2a2a2a;
-  --ring: #facc15;
+  --ring: #faff69;
 
   /* Chart colors */
-  --chart-1: #facc15;
+  --chart-1: #faff69;
   --chart-2: #22c55e;
   --chart-3: #3b82f6;
   --chart-4: #a855f7;
   --chart-5: #ec4899;
 
   /* Sidebar */
-  --sidebar: #0d0d0d;
+  --sidebar: #1d1d1d;
   --sidebar-foreground: #fafafa;
-  --sidebar-primary: #facc15;
-  --sidebar-primary-foreground: #0d0d0d;
+  --sidebar-primary: #faff69;
+  --sidebar-primary-foreground: #1d1d1d;
   --sidebar-accent: #1f1f1f;
   --sidebar-accent-foreground: #fafafa;
   --sidebar-border: #2a2a2a;
-  --sidebar-ring: #facc15;
+  --sidebar-ring: #faff69;
 }
 
 @layer base {
@@ -175,9 +175,11 @@
   .status-ok {
     @apply text-green-500;
   }
+
   .bg-status-ok {
     @apply bg-green-500/10;
   }
+
   .border-status-ok {
     @apply border-green-500/50;
   }
@@ -185,9 +187,11 @@
   .status-warning {
     @apply text-yellow-500;
   }
+
   .bg-status-warning {
     @apply bg-yellow-500/10;
   }
+
   .border-status-warning {
     @apply border-yellow-500/50;
   }
@@ -195,9 +199,11 @@
   .status-critical {
     @apply text-red-500;
   }
+
   .bg-status-critical {
     @apply bg-red-500/10;
   }
+
   .border-status-critical {
     @apply border-red-500/50;
   }
