@@ -81,7 +81,7 @@ export default function SqlConsolePage() {
   const activeQueryTab = activeTab?.type === "query" ? activeTab : null;
 
   const handleExecute = useCallback(
-    async (page: number = 0, pageSize: number = 1000) => {
+    async (page: number = 0, pageSize: number = 100) => {
       const tab = getActiveQueryTab();
       if (!tab || tab.isRunning) return;
 
@@ -322,7 +322,7 @@ export default function SqlConsolePage() {
   const handlePageChange = useCallback(
     (page: number) => {
       // ResultGrid passes 1-based page index, but our API uses 0-based
-      const currentSize = tabPagination[activeTabId || ""]?.pageSize || 1000;
+      const currentSize = tabPagination[activeTabId || ""]?.pageSize || 100;
       handleExecute(page - 1, currentSize);
     },
     [handleExecute, tabPagination, activeTabId]
@@ -565,7 +565,7 @@ export default function SqlConsolePage() {
               onClick={() =>
                 handleExecute(
                   0,
-                  tabPagination[activeTabId || ""]?.pageSize || 1000
+                  tabPagination[activeTabId || ""]?.pageSize || 100
                 )
               } // Maintain current page size
               disabled={!activeQueryTab || activeQueryTab.isRunning}
@@ -598,7 +598,7 @@ export default function SqlConsolePage() {
                   onClick={() =>
                     handleExecute(
                       0,
-                      tabPagination[activeTabId || ""]?.pageSize || 1000
+                      tabPagination[activeTabId || ""]?.pageSize || 100
                     )
                   }
                 >
@@ -738,7 +738,7 @@ export default function SqlConsolePage() {
                       }
                       page={tabPagination[activeTabId || ""]?.page || 0}
                       pageSize={
-                        tabPagination[activeTabId || ""]?.pageSize || 1000
+                        tabPagination[activeTabId || ""]?.pageSize || 100
                       }
                       onPageChange={handlePageChange}
                       onPageSizeChange={handlePageSizeChange}
