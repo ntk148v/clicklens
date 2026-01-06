@@ -41,7 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
+
 // import type { QueryResponse } from "@/app/api/clickhouse/query/route"; // Removed
 
 interface QueryResult {
@@ -66,6 +66,12 @@ export default function SqlConsolePage() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
 
+  // Local state for pagination per tab
+  // map of tabId -> { page: number, pageSize: number }
+  const [tabPagination, setTabPagination] = useState<
+    Record<string, { page: number; pageSize: number }>
+  >({});
+
   // Initialize tabs on first load
   useEffect(() => {
     initializeTabs();
@@ -74,234 +80,261 @@ export default function SqlConsolePage() {
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeQueryTab = activeTab?.type === "query" ? activeTab : null;
 
-  const handleExecute = useCallback(async () => {
-    const tab = getActiveQueryTab();
-    if (!tab || tab.isRunning) return;
+  const handleExecute = useCallback(
+    async (page: number = 0, pageSize: number = 1000) => {
+      const tab = getActiveQueryTab();
+      if (!tab || tab.isRunning) return;
 
-    const sql = tab.sql.trim();
-    if (!sql) return;
+      const sql = tab.sql.trim();
+      if (!sql) return;
 
-    // Import splitter dynamically to avoid SSR issues
-    const { splitSqlStatements } = await import("@/lib/sql");
-    const statements = splitSqlStatements(sql);
+      // Import splitter dynamically to avoid SSR issues
+      const { splitSqlStatements } = await import("@/lib/sql");
+      const statements = splitSqlStatements(sql);
 
-    if (statements.length === 0) return;
+      if (statements.length === 0) return;
 
-    const queryId = crypto.randomUUID();
-    updateTab(tab.id, { isRunning: true, error: null, queryId });
+      const queryId = crypto.randomUUID();
+      updateTab(tab.id, { isRunning: true, error: null, queryId });
 
-    let lastSelectResult: QueryResult | null = null;
-    let executedCount = 0;
-    let totalElapsed = 0;
+      // Update active page
+      setTabPagination((prev) => ({
+        ...prev,
+        [tab.id]: { page, pageSize },
+      }));
 
-    try {
-      for (const statement of statements) {
-        // Check if cancelled
+      let lastSelectResult: QueryResult | null = null;
+      let executedCount = 0;
+      let totalElapsed = 0;
+
+      try {
+        for (const statement of statements) {
+          // Check if cancelled
+          const currentTab = getActiveQueryTab();
+          if (
+            !currentTab ||
+            currentTab.id !== tab.id ||
+            !currentTab.isRunning
+          ) {
+            return;
+          }
+
+          const response = await fetch("/api/clickhouse/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sql: statement,
+              query_id: queryId,
+              page: page,
+              pageSize: pageSize,
+            }),
+          });
+
+          if (!response.ok || !response.body) {
+            throw new Error("Failed to start query execution");
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          // Initialize incremental result for this statement
+          let currentMeta: Array<{ name: string; type: string }> = [];
+          let currentData: Record<string, unknown>[] = [];
+          let currentStatistics = {
+            elapsed: 0,
+            rows_read: 0,
+            bytes_read: 0,
+          };
+          let limitReached = false;
+          let queryError = null;
+          let isSelect = false;
+          let lastUpdate = 0;
+
+          let buffer = "";
+          // Process stream
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+
+              try {
+                const event = JSON.parse(line);
+
+                if (event.type === "meta") {
+                  currentMeta = event.data;
+                  isSelect = true; // If we get meta, it's a SELECT-like query
+                  // Update tab immediately to show headers?
+                  // Optionally we can update UI here to show empty table with headers
+                } else if (event.type === "data") {
+                  // event.data is an array of rows [ [val1, val2], ... ]
+                  // Optimization: Store raw arrays to save memory. ResultGrid now supports this via accessorFn.
+
+                  // details: event.data is array of arrays (rows).
+                  // Just push them directly.
+                  currentData.push(...event.data);
+
+                  // Throttle UI updates to avoid freezing
+                  const now = Date.now();
+                  if (now - lastUpdate > 200) {
+                    updateTab(tab.id, {
+                      isRunning: true,
+                      result: {
+                        data: [...currentData], // Create copy for React state only on render
+                        meta: currentMeta,
+                        rows: currentData.length,
+                        statistics: {
+                          ...currentStatistics,
+                          rows_read: event.rows_count,
+                        },
+                      },
+                    });
+                    lastUpdate = now;
+                  }
+                } else if (event.type === "progress") {
+                  // Update statistics
+                  currentStatistics.rows_read = event.rows_read;
+                  updateTab(tab.id, {
+                    result: {
+                      data: currentData, // Keep existing
+                      meta: currentMeta,
+                      rows: currentData.length,
+                      statistics: currentStatistics,
+                    } as any, // partial update workaround
+                  });
+                } else if (event.type === "done") {
+                  limitReached = event.limit_reached;
+                  if (event.statistics) {
+                    currentStatistics = {
+                      ...currentStatistics,
+                      ...event.statistics,
+                    };
+                  }
+                } else if (event.type === "error") {
+                  queryError = event.error;
+                }
+              } catch (e) {
+                console.error("Error parsing chunk", e);
+              }
+            }
+          }
+
+          if (queryError) {
+            throw new Error(queryError.message || "Query failed");
+          }
+
+          executedCount++;
+          totalElapsed += currentStatistics.elapsed;
+
+          if (isSelect) {
+            lastSelectResult = {
+              data: currentData,
+              meta: currentMeta,
+              rows: currentData.length,
+              statistics: currentStatistics,
+              rows_before_limit_at_least: limitReached ? 500000 : undefined, // Just a hint
+            };
+          }
+        }
+
+        // All statements succeeded
         const currentTab = getActiveQueryTab();
         if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning) {
           return;
         }
 
-        const response = await fetch("/api/clickhouse/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sql: statement, query_id: queryId }),
-        });
+        if (lastSelectResult) {
+          // Final update
+          updateTab(tab.id, {
+            isRunning: false,
+            result: lastSelectResult,
+            error: null,
+            queryId: undefined,
+          });
 
-        if (!response.ok || !response.body) {
-          throw new Error("Failed to start query execution");
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        // Initialize incremental result for this statement
-        let currentMeta: Array<{ name: string; type: string }> = [];
-        let currentData: Record<string, unknown>[] = [];
-        let currentStatistics = {
-          elapsed: 0,
-          rows_read: 0,
-          bytes_read: 0,
-        };
-        let limitReached = false;
-        let queryError = null;
-        let isSelect = false;
-        let lastUpdate = 0;
-
-        let buffer = "";
-        // Process stream
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-
-            try {
-              const event = JSON.parse(line);
-
-              if (event.type === "meta") {
-                currentMeta = event.data;
-                isSelect = true; // If we get meta, it's a SELECT-like query
-                // Update tab immediately to show headers?
-                // Optionally we can update UI here to show empty table with headers
-              } else if (event.type === "data") {
-                // event.data is an array of rows [ [val1, val2], ... ]
-                // Optimization: Store raw arrays to save memory. ResultGrid now supports this via accessorFn.
-
-                // details: event.data is array of arrays (rows).
-                // Just push them directly.
-                currentData.push(...event.data);
-
-                // Throttle UI updates to avoid freezing
-                const now = Date.now();
-                if (now - lastUpdate > 200) {
-                  updateTab(tab.id, {
-                    isRunning: true,
-                    result: {
-                      data: [...currentData], // Create copy for React state only on render
-                      meta: currentMeta,
-                      rows: currentData.length,
-                      statistics: {
-                        ...currentStatistics,
-                        rows_read: event.rows_count,
-                      },
-                    },
-                  });
-                  lastUpdate = now;
-                }
-              } else if (event.type === "progress") {
-                // Update statistics
-                currentStatistics.rows_read = event.rows_read;
-                updateTab(tab.id, {
-                  result: {
-                    data: currentData, // Keep existing
-                    meta: currentMeta,
-                    rows: currentData.length,
-                    statistics: currentStatistics,
-                  } as any, // partial update workaround
-                });
-              } else if (event.type === "done") {
-                limitReached = event.limit_reached;
-                if (event.statistics) {
-                  currentStatistics = {
-                    ...currentStatistics,
-                    ...event.statistics,
-                  };
-                }
-              } else if (event.type === "error") {
-                queryError = event.error;
-              }
-            } catch (e) {
-              console.error("Error parsing chunk", e);
-            }
-          }
-        }
-
-        if (queryError) {
-          throw new Error(queryError.message || "Query failed");
-        }
-
-        executedCount++;
-        totalElapsed += currentStatistics.elapsed;
-
-        if (isSelect) {
-          lastSelectResult = {
-            data: currentData,
-            meta: currentMeta,
-            rows: currentData.length,
-            statistics: currentStatistics,
-            rows_before_limit_at_least: limitReached ? 500000 : undefined, // Just a hint
-          };
-
-          if (limitReached) {
-            toast.warning("Row limit reached", {
-              description:
-                "This query returns more than the maximum allowable results in the SQL console (500000 rows). Result set has been automatically limited.",
-              duration: 5000,
-            });
-          }
-        }
-      }
-
-      // All statements succeeded
-      const currentTab = getActiveQueryTab();
-      if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning) {
-        return;
-      }
-
-      if (lastSelectResult) {
-        // Final update
-        updateTab(tab.id, {
-          isRunning: false,
-          result: lastSelectResult,
-          error: null,
-          queryId: undefined,
-        });
-
-        addToHistory({
-          sql,
-          duration: totalElapsed,
-          rowsReturned: lastSelectResult.rows,
-          rowsRead: lastSelectResult.statistics.rows_read,
-          bytesRead: lastSelectResult.statistics.bytes_read,
-          memoryUsage: lastSelectResult.statistics.memory_usage,
-          user: user?.username,
-        });
-      } else {
-        // No SELECT results, show success message
-        updateTab(tab.id, {
-          isRunning: false,
-          result: {
-            data: [
-              {
-                message: `${executedCount} statement(s) executed successfully`,
+          addToHistory({
+            sql,
+            duration: totalElapsed,
+            rowsReturned: lastSelectResult.rows,
+            rowsRead: lastSelectResult.statistics.rows_read,
+            bytesRead: lastSelectResult.statistics.bytes_read,
+            memoryUsage: lastSelectResult.statistics.memory_usage,
+            user: user?.username,
+          });
+        } else {
+          // No SELECT results, show success message
+          updateTab(tab.id, {
+            isRunning: false,
+            result: {
+              data: [
+                {
+                  message: `${executedCount} statement(s) executed successfully`,
+                },
+              ],
+              meta: [{ name: "message", type: "String" }],
+              rows: 1,
+              statistics: {
+                elapsed: totalElapsed,
+                rows_read: 0,
+                bytes_read: 0,
               },
-            ],
-            meta: [{ name: "message", type: "String" }],
-            rows: 1,
-            statistics: {
-              elapsed: totalElapsed,
-              rows_read: 0,
-              bytes_read: 0,
             },
+            error: null,
+            queryId: undefined,
+          });
+
+          addToHistory({
+            sql,
+            duration: totalElapsed,
+            rowsReturned: 0,
+            rowsRead: 0,
+            bytesRead: 0,
+            user: user?.username,
+          });
+        }
+      } catch (error) {
+        updateTab(tab.id, {
+          isRunning: false,
+          result: null,
+          error: {
+            code: 0,
+            message: error instanceof Error ? error.message : "Unknown error",
+            type: "network",
+            userMessage: "Failed to connect to server",
           },
-          error: null,
           queryId: undefined,
         });
 
         addToHistory({
           sql,
-          duration: totalElapsed,
-          rowsReturned: 0,
-          rowsRead: 0,
-          bytesRead: 0,
-          user: user?.username,
+          error: "Network error",
         });
       }
-    } catch (error) {
-      updateTab(tab.id, {
-        isRunning: false,
-        result: null,
-        error: {
-          code: 0,
-          message: error instanceof Error ? error.message : "Unknown error",
-          type: "network",
-          userMessage: "Failed to connect to server",
-        },
-        queryId: undefined,
-      });
+    },
+    [getActiveQueryTab, updateTab, addToHistory, user]
+  );
 
-      addToHistory({
-        sql,
-        error: "Network error",
-      });
-    }
-  }, [getActiveQueryTab, updateTab, addToHistory, user]);
+  const handlePageChange = useCallback(
+    (page: number) => {
+      // ResultGrid passes 1-based page index, but our API uses 0-based
+      const currentSize = tabPagination[activeTabId || ""]?.pageSize || 1000;
+      handleExecute(page - 1, currentSize);
+    },
+    [handleExecute, tabPagination, activeTabId]
+  );
+
+  const handlePageSizeChange = useCallback(
+    (size: number) => {
+      // Reset to page 0 when size changes
+      handleExecute(0, size);
+    },
+    [handleExecute]
+  );
 
   const handleCancel = useCallback(async () => {
     const tab = getActiveQueryTab();
@@ -444,14 +477,6 @@ export default function SqlConsolePage() {
       if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning)
         return;
 
-      if (limitReached) {
-        toast.warning("Row limit reached", {
-          description:
-            "This query returns more than the maximum allowable results in the SQL console (500000 rows). Result set has been automatically limited.",
-          duration: 5000,
-        });
-      }
-
       updateTab(tab.id, {
         isRunning: false,
         result: {
@@ -537,7 +562,12 @@ export default function SqlConsolePage() {
           <div className="flex items-center">
             <Button
               size="sm"
-              onClick={handleExecute}
+              onClick={() =>
+                handleExecute(
+                  0,
+                  tabPagination[activeTabId || ""]?.pageSize || 1000
+                )
+              } // Maintain current page size
               disabled={!activeQueryTab || activeQueryTab.isRunning}
               className="rounded-r-none"
             >
@@ -564,7 +594,14 @@ export default function SqlConsolePage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExecute}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    handleExecute(
+                      0,
+                      tabPagination[activeTabId || ""]?.pageSize || 1000
+                    )
+                  }
+                >
                   <Play className="w-4 h-4 mr-2" />
                   Run All
                   <span className="ml-auto text-xs text-muted-foreground">
@@ -694,9 +731,17 @@ export default function SqlConsolePage() {
                       meta={activeQueryTab.result.meta}
                       statistics={activeQueryTab.result.statistics}
                       totalRows={
-                        activeQueryTab.result.rows_before_limit_at_least ||
-                        activeQueryTab.result.rows
+                        // If we hit limit or it's pagination mode, we might not know total rows
+                        // But we want to enable "Next" button if we have full page.
+                        // We can pass undefined or estimate
+                        undefined
                       }
+                      page={tabPagination[activeTabId || ""]?.page || 0}
+                      pageSize={
+                        tabPagination[activeTabId || ""]?.pageSize || 1000
+                      }
+                      onPageChange={handlePageChange}
+                      onPageSizeChange={handlePageSizeChange}
                       className="h-full"
                     />
                   ) : (

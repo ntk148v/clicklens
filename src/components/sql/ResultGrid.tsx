@@ -54,7 +54,13 @@ interface ResultGridProps {
   statistics?: QueryStatistics;
   totalRows?: number;
   className?: string;
+  page?: number; // 0-indexed
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }
+
+// ... imports and helper functions ...
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -95,6 +101,10 @@ export function ResultGrid({
   statistics,
   totalRows,
   className,
+  page = 0,
+  pageSize = 100,
+  onPageChange,
+  onPageSizeChange,
 }: ResultGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>("onChange");
@@ -146,23 +156,28 @@ export function ResultGrid({
       },
       size: 150,
       minSize: 80,
+      enableResizing: true,
     }));
   }, [meta]);
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: {
+      sorting,
+      // If controlled pagination
+      pagination: {
+        pageIndex: page,
+        pageSize: pageSize,
+      },
+    },
+    manualPagination: !!onPageChange, // Enable manual pagination if onPageChange is provided
+    pageCount: totalRows ? Math.ceil(totalRows / pageSize) : -1, // -1 means unknown page count
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode,
-    initialState: {
-      pagination: {
-        pageSize: 100,
-      },
-    },
   });
 
   const copyToClipboard = async () => {
@@ -302,7 +317,20 @@ export function ResultGrid({
         totalPages={table.getPageCount()}
         totalItems={totalRows ?? data.length}
         pageSize={table.getState().pagination.pageSize}
-        onPageChange={(page) => table.setPageIndex(page - 1)}
+        onPageChange={(p) => {
+          if (onPageChange) {
+            onPageChange(p);
+          } else {
+            table.setPageIndex(p - 1);
+          }
+        }}
+        onPageSizeChange={(size) => {
+          if (onPageSizeChange) {
+            onPageSizeChange(size);
+          } else {
+            table.setPageSize(size);
+          }
+        }}
       />
     </div>
   );

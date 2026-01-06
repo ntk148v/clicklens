@@ -44,8 +44,17 @@ export async function POST(request: NextRequest) {
 
     const client = createClientWithConfig(config);
 
+    let sql = body.sql;
+    if (typeof body.page === "number") {
+      const pageSize = typeof body.pageSize === "number" ? body.pageSize : 1000;
+      const offset = body.page * pageSize;
+      // Remove trailing semicolon
+      const cleanSql = sql.trim().replace(/;$/, "");
+      sql = `SELECT * FROM (${cleanSql}) LIMIT ${pageSize} OFFSET ${offset}`;
+    }
+
     // Get the ClickHouse stream
-    const resultSet = await client.queryStream(body.sql, {
+    const resultSet = await client.queryStream(sql, {
       timeout: body.timeout,
       query_id: body.query_id,
       format: "JSONCompactEachRowWithNamesAndTypes",
