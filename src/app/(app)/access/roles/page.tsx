@@ -99,6 +99,7 @@ import {
 import type { SystemRole } from "@/lib/clickhouse";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { PaginationControls } from "@/components/monitoring";
 
 interface RoleWithPrivileges extends SystemRole {
   isFeatureRole: boolean;
@@ -127,6 +128,10 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<RoleWithPrivileges[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination for user roles
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   // Protect route
   useEffect(() => {
@@ -423,6 +428,12 @@ export default function RolesPage() {
   const featureRoles = roles.filter((r) => r.isFeatureRole);
   const userRoles = roles.filter((r) => !r.isFeatureRole);
 
+  const paginatedUserRoles = userRoles.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+  const totalPages = Math.ceil(userRoles.length / pageSize);
+
   if (authLoading || (!permissions?.canManageUsers && !authLoading)) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -541,9 +552,9 @@ export default function RolesPage() {
               </div>
 
               <Card>
-                <ScrollArea className="h-[calc(100vh-480px)]">
+                <div className="rounded-md border">
                   <Table>
-                    <TableHeader className="sticky top-0 bg-background">
+                    <TableHeader>
                       <TableRow>
                         <TableHead className="w-[180px]">Role Name</TableHead>
                         <TableHead>Inherited Roles</TableHead>
@@ -552,17 +563,17 @@ export default function RolesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {userRoles.length === 0 ? (
+                      {paginatedUserRoles.length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={4}
                             className="text-center text-muted-foreground py-8"
                           >
-                            No custom roles yet. Create one to get started.
+                            No custom roles found.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        userRoles.map((role) => (
+                        paginatedUserRoles.map((role) => (
                           <TableRow key={role.id}>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
@@ -731,7 +742,15 @@ export default function RolesPage() {
                       )}
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
+                <PaginationControls
+                  page={page}
+                  totalPages={totalPages}
+                  totalItems={userRoles.length}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                />
               </Card>
             </div>
           </>

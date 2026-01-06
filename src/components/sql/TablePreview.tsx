@@ -39,7 +39,7 @@ function formatCellValue(value: unknown): string {
 }
 
 export function TablePreview({ database, table }: TablePreviewProps) {
-  const [PAGE_SIZE, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(50);
   const [previewTab, setPreviewTab] = useState<"data" | "structure">("data");
   const [loading, setLoading] = useState(false);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
@@ -76,10 +76,10 @@ export function TablePreview({ database, table }: TablePreviewProps) {
     }
   };
 
-  const totalPages = Math.ceil(data.length / PAGE_SIZE);
+  const totalPages = Math.ceil(data.length / pageSize);
   const paginatedData = data.slice(
-    currentPage * PAGE_SIZE,
-    (currentPage + 1) * PAGE_SIZE
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize
   );
 
   return (
@@ -210,7 +210,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
           page={currentPage + 1}
           totalPages={totalPages}
           totalItems={data.length}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onPageChange={(p) => setCurrentPage(p - 1)}
           onPageSizeChange={setPageSize}
         />

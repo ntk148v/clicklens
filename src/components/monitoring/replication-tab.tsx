@@ -18,7 +18,7 @@ import { StatusBadge, StatusDot } from "@/components/monitoring";
 import { useReplicas, formatNumber } from "@/lib/hooks/use-monitoring";
 import { useState, useMemo } from "react";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 50;
 
 interface ReplicationTabProps {
   refreshInterval?: number;
@@ -29,18 +29,19 @@ export function ReplicationTab({
 }: ReplicationTabProps) {
   const { data, isLoading, error, refetch } = useReplicas({ refreshInterval });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Paginate replicas
   const paginatedReplicas = useMemo(() => {
     if (!data?.replicas) return [];
-    const start = (page - 1) * PAGE_SIZE;
-    return data.replicas.slice(start, start + PAGE_SIZE);
-  }, [data?.replicas, page]);
+    const start = (page - 1) * pageSize;
+    return data.replicas.slice(start, start + pageSize);
+  }, [data?.replicas, page, pageSize]);
 
   const totalPages = useMemo(() => {
     if (!data?.replicas) return 0;
-    return Math.ceil(data.replicas.length / PAGE_SIZE);
-  }, [data?.replicas]);
+    return Math.ceil(data.replicas.length / pageSize);
+  }, [data?.replicas, pageSize]);
 
   if (error) {
     return (
@@ -228,8 +229,9 @@ export function ReplicationTab({
           page={page}
           totalPages={totalPages}
           totalItems={data?.replicas.length || 0}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={setPageSize}
         />
       </div>
 

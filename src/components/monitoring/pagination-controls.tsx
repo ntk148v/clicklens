@@ -45,7 +45,9 @@ export function PaginationControls({
       <div className="flex items-center gap-4">
         <div className="text-sm text-muted-foreground">
           {isUnknownTotal ? (
-            <span>Page {page}</span>
+            <span>
+              Showing {start}-{page * pageSize}
+            </span>
           ) : (
             <span>
               Showing {start}-{Math.min(page * pageSize, totalItems)} of{" "}

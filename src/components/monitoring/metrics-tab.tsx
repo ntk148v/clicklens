@@ -106,12 +106,13 @@ function formatMetricValue(name: string, value: number): string {
   return value.toFixed(2);
 }
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 50;
 
 export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<MetricCategory | "all">("all");
   const [activeSubTab, setActiveSubTab] = useState("metrics");
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [metricsPage, setMetricsPage] = useState(1);
   const [asyncPage, setAsyncPage] = useState(1);
   const [eventsPage, setEventsPage] = useState(1);
@@ -158,24 +159,24 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
 
   // Paginated data
   const paginatedMetrics = useMemo(() => {
-    const start = (metricsPage - 1) * PAGE_SIZE;
-    return filteredMetrics.slice(start, start + PAGE_SIZE);
-  }, [filteredMetrics, metricsPage]);
+    const start = (metricsPage - 1) * pageSize;
+    return filteredMetrics.slice(start, start + pageSize);
+  }, [filteredMetrics, metricsPage, pageSize]);
 
   const paginatedAsyncMetrics = useMemo(() => {
-    const start = (asyncPage - 1) * PAGE_SIZE;
-    return filteredAsyncMetrics.slice(start, start + PAGE_SIZE);
-  }, [filteredAsyncMetrics, asyncPage]);
+    const start = (asyncPage - 1) * pageSize;
+    return filteredAsyncMetrics.slice(start, start + pageSize);
+  }, [filteredAsyncMetrics, asyncPage, pageSize]);
 
   const paginatedEvents = useMemo(() => {
-    const start = (eventsPage - 1) * PAGE_SIZE;
-    return filteredEvents.slice(start, start + PAGE_SIZE);
-  }, [filteredEvents, eventsPage]);
+    const start = (eventsPage - 1) * pageSize;
+    return filteredEvents.slice(start, start + pageSize);
+  }, [filteredEvents, eventsPage, pageSize]);
 
   // Total pages
-  const metricsTotalPages = Math.ceil(filteredMetrics.length / PAGE_SIZE);
-  const asyncTotalPages = Math.ceil(filteredAsyncMetrics.length / PAGE_SIZE);
-  const eventsTotalPages = Math.ceil(filteredEvents.length / PAGE_SIZE);
+  const metricsTotalPages = Math.ceil(filteredMetrics.length / pageSize);
+  const asyncTotalPages = Math.ceil(filteredAsyncMetrics.length / pageSize);
+  const eventsTotalPages = Math.ceil(filteredEvents.length / pageSize);
 
   // Reset page when filter changes
   const handleSearchChange = (value: string) => {
@@ -315,8 +316,9 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
               page={metricsPage}
               totalPages={metricsTotalPages}
               totalItems={filteredMetrics.length}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
               onPageChange={setMetricsPage}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </TabsContent>
@@ -376,8 +378,9 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
               page={asyncPage}
               totalPages={asyncTotalPages}
               totalItems={filteredAsyncMetrics.length}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
               onPageChange={setAsyncPage}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </TabsContent>
@@ -437,8 +440,9 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
               page={eventsPage}
               totalPages={eventsTotalPages}
               totalItems={filteredEvents.length}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
               onPageChange={setEventsPage}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </TabsContent>
