@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils";
 export interface RefreshControlProps {
   onRefresh: () => void;
   intervals?: number[]; // in seconds
-  defaultInterval?: number;
+  interval?: number; // controlled state
+  onIntervalChange?: (interval: number) => void;
+  defaultInterval?: number; // kept for backward compatibility if needed, but preferred to be controlled
   isLoading?: boolean;
   className?: string;
 }
@@ -23,40 +25,54 @@ export interface RefreshControlProps {
 export function RefreshControl({
   onRefresh,
   intervals = [5, 10, 30, 60],
+  interval,
+  onIntervalChange,
   defaultInterval = 30,
   isLoading = false,
   className,
 }: RefreshControlProps) {
-  const [refreshInterval, setRefreshInterval] = useState<number>(defaultInterval);
+  // Use controlled state if provided, otherwise local state
+  const [internalInterval, setInternalInterval] =
+    useState<number>(defaultInterval);
+  const currentInterval = interval !== undefined ? interval : internalInterval;
+
   const [isPaused, setIsPaused] = useState(false);
-  const [countdown, setCountdown] = useState(defaultInterval);
+  const [countdown, setCountdown] = useState(currentInterval);
 
   const handleRefresh = useCallback(() => {
     onRefresh();
-    setCountdown(refreshInterval);
-  }, [onRefresh, refreshInterval]);
+    setCountdown(currentInterval);
+  }, [onRefresh, currentInterval]);
+
+  const handleIntervalChange = (newInterval: number) => {
+    if (onIntervalChange) {
+      onIntervalChange(newInterval);
+    } else {
+      setInternalInterval(newInterval);
+    }
+  };
 
   // Auto-refresh timer
   useEffect(() => {
-    if (isPaused || refreshInterval === 0) return;
+    if (isPaused || currentInterval === 0) return;
 
     const timer = window.setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           handleRefresh();
-          return refreshInterval;
+          return currentInterval;
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [refreshInterval, isPaused, handleRefresh]);
+  }, [currentInterval, isPaused, handleRefresh]);
 
   // Reset countdown when interval changes
   useEffect(() => {
-    setCountdown(refreshInterval);
-  }, [refreshInterval]);
+    setCountdown(currentInterval);
+  }, [currentInterval]);
 
   const formatInterval = (seconds: number) => {
     if (seconds === 0) return "Off";
@@ -67,7 +83,7 @@ export function RefreshControl({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {/* Countdown indicator */}
-      {!isPaused && refreshInterval > 0 && (
+      {!isPaused && currentInterval > 0 && (
         <span className="text-xs text-muted-foreground tabular-nums">
           {countdown}s
         </span>
@@ -102,8 +118,8 @@ export function RefreshControl({
 
       {/* Interval selector */}
       <Select
-        value={String(refreshInterval)}
-        onValueChange={(value) => setRefreshInterval(Number(value))}
+        value={String(currentInterval)}
+        onValueChange={(value) => handleIntervalChange(Number(value))}
       >
         <SelectTrigger className="h-8 w-[80px] text-xs">
           <SelectValue />

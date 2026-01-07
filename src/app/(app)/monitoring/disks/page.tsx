@@ -6,6 +6,7 @@ import { DisksTab, RefreshControl } from "@/components/monitoring";
 
 export default function MonitoringDisksPage() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [interval, setInterval] = useState(30);
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
@@ -19,13 +20,17 @@ export default function MonitoringDisksPage() {
           <RefreshControl
             onRefresh={handleRefresh}
             intervals={[10, 30, 60, 120]}
-            defaultInterval={30}
+            interval={interval}
+            onIntervalChange={setInterval}
           />
         }
       />
 
       <div className="flex-1 p-6 overflow-auto">
-        <DisksTab key={`disks-${refreshKey}`} refreshInterval={30000} />
+        <DisksTab
+          key={`disks-${refreshKey}`}
+          refreshInterval={interval * 1000}
+        />
       </div>
     </div>
   );

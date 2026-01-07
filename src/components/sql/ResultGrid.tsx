@@ -49,12 +49,18 @@ interface QueryStatistics {
 }
 
 interface ResultGridProps {
-  data: Record<string, unknown>[];
+  data: any[]; // Changed from Record<string, unknown>[] to support compact array rows
   meta: ColumnMeta[];
   statistics?: QueryStatistics;
   totalRows?: number;
   className?: string;
+  page?: number; // 0-indexed
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }
+
+// ... imports and helper functions ...
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -95,14 +101,25 @@ export function ResultGrid({
   statistics,
   totalRows,
   className,
+  page = 0,
+  pageSize = 100,
+  onPageChange,
+  onPageSizeChange,
 }: ResultGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>("onChange");
 
-  const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(() => {
-    return meta.map((col) => ({
-      id: col.name,
-      accessorKey: col.name,
+  const columns = useMemo<ColumnDef<any>[]>(() => {
+    return meta.map((col, idx) => ({
+      id: `${String(col.name)}_${idx}`,
+      accessorFn: (row: any) => {
+        // Handle both array (streamed) and object (legacy/static) formats if necessary
+        // But for this tab, it's likely array now.
+        // Safety check if row is array
+        if (Array.isArray(row)) return row[idx];
+        // Fallback for object-based rows (if any legacy path remains)
+        return row[col.name];
+      },
       header: ({ column }) => (
         <div className="flex items-center gap-1">
           <span className="font-semibold">{col.name}</span>
@@ -139,23 +156,28 @@ export function ResultGrid({
       },
       size: 150,
       minSize: 80,
+      enableResizing: true,
     }));
   }, [meta]);
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: {
+      sorting,
+      // If controlled pagination
+      pagination: {
+        pageIndex: page,
+        pageSize: pageSize,
+      },
+    },
+    manualPagination: !!onPageChange, // Enable manual pagination if onPageChange is provided
+    pageCount: totalRows ? Math.ceil(totalRows / pageSize) : -1, // -1 means unknown page count
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode,
-    initialState: {
-      pagination: {
-        pageSize: 100,
-      },
-    },
   });
 
   const copyToClipboard = async () => {
@@ -295,7 +317,20 @@ export function ResultGrid({
         totalPages={table.getPageCount()}
         totalItems={totalRows ?? data.length}
         pageSize={table.getState().pagination.pageSize}
-        onPageChange={(page) => table.setPageIndex(page - 1)}
+        onPageChange={(p) => {
+          if (onPageChange) {
+            onPageChange(p);
+          } else {
+            table.setPageIndex(p - 1);
+          }
+        }}
+        onPageSizeChange={(size) => {
+          if (onPageSizeChange) {
+            onPageSizeChange(size);
+          } else {
+            table.setPageSize(size);
+          }
+        }}
       />
     </div>
   );

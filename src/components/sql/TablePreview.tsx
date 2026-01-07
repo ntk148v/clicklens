@@ -14,8 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Database, Columns, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Database, Columns } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PaginationControls } from "../monitoring";
 
 interface ColumnInfo {
   name: string;
@@ -30,8 +31,6 @@ interface TablePreviewProps {
   table: string;
 }
 
-const PAGE_SIZE = 100;
-
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? "true" : "false";
@@ -40,6 +39,7 @@ function formatCellValue(value: unknown): string {
 }
 
 export function TablePreview({ database, table }: TablePreviewProps) {
+  const [pageSize, setPageSize] = useState(50);
   const [previewTab, setPreviewTab] = useState<"data" | "structure">("data");
   const [loading, setLoading] = useState(false);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
@@ -55,7 +55,9 @@ export function TablePreview({ database, table }: TablePreviewProps) {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/clickhouse/tables/${encodeURIComponent(table)}?database=${encodeURIComponent(database)}&type=${type}`
+        `/api/clickhouse/tables/${encodeURIComponent(
+          table
+        )}?database=${encodeURIComponent(database)}&type=${type}`
       );
       const result = await res.json();
       if (result.success) {
@@ -74,10 +76,10 @@ export function TablePreview({ database, table }: TablePreviewProps) {
     }
   };
 
-  const totalPages = Math.ceil(data.length / PAGE_SIZE);
+  const totalPages = Math.ceil(data.length / pageSize);
   const paginatedData = data.slice(
-    currentPage * PAGE_SIZE,
-    (currentPage + 1) * PAGE_SIZE
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize
   );
 
   return (
@@ -199,48 +201,20 @@ export function TablePreview({ database, table }: TablePreviewProps) {
       <div className="flex items-center justify-between px-4 py-1.5 border-t text-xs text-muted-foreground bg-muted/30">
         <span>
           {previewTab === "data"
-            ? `${data.length} rows (preview limited to 100)`
+            ? `${data.length} rows`
             : `${columns.length} columns`}
         </span>
-        {previewTab === "data" && totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-              disabled={currentPage === 0}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                min={1}
-                max={totalPages}
-                value={currentPage + 1}
-                onChange={(e) => {
-                  const page = parseInt(e.target.value, 10);
-                  if (page >= 1 && page <= totalPages) {
-                    setCurrentPage(page - 1);
-                  }
-                }}
-                className="w-12 h-6 text-center text-xs"
-              />
-              <span>of {totalPages}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={currentPage >= totalPages - 1}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )}
       </div>
+      {previewTab === "data" && (
+        <PaginationControls
+          page={currentPage + 1}
+          totalPages={totalPages}
+          totalItems={data.length}
+          pageSize={pageSize}
+          onPageChange={(p) => setCurrentPage(p - 1)}
+          onPageSizeChange={setPageSize}
+        />
+      )}
     </Card>
   );
 }

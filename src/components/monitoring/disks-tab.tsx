@@ -19,7 +19,7 @@ import { StatusBadge } from "@/components/monitoring";
 import { Badge } from "@/components/ui/badge";
 import { useDisks, formatBytes } from "@/lib/hooks/use-monitoring";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 50;
 
 // Progress bar component
 function DiskUsageBar({
@@ -54,18 +54,19 @@ interface DisksTabProps {
 export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
   const { data, isLoading, error, refetch } = useDisks({ refreshInterval });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Paginate disks
   const paginatedDisks = useMemo(() => {
     if (!data?.disks) return [];
-    const start = (page - 1) * PAGE_SIZE;
-    return data.disks.slice(start, start + PAGE_SIZE);
-  }, [data?.disks, page]);
+    const start = (page - 1) * pageSize;
+    return data.disks.slice(start, start + pageSize);
+  }, [data?.disks, page, pageSize]);
 
   const totalPages = useMemo(() => {
     if (!data?.disks) return 0;
-    return Math.ceil(data.disks.length / PAGE_SIZE);
-  }, [data?.disks]);
+    return Math.ceil(data.disks.length / pageSize);
+  }, [data?.disks, pageSize]);
 
   if (error) {
     return (
@@ -306,8 +307,9 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
           page={page}
           totalPages={totalPages}
           totalItems={data?.disks.length || 0}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={setPageSize}
         />
       </div>
 
