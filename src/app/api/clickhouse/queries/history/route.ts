@@ -85,6 +85,7 @@ export async function GET(
     const offset = parseInt(searchParams.get("offset") || "0");
     const user = searchParams.get("user");
     const minDuration = searchParams.get("minDuration");
+    const status = searchParams.get("status"); // all, success, error
     const queryType = searchParams.get("queryType"); // SELECT, INSERT, etc.
 
     const lensConfig = getLensConfig();
@@ -103,7 +104,18 @@ export async function GET(
     const client = createClientWithConfig(lensConfig);
 
     // Build WHERE conditions
-    const conditions: string[] = ["type = 'QueryFinish'"];
+    // We want both finished queries and exceptions by default
+    const conditions: string[] = [
+      "type IN ('QueryFinish', 'ExceptionWhileProcessing')",
+    ];
+
+    if (status === "success") {
+      conditions.push("type = 'QueryFinish' AND exception_code = 0");
+    } else if (status === "error") {
+      conditions.push(
+        "(type = 'ExceptionWhileProcessing' OR exception_code != 0)"
+      );
+    }
 
     if (user) {
       const safeUser = user.replace(/'/g, "''");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Loader2, Filter, Clock } from "lucide-react";
+import { Loader2, Filter, Clock, AlertCircle, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ export function HistoryTab() {
   const [userFilter, setUserFilter] = useState("");
   const [minDuration, setMinDuration] = useState("");
   const [queryType, setQueryType] = useState("");
+  const [status, setStatus] = useState<"all" | "success" | "error">("all");
 
   // Input state (local)
   const [userInput, setUserInput] = useState("");
@@ -68,8 +69,9 @@ export function HistoryTab() {
       user: userFilter || undefined,
       minDuration: minDuration ? parseInt(minDuration) : undefined,
       queryType: queryType || undefined,
+      status: status,
     }),
-    [page, pageSize, userFilter, minDuration, queryType]
+    [page, pageSize, userFilter, minDuration, queryType, status]
   );
 
   const { data, isLoading, error } = useQueryHistory(filters);
@@ -164,6 +166,22 @@ export function HistoryTab() {
             <SelectItem value="Create">CREATE</SelectItem>
             <SelectItem value="Alter">ALTER</SelectItem>
             <SelectItem value="Drop">DROP</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v as "all" | "success" | "error");
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="success">Success</SelectItem>
+            <SelectItem value="error">Error</SelectItem>
           </SelectContent>
         </Select>
         <Badge variant="outline" className="ml-auto border-none bg-muted/50">
@@ -286,9 +304,21 @@ export function HistoryTab() {
                     </TableCell>
                     <TableCell className="text-xs">
                       {query.exception ? (
-                        <Badge variant="destructive">Error</Badge>
+                        <Badge
+                          variant="destructive"
+                          className="flex items-center gap-1 w-fit"
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          Error
+                        </Badge>
                       ) : (
-                        <Badge variant="secondary">Success</Badge>
+                        <Badge
+                          variant="outline"
+                          className="flex items-center gap-1 text-green-600 bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400 w-fit"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Success
+                        </Badge>
                       )}
                     </TableCell>
                   </TableRow>
