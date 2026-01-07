@@ -110,10 +110,15 @@ export async function POST(request: NextRequest) {
               } else if (lineCount === 1) {
                 // Column Types
                 const colTypes = data as string[];
-                meta = colNames.map((name, i) => ({
-                  name: String(name),
-                  type: String(colTypes[i]),
-                }));
+                if (Array.isArray(colNames) && Array.isArray(colTypes)) {
+                  meta = colNames.map((name, i) => ({
+                    name: String(name),
+                    type: String(colTypes[i]),
+                  }));
+                } else {
+                  // Fallback if format is unexpected
+                  meta = [{ name: "result", type: "String" }];
+                }
 
                 // Send Schema
                 push({ type: "meta", data: meta, rows: 0 }); // Initial meta

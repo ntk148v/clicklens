@@ -51,14 +51,15 @@ export const FEATURE_ROLES: FeatureRole[] = [
   {
     id: "clicklens_query_monitor",
     name: "Query Monitor",
-    description: "View and kill running queries",
+    description: "View and kill running queries, analyze query performance",
     details:
       "Grants KILL QUERY globally to terminate running queries. " +
-      "Also grants SELECT on system.processes and system.query_log for monitoring.",
+      "Also grants SELECT on system.processes, system.query_log, and system.query_cache for monitoring.",
     grants: [
       "GRANT KILL QUERY ON *.* TO `clicklens_query_monitor`",
       "GRANT SELECT ON system.processes TO `clicklens_query_monitor`",
       "GRANT SELECT ON system.query_log TO `clicklens_query_monitor`",
+      "GRANT SELECT ON system.query_cache TO `clicklens_query_monitor`",
     ],
   },
   {

@@ -4,6 +4,8 @@ export { QueryTabs } from "./QueryTabs";
 export { QueryHistory } from "./QueryHistory";
 export { DatabaseSelector } from "./DatabaseSelector";
 export { TableSidebar } from "./TableSidebar";
+export * from "./ExplainButton";
+export * from "./ExplainVisualizer";
 export { TablePreview } from "./TablePreview";
 export { SavedQueries } from "./SavedQueries";
 export { SaveQueryDialog } from "./SaveQueryDialog";

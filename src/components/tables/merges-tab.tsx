@@ -5,10 +5,11 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -22,6 +23,35 @@ interface MergesTabProps {
 
 export function MergesTab({ database, table }: MergesTabProps) {
   const { data, isLoading, error, refetch } = useTableMerges(database, table);
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>("elapsed");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedMerges = useMemo(() => {
+    if (!data?.merges) return [];
+
+    return [...data.merges].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.merges, sortColumn, sortDirection]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   if (isLoading) {
     return (
@@ -50,7 +80,7 @@ export function MergesTab({ database, table }: MergesTabProps) {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
@@ -91,22 +121,72 @@ export function MergesTab({ database, table }: MergesTabProps) {
       </div>
 
       {/* Merges Table */}
-      <Card>
-        <div className="overflow-auto">
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-hidden relative">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Result Part</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="min-w-[150px]">Progress</TableHead>
-                <TableHead className="text-right">Parts</TableHead>
-                <TableHead className="text-right">Rows</TableHead>
-                <TableHead className="text-right">Memory</TableHead>
-                <TableHead className="text-right">Elapsed</TableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "result_part_name" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("result_part_name", dir)}
+                >
+                  Result Part
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "merge_type" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("merge_type", dir)}
+                >
+                  Type
+                </SortableTableHead>
+                <SortableTableHead
+                  className="min-w-[150px]"
+                  currentSort={sortColumn === "progress" ? sortDirection : null}
+                  onSort={(dir) => updateSort("progress", dir)}
+                >
+                  Progress
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "num_parts" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("num_parts", dir)}
+                >
+                  Parts
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "rows_written" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("rows_written", dir)}
+                >
+                  Rows
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "memory_usage" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("memory_usage", dir)}
+                >
+                  Memory
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={sortColumn === "elapsed" ? sortDirection : null}
+                  onSort={(dir) => updateSort("elapsed", dir)}
+                >
+                  Elapsed
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.merges.map((merge, idx) => (
+              {sortedMerges.map((merge, idx) => (
                 <TableRow key={idx}>
                   <TableCell className="font-mono text-xs">
                     {merge.result_part_name}

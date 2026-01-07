@@ -14,7 +14,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -117,6 +117,16 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
   const [asyncPage, setAsyncPage] = useState(1);
   const [eventsPage, setEventsPage] = useState(1);
 
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{
+    column: string;
+    direction: "asc" | "desc" | null;
+  }>({ column: "metric", direction: "asc" });
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortConfig({ column, direction });
+  };
+
   const { data, isLoading, error } = useMetrics(undefined, { refreshInterval });
 
   // Filter metrics based on search and category
@@ -157,21 +167,51 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
     );
   }, [data?.events, search]);
 
+  // Sorting logic helper
+  const sortData = <T extends Record<string, any>>(items: T[]) => {
+    if (!sortConfig.direction || !sortConfig.column) return items;
+
+    return [...items].sort((a, b) => {
+      const aValue = a[sortConfig.column];
+      const bValue = b[sortConfig.column];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortConfig.direction === "asc" ? comparison : -comparison;
+    });
+  };
+
+  const sortedMetrics = useMemo(
+    () => sortData(filteredMetrics),
+    [filteredMetrics, sortConfig]
+  );
+  const sortedAsyncMetrics = useMemo(
+    () => sortData(filteredAsyncMetrics),
+    [filteredAsyncMetrics, sortConfig]
+  );
+  const sortedEvents = useMemo(
+    () => sortData(filteredEvents),
+    [filteredEvents, sortConfig]
+  );
+
   // Paginated data
   const paginatedMetrics = useMemo(() => {
     const start = (metricsPage - 1) * pageSize;
-    return filteredMetrics.slice(start, start + pageSize);
-  }, [filteredMetrics, metricsPage, pageSize]);
+    return sortedMetrics.slice(start, start + pageSize);
+  }, [sortedMetrics, metricsPage, pageSize]);
 
   const paginatedAsyncMetrics = useMemo(() => {
     const start = (asyncPage - 1) * pageSize;
-    return filteredAsyncMetrics.slice(start, start + pageSize);
-  }, [filteredAsyncMetrics, asyncPage, pageSize]);
+    return sortedAsyncMetrics.slice(start, start + pageSize);
+  }, [sortedAsyncMetrics, asyncPage, pageSize]);
 
   const paginatedEvents = useMemo(() => {
     const start = (eventsPage - 1) * pageSize;
-    return filteredEvents.slice(start, start + pageSize);
-  }, [filteredEvents, eventsPage, pageSize]);
+    return sortedEvents.slice(start, start + pageSize);
+  }, [sortedEvents, eventsPage, pageSize]);
 
   // Total pages
   const metricsTotalPages = Math.ceil(filteredMetrics.length / pageSize);
@@ -201,7 +241,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full flex flex-col">
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -236,7 +276,11 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
       </div>
 
       {/* Sub-tabs */}
-      <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
+      <Tabs
+        value={activeSubTab}
+        onValueChange={setActiveSubTab}
+        className="flex-1 flex flex-col min-h-0"
+      >
         <TabsList>
           <TabsTrigger value="metrics">
             Metrics ({filteredMetrics.length})
@@ -249,15 +293,50 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="metrics" className="mt-4">
-          <div className="rounded-md border">
+        <TabsContent
+          value="metrics"
+          className="mt-4 flex-1 min-h-0 flex flex-col"
+        >
+          <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Metric</TableHead>
-                  <TableHead className="w-[100px]">Category</TableHead>
-                  <TableHead className="w-[120px] text-right">Value</TableHead>
-                  <TableHead>Description</TableHead>
+                  <SortableTableHead
+                    className="w-[250px]"
+                    currentSort={
+                      sortConfig.column === "metric"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("metric", dir)}
+                  >
+                    Metric
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="w-[100px]"
+                    currentSort={
+                      sortConfig.column === "category"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("category", dir)}
+                  >
+                    Category
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="w-[120px] text-right"
+                    currentSort={
+                      sortConfig.column === "value"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("value", dir)}
+                  >
+                    Value
+                  </SortableTableHead>
+                  <SortableTableHead sortable={false}>
+                    Description
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -312,25 +391,52 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 )}
               </TableBody>
             </Table>
-            <PaginationControls
-              page={metricsPage}
-              totalPages={metricsTotalPages}
-              totalItems={filteredMetrics.length}
-              pageSize={pageSize}
-              onPageChange={setMetricsPage}
-              onPageSizeChange={setPageSize}
-            />
+            <div className="p-4 border-t">
+              <PaginationControls
+                page={metricsPage}
+                totalPages={metricsTotalPages}
+                totalItems={filteredMetrics.length}
+                pageSize={pageSize}
+                onPageChange={setMetricsPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="async" className="mt-4">
-          <div className="rounded-md border">
+        <TabsContent
+          value="async"
+          className="mt-4 flex-1 min-h-0 flex flex-col"
+        >
+          <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Metric</TableHead>
-                  <TableHead className="w-[150px] text-right">Value</TableHead>
-                  <TableHead>Description</TableHead>
+                  <SortableTableHead
+                    className="w-[300px]"
+                    currentSort={
+                      sortConfig.column === "metric"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("metric", dir)}
+                  >
+                    Metric
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="w-[150px] text-right"
+                    currentSort={
+                      sortConfig.column === "value"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("value", dir)}
+                  >
+                    Value
+                  </SortableTableHead>
+                  <SortableTableHead sortable={false}>
+                    Description
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -374,25 +480,52 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 )}
               </TableBody>
             </Table>
-            <PaginationControls
-              page={asyncPage}
-              totalPages={asyncTotalPages}
-              totalItems={filteredAsyncMetrics.length}
-              pageSize={pageSize}
-              onPageChange={setAsyncPage}
-              onPageSizeChange={setPageSize}
-            />
+            <div className="p-4 border-t">
+              <PaginationControls
+                page={asyncPage}
+                totalPages={asyncTotalPages}
+                totalItems={filteredAsyncMetrics.length}
+                pageSize={pageSize}
+                onPageChange={setAsyncPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="events" className="mt-4">
-          <div className="rounded-md border">
+        <TabsContent
+          value="events"
+          className="mt-4 flex-1 min-h-0 flex flex-col"
+        >
+          <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Event</TableHead>
-                  <TableHead className="w-[150px] text-right">Count</TableHead>
-                  <TableHead>Description</TableHead>
+                  <SortableTableHead
+                    className="w-[300px]"
+                    currentSort={
+                      sortConfig.column === "event"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("event", dir)}
+                  >
+                    Event
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="w-[150px] text-right"
+                    currentSort={
+                      sortConfig.column === "value"
+                        ? sortConfig.direction
+                        : null
+                    }
+                    onSort={(dir) => updateSort("value", dir)}
+                  >
+                    Count
+                  </SortableTableHead>
+                  <SortableTableHead sortable={false}>
+                    Description
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -436,14 +569,16 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 )}
               </TableBody>
             </Table>
-            <PaginationControls
-              page={eventsPage}
-              totalPages={eventsTotalPages}
-              totalItems={filteredEvents.length}
-              pageSize={pageSize}
-              onPageChange={setEventsPage}
-              onPageSizeChange={setPageSize}
-            />
+            <div className="p-4 border-t">
+              <PaginationControls
+                page={eventsPage}
+                totalPages={eventsTotalPages}
+                totalItems={filteredEvents.length}
+                pageSize={pageSize}
+                onPageChange={setEventsPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
           </div>
         </TabsContent>
       </Tabs>

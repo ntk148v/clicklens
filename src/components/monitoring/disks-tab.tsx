@@ -6,15 +6,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  StatCard,
-  PaginationControls,
-  TruncatedCell,
-} from "@/components/monitoring";
+import { StatCard, PaginationControls } from "@/components/monitoring";
+import { TruncatedCell } from "@/components/ui/truncated-cell";
 import { StatusBadge } from "@/components/monitoring";
 import { Badge } from "@/components/ui/badge";
 import { useDisks, formatBytes } from "@/lib/hooks/use-monitoring";
@@ -56,12 +53,42 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(
+    "usedPercentage"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedDisks = useMemo(() => {
+    if (!data?.disks) return [];
+
+    return [...data.disks].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.disks, sortColumn, sortDirection]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
+
   // Paginate disks
   const paginatedDisks = useMemo(() => {
-    if (!data?.disks) return [];
     const start = (page - 1) * pageSize;
-    return data.disks.slice(start, start + pageSize);
-  }, [data?.disks, page, pageSize]);
+    return sortedDisks.slice(start, start + pageSize);
+  }, [sortedDisks, page, pageSize]);
 
   const totalPages = useMemo(() => {
     if (!data?.disks) return 0;
@@ -92,7 +119,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
   const isMultiNode = data?.nodes && data.nodes.length > 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-full flex flex-col">
       {/* Cluster info banner */}
       {data?.clusterName && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -166,151 +193,221 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
       )}
 
       {/* Disks Table */}
-      <div className="rounded-md border">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {isMultiNode && <TableHead>Node</TableHead>}
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Path</TableHead>
-                <TableHead className="w-[180px]">Usage</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Used</TableHead>
-                <TableHead className="text-right">Free</TableHead>
-                <TableHead className="text-right">Compressed</TableHead>
-                <TableHead className="text-right">Ratio</TableHead>
-                <TableHead className="text-right">Parts</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {isMultiNode && (
-                      <TableCell>
-                        <div className="h-4 w-20 bg-muted animate-pulse rounded" />
-                      </TableCell>
-                    )}
+      <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {isMultiNode && (
+                <SortableTableHead
+                  currentSort={sortColumn === "node" ? sortDirection : null}
+                  onSort={(dir) => updateSort("node", dir)}
+                >
+                  Node
+                </SortableTableHead>
+              )}
+              <SortableTableHead
+                currentSort={sortColumn === "name" ? sortDirection : null}
+                onSort={(dir) => updateSort("name", dir)}
+              >
+                Name
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "type" ? sortDirection : null}
+                onSort={(dir) => updateSort("type", dir)}
+              >
+                Type
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "path" ? sortDirection : null}
+                onSort={(dir) => updateSort("path", dir)}
+              >
+                Path
+              </SortableTableHead>
+              <SortableTableHead
+                className="w-[180px]"
+                currentSort={
+                  sortColumn === "usedPercentage" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("usedPercentage", dir)}
+              >
+                Usage
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "totalSpace" ? sortDirection : null}
+                onSort={(dir) => updateSort("totalSpace", dir)}
+              >
+                Total
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "usedSpace" ? sortDirection : null}
+                onSort={(dir) => updateSort("usedSpace", dir)}
+              >
+                Used
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "freeSpace" ? sortDirection : null}
+                onSort={(dir) => updateSort("freeSpace", dir)}
+              >
+                Free
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "compressedBytes" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("compressedBytes", dir)}
+              >
+                Compressed
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "compressionRatio" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("compressionRatio", dir)}
+              >
+                Ratio
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "partsCount" ? sortDirection : null}
+                onSort={(dir) => updateSort("partsCount", dir)}
+              >
+                Parts
+              </SortableTableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  {isMultiNode && (
                     <TableCell>
                       <div className="h-4 w-20 bg-muted animate-pulse rounded" />
                     </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-16 bg-muted animate-pulse rounded" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-full bg-muted animate-pulse rounded" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : paginatedDisks.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={isMultiNode ? 11 : 10}
-                    className="text-center text-muted-foreground"
-                  >
-                    No disks found
+                  )}
+                  <TableCell>
+                    <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-full bg-muted animate-pulse rounded" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-16 bg-muted animate-pulse rounded ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" />
                   </TableCell>
                 </TableRow>
-              ) : (
-                paginatedDisks.map((disk, idx) => (
-                  <TableRow key={`${disk.node}-${disk.name}-${idx}`}>
-                    {isMultiNode && (
-                      <TableCell>
-                        <TruncatedCell value={disk.node} maxWidth={100} />
-                      </TableCell>
-                    )}
-                    <TableCell className="font-mono font-medium">
-                      {disk.name}
-                    </TableCell>
+              ))
+            ) : paginatedDisks.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={isMultiNode ? 11 : 10}
+                  className="text-center text-muted-foreground"
+                >
+                  No disks found
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedDisks.map((disk, idx) => (
+                <TableRow key={`${disk.node}-${disk.name}-${idx}`}>
+                  {isMultiNode && (
                     <TableCell>
-                      <span className="text-xs px-2 py-1 rounded-full bg-muted">
-                        {disk.type}
-                      </span>
+                      <TruncatedCell value={disk.node} maxWidth={100} />
                     </TableCell>
-                    <TableCell>
-                      <TruncatedCell
-                        value={disk.path}
-                        maxWidth={150}
-                        className="text-muted-foreground"
+                  )}
+                  <TableCell className="font-mono font-medium">
+                    {disk.name}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs px-2 py-1 rounded-full bg-muted">
+                      {disk.type}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <TruncatedCell
+                      value={disk.path}
+                      maxWidth={150}
+                      className="text-muted-foreground"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <DiskUsageBar
+                        percentage={disk.usedPercentage || 0}
+                        className="flex-1"
                       />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <DiskUsageBar
-                          percentage={disk.usedPercentage || 0}
-                          className="flex-1"
-                        />
-                        <span
-                          className={`text-xs font-mono w-12 text-right ${
-                            (disk.usedPercentage || 0) >= 90
-                              ? "text-red-500"
-                              : (disk.usedPercentage || 0) >= 75
-                              ? "text-yellow-500"
-                              : ""
-                          }`}
-                        >
-                          {disk.usedPercentage || 0}%
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatBytes(disk.totalSpace)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatBytes(disk.usedSpace)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatBytes(disk.freeSpace)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {disk.compressedBytes
-                        ? formatBytes(disk.compressedBytes)
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatCompressionRatio(disk.compressionRatio)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {disk.partsCount?.toLocaleString() || "-"}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                      <span
+                        className={`text-xs font-mono w-12 text-right ${
+                          (disk.usedPercentage || 0) >= 90
+                            ? "text-red-500"
+                            : (disk.usedPercentage || 0) >= 75
+                            ? "text-yellow-500"
+                            : ""
+                        }`}
+                      >
+                        {disk.usedPercentage || 0}%
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatBytes(disk.totalSpace)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatBytes(disk.usedSpace)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatBytes(disk.freeSpace)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {disk.compressedBytes
+                      ? formatBytes(disk.compressedBytes)
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatCompressionRatio(disk.compressionRatio)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {disk.partsCount?.toLocaleString() || "-"}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
         {/* Pagination */}
-        <PaginationControls
-          page={page}
-          totalPages={totalPages}
-          totalItems={data?.disks.length || 0}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        <div className="p-4 border-t">
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={data?.disks.length || 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </div>
 
       {/* Info */}

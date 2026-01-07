@@ -15,22 +15,18 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   Copy,
   Download,
 } from "lucide-react";
@@ -129,20 +125,6 @@ export function ResultGrid({
           >
             {col.type}
           </Badge>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 ml-auto"
-            onClick={() => column.toggleSorting()}
-          >
-            {column.getIsSorted() === "asc" ? (
-              <ArrowUp className="h-3 w-3" />
-            ) : column.getIsSorted() === "desc" ? (
-              <ArrowDown className="h-3 w-3" />
-            ) : (
-              <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-            )}
-          </Button>
         </div>
       ),
       cell: ({ getValue }) => {
@@ -271,45 +253,50 @@ export function ResultGrid({
       )}
 
       {/* Table */}
-      <ScrollArea className="flex-1">
-        <Table>
-          <TableHeader className="sticky top-0 bg-background z-10">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className="font-semibold whitespace-nowrap"
-                    style={{ width: header.getSize() }}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="hover:bg-muted/50">
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    key={cell.id}
-                    className="py-1.5 px-4 font-mono text-sm"
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="hover:bg-transparent">
+              {headerGroup.headers.map((header) => (
+                <SortableTableHead
+                  key={header.id}
+                  className="whitespace-nowrap"
+                  style={{ width: header.getSize() }}
+                  sortable={header.column.getCanSort()}
+                  currentSort={
+                    header.column.getIsSorted() as "asc" | "desc" | null
+                  }
+                  onSort={(dir) => {
+                    if (!dir) header.column.clearSorting();
+                    else header.column.toggleSorting(dir === "desc");
+                  }}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                </SortableTableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id} className="hover:bg-muted/50">
+              {row.getVisibleCells().map((cell) => (
+                <TableCell
+                  key={cell.id}
+                  className="py-1.5 px-4 font-mono text-sm"
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
       {/* Pagination */}
       <PaginationControls

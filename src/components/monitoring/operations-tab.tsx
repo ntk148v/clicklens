@@ -5,10 +5,11 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useState, useMemo } from "react";
 import { StatCard } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
 import {
@@ -46,6 +47,52 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
   const { data, isLoading, error, refetch } = useOperations({
     refreshInterval,
   });
+
+  // Sorting state for Merges
+  const [mergeSort, setMergeSort] = useState<{
+    col: string;
+    dir: "asc" | "desc" | null;
+  }>({ col: "elapsed", dir: "desc" });
+  // Sorting state for Mutations
+  const [mutationSort, setMutationSort] = useState<{
+    col: string;
+    dir: "asc" | "desc" | null;
+  }>({ col: "createTime", dir: "desc" });
+
+  const updateMergeSort = (col: string, dir: "asc" | "desc" | null) =>
+    setMergeSort({ col, dir });
+  const updateMutationSort = (col: string, dir: "asc" | "desc" | null) =>
+    setMutationSort({ col, dir });
+
+  const sortedMerges = useMemo(() => {
+    if (!data?.merges) return [];
+    return [...data.merges].sort((a, b) => {
+      if (!mergeSort.dir) return 0;
+      const aVal = (a as any)[mergeSort.col];
+      const bVal = (b as any)[mergeSort.col];
+      if (aVal === bVal) return 0;
+      const cmp = (aVal ?? 0) < (bVal ?? 0) ? -1 : 1;
+      return mergeSort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [data?.merges, mergeSort]);
+
+  const sortedMutations = useMemo(() => {
+    if (!data?.mutations) return [];
+    return [...data.mutations].sort((a, b) => {
+      if (!mutationSort.dir) return 0;
+      const aVal = (a as any)[mutationSort.col];
+      const bVal = (b as any)[mutationSort.col];
+      if (aVal === bVal) return 0;
+      // Handle strings safely
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return mutationSort.dir === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      const cmp = (aVal ?? 0) < (bVal ?? 0) ? -1 : 1;
+      return mutationSort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [data?.mutations, mutationSort]);
 
   if (error) {
     return (
@@ -122,21 +169,79 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
             <GitMerge className="w-5 h-5" />
             Active Merges
           </h3>
-          <div className="rounded-md border">
+          <div className="rounded-md border h-[400px] flex flex-col overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Database.Table</TableHead>
-                  <TableHead>Result Part</TableHead>
-                  <TableHead className="text-center">Parts</TableHead>
-                  <TableHead className="w-[150px]">Progress</TableHead>
-                  <TableHead className="text-right">Elapsed</TableHead>
-                  <TableHead className="text-right">Size</TableHead>
-                  <TableHead className="text-right">Memory</TableHead>
+                  <SortableTableHead
+                    currentSort={
+                      mergeSort.col === "table" ? mergeSort.dir : null
+                    }
+                    onSort={(dir) => updateMergeSort("table", dir)}
+                  >
+                    Database.Table
+                  </SortableTableHead>
+                  <SortableTableHead
+                    currentSort={
+                      mergeSort.col === "resultPartName" ? mergeSort.dir : null
+                    }
+                    onSort={(dir) => updateMergeSort("resultPartName", dir)}
+                  >
+                    Result Part
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-center"
+                    currentSort={
+                      mergeSort.col === "numParts" ? mergeSort.dir : null
+                    }
+                    onSort={(dir) => updateMergeSort("numParts", dir)}
+                  >
+                    Parts
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="w-[150px]"
+                    currentSort={
+                      mergeSort.col === "progress" ? mergeSort.dir : null
+                    }
+                    onSort={(dir) => updateMergeSort("progress", dir)}
+                  >
+                    Progress
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right"
+                    currentSort={
+                      mergeSort.col === "elapsed" ? mergeSort.dir : null
+                    }
+                    onSort={(dir) => updateMergeSort("elapsed", dir)}
+                  >
+                    Elapsed
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right"
+                    currentSort={
+                      mergeSort.col === "totalSizeBytesCompressed"
+                        ? mergeSort.dir
+                        : null
+                    }
+                    onSort={(dir) =>
+                      updateMergeSort("totalSizeBytesCompressed", dir)
+                    }
+                  >
+                    Size
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right"
+                    currentSort={
+                      mergeSort.col === "memoryUsage" ? mergeSort.dir : null
+                    }
+                    onSort={(dir) => updateMergeSort("memoryUsage", dir)}
+                  >
+                    Memory
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.merges.map((m, i) => (
+                {sortedMerges.map((m, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-mono text-sm">
                       <TruncatedCell
@@ -187,20 +292,62 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
             <Scissors className="w-5 h-5" />
             Active Mutations
           </h3>
-          <div className="rounded-md border">
+          <div className="rounded-md border h-[400px] flex flex-col overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Database.Table</TableHead>
-                  <TableHead>Mutation ID</TableHead>
-                  <TableHead>Command</TableHead>
-                  <TableHead className="text-center">Parts To Do</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <SortableTableHead
+                    currentSort={
+                      mutationSort.col === "table" ? mutationSort.dir : null
+                    }
+                    onSort={(dir) => updateMutationSort("table", dir)}
+                  >
+                    Database.Table
+                  </SortableTableHead>
+                  <SortableTableHead
+                    currentSort={
+                      mutationSort.col === "mutationId"
+                        ? mutationSort.dir
+                        : null
+                    }
+                    onSort={(dir) => updateMutationSort("mutationId", dir)}
+                  >
+                    Mutation ID
+                  </SortableTableHead>
+                  <SortableTableHead
+                    currentSort={
+                      mutationSort.col === "command" ? mutationSort.dir : null
+                    }
+                    onSort={(dir) => updateMutationSort("command", dir)}
+                  >
+                    Command
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-center"
+                    currentSort={
+                      mutationSort.col === "partsToDo" ? mutationSort.dir : null
+                    }
+                    onSort={(dir) => updateMutationSort("partsToDo", dir)}
+                  >
+                    Parts To Do
+                  </SortableTableHead>
+                  <SortableTableHead className="text-center" sortable={false}>
+                    Status
+                  </SortableTableHead>
+                  <SortableTableHead
+                    currentSort={
+                      mutationSort.col === "createTime"
+                        ? mutationSort.dir
+                        : null
+                    }
+                    onSort={(dir) => updateMutationSort("createTime", dir)}
+                  >
+                    Created
+                  </SortableTableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.mutations.map((m, i) => (
+                {sortedMutations.map((m, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-mono text-sm">
                       <TruncatedCell

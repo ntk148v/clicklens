@@ -6,7 +6,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -14,6 +14,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaginationControls } from "@/components/monitoring";
 import { useTableMutations } from "@/lib/hooks/use-table-explorer";
+import { TruncatedCell } from "@/components/ui/truncated-cell";
+
+type Mutation = {
+  mutation_id: string;
+  command: string;
+  create_time: string;
+  parts_to_do: number;
+  is_done: number;
+  latest_fail_reason: string;
+  block_numbers: { count: number };
+};
 
 interface MutationsTabProps {
   database: string;
@@ -27,11 +38,42 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const paginatedMutations = useMemo(() => {
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(
+    "create_time"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedMutations = useMemo(() => {
     if (!data?.mutations) return [];
+
+    return [...data.mutations].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      // Type safety hack: assume keys exist
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.mutations, sortColumn, sortDirection]);
+
+  const paginatedMutations = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return data.mutations.slice(start, start + pageSize);
-  }, [data?.mutations, page, pageSize]);
+    return sortedMutations.slice(start, start + pageSize);
+  }, [sortedMutations, page, pageSize]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   const totalPages = useMemo(() => {
     if (!data?.mutations) return 0;
@@ -64,7 +106,7 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -117,16 +159,48 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
       </div>
 
       {/* Mutations Table */}
-      <Card>
-        <div className="overflow-auto">
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-hidden relative">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Mutation ID</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Parts To Do</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="min-w-[300px]">Command</TableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "mutation_id" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("mutation_id", dir)}
+                >
+                  Mutation ID
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "is_done" ? sortDirection : null}
+                  onSort={(dir) => updateSort("is_done", dir)}
+                >
+                  Status
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "parts_to_do" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("parts_to_do", dir)}
+                >
+                  Parts To Do
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "create_time" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("create_time", dir)}
+                >
+                  Created
+                </SortableTableHead>
+                <SortableTableHead
+                  className="min-w-[300px]"
+                  currentSort={sortColumn === "command" ? sortDirection : null}
+                  onSort={(dir) => updateSort("command", dir)}
+                >
+                  Command
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -163,9 +237,11 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
                       {new Date(mutation.create_time).toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono block truncate max-w-[400px]">
-                        {mutation.command}
-                      </code>
+                      <TruncatedCell
+                        value={mutation.command}
+                        maxWidth={400}
+                        className="bg-muted px-2 py-1 rounded"
+                      />
                       {isFailed && (
                         <div className="text-xs text-red-500 mt-1">
                           Error: {mutation.latest_fail_reason}

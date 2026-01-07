@@ -6,7 +6,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -28,11 +28,41 @@ export function PartsTab({ database, table }: PartsTabProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const paginatedParts = useMemo(() => {
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(
+    "modification_time"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedParts = useMemo(() => {
     if (!data?.parts) return [];
+
+    return [...data.parts].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.parts, sortColumn, sortDirection]);
+
+  const paginatedParts = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return data.parts.slice(start, start + pageSize);
-  }, [data?.parts, page, pageSize]);
+    return sortedParts.slice(start, start + pageSize);
+  }, [sortedParts, page, pageSize]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   const totalPages = useMemo(() => {
     if (!data?.parts) return 0;
@@ -65,7 +95,7 @@ export function PartsTab({ database, table }: PartsTabProps) {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
@@ -121,18 +151,66 @@ export function PartsTab({ database, table }: PartsTabProps) {
       </div>
 
       {/* Parts Table */}
-      <Card>
-        <div className="overflow-auto">
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-hidden relative">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Partition</TableHead>
-                <TableHead>Part Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Rows</TableHead>
-                <TableHead className="text-right">Size</TableHead>
-                <TableHead className="text-right">Compression</TableHead>
-                <TableHead>Modified</TableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "partition" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("partition", dir)}
+                >
+                  Partition
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "name" ? sortDirection : null}
+                  onSort={(dir) => updateSort("name", dir)}
+                >
+                  Part Name
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "part_type" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("part_type", dir)}
+                >
+                  Type
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={sortColumn === "rows" ? sortDirection : null}
+                  onSort={(dir) => updateSort("rows", dir)}
+                >
+                  Rows
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "bytes_on_disk" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("bytes_on_disk", dir)}
+                >
+                  Size
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "compression_ratio" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("compression_ratio", dir)}
+                >
+                  Compression
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "modification_time" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("modification_time", dir)}
+                >
+                  Modified
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

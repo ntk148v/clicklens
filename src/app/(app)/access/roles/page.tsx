@@ -8,7 +8,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -132,6 +132,17 @@ export default function RolesPage() {
   // Pagination for user roles
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "asc"
+  );
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   // Protect route
   useEffect(() => {
@@ -428,7 +439,21 @@ export default function RolesPage() {
   const featureRoles = roles.filter((r) => r.isFeatureRole);
   const userRoles = roles.filter((r) => !r.isFeatureRole);
 
-  const paginatedUserRoles = userRoles.slice(
+  const sortedUserRoles = useMemo(() => {
+    return [...userRoles].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [userRoles, sortColumn, sortDirection]);
+
+  const paginatedUserRoles = sortedUserRoles.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -444,26 +469,9 @@ export default function RolesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Access Control">
-        <Tabs defaultValue="roles" className="ml-4">
-          <TabsList className="h-8">
-            <TabsTrigger value="users" className="text-xs" asChild>
-              <Link href="/access/users">
-                <Users className="w-3.5 h-3.5 mr-1" />
-                Users
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="text-xs" asChild>
-              <Link href="/access/roles">
-                <Shield className="w-3.5 h-3.5 mr-1" />
-                Roles
-              </Link>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </Header>
+      <Header title="Roles"></Header>
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6 h-full flex flex-col overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -521,7 +529,7 @@ export default function RolesPage() {
             <Separator />
 
             {/* User Roles Section */}
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold">Custom Roles</h2>
@@ -551,15 +559,32 @@ export default function RolesPage() {
                 </div>
               </div>
 
-              <Card>
-                <div className="rounded-md border">
+              <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none">
+                <div className="flex-1 border rounded-md overflow-hidden relative">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[180px]">Role Name</TableHead>
-                        <TableHead>Inherited Roles</TableHead>
-                        <TableHead>Data Access</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
+                        <SortableTableHead
+                          className="w-[180px]"
+                          currentSort={
+                            sortColumn === "name" ? sortDirection : null
+                          }
+                          onSort={(dir) => updateSort("name", dir)}
+                        >
+                          Role Name
+                        </SortableTableHead>
+                        <SortableTableHead sortable={false}>
+                          Inherited Roles
+                        </SortableTableHead>
+                        <SortableTableHead sortable={false}>
+                          Data Access
+                        </SortableTableHead>
+                        <SortableTableHead
+                          className="w-[100px]"
+                          sortable={false}
+                        >
+                          Actions
+                        </SortableTableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
