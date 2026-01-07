@@ -20,6 +20,9 @@ import {
   HeartPulse,
   HardDrive,
   LayoutDashboard,
+  Zap,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,6 +82,34 @@ const monitoringItems = [
   },
 ];
 
+// Queries sub-navigation items
+const queriesItems = [
+  {
+    name: "Running",
+    href: "/queries/running",
+    icon: Zap,
+    description: "Live running queries",
+  },
+  {
+    name: "History",
+    href: "/queries/history",
+    icon: Clock,
+    description: "Historical query log",
+  },
+  {
+    name: "Analytics",
+    href: "/queries/analytics",
+    icon: TrendingUp,
+    description: "Query performance analytics",
+  },
+  {
+    name: "Cache",
+    href: "/queries/cache",
+    icon: Database,
+    description: "Query cache status",
+  },
+];
+
 // Main navigation items with permission requirements
 const navigation = [
   {
@@ -97,10 +128,11 @@ const navigation = [
   },
   {
     name: "Queries",
-    href: "/monitoring/queries",
+    href: "/queries",
     icon: Activity,
     description: "Monitor running queries",
     requiresPermission: "canViewProcesses" as const,
+    subItems: queriesItems,
   },
   {
     name: "Monitoring",
@@ -122,10 +154,20 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [monitoringExpanded, setMonitoringExpanded] = useState(
-    pathname.startsWith("/monitoring")
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
+    () => ({
+      Monitoring: pathname.startsWith("/monitoring"),
+      Queries: pathname.startsWith("/queries"),
+    })
   );
   const { user, permissions, logout, isLoading } = useAuth();
+
+  const toggleExpanded = (name: string) => {
+    setExpandedItems((prev) => ({
+      ...prev,
+      [name]: !prev[name],
+    }));
+  };
 
   // Filter navigation based on permissions
   const visibleNavigation = navigation.filter((item) => {
@@ -159,10 +201,11 @@ export function Sidebar() {
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {visibleNavigation.map((item) => {
             const isActive = item.subItems
-              ? pathname.startsWith(item.href) && !pathname.includes("/queries")
+              ? pathname.startsWith(item.href)
               : pathname.startsWith(item.href);
             const Icon = item.icon;
             const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isExpanded = expandedItems[item.name];
 
             // If it's a monitoring item with sub-items
             if (hasSubItems) {
@@ -225,7 +268,7 @@ export function Sidebar() {
               return (
                 <div key={item.name} className="space-y-1">
                   <button
-                    onClick={() => setMonitoringExpanded(!monitoringExpanded)}
+                    onClick={() => toggleExpanded(item.name)}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full",
                       isActive
@@ -238,12 +281,12 @@ export function Sidebar() {
                     <ChevronDown
                       className={cn(
                         "w-4 h-4 transition-transform",
-                        monitoringExpanded && "rotate-180"
+                        isExpanded && "rotate-180"
                       )}
                     />
                   </button>
 
-                  {monitoringExpanded && (
+                  {isExpanded && (
                     <div className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
                       {item.subItems?.map((subItem) => {
                         const SubIcon = subItem.icon;

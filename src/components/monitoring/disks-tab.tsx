@@ -10,11 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  StatCard,
-  PaginationControls,
-  TruncatedCell,
-} from "@/components/monitoring";
+import { StatCard, PaginationControls } from "@/components/monitoring";
+import { TruncatedCell } from "@/components/ui/truncated-cell";
 import { StatusBadge } from "@/components/monitoring";
 import { Badge } from "@/components/ui/badge";
 import { useDisks, formatBytes } from "@/lib/hooks/use-monitoring";

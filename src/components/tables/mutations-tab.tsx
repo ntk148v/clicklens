@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaginationControls } from "@/components/monitoring";
 import { useTableMutations } from "@/lib/hooks/use-table-explorer";
+import { TruncatedCell } from "@/components/ui/truncated-cell";
 
 interface MutationsTabProps {
   database: string;
@@ -163,9 +164,11 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
                       {new Date(mutation.create_time).toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono block truncate max-w-[400px]">
-                        {mutation.command}
-                      </code>
+                      <TruncatedCell
+                        value={mutation.command}
+                        maxWidth={400}
+                        className="bg-muted px-2 py-1 rounded"
+                      />
                       {isFailed && (
                         <div className="text-xs text-red-500 mt-1">
                           Error: {mutation.latest_fail_reason}
