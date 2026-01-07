@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -127,73 +127,68 @@ export function TablePreview({ database, table }: TablePreviewProps) {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : previewTab === "structure" ? (
-          <ScrollArea className="h-full">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background">
-                <TableRow>
-                  <TableHead>Column</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Default</TableHead>
-                  <TableHead>Comment</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Column</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Default</TableHead>
+                <TableHead>Comment</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {columns.map((col) => (
+                <TableRow key={col.name}>
+                  <TableCell className="font-mono font-medium">
+                    {col.name}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {col.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {col.default_kind ? (
+                      <code>
+                        {col.default_kind}: {col.default_expression}
+                      </code>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {col.comment || "—"}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {columns.map((col) => (
-                  <TableRow key={col.name}>
-                    <TableCell className="font-mono font-medium">
-                      {col.name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono text-xs">
-                        {col.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {col.default_kind ? (
-                        <code>
-                          {col.default_kind}: {col.default_expression}
-                        </code>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {col.comment || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
-          <ScrollArea className="h-full">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background">
-                <TableRow>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {meta.map((col) => (
+                  <TableHead key={col.name} className="whitespace-nowrap">
+                    {col.name}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedData.map((row, i) => (
+                <TableRow key={i}>
                   {meta.map((col) => (
-                    <TableHead key={col.name} className="whitespace-nowrap">
-                      {col.name}
-                    </TableHead>
+                    <TableCell
+                      key={col.name}
+                      className="font-mono text-xs max-w-[200px] truncate"
+                    >
+                      {formatCellValue(row[col.name])}
+                    </TableCell>
                   ))}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedData.map((row, i) => (
-                  <TableRow key={i}>
-                    {meta.map((col) => (
-                      <TableCell
-                        key={col.name}
-                        className="font-mono text-xs max-w-[200px] truncate"
-                      >
-                        {formatCellValue(row[col.name])}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 

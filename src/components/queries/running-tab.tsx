@@ -6,8 +6,9 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
+  TableHead,
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -25,11 +26,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useRunningQueries } from "@/lib/hooks/use-query-analytics";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
-import { SortableHeader, SortDirection } from "@/components/ui/sortable-header";
 import type { RunningQuery } from "@/lib/hooks/use-query-analytics";
 
 interface RunningTabProps {
@@ -43,7 +42,9 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    null
+  );
 
   const sortedQueries = data
     ? [...data].sort((a, b) => {
@@ -61,7 +62,7 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
       })
     : [];
 
-  const handleSort = (column: string, direction: SortDirection) => {
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
     setSortColumn(column);
     setSortDirection(direction);
   };
@@ -139,135 +140,115 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
       {/* Queries Table */}
       <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
         <div className="flex-1 border rounded-md overflow-hidden relative">
-          <ScrollArea className="h-[600px]">
-            <div className="min-w-max">
-              <Table>
-                <TableHeader className="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
-                  <TableRow>
-                    <TableHead className="min-w-[300px]">
-                      <SortableHeader
-                        column="query"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                      >
-                        Query
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader
-                        column="user"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                      >
-                        User
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader
-                        column="elapsed"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                        className="ml-auto"
-                      >
-                        Elapsed
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader
-                        column="read_bytes"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                        className="ml-auto"
-                      >
-                        Read
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader
-                        column="memory_usage"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                        className="ml-auto"
-                      >
-                        Memory
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead className="w-[80px]">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedQueries.map((query) => (
-                    <TableRow key={query.query_id}>
-                      <TableCell>
-                        <TruncatedCell
-                          value={query.query}
-                          maxWidth={400}
-                          className="bg-muted px-2 py-1 rounded"
-                        />
-                        <span className="text-xs text-muted-foreground mt-1 block">
-                          ID: {query.query_id.slice(0, 8)}...
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          {query.user}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {query.elapsed.toFixed(2)}s
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatBytes(query.read_bytes)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatBytes(query.memory_usage)}
-                      </TableCell>
-                      <TableCell>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={killingId === query.query_id}
-                            >
-                              {killingId === query.query_id ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <XOctagon className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Kill Query?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will terminate the query immediately. This
-                                action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleKillQuery(query.query_id)}
-                              >
-                                Kill Query
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead
+                  className="min-w-[300px]"
+                  currentSort={sortColumn === "query" ? sortDirection : null}
+                  onSort={(dir) => updateSort("query", dir)}
+                >
+                  Query
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "user" ? sortDirection : null}
+                  onSort={(dir) => updateSort("user", dir)}
+                >
+                  User
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right ml-auto"
+                  currentSort={sortColumn === "elapsed" ? sortDirection : null}
+                  onSort={(dir) => updateSort("elapsed", dir)}
+                >
+                  Elapsed
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right ml-auto"
+                  currentSort={
+                    sortColumn === "read_bytes" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("read_bytes", dir)}
+                >
+                  Read
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right ml-auto"
+                  currentSort={
+                    sortColumn === "memory_usage" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("memory_usage", dir)}
+                >
+                  Memory
+                </SortableTableHead>
+                <TableHead className="w-[80px]">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedQueries.map((query) => (
+                <TableRow key={query.query_id}>
+                  <TableCell>
+                    <TruncatedCell
+                      value={query.query}
+                      maxWidth={400}
+                      className="bg-muted px-2 py-1 rounded"
+                    />
+                    <span className="text-xs text-muted-foreground mt-1 block">
+                      ID: {query.query_id.slice(0, 8)}...
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-xs">
+                      {query.user}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {query.elapsed.toFixed(2)}s
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatBytes(query.read_bytes)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatBytes(query.memory_usage)}
+                  </TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={killingId === query.query_id}
+                        >
+                          {killingId === query.query_id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <XOctagon className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Kill Query?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will terminate the query immediately. This
+                            action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleKillQuery(query.query_id)}
+                          >
+                            Kill Query
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </Card>
     </div>

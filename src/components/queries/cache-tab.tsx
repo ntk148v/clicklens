@@ -6,25 +6,26 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useQueryCache } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
-import { SortableHeader, SortDirection } from "@/components/ui/sortable-header";
 import type { QueryCacheEntry } from "@/lib/hooks/use-query-analytics";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export function CacheTab() {
   const { data, isLoading, error } = useQueryCache();
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    null
+  );
 
   const sortedEntries = data?.entries
     ? [...data.entries].sort((a, b) => {
@@ -42,7 +43,7 @@ export function CacheTab() {
       })
     : [];
 
-  const handleSort = (column: string, direction: SortDirection) => {
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
     setSortColumn(column);
     setSortDirection(direction);
   };
@@ -103,7 +104,7 @@ export function CacheTab() {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
@@ -143,96 +144,80 @@ export function CacheTab() {
       {/* Cache Entries Table */}
       <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
         <div className="flex-1 border rounded-md overflow-hidden relative">
-          <ScrollArea className="h-[600px]">
-            <div className="min-w-max">
-              <Table>
-                <TableHeader className="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
-                  <TableRow>
-                    <TableHead className="min-w-[300px]">
-                      <SortableHeader
-                        column="query"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                      >
-                        Query
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader
-                        column="result_size"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                        className="ml-auto"
-                      >
-                        Size
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader
-                        column="stale"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                      >
-                        Status
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader
-                        column="expires_at"
-                        sortedColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
-                      >
-                        Expires
-                      </SortableHeader>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedEntries.map((entry, idx) => (
-                    <TableRow key={entry.key_hash || idx}>
-                      <TableCell>
-                        <TruncatedCell
-                          value={entry.query}
-                          maxWidth={400}
-                          className="bg-muted px-2 py-1 rounded"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatBytes(entry.result_size)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {entry.stale === 1 && (
-                            <Badge variant="secondary" className="text-xs">
-                              Stale
-                            </Badge>
-                          )}
-                          {entry.compressed === 1 && (
-                            <Badge variant="outline" className="text-xs">
-                              Compressed
-                            </Badge>
-                          )}
-                          {entry.shared === 1 && (
-                            <Badge variant="outline" className="text-xs">
-                              Shared
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(entry.expires_at).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead
+                  className="min-w-[300px]"
+                  currentSort={sortColumn === "query" ? sortDirection : null}
+                  onSort={(dir) => updateSort("query", dir)}
+                >
+                  Query
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right ml-auto"
+                  currentSort={
+                    sortColumn === "result_size" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("result_size", dir)}
+                >
+                  Size
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "stale" ? sortDirection : null}
+                  onSort={(dir) => updateSort("stale", dir)}
+                >
+                  Status
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={
+                    sortColumn === "expires_at" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("expires_at", dir)}
+                >
+                  Expires
+                </SortableTableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedEntries.map((entry, idx) => (
+                <TableRow key={entry.key_hash || idx}>
+                  <TableCell>
+                    <TruncatedCell
+                      value={entry.query}
+                      maxWidth={400}
+                      className="bg-muted px-2 py-1 rounded"
+                    />
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatBytes(entry.result_size)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {entry.stale === 1 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Stale
+                        </Badge>
+                      )}
+                      {entry.compressed === 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          Compressed
+                        </Badge>
+                      )}
+                      {entry.shared === 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          Shared
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(entry.expires_at).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </Card>
     </div>

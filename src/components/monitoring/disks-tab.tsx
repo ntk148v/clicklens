@@ -6,7 +6,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -53,12 +53,42 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(
+    "usedPercentage"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedDisks = useMemo(() => {
+    if (!data?.disks) return [];
+
+    return [...data.disks].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.disks, sortColumn, sortDirection]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
+
   // Paginate disks
   const paginatedDisks = useMemo(() => {
-    if (!data?.disks) return [];
     const start = (page - 1) * pageSize;
-    return data.disks.slice(start, start + pageSize);
-  }, [data?.disks, page, pageSize]);
+    return sortedDisks.slice(start, start + pageSize);
+  }, [sortedDisks, page, pageSize]);
 
   const totalPages = useMemo(() => {
     if (!data?.disks) return 0;
@@ -168,17 +198,95 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                {isMultiNode && <TableHead>Node</TableHead>}
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Path</TableHead>
-                <TableHead className="w-[180px]">Usage</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Used</TableHead>
-                <TableHead className="text-right">Free</TableHead>
-                <TableHead className="text-right">Compressed</TableHead>
-                <TableHead className="text-right">Ratio</TableHead>
-                <TableHead className="text-right">Parts</TableHead>
+                {isMultiNode && (
+                  <SortableTableHead
+                    currentSort={sortColumn === "node" ? sortDirection : null}
+                    onSort={(dir) => updateSort("node", dir)}
+                  >
+                    Node
+                  </SortableTableHead>
+                )}
+                <SortableTableHead
+                  currentSort={sortColumn === "name" ? sortDirection : null}
+                  onSort={(dir) => updateSort("name", dir)}
+                >
+                  Name
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "type" ? sortDirection : null}
+                  onSort={(dir) => updateSort("type", dir)}
+                >
+                  Type
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "path" ? sortDirection : null}
+                  onSort={(dir) => updateSort("path", dir)}
+                >
+                  Path
+                </SortableTableHead>
+                <SortableTableHead
+                  className="w-[180px]"
+                  currentSort={
+                    sortColumn === "usedPercentage" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("usedPercentage", dir)}
+                >
+                  Usage
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "totalSpace" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("totalSpace", dir)}
+                >
+                  Total
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "usedSpace" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("usedSpace", dir)}
+                >
+                  Used
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "freeSpace" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("freeSpace", dir)}
+                >
+                  Free
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "compressedBytes" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("compressedBytes", dir)}
+                >
+                  Compressed
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "compressionRatio" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("compressionRatio", dir)}
+                >
+                  Ratio
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "partsCount" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("partsCount", dir)}
+                >
+                  Parts
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

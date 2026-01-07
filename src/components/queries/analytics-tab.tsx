@@ -13,27 +13,42 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useQueryAnalytics } from "@/lib/hooks/use-query-analytics";
-import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
+
+import {
+  useQueryAnalytics,
+  type ExpensiveQuery,
+} from "@/lib/hooks/use-query-analytics";
+import {
+  formatDuration,
+  formatBytes,
+  formatNumber,
+} from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
-import { SortableHeader, SortDirection } from "@/components/ui/sortable-header";
-import type { ExpensiveQuery } from "@/lib/hooks/use-query-analytics";
+import { PaginationControls } from "@/components/monitoring";
+
+const DEFAULT_PAGE_SIZE = 50;
 
 export function AnalyticsTab() {
   const [metric, setMetric] = useState<"duration" | "memory" | "read_bytes">(
     "duration"
   );
+
   // Sorting state
-  const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [sortColumn, setSortColumn] = useState<string | undefined>("count");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { data, isLoading, error } = useQueryAnalytics(metric);
 
@@ -53,7 +68,13 @@ export function AnalyticsTab() {
       })
     : [];
 
-  const handleSort = (column: string, direction: SortDirection) => {
+  const paginatedQueries = sortedQueries.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+  const totalPages = Math.ceil(sortedQueries.length / pageSize);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
     setSortColumn(column);
     setSortDirection(direction);
   };
@@ -77,20 +98,14 @@ export function AnalyticsTab() {
   if (!data) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-        <TrendingUp className="h-12 w-12 mb-4 opacity-50" />
+        <Clock className="h-12 w-12 mb-4 opacity-50" />
         <p>No analytics data available</p>
       </div>
     );
   }
 
-  const formatDuration = (ms: number) => {
-    if (ms < 1000) return `${ms.toFixed(0)} ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(2)} s`;
-    return `${(ms / 60000).toFixed(2)} min`;
-  };
-
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
@@ -159,7 +174,11 @@ export function AnalyticsTab() {
       </div>
 
       {/* Metric Tabs */}
-      <Tabs value={metric} onValueChange={(v) => setMetric(v as typeof metric)}>
+      <Tabs
+        value={metric}
+        onValueChange={(v) => setMetric(v as typeof metric)}
+        className="flex-1 flex flex-col overflow-hidden"
+      >
         <TabsList>
           <TabsTrigger value="duration">
             <Clock className="h-3 w-3 mr-1" />
@@ -175,138 +194,111 @@ export function AnalyticsTab() {
           </TabsTrigger>
         </TabsList>
 
-        <Card className="mt-4 flex-1 border-none shadow-none flex flex-col overflow-hidden">
+        <Card className="mt-4 flex-1 overflow-hidden border-none shadow-none flex flex-col">
           <CardHeader className="px-0">
             <CardTitle className="text-sm">
               Top Query Patterns (Last 7 Days)
             </CardTitle>
           </CardHeader>
           <div className="flex-1 border rounded-md overflow-hidden relative">
-            <ScrollArea className="h-[600px]">
-              <div className="min-w-max">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
-                    <TableRow>
-                      <TableHead className="min-w-[300px]">
-                        <SortableHeader
-                          column="query"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                        >
-                          Query Pattern
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead>
-                        <SortableHeader
-                          column="user"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                        >
-                          User
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader
-                          column="count"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                          className="ml-auto"
-                        >
-                          Count
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader
-                          column="avg_duration_ms"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                          className="ml-auto"
-                        >
-                          Avg Duration
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader
-                          column="max_duration_ms"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                          className="ml-auto"
-                        >
-                          Max Duration
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader
-                          column="avg_memory"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                          className="ml-auto"
-                        >
-                          Avg Memory
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader
-                          column="avg_read_bytes"
-                          sortedColumn={sortColumn}
-                          sortDirection={sortDirection}
-                          onSort={handleSort}
-                          className="ml-auto"
-                        >
-                          Avg Read
-                        </SortableHeader>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedQueries.map((query, idx) => (
-                      <TableRow key={query.normalized_query_hash || idx}>
-                        <TableCell>
-                          <TruncatedCell
-                            value={query.query}
-                            maxWidth={400}
-                            className="bg-muted px-2 py-1 rounded"
-                          />
-                          <span className="text-xs text-muted-foreground mt-1 block">
-                            Last run:{" "}
-                            {new Date(query.last_event_time).toLocaleString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {query.user}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {formatNumber(query.count)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {formatDuration(query.avg_duration_ms)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {formatDuration(query.max_duration_ms)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {formatBytes(query.avg_memory)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {formatBytes(query.avg_read_bytes)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableTableHead
+                    className="min-w-[400px]"
+                    currentSort={sortColumn === "query" ? sortDirection : null}
+                    onSort={(dir) => updateSort("query", dir)}
+                  >
+                    Query Pattern
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="min-w-[100px]"
+                    currentSort={sortColumn === "user" ? sortDirection : null}
+                    onSort={(dir) => updateSort("user", dir)}
+                  >
+                    User
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right ml-auto"
+                    currentSort={sortColumn === "count" ? sortDirection : null}
+                    onSort={(dir) => updateSort("count", dir)}
+                  >
+                    Count
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right ml-auto"
+                    currentSort={
+                      sortColumn === "avg_duration_ms" ? sortDirection : null
+                    }
+                    onSort={(dir) => updateSort("avg_duration_ms", dir)}
+                  >
+                    Avg Duration
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right ml-auto"
+                    currentSort={
+                      sortColumn === "avg_read_bytes" ? sortDirection : null
+                    }
+                    onSort={(dir) => updateSort("avg_read_bytes", dir)}
+                  >
+                    Avg Read Bytes
+                  </SortableTableHead>
+                  <SortableTableHead
+                    className="text-right ml-auto"
+                    currentSort={
+                      sortColumn === "avg_memory" ? sortDirection : null
+                    }
+                    onSort={(dir) => updateSort("avg_memory", dir)}
+                  >
+                    Avg Memory
+                  </SortableTableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedQueries.map((query, idx) => (
+                  <TableRow key={query.normalized_query_hash || idx}>
+                    <TableCell>
+                      <TruncatedCell
+                        value={query.query}
+                        maxWidth={400}
+                        className="bg-muted px-2 py-1 rounded"
+                      />
+                      <span className="text-xs text-muted-foreground mt-1 block">
+                        Last run:{" "}
+                        {new Date(query.last_event_time).toLocaleString()}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {query.user}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatNumber(query.count)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatDuration(query.avg_duration_ms)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatBytes(query.avg_read_bytes)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatBytes(query.avg_memory)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </Card>
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          totalItems={sortedQueries.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </Tabs>
     </div>
   );

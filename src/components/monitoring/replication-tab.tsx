@@ -5,7 +5,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -31,12 +31,42 @@ export function ReplicationTab({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(
+    "absoluteDelay"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedReplicas = useMemo(() => {
+    if (!data?.replicas) return [];
+
+    return [...data.replicas].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.replicas, sortColumn, sortDirection]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
+
   // Paginate replicas
   const paginatedReplicas = useMemo(() => {
-    if (!data?.replicas) return [];
     const start = (page - 1) * pageSize;
-    return data.replicas.slice(start, start + pageSize);
-  }, [data?.replicas, page, pageSize]);
+    return sortedReplicas.slice(start, start + pageSize);
+  }, [sortedReplicas, page, pageSize]);
 
   const totalPages = useMemo(() => {
     if (!data?.replicas) return 0;
@@ -123,14 +153,64 @@ export function ReplicationTab({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">Status</TableHead>
-              <TableHead>Database</TableHead>
-              <TableHead>Table</TableHead>
-              <TableHead className="text-center">Leader</TableHead>
-              <TableHead className="text-center">Readonly</TableHead>
-              <TableHead className="text-right">Queue</TableHead>
-              <TableHead className="text-right">Delay</TableHead>
-              <TableHead className="text-right">Replicas</TableHead>
+              <SortableTableHead
+                className="w-[50px]"
+                currentSort={sortColumn === "isReadonly" ? sortDirection : null}
+                onSort={(dir) => updateSort("isReadonly", dir)}
+              >
+                Status
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "database" ? sortDirection : null}
+                onSort={(dir) => updateSort("database", dir)}
+              >
+                Database
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "table" ? sortDirection : null}
+                onSort={(dir) => updateSort("table", dir)}
+              >
+                Table
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-center"
+                currentSort={sortColumn === "isLeader" ? sortDirection : null}
+                onSort={(dir) => updateSort("isLeader", dir)}
+              >
+                Leader
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-center"
+                currentSort={sortColumn === "isReadonly" ? sortDirection : null}
+                onSort={(dir) => updateSort("isReadonly", dir)}
+              >
+                Readonly
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "queueSize" ? sortDirection : null}
+                onSort={(dir) => updateSort("queueSize", dir)}
+              >
+                Queue
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "absoluteDelay" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("absoluteDelay", dir)}
+              >
+                Delay
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "activeReplicas" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("activeReplicas", dir)}
+              >
+                Replicas
+              </SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

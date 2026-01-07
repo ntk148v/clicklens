@@ -8,10 +8,11 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,11 +82,40 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Pagination
+  // Pagination
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  const paginatedUsers = users.slice((page - 1) * pageSize, page * pageSize);
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "asc"
+  );
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [users, sortColumn, sortDirection]);
+
+  const paginatedUsers = sortedUsers.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
   const totalPages = Math.ceil(users.length / pageSize);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   // Create/Edit user dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -281,7 +311,7 @@ export default function UsersPage() {
         </Tabs>
       </Header>
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -304,7 +334,7 @@ export default function UsersPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 h-full flex flex-col">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Users</h2>
@@ -332,15 +362,34 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <Card>
-              <div className="rounded-md border">
+            <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none">
+              <div className="flex-1 border rounded-md overflow-hidden relative">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[200px]">Name</TableHead>
-                      <TableHead>Auth Type</TableHead>
-                      <TableHead>Assigned Roles</TableHead>
-                      <TableHead className="w-[100px]">Actions</TableHead>
+                      <SortableTableHead
+                        className="w-[200px]"
+                        currentSort={
+                          sortColumn === "name" ? sortDirection : null
+                        }
+                        onSort={(dir) => updateSort("name", dir)}
+                      >
+                        Name
+                      </SortableTableHead>
+                      <SortableTableHead
+                        currentSort={
+                          sortColumn === "auth_type" ? sortDirection : null
+                        }
+                        onSort={(dir) => updateSort("auth_type", dir)}
+                      >
+                        Auth Type
+                      </SortableTableHead>
+                      <SortableTableHead sortable={false}>
+                        Assigned Roles
+                      </SortableTableHead>
+                      <SortableTableHead className="w-[100px]" sortable={false}>
+                        Actions
+                      </SortableTableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

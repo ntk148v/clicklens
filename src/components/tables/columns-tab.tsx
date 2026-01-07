@@ -6,7 +6,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
+  SortableTableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -29,11 +29,41 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const paginatedColumns = useMemo(() => {
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(
+    "bytes_on_disk"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    "desc"
+  );
+
+  const sortedColumns = useMemo(() => {
     if (!data?.columns) return [];
+
+    return [...data.columns].sort((a, b) => {
+      if (!sortColumn || !sortDirection) return 0;
+
+      const aValue = (a as any)[sortColumn];
+      const bValue = (b as any)[sortColumn];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.columns, sortColumn, sortDirection]);
+
+  const paginatedColumns = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return data.columns.slice(start, start + pageSize);
-  }, [data?.columns, page, pageSize]);
+    return sortedColumns.slice(start, start + pageSize);
+  }, [sortedColumns, page, pageSize]);
+
+  const updateSort = (column: string, direction: "asc" | "desc" | null) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   const totalPages = useMemo(() => {
     if (!data?.columns) return 0;
@@ -72,7 +102,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -120,16 +150,45 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
       </div>
 
       {/* Columns Table */}
-      <Card>
-        <div className="overflow-auto">
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-hidden relative">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[150px]">Column</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Size</TableHead>
-                <TableHead className="min-w-[150px]">Size %</TableHead>
-                <TableHead className="text-right">Compression</TableHead>
+                <SortableTableHead
+                  className="min-w-[150px]"
+                  currentSort={sortColumn === "column" ? sortDirection : null}
+                  onSort={(dir) => updateSort("column", dir)}
+                >
+                  Column
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "type" ? sortDirection : null}
+                  onSort={(dir) => updateSort("type", dir)}
+                >
+                  Type
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "bytes_on_disk" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("bytes_on_disk", dir)}
+                >
+                  Size
+                </SortableTableHead>
+                <SortableTableHead className="min-w-[150px]" sortable={false}>
+                  Size %
+                </SortableTableHead>
+                <SortableTableHead
+                  className="text-right"
+                  currentSort={
+                    sortColumn === "compression_ratio" ? sortDirection : null
+                  }
+                  onSort={(dir) => updateSort("compression_ratio", dir)}
+                >
+                  Compression
+                </SortableTableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
