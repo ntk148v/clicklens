@@ -113,7 +113,7 @@ export function ReplicationTab({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-full flex flex-col">
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -149,7 +149,7 @@ export function ReplicationTab({
       </div>
 
       {/* Replicas Table */}
-      <div className="rounded-md border">
+      <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
         <Table>
           <TableHeader>
             <TableRow>
@@ -305,14 +305,16 @@ export function ReplicationTab({
                 })}
           </TableBody>
         </Table>
-        <PaginationControls
-          page={page}
-          totalPages={totalPages}
-          totalItems={data?.replicas.length || 0}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        <div className="p-4 border-t">
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={data?.replicas.length || 0}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </div>
 
       {/* Info */}

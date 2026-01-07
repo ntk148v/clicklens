@@ -169,7 +169,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
             <GitMerge className="w-5 h-5" />
             Active Merges
           </h3>
-          <div className="rounded-md border">
+          <div className="rounded-md border h-[400px] flex flex-col overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -292,7 +292,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
             <Scissors className="w-5 h-5" />
             Active Mutations
           </h3>
-          <div className="rounded-md border">
+          <div className="rounded-md border h-[400px] flex flex-col overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
