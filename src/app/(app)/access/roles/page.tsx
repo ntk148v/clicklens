@@ -469,24 +469,7 @@ export default function RolesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Access Control">
-        <Tabs defaultValue="roles" className="ml-4">
-          <TabsList className="h-8">
-            <TabsTrigger value="users" className="text-xs" asChild>
-              <Link href="/access/users">
-                <Users className="w-3.5 h-3.5 mr-1" />
-                Users
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="text-xs" asChild>
-              <Link href="/access/roles">
-                <Shield className="w-3.5 h-3.5 mr-1" />
-                Roles
-              </Link>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </Header>
+      <Header title="Roles"></Header>
 
       <div className="flex-1 p-6 space-y-6 h-full flex flex-col overflow-hidden">
         {loading ? (

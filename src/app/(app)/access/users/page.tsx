@@ -292,24 +292,7 @@ export default function UsersPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Access Control">
-        <Tabs defaultValue="users" className="ml-4">
-          <TabsList className="h-8">
-            <TabsTrigger value="users" className="text-xs" asChild>
-              <Link href="/access/users">
-                <Users className="w-3.5 h-3.5 mr-1" />
-                Users
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="text-xs" asChild>
-              <Link href="/access/roles">
-                <Shield className="w-3.5 h-3.5 mr-1" />
-                Roles
-              </Link>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </Header>
+      <Header title="Users"></Header>
 
       <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
         {loading ? (
@@ -337,7 +320,6 @@ export default function UsersPage() {
           <div className="space-y-6 h-full flex flex-col">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold">Users</h2>
                 <p className="text-sm text-muted-foreground">
                   {users.length} user{users.length !== 1 ? "s" : ""} • Users are
                   assigned roles only

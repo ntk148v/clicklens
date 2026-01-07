@@ -23,6 +23,7 @@ import {
   Zap,
   Clock,
   TrendingUp,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -110,6 +111,22 @@ const queriesItems = [
   },
 ];
 
+// Access sub-navigation items
+const accessItems = [
+  {
+    name: "Users",
+    href: "/access/users",
+    icon: User,
+    description: "Manage database users",
+  },
+  {
+    name: "Roles",
+    href: "/access/roles",
+    icon: Shield,
+    description: "Manage roles and permissions",
+  },
+];
+
 // Main navigation items with permission requirements
 const navigation = [
   {
@@ -144,10 +161,11 @@ const navigation = [
   },
   {
     name: "Access",
-    href: "/access/users",
+    href: "/access",
     icon: Users,
     description: "Users, roles, and grants",
     requiresPermission: "canManageUsers" as const,
+    subItems: accessItems,
   },
 ];
 
@@ -158,6 +176,7 @@ export function Sidebar() {
     () => ({
       Monitoring: pathname.startsWith("/monitoring"),
       Queries: pathname.startsWith("/queries"),
+      Access: pathname.startsWith("/access"),
     })
   );
   const { user, permissions, logout, isLoading } = useAuth();
