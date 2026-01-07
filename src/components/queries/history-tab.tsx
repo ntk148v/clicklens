@@ -1,8 +1,16 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Loader2, Filter, Clock, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  Loader2,
+  Filter,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,11 +34,17 @@ import {
   type QueryHistoryEntry,
 } from "@/lib/hooks/use-query-analytics";
 import { formatDuration, formatBytes } from "@/lib/hooks/use-monitoring";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 
 const DEFAULT_PAGE_SIZE = 50;
 
 export function HistoryTab() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const initialFingerprint = searchParams.get("fingerprint") || "";
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -39,6 +53,7 @@ export function HistoryTab() {
   const [minDuration, setMinDuration] = useState("");
   const [queryType, setQueryType] = useState("");
   const [status, setStatus] = useState<"all" | "success" | "error">("all");
+  const [fingerprint, setFingerprint] = useState(initialFingerprint);
 
   // Input state (local)
   const [userInput, setUserInput] = useState("");
@@ -70,8 +85,9 @@ export function HistoryTab() {
       minDuration: minDuration ? parseInt(minDuration) : undefined,
       queryType: queryType || undefined,
       status: status,
+      fingerprint: fingerprint || undefined,
     }),
-    [page, pageSize, userFilter, minDuration, queryType, status]
+    [page, pageSize, userFilter, minDuration, queryType, status, fingerprint]
   );
 
   const { data, isLoading, error } = useQueryHistory(filters);
@@ -188,6 +204,27 @@ export function HistoryTab() {
           {data?.total ? data.total.toLocaleString() : 0} total queries
         </Badge>
       </div>
+
+      {fingerprint && (
+        <div className="px-1">
+          <Badge variant="secondary" className="gap-2 pl-2 pr-1 py-1 h-7">
+            Filtered by Query Pattern: {fingerprint.substring(0, 8)}...
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-4 w-4 rounded-full ml-1 hover:bg-muted/50"
+              onClick={() => {
+                setFingerprint("");
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete("fingerprint");
+                router.replace(`${pathname}?${params.toString()}`);
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </Badge>
+        </div>
+      )}
 
       {/* History Table */}
       <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">

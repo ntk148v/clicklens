@@ -41,6 +41,10 @@ interface QueryTab {
     userMessage: string;
   } | null;
   queryId?: string;
+  explainResult?: {
+    type: "AST" | "SYNTAX" | "PLAN" | "PIPELINE";
+    data: string | object;
+  } | null;
 }
 
 interface TableTab {
@@ -225,6 +229,7 @@ export const useTabsStore = create<TabsState>()(
           .map((t) => ({
             ...t,
             result: null,
+            explainResult: null,
             isRunning: false,
             error: null,
           })),

@@ -98,6 +98,7 @@ export interface QueryHistoryFilters {
   minDuration?: number;
   queryType?: string;
   status?: "all" | "success" | "error";
+  fingerprint?: string;
 }
 
 export function useQueryHistory(filters: QueryHistoryFilters = {}) {
@@ -110,6 +111,7 @@ export function useQueryHistory(filters: QueryHistoryFilters = {}) {
   if (filters.queryType) params.set("queryType", filters.queryType);
   if (filters.status && filters.status !== "all")
     params.set("status", filters.status);
+  if (filters.fingerprint) params.set("fingerprint", filters.fingerprint);
 
   const endpoint = `/api/clickhouse/queries/history?${params.toString()}`;
 

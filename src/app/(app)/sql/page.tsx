@@ -12,6 +12,9 @@ import {
   TablePreview,
   SavedQueries,
   SaveQueryDialog,
+  ExplainButton,
+  ExplainVisualizer,
+  type ExplainType,
 } from "@/components/sql";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
 import { useAuth } from "@/components/auth";
@@ -519,6 +522,117 @@ export default function SqlConsolePage() {
     }
   }, [getActiveQueryTab, updateTab, addToHistory, user, cursorPosition]);
 
+  const handleExplain = useCallback(
+    async (type: ExplainType) => {
+      const tab = getActiveQueryTab();
+      if (!tab || tab.isRunning) return;
+
+      const sql = tab.sql.trim();
+      if (!sql) return;
+
+      const { splitSqlStatements } = await import("@/lib/sql");
+      const statements = splitSqlStatements(sql);
+      // Only explain the first statement if multiple
+      const statement = statements[0];
+
+      if (!statement) return;
+
+      // Reset previous results
+      updateTab(tab.id, {
+        isRunning: true,
+        error: null,
+        result: null,
+        explainResult: null,
+      });
+
+      try {
+        let query = "";
+        let format = undefined;
+
+        // Remove existing EXPLAIN prefix if present to avoid double explain
+        // Regex handles "EXPLAIN", "EXPLAIN AST", "EXPLAIN PLAN", etc.
+        const cleanStatement = statement.replace(/^EXPLAIN\s+(\w+\s+)?/i, "");
+        query = `EXPLAIN ${type} ${cleanStatement}`;
+
+        const response = await fetch("/api/clickhouse/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sql: query,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || "Failed to explain");
+        }
+
+        // Read the stream
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let resultData = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            resultData += decoder.decode(value, { stream: true });
+          }
+        }
+
+        // Process result
+        // If we used format="JSON", resultData should be the JSON string.
+        // If we used default format, resultData is NDJSON stream of rows.
+
+        let finalData: string | object = resultData;
+
+        // NDJSON row parsing
+        // We expect 1 row with 1 column usually
+        const lines = resultData.split("\n");
+        let capturedText = "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            if (event.type === "data") {
+              // event.data is [[ "text" ]]
+              if (Array.isArray(event.data)) {
+                for (const row of event.data) {
+                  // row is array of columns.
+                  // explain usually has 1 column 'explain'
+                  const colVal =
+                    row[Object.keys(row)[0]] || Object.values(row)[0];
+                  capturedText += colVal + "\n";
+                }
+              }
+            } else if (event.type === "error") {
+              throw new Error(event.error.message);
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+        finalData = capturedText || resultData;
+
+        updateTab(tab.id, {
+          isRunning: false,
+          explainResult: { type, data: finalData },
+        });
+      } catch (error) {
+        updateTab(tab.id, {
+          isRunning: false,
+          error: {
+            code: 0,
+            message: error instanceof Error ? error.message : "Unknown error",
+            type: "EXPLAIN_ERROR",
+            userMessage: "Failed to explain query",
+          },
+        });
+      }
+    },
+    [getActiveQueryTab, updateTab]
+  );
+
   const handleHistorySelect = useCallback(
     (sql: string) => {
       if (activeTabId && activeQueryTab) {
@@ -558,6 +672,13 @@ export default function SqlConsolePage() {
           </Button>
 
           <Separator orientation="vertical" className="h-6" />
+
+          <ExplainButton
+            onExplain={handleExplain}
+            disabled={!activeQueryTab || activeQueryTab.isRunning}
+          />
+
+          <Separator orientation="vertical" className="h-6 mx-2" />
 
           <div className="flex items-center">
             <Button
@@ -743,6 +864,11 @@ export default function SqlConsolePage() {
                       onPageChange={handlePageChange}
                       onPageSizeChange={handlePageSizeChange}
                       className="h-full"
+                    />
+                  ) : activeQueryTab.explainResult ? (
+                    <ExplainVisualizer
+                      type={activeQueryTab.explainResult.type}
+                      data={activeQueryTab.explainResult.data}
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">

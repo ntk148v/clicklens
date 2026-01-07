@@ -35,7 +35,10 @@ import { PaginationControls } from "@/components/monitoring";
 
 const DEFAULT_PAGE_SIZE = 50;
 
+import { useRouter } from "next/navigation";
+
 export function AnalyticsTab() {
+  const router = useRouter();
   const [metric, setMetric] = useState<"duration" | "memory" | "read_bytes">(
     "duration"
   );
@@ -258,12 +261,24 @@ export function AnalyticsTab() {
                 {paginatedQueries.map((query, idx) => (
                   <TableRow key={query.normalized_query_hash || idx}>
                     <TableCell>
-                      <TruncatedCell
-                        value={query.query}
-                        maxWidth={400}
-                        className="bg-muted px-2 py-1 rounded"
-                      />
-                      <span className="text-xs text-muted-foreground mt-1 block">
+                      <button
+                        className="text-left w-full hover:bg-muted/50 rounded p-1 transition-colors group"
+                        onClick={() =>
+                          router.push(
+                            `/queries/history?fingerprint=${query.normalized_query_hash}`
+                          )
+                        }
+                      >
+                        <TruncatedCell
+                          value={query.query}
+                          maxWidth={400}
+                          className="bg-muted px-2 py-1 rounded group-hover:bg-background transition-colors"
+                        />
+                        <span className="text-xs text-blue-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                          View details <TrendingUp className="w-3 h-3" />
+                        </span>
+                      </button>
+                      <span className="text-xs text-muted-foreground mt-1 block px-1">
                         Last run:{" "}
                         {new Date(query.last_event_time).toLocaleString()}
                       </span>

@@ -87,6 +87,7 @@ export async function GET(
     const minDuration = searchParams.get("minDuration");
     const status = searchParams.get("status"); // all, success, error
     const queryType = searchParams.get("queryType"); // SELECT, INSERT, etc.
+    const fingerprint = searchParams.get("fingerprint");
 
     const lensConfig = getLensConfig();
     if (!lensConfig) {
@@ -132,6 +133,11 @@ export async function GET(
     if (queryType) {
       const safeType = queryType.replace(/'/g, "''");
       conditions.push(`query_kind = '${safeType}'`);
+    }
+
+    if (fingerprint) {
+      const safeFingerprint = fingerprint.replace(/'/g, "''");
+      conditions.push(`normalized_query_hash = '${safeFingerprint}'`);
     }
 
     const whereClause =
