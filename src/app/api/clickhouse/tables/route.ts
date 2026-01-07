@@ -16,6 +16,7 @@ import {
 } from "@/lib/clickhouse";
 
 interface TableInfo {
+  database?: string;
   name: string;
   engine: string;
   total_rows: number;
@@ -73,20 +74,8 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const database = searchParams.get("database");
 
-    if (!database) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 400,
-            message: "Database parameter is required",
-            type: "BAD_REQUEST",
-            userMessage: "Please specify a database",
-          },
-        },
-        { status: 400 }
-      );
-    }
+    // If database is provided, we fetch tables for that database.
+    // If not, we fetch all tables for all databases (caching mode).
 
     const lensConfig = getLensConfig();
     if (!lensConfig) {
@@ -98,13 +87,13 @@ export async function GET(
 
     const client = createClientWithConfig(lensConfig);
     const safeUser = session.user.username.replace(/'/g, "''");
-    const safeDatabase = database.replace(/'/g, "''");
+    const safeDatabase = database ? database.replace(/'/g, "''") : null;
 
     try {
       // Get roles assigned to the user
       const rolesResult = await client.query(`
-        SELECT granted_role_name as role 
-        FROM system.role_grants 
+        SELECT granted_role_name as role
+        FROM system.role_grants
         WHERE user_name = '${safeUser}'
       `);
       const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
@@ -119,7 +108,7 @@ export async function GET(
 
       // 1. Check for global access (*.*)
       const globalCheck = await client.query(`
-        SELECT count() as cnt FROM system.grants 
+        SELECT count() as cnt FROM system.grants
         WHERE ${grantFilter}
         AND (database IS NULL OR database = '*')
         AND access_type IN ('SELECT', 'ALL')
@@ -131,55 +120,107 @@ export async function GET(
       const cnt = globalData[0]?.cnt;
       const hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
 
-      // 2. Check for database level access (db.*)
-      const dbCheck = await client.query(`
-          SELECT count() as cnt FROM system.grants 
-          WHERE ${grantFilter}
-          AND database = '${safeDatabase}'
-          AND (table IS NULL OR table = '*')
-          AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-        `);
-      const dbData = dbCheck.data as unknown as Array<{ cnt: string | number }>;
-      const dbCnt = dbData[0]?.cnt;
-      const hasDbAccess = dbCnt !== 0 && dbCnt !== "0" && dbCnt !== undefined;
+      // 2. Check for database level access (db.*) - ONLY if database is specified
+      let hasDbAccess = false;
+      if (safeDatabase && !hasGlobalAccess) {
+        const dbCheck = await client.query(`
+            SELECT count() as cnt FROM system.grants
+            WHERE ${grantFilter}
+            AND database = '${safeDatabase}'
+            AND (table IS NULL OR table = '*')
+            AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+          `);
+        const dbData = dbCheck.data as unknown as Array<{
+          cnt: string | number;
+        }>;
+        const dbCnt = dbData[0]?.cnt;
+        hasDbAccess = dbCnt !== 0 && dbCnt !== "0" && dbCnt !== undefined;
+      }
 
       let result;
 
-      if (hasGlobalAccess || hasDbAccess) {
-        // User has access to all tables in this database
+      if (hasGlobalAccess) {
+        // Global access: Fetch all tables or for specific db
+        const dbFilter = safeDatabase
+          ? `WHERE database = '${safeDatabase}'`
+          : "";
         result = await client.query(`
-          SELECT 
+          SELECT
+            database,
             name,
             engine,
             total_rows,
             total_bytes
-          FROM system.tables 
+          FROM system.tables
+          ${dbFilter}
+          ORDER BY database, name
+        `);
+      } else if (hasDbAccess && safeDatabase) {
+        // DB access: Fetch all tables for this db
+        result = await client.query(`
+          SELECT
+            database,
+            name,
+            engine,
+            total_rows,
+            total_bytes
+          FROM system.tables
           WHERE database = '${safeDatabase}'
           ORDER BY name
         `);
       } else {
-        // User might have access to specific tables only
-        // Get list of tables user has access to in this database
-        const allowedTablesQuery = `
-          SELECT DISTINCT table FROM system.grants
-          WHERE ${grantFilter}
-          AND database = '${safeDatabase}'
-          AND table IS NOT NULL
-          AND table != '*'
-          AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-        `;
+        // Specific table access only
+        // Complex case: find allowed tables
+        let allowedTablesQuery;
 
-        result = await client.query(`
-          SELECT 
-            name,
-            engine,
-            total_rows,
-            total_bytes
-          FROM system.tables 
-          WHERE database = '${safeDatabase}'
-          AND name IN (${allowedTablesQuery})
-          ORDER BY name
-        `);
+        if (safeDatabase) {
+          allowedTablesQuery = `
+              SELECT DISTINCT table FROM system.grants
+              WHERE ${grantFilter}
+              AND database = '${safeDatabase}'
+              AND table IS NOT NULL
+              AND table != '*'
+              AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+            `;
+        } else {
+          // For all databases
+          allowedTablesQuery = `
+              SELECT DISTINCT database, table FROM system.grants
+              WHERE ${grantFilter}
+              AND table IS NOT NULL
+              AND table != '*'
+              AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+            `;
+        }
+
+        if (safeDatabase) {
+          result = await client.query(`
+              SELECT
+                database,
+                name,
+                engine,
+                total_rows,
+                total_bytes
+              FROM system.tables
+              WHERE database = '${safeDatabase}'
+              AND name IN (${allowedTablesQuery})
+              ORDER BY name
+            `);
+        } else {
+          // This might be inefficient if user has many grants, but it's the safest way without global/db permissions
+          // We can join or filtering by tuple (database, name)
+          result = await client.query(`
+              SELECT
+                database,
+                name,
+                engine,
+                total_rows,
+                total_bytes
+              FROM system.tables
+              WHERE (database, name) IN (${allowedTablesQuery})
+              ORDER BY database, name
+            `);
+        }
       }
 
       return NextResponse.json({
