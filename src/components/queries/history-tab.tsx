@@ -33,9 +33,27 @@ const DEFAULT_PAGE_SIZE = 50;
 export function HistoryTab() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  // Filter state (for API)
   const [userFilter, setUserFilter] = useState("");
   const [minDuration, setMinDuration] = useState("");
   const [queryType, setQueryType] = useState("");
+
+  // Input state (local)
+  const [userInput, setUserInput] = useState("");
+  const [durationInput, setDurationInput] = useState("");
+
+  const handleSearch = () => {
+    setUserFilter(userInput);
+    setMinDuration(durationInput);
+    setPage(1); // Reset to first page on new search
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
@@ -106,46 +124,52 @@ export function HistoryTab() {
   return (
     <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Filters */}
-      <Card className="p-4 flex-none">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Filters:</span>
-          </div>
-          <Input
-            placeholder="User..."
-            value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
-            className="w-[150px]"
-          />
-          <Input
-            placeholder="Min duration (ms)"
-            value={minDuration}
-            onChange={(e) => setMinDuration(e.target.value)}
-            className="w-[150px]"
-            type="number"
-          />
-          <Select
-            value={queryType || "all"}
-            onValueChange={(v) => setQueryType(v === "all" ? "" : v)}
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Query type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="Select">SELECT</SelectItem>
-              <SelectItem value="Insert">INSERT</SelectItem>
-              <SelectItem value="Create">CREATE</SelectItem>
-              <SelectItem value="Alter">ALTER</SelectItem>
-              <SelectItem value="Drop">DROP</SelectItem>
-            </SelectContent>
-          </Select>
-          <Badge variant="outline" className="ml-auto">
-            {data?.total ? data.total.toLocaleString() : 0} total queries
-          </Badge>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-4 p-1">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Filters:</span>
         </div>
-      </Card>
+        <Input
+          placeholder="User..."
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSearch}
+          className="w-[150px]"
+        />
+        <Input
+          placeholder="Min duration (ms)"
+          value={durationInput}
+          onChange={(e) => setDurationInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSearch}
+          className="w-[150px]"
+          type="number"
+        />
+        <Select
+          value={queryType || "all"}
+          onValueChange={(v) => {
+            setQueryType(v === "all" ? "" : v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Query type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="Select">SELECT</SelectItem>
+            <SelectItem value="Insert">INSERT</SelectItem>
+            <SelectItem value="Create">CREATE</SelectItem>
+            <SelectItem value="Alter">ALTER</SelectItem>
+            <SelectItem value="Drop">DROP</SelectItem>
+          </SelectContent>
+        </Select>
+        <Badge variant="outline" className="ml-auto border-none bg-muted/50">
+          {data?.total ? data.total.toLocaleString() : 0} total queries
+        </Badge>
+      </div>
 
       {/* History Table */}
       <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
