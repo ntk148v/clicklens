@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 interface TableInfo {
+  database?: string;
   name: string;
   engine: string;
   total_rows: number;
@@ -26,6 +27,7 @@ interface SqlBrowserState {
   // Tables
   tables: TableInfo[];
   loadingTables: boolean;
+  tablesCache: Record<string, TableInfo[]>;
 
   // Selected table preview
   selectedTable: string | null;
@@ -64,6 +66,8 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
   previewTab: "data",
   sidebarCollapsed: false,
 
+  tablesCache: {},
+
   fetchDatabases: async () => {
     set({ loadingDatabases: true });
     try {
@@ -72,6 +76,30 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
       if (data.success && data.data) {
         const dbNames = data.data.map((d: { name: string }) => d.name);
         set({ databases: dbNames, loadingDatabases: false });
+
+        // Preload all tables
+        // We do this in the background or immediately if list is small?
+        // Let's do it immediately to ensure cache is hot.
+        try {
+          const tableRes = await fetch("/api/clickhouse/tables");
+          const tableResult = await tableRes.json();
+          if (tableResult.success && tableResult.data) {
+            const allTables = tableResult.data as TableInfo[];
+            const cache: Record<string, TableInfo[]> = {};
+
+            // Group by database
+            allTables.forEach((t) => {
+              const db = t.database || "default";
+              if (!cache[db]) cache[db] = [];
+              cache[db].push(t);
+            });
+
+            set({ tablesCache: cache });
+          }
+        } catch (e) {
+          console.error("Failed to preload tables", e);
+        }
+
         // Auto-select first database if none selected
         if (dbNames.length > 0 && !get().selectedDatabase) {
           get().selectDatabase(dbNames[0]);
@@ -85,14 +113,32 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
   },
 
   selectDatabase: async (db: string) => {
+    const { tablesCache } = get();
+
+    // Use cache if available
+    if (tablesCache[db]) {
+      set({
+        selectedDatabase: db,
+        tables: tablesCache[db],
+        selectedTable: null,
+      });
+      return;
+    }
+
     set({ selectedDatabase: db, loadingTables: true, selectedTable: null });
+
+    // Fallback to fetch if not cached (though fetchDatabases should have populated it)
     try {
       const res = await fetch(
         `/api/clickhouse/tables?database=${encodeURIComponent(db)}`
       );
       const data = await res.json();
       if (data.success && data.data) {
-        set({ tables: data.data, loadingTables: false });
+        set((state) => ({
+          tables: data.data,
+          loadingTables: false,
+          tablesCache: { ...state.tablesCache, [db]: data.data },
+        }));
       } else {
         set({ tables: [], loadingTables: false });
       }

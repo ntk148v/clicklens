@@ -29,10 +29,10 @@ export const FEATURE_ROLES: FeatureRole[] = [
   {
     id: "clicklens_table_explorer",
     name: "Table Explorer",
-    description: "Browse databases, tables, and columns",
+    description: "Browse databases, tables, parts, and replication status",
     details:
       "Grants SHOW DATABASES, SHOW TABLES, SHOW COLUMNS, SHOW DICTIONARIES globally. " +
-      "Also grants SELECT on system.tables, system.columns, and system.databases for schema browsing.",
+      "Also grants SELECT on system tables for schema browsing, parts, columns, replicas, mutations, and merges.",
     grants: [
       "GRANT SHOW DATABASES ON *.* TO `clicklens_table_explorer`",
       "GRANT SHOW TABLES ON *.* TO `clicklens_table_explorer`",
@@ -41,6 +41,11 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "GRANT SELECT ON system.tables TO `clicklens_table_explorer`",
       "GRANT SELECT ON system.columns TO `clicklens_table_explorer`",
       "GRANT SELECT ON system.databases TO `clicklens_table_explorer`",
+      "GRANT SELECT ON system.parts TO `clicklens_table_explorer`",
+      "GRANT SELECT ON system.parts_columns TO `clicklens_table_explorer`",
+      "GRANT SELECT ON system.replicas TO `clicklens_table_explorer`",
+      "GRANT SELECT ON system.mutations TO `clicklens_table_explorer`",
+      "GRANT SELECT ON system.merges TO `clicklens_table_explorer`",
     ],
   },
   {

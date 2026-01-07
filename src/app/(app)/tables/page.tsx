@@ -1,75 +1,227 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout";
+import { DatabaseSelector } from "@/components/sql";
+import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
-import { Database, HardDrive, Layers, BarChart3 } from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Database,
+  Loader2,
+  RefreshCw,
+  LayoutDashboard,
+  Layers,
+  Columns,
+  Server,
+  Zap,
+  Combine,
+  Code,
+} from "lucide-react";
+import {
+  OverviewTab,
+  PartsTab,
+  ColumnsTab,
+  ReplicasTab,
+  MutationsTab,
+  MergesTab,
+  DdlTab,
+} from "@/components/tables";
+
+interface TableInfo {
+  name: string;
+  engine: string;
+  total_rows: number;
+  total_bytes: number;
+}
 
 export default function TablesPage() {
+  // Use the SQL browser store for database selection and tables
+  const { selectedDatabase, tables, loadingTables } = useSqlBrowserStore();
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auto-select first table when tables update and nothing selected
+  useEffect(() => {
+    if (tables.length > 0 && !selectedTable) {
+      setSelectedTable(tables[0].name);
+    }
+    // If we switched db and tables are empty, reset selection
+    if (tables.length === 0) {
+      setSelectedTable(null);
+    }
+  }, [tables, selectedTable]);
+
+  const handleRefresh = () => {
+    // Trigger re-fetch by incrementing refresh key
+    // For table data, this refreshes the tab content
+    setRefreshKey((k) => k + 1);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Table Explorer" />
 
-      <div className="flex-1 p-6">
-        <div className="max-w-2xl mx-auto text-center py-16">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-            <Database className="w-8 h-8 text-primary" />
+      <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+        {/* Selection Bar */}
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Database:</span>
+              <DatabaseSelector />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Table:</span>
+              <Select
+                value={selectedTable || ""}
+                onValueChange={setSelectedTable}
+                disabled={!selectedDatabase || loadingTables}
+              >
+                <SelectTrigger className="w-[200px]">
+                  {loadingTables ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SelectValue placeholder="Select table" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {tables.map((table) => (
+                    <SelectItem key={table.name} value={table.name}>
+                      {table.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedTable && (
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            )}
           </div>
-          <h2 className="text-2xl font-bold mb-4">Table Explorer</h2>
-          <p className="text-muted-foreground mb-8">
-            Browse databases, tables, and parts. View compression ratios, column
-            statistics, and hot partitions.
-          </p>
+        </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-            <Card>
-              <CardHeader className="pb-2">
-                <HardDrive className="w-5 h-5 text-primary mb-2" />
-                <CardTitle className="text-sm">Table Size</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-xs">
-                  View storage size, row count, and compression ratio for each
-                  table
-                </CardDescription>
-              </CardContent>
+        {/* Main Content */}
+        {!selectedDatabase || !selectedTable ? (
+          <Card className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+            <Database className="h-16 w-16 mb-4 opacity-50" />
+            <p className="text-lg font-medium">Select a database and table</p>
+            <p className="text-sm mt-2">
+              Choose a database and table to explore its structure and stats
+            </p>
+          </Card>
+        ) : (
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            <TabsList className="grid w-full grid-cols-7">
+              <TabsTrigger value="overview" className="text-xs">
+                <LayoutDashboard className="h-3 w-3 mr-1" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="parts" className="text-xs">
+                <Layers className="h-3 w-3 mr-1" />
+                Parts
+              </TabsTrigger>
+              <TabsTrigger value="columns" className="text-xs">
+                <Columns className="h-3 w-3 mr-1" />
+                Columns
+              </TabsTrigger>
+              <TabsTrigger value="replicas" className="text-xs">
+                <Server className="h-3 w-3 mr-1" />
+                Replicas
+              </TabsTrigger>
+              <TabsTrigger value="mutations" className="text-xs">
+                <Zap className="h-3 w-3 mr-1" />
+                Mutations
+              </TabsTrigger>
+              <TabsTrigger value="merges" className="text-xs">
+                <Combine className="h-3 w-3 mr-1" />
+                Merges
+              </TabsTrigger>
+              <TabsTrigger value="ddl" className="text-xs">
+                <Code className="h-3 w-3 mr-1" />
+                DDL
+              </TabsTrigger>
+            </TabsList>
+
+            <Card className="flex-1 mt-4 overflow-auto">
+              <TabsContent
+                value="overview"
+                className="m-0 h-full"
+                key={`overview-${refreshKey}`}
+              >
+                <OverviewTab
+                  database={selectedDatabase}
+                  table={selectedTable}
+                />
+              </TabsContent>
+              <TabsContent
+                value="parts"
+                className="m-0 h-full"
+                key={`parts-${refreshKey}`}
+              >
+                <PartsTab database={selectedDatabase} table={selectedTable} />
+              </TabsContent>
+              <TabsContent
+                value="columns"
+                className="m-0 h-full"
+                key={`columns-${refreshKey}`}
+              >
+                <ColumnsTab database={selectedDatabase} table={selectedTable} />
+              </TabsContent>
+              <TabsContent
+                value="replicas"
+                className="m-0 h-full"
+                key={`replicas-${refreshKey}`}
+              >
+                <ReplicasTab
+                  database={selectedDatabase}
+                  table={selectedTable}
+                />
+              </TabsContent>
+              <TabsContent
+                value="mutations"
+                className="m-0 h-full"
+                key={`mutations-${refreshKey}`}
+              >
+                <MutationsTab
+                  database={selectedDatabase}
+                  table={selectedTable}
+                />
+              </TabsContent>
+              <TabsContent
+                value="merges"
+                className="m-0 h-full"
+                key={`merges-${refreshKey}`}
+              >
+                <MergesTab database={selectedDatabase} table={selectedTable} />
+              </TabsContent>
+              <TabsContent
+                value="ddl"
+                className="m-0 h-full"
+                key={`ddl-${refreshKey}`}
+              >
+                <DdlTab database={selectedDatabase} table={selectedTable} />
+              </TabsContent>
             </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <Layers className="w-5 h-5 text-primary mb-2" />
-                <CardTitle className="text-sm">Parts Info</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-xs">
-                  Explore data parts, partitions, and merge activity
-                </CardDescription>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <BarChart3 className="w-5 h-5 text-primary mb-2" />
-                <CardTitle className="text-sm">Column Stats</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-xs">
-                  Column-level size, type, and compression information
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </div>
-
-          <p className="text-xs text-muted-foreground mt-8 p-4 rounded-lg bg-muted border">
-            🚧 Coming soon — Use the SQL Console to query{" "}
-            <code className="text-primary">system.tables</code>,{" "}
-            <code className="text-primary">system.parts</code>, and{" "}
-            <code className="text-primary">system.columns</code> directly.
-          </p>
-        </div>
+          </Tabs>
+        )}
       </div>
     </div>
   );
