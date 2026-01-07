@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2, Database, AlertCircle } from "lucide-react";
 import {
   Table,
@@ -11,12 +12,40 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useQueryCache } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { SortableHeader, SortDirection } from "@/components/ui/sortable-header";
+import type { QueryCacheEntry } from "@/lib/hooks/use-query-analytics";
 
 export function CacheTab() {
   const { data, isLoading, error } = useQueryCache();
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+
+  const sortedEntries = data?.entries
+    ? [...data.entries].sort((a, b) => {
+        if (!sortColumn || !sortDirection) return 0;
+
+        const aValue = a[sortColumn as keyof QueryCacheEntry];
+        const bValue = b[sortColumn as keyof QueryCacheEntry];
+
+        if (aValue === bValue) return 0;
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+
+        const comparison = aValue < bValue ? -1 : 1;
+        return sortDirection === "asc" ? comparison : -comparison;
+      })
+    : [];
+
+  const handleSort = (column: string, direction: SortDirection) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   if (isLoading) {
     return (
@@ -112,56 +141,98 @@ export function CacheTab() {
       </div>
 
       {/* Cache Entries Table */}
-      <Card>
-        <div className="overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[300px]">Query</TableHead>
-                <TableHead className="text-right">Size</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Expires</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.entries.map((entry, idx) => (
-                <TableRow key={entry.key_hash || idx}>
-                  <TableCell>
-                    <TruncatedCell
-                      value={entry.query}
-                      maxWidth={400}
-                      className="bg-muted px-2 py-1 rounded"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatBytes(entry.result_size)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {entry.stale === 1 && (
-                        <Badge variant="secondary" className="text-xs">
-                          Stale
-                        </Badge>
-                      )}
-                      {entry.compressed === 1 && (
-                        <Badge variant="outline" className="text-xs">
-                          Compressed
-                        </Badge>
-                      )}
-                      {entry.shared === 1 && (
-                        <Badge variant="outline" className="text-xs">
-                          Shared
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(entry.expires_at).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-hidden relative">
+          <ScrollArea className="h-[600px]">
+            <div className="min-w-max">
+              <Table>
+                <TableHeader className="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
+                  <TableRow>
+                    <TableHead className="min-w-[300px]">
+                      <SortableHeader
+                        column="query"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        Query
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        column="result_size"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="ml-auto"
+                      >
+                        Size
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        column="stale"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        Status
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        column="expires_at"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        Expires
+                      </SortableHeader>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedEntries.map((entry, idx) => (
+                    <TableRow key={entry.key_hash || idx}>
+                      <TableCell>
+                        <TruncatedCell
+                          value={entry.query}
+                          maxWidth={400}
+                          className="bg-muted px-2 py-1 rounded"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {formatBytes(entry.result_size)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {entry.stale === 1 && (
+                            <Badge variant="secondary" className="text-xs">
+                              Stale
+                            </Badge>
+                          )}
+                          {entry.compressed === 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              Compressed
+                            </Badge>
+                          )}
+                          {entry.shared === 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              Shared
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(entry.expires_at).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </div>
       </Card>
     </div>

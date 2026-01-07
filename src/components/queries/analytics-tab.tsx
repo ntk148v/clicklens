@@ -20,15 +20,43 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useQueryAnalytics } from "@/lib/hooks/use-query-analytics";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { SortableHeader, SortDirection } from "@/components/ui/sortable-header";
+import type { ExpensiveQuery } from "@/lib/hooks/use-query-analytics";
 
 export function AnalyticsTab() {
   const [metric, setMetric] = useState<"duration" | "memory" | "read_bytes">(
     "duration"
   );
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+
   const { data, isLoading, error } = useQueryAnalytics(metric);
+
+  const sortedQueries = data?.queries
+    ? [...data.queries].sort((a, b) => {
+        if (!sortColumn || !sortDirection) return 0;
+
+        const aValue = a[sortColumn as keyof ExpensiveQuery];
+        const bValue = b[sortColumn as keyof ExpensiveQuery];
+
+        if (aValue === bValue) return 0;
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+
+        const comparison = aValue < bValue ? -1 : 1;
+        return sortDirection === "asc" ? comparison : -comparison;
+      })
+    : [];
+
+  const handleSort = (column: string, direction: SortDirection) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   if (isLoading) {
     return (
@@ -147,63 +175,136 @@ export function AnalyticsTab() {
           </TabsTrigger>
         </TabsList>
 
-        <Card className="mt-4">
-          <CardHeader>
+        <Card className="mt-4 flex-1 border-none shadow-none flex flex-col overflow-hidden">
+          <CardHeader className="px-0">
             <CardTitle className="text-sm">
               Top Query Patterns (Last 7 Days)
             </CardTitle>
           </CardHeader>
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[300px]">Query Pattern</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                  <TableHead className="text-right">Avg Duration</TableHead>
-                  <TableHead className="text-right">Max Duration</TableHead>
-                  <TableHead className="text-right">Avg Memory</TableHead>
-                  <TableHead className="text-right">Avg Read</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.queries.map((query, idx) => (
-                  <TableRow key={query.normalized_query_hash || idx}>
-                    <TableCell>
-                      <TruncatedCell
-                        value={query.query}
-                        maxWidth={400}
-                        className="bg-muted px-2 py-1 rounded"
-                      />
-                      <span className="text-xs text-muted-foreground mt-1 block">
-                        Last run:{" "}
-                        {new Date(query.last_event_time).toLocaleString()}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {query.user}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatNumber(query.count)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatDuration(query.avg_duration_ms)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatDuration(query.max_duration_ms)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatBytes(query.avg_memory)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatBytes(query.avg_read_bytes)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="flex-1 border rounded-md overflow-hidden relative">
+            <ScrollArea className="h-[600px]">
+              <div className="min-w-max">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
+                    <TableRow>
+                      <TableHead className="min-w-[300px]">
+                        <SortableHeader
+                          column="query"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                        >
+                          Query Pattern
+                        </SortableHeader>
+                      </TableHead>
+                      <TableHead>
+                        <SortableHeader
+                          column="user"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                        >
+                          User
+                        </SortableHeader>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader
+                          column="count"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                          className="ml-auto"
+                        >
+                          Count
+                        </SortableHeader>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader
+                          column="avg_duration_ms"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                          className="ml-auto"
+                        >
+                          Avg Duration
+                        </SortableHeader>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader
+                          column="max_duration_ms"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                          className="ml-auto"
+                        >
+                          Max Duration
+                        </SortableHeader>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader
+                          column="avg_memory"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                          className="ml-auto"
+                        >
+                          Avg Memory
+                        </SortableHeader>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader
+                          column="avg_read_bytes"
+                          sortedColumn={sortColumn}
+                          sortDirection={sortDirection}
+                          onSort={handleSort}
+                          className="ml-auto"
+                        >
+                          Avg Read
+                        </SortableHeader>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedQueries.map((query, idx) => (
+                      <TableRow key={query.normalized_query_hash || idx}>
+                        <TableCell>
+                          <TruncatedCell
+                            value={query.query}
+                            maxWidth={400}
+                            className="bg-muted px-2 py-1 rounded"
+                          />
+                          <span className="text-xs text-muted-foreground mt-1 block">
+                            Last run:{" "}
+                            {new Date(query.last_event_time).toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs">
+                            {query.user}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatNumber(query.count)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatDuration(query.avg_duration_ms)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatDuration(query.max_duration_ms)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatBytes(query.avg_memory)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatBytes(query.avg_read_bytes)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
         </Card>
       </Tabs>

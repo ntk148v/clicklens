@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Loader2, Clock, Search, Filter } from "lucide-react";
+import { Loader2, Filter, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -10,9 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,10 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { PaginationControls } from "@/components/monitoring";
 import { useQueryHistory } from "@/lib/hooks/use-query-analytics";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { SortableHeader, SortDirection } from "@/components/ui/sortable-header";
+import type { QueryHistoryEntry } from "@/lib/hooks/use-query-analytics";
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -33,6 +36,10 @@ export function HistoryTab() {
   const [userFilter, setUserFilter] = useState("");
   const [minDuration, setMinDuration] = useState("");
   const [queryType, setQueryType] = useState("");
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
   const filters = useMemo(
     () => ({
@@ -47,10 +54,35 @@ export function HistoryTab() {
 
   const { data, isLoading, error } = useQueryHistory(filters);
 
+  // Client-side sorting of the fetched page
+  // Note: For true global sorting, API needs update.
+  // This sorts the current page which is a standard limitation without backend support.
+  const sortedQueries = useMemo(() => {
+    if (!data?.queries) return [];
+    if (!sortColumn || !sortDirection) return data.queries;
+
+    return [...data.queries].sort((a, b) => {
+      const aValue = a[sortColumn as keyof QueryHistoryEntry];
+      const bValue = b[sortColumn as keyof QueryHistoryEntry];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [data?.queries, sortColumn, sortDirection]);
+
   const totalPages = useMemo(() => {
     if (!data?.total) return 0;
     return Math.ceil(data.total / pageSize);
   }, [data?.total, pageSize]);
+
+  const handleSort = (column: string, direction: SortDirection) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
 
   if (isLoading) {
     return (
@@ -68,22 +100,10 @@ export function HistoryTab() {
     );
   }
 
-  if (!data || data.queries.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-        <Clock className="h-12 w-12 mb-4 opacity-50" />
-        <p>No query history found</p>
-        <p className="text-sm mt-2">
-          Query history will appear here after queries are executed
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 h-full flex flex-col">
       {/* Filters */}
-      <Card className="p-4">
+      <Card className="p-4 flex-none">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -119,72 +139,153 @@ export function HistoryTab() {
             </SelectContent>
           </Select>
           <Badge variant="outline" className="ml-auto">
-            {formatNumber(data.total)} total queries
+            {data?.total ? formatNumber(data.total) : 0} total queries
           </Badge>
         </div>
       </Card>
 
       {/* History Table */}
-      <Card>
-        <div className="overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[300px]">Query</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Duration</TableHead>
-                <TableHead className="text-right">Read</TableHead>
-                <TableHead className="text-right">Memory</TableHead>
-                <TableHead>Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.queries.map((query, idx) => (
-                <TableRow key={`${query.query_id}-${idx}`}>
-                  <TableCell>
-                    <TruncatedCell
-                      value={query.query}
-                      maxWidth={400}
-                      className="bg-muted px-2 py-1 rounded"
-                    />
-                    {query.exception && (
-                      <span className="text-xs text-destructive mt-1 block truncate">
-                        Error: {query.exception.slice(0, 100)}...
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="text-xs">
-                      {query.user}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {query.query_kind}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {query.query_duration_ms.toLocaleString()} ms
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatBytes(query.read_bytes)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatBytes(query.memory_usage)}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(query.event_time).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-hidden relative">
+          <ScrollArea className="h-full">
+            <div className="min-w-max">
+              <Table>
+                <TableHeader className="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
+                  <TableRow>
+                    <TableHead className="min-w-[300px]">
+                      <SortableHeader
+                        column="query"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        Query
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        column="user"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        User
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        column="query_kind"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        Type
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        column="query_duration_ms"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="ml-auto"
+                      >
+                        Duration
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        column="read_bytes"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="ml-auto"
+                      >
+                        Read
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader
+                        column="memory_usage"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="ml-auto"
+                      >
+                        Memory
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        column="event_time"
+                        sortedColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      >
+                        Time
+                      </SortableHeader>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedQueries.length > 0 ? (
+                    sortedQueries.map((query, idx) => (
+                      <TableRow key={`${query.query_id}-${idx}`}>
+                        <TableCell>
+                          <div className="max-w-[500px]">
+                            <TruncatedCell
+                              value={query.query}
+                              maxWidth={500}
+                              className="bg-muted px-2 py-1 rounded"
+                            />
+                            {query.exception && (
+                              <span className="text-xs text-destructive mt-1 block truncate">
+                                Error: {query.exception.slice(0, 100)}...
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs">
+                            {query.user}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {query.query_kind}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {query.query_duration_ms.toLocaleString()} ms
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatBytes(query.read_bytes)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatBytes(query.memory_usage)}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(query.event_time).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No queries found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </div>
         <PaginationControls
           page={page}
           totalPages={totalPages}
-          totalItems={data.total}
+          totalItems={data?.total || 0}
           pageSize={pageSize}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
