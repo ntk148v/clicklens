@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
 import { Search } from "lucide-react";
 import { SystemLogsTable } from "./SystemLogsTable";
 import { RefreshControl } from "@/components/monitoring/refresh-control";
+import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
 import type { LogEntry } from "@/lib/hooks/use-logs";
 
 type TimeRange = "5m" | "15m" | "1h" | "6h" | "12h" | "24h" | "7d" | "all";
@@ -35,6 +36,36 @@ const LOG_LEVELS: LogLevel[] = [
   "Trace",
 ];
 
+// Calculate time range start
+function getMinTime(range: TimeRange): string | undefined {
+  if (range === "all") return undefined;
+  const now = new Date();
+  switch (range) {
+    case "5m":
+      now.setMinutes(now.getMinutes() - 5);
+      break;
+    case "15m":
+      now.setMinutes(now.getMinutes() - 15);
+      break;
+    case "1h":
+      now.setHours(now.getHours() - 1);
+      break;
+    case "6h":
+      now.setHours(now.getHours() - 6);
+      break;
+    case "12h":
+      now.setHours(now.getHours() - 12);
+      break;
+    case "24h":
+      now.setHours(now.getHours() - 24);
+      break;
+    case "7d":
+      now.setDate(now.getDate() - 7);
+      break;
+  }
+  return now.toISOString();
+}
+
 export function LogsViewer() {
   // Filters
   const [search, setSearch] = useState("");
@@ -43,154 +74,77 @@ export function LogsViewer() {
   const [timeRange, setTimeRange] = useState<TimeRange>("1h");
   const [refreshInterval, setRefreshInterval] = useState(0);
 
-  // Data state - accumulated logs
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Track the newest timestamp we have for incremental fetching
-  const newestTimestamp = useRef<string | null>(null);
-
-  // Calculate time range start
-  const getMinTime = useCallback((range: TimeRange): string | undefined => {
-    if (range === "all") return undefined;
-    const now = new Date();
-    switch (range) {
-      case "5m":
-        now.setMinutes(now.getMinutes() - 5);
-        break;
-      case "15m":
-        now.setMinutes(now.getMinutes() - 15);
-        break;
-      case "1h":
-        now.setHours(now.getHours() - 1);
-        break;
-      case "6h":
-        now.setHours(now.getHours() - 6);
-        break;
-      case "12h":
-        now.setHours(now.getHours() - 12);
-        break;
-      case "24h":
-        now.setHours(now.getHours() - 24);
-        break;
-      case "7d":
-        now.setDate(now.getDate() - 7);
-        break;
-    }
-    return now.toISOString();
-  }, []);
-
-  // Build query params
-  const buildParams = useCallback(
-    (sinceTimestamp?: string | null) => {
-      const params = new URLSearchParams();
-      params.set("limit", "1000");
-      if (search) params.set("search", search);
-      if (component) params.set("component", component);
-      if (level !== "All") params.set("level", level);
-
-      // If incremental fetch, use sinceTimestamp; otherwise use time range
-      if (sinceTimestamp) {
-        params.set("minTime", sinceTimestamp);
-      } else {
-        const minTime = getMinTime(timeRange);
-        if (minTime) params.set("minTime", minTime);
-      }
-
-      return params;
-    },
-    [search, component, level, timeRange, getMinTime]
+  // Memoize fetch params
+  const fetchParams = useMemo(
+    () => ({
+      search,
+      component,
+      level,
+      minTime: getMinTime(timeRange),
+    }),
+    [search, component, level, timeRange]
   );
 
-  // Full fetch - clears existing data and loads fresh
-  const fetchLogs = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Fetch function for the hook
+  const fetchLogs = useCallback(
+    async (params: typeof fetchParams & { sinceTimestamp?: string }) => {
+      const urlParams = new URLSearchParams();
+      urlParams.set("limit", "1000");
+      if (params.search) urlParams.set("search", params.search);
+      if (params.component) urlParams.set("component", params.component);
+      if (params.level && params.level !== "All")
+        urlParams.set("level", params.level);
 
-    try {
-      const params = buildParams();
+      // Use sinceTimestamp for incremental, minTime for full reload
+      if (params.sinceTimestamp) {
+        urlParams.set("minTime", params.sinceTimestamp);
+      } else if (params.minTime) {
+        urlParams.set("minTime", params.minTime);
+      }
+
       const response = await fetch(
-        `/api/clickhouse/logging?${params.toString()}`
+        `/api/clickhouse/logging?${urlParams.toString()}`
       );
       const result = await response.json();
 
-      if (result.success && result.data?.data) {
-        const newLogs = result.data.data as LogEntry[];
-        setLogs(newLogs);
-
-        // Track newest timestamp for incremental refresh
-        if (newLogs.length > 0) {
-          newestTimestamp.current = newLogs[0].timestamp;
-        }
-      } else {
-        setError(result.error || "Failed to fetch logs");
+      if (!result.success) {
+        throw new Error(result.error || "Failed to fetch logs");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [buildParams]);
 
-  // Incremental fetch - appends new data only
-  const fetchNewLogs = useCallback(async () => {
-    if (!newestTimestamp.current) {
-      // No existing data, do a full fetch
-      return fetchLogs();
-    }
+      return (result.data?.data || []) as LogEntry[];
+    },
+    []
+  );
 
-    setIsLoading(true);
-
-    try {
-      const params = buildParams(newestTimestamp.current);
-      const response = await fetch(
-        `/api/clickhouse/logging?${params.toString()}`
-      );
-      const result = await response.json();
-
-      if (result.success && result.data?.data) {
-        const newLogs = result.data.data as LogEntry[];
-
-        if (newLogs.length > 0) {
-          // Prepend new logs (they are newer)
-          setLogs((prev) => {
-            // Filter out duplicates by timestamp
-            const existingTimestamps = new Set(prev.map((l) => l.timestamp));
-            const uniqueNewLogs = newLogs.filter(
-              (l) => !existingTimestamps.has(l.timestamp)
-            );
-            return [...uniqueNewLogs, ...prev];
-          });
-
-          // Update newest timestamp
-          newestTimestamp.current = newLogs[0].timestamp;
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch new logs:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [buildParams, fetchLogs]);
-
-  // Handle refresh from RefreshControl
-  const handleRefresh = useCallback(() => {
-    fetchNewLogs();
-  }, [fetchNewLogs]);
-
-  // Handle filter changes - do full reload
-  const handleApplyFilters = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    newestTimestamp.current = null; // Reset for fresh fetch
-    fetchLogs();
-  };
+  // Use the shared incremental data hook
+  const {
+    data: logs,
+    isLoading,
+    error,
+    reload,
+    fetchNew,
+    newestTimestamp,
+  } = useIncrementalData(
+    {
+      fetchFn: fetchLogs,
+      getTimestamp: (log) => log.timestamp,
+      getKey: (log) =>
+        `${log.timestamp}_${log.component}_${log.message.slice(0, 50)}`,
+    },
+    fetchParams
+  );
 
   // Initial load
-  useMemo(() => {
-    fetchLogs();
+  useEffect(() => {
+    reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle filter apply - do full reload
+  const handleApplyFilters = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    reload();
+  };
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -199,7 +153,7 @@ export function LogsViewer() {
         <RefreshControl
           interval={refreshInterval}
           onIntervalChange={setRefreshInterval}
-          onRefresh={handleRefresh}
+          onRefresh={fetchNew}
           isLoading={isLoading}
           intervals={[5, 10, 30, 60]}
         />
@@ -288,7 +242,8 @@ export function LogsViewer() {
       {/* Stats */}
       <div className="text-xs text-muted-foreground">
         Showing {logs.length} logs
-        {newestTimestamp.current && ` • Latest: ${newestTimestamp.current}`}
+        {newestTimestamp &&
+          ` • Latest: ${new Date(newestTimestamp).toLocaleTimeString()}`}
       </div>
     </div>
   );
