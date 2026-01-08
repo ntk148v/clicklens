@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
   ClickableTableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -256,56 +257,58 @@ export function ResultGrid({
         </div>
       )}
 
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="hover:bg-transparent">
-              {headerGroup.headers.map((header) => (
-                <SortableTableHead
-                  key={header.id}
-                  className="whitespace-nowrap"
-                  style={{ width: header.getSize() }}
-                  sortable={header.column.getCanSort()}
-                  currentSort={
-                    header.column.getIsSorted() as "asc" | "desc" | null
-                  }
-                  onSort={(dir) => {
-                    if (!dir) header.column.clearSorting();
-                    else header.column.toggleSorting(dir === "desc");
-                  }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </SortableTableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody isLoading={isLoading}>
-          {table.getRowModel().rows.map((row, rowIndex) => (
-            <ClickableTableRow
-              key={row.id}
-              record={data[page * pageSize + rowIndex]}
-              columns={meta}
-              rowIndex={page * pageSize + rowIndex}
-              sheetTitle="Query Result"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  className="py-1.5 px-4 font-mono text-sm"
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </ClickableTableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <TableWrapper>
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                {headerGroup.headers.map((header) => (
+                  <SortableTableHead
+                    key={header.id}
+                    className="whitespace-nowrap"
+                    style={{ width: header.getSize() }}
+                    sortable={header.column.getCanSort()}
+                    currentSort={
+                      header.column.getIsSorted() as "asc" | "desc" | null
+                    }
+                    onSort={(dir) => {
+                      if (!dir) header.column.clearSorting();
+                      else header.column.toggleSorting(dir === "desc");
+                    }}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </SortableTableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody isLoading={isLoading}>
+            {table.getRowModel().rows.map((row, rowIndex) => (
+              <ClickableTableRow
+                key={row.id}
+                record={data[page * pageSize + rowIndex]}
+                columns={meta}
+                rowIndex={page * pageSize + rowIndex}
+                sheetTitle="Query Result"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    key={cell.id}
+                    className="py-1.5 px-4 font-mono text-sm"
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </ClickableTableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableWrapper>
 
       {/* Pagination */}
       <PaginationControls

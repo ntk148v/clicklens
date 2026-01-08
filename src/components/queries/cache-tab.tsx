@@ -9,6 +9,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,84 +143,80 @@ export function CacheTab() {
       </div>
 
       {/* Cache Entries Table */}
-      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
-        <div className="flex-1 border rounded-md overflow-hidden relative">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  className="min-w-[300px]"
-                  currentSort={sortColumn === "query" ? sortDirection : null}
-                  onSort={(dir) => updateSort("query", dir)}
-                >
-                  Query
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right ml-auto"
-                  currentSort={
-                    sortColumn === "result_size" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("result_size", dir)}
-                >
-                  Size
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={sortColumn === "stale" ? sortDirection : null}
-                  onSort={(dir) => updateSort("stale", dir)}
-                >
-                  Status
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "expires_at" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("expires_at", dir)}
-                >
-                  Expires
-                </SortableTableHead>
+      <TableWrapper>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableTableHead
+                className="min-w-[300px]"
+                currentSort={sortColumn === "query" ? sortDirection : null}
+                onSort={(dir) => updateSort("query", dir)}
+              >
+                Query
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right ml-auto"
+                currentSort={
+                  sortColumn === "result_size" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("result_size", dir)}
+              >
+                Size
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "stale" ? sortDirection : null}
+                onSort={(dir) => updateSort("stale", dir)}
+              >
+                Status
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "expires_at" ? sortDirection : null}
+                onSort={(dir) => updateSort("expires_at", dir)}
+              >
+                Expires
+              </SortableTableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody isLoading={isLoading}>
+            {sortedEntries.map((entry, idx) => (
+              <TableRow key={entry.key_hash || idx}>
+                <TableCell>
+                  <TruncatedCell
+                    value={entry.query}
+                    maxWidth={400}
+                    className="bg-muted px-2 py-1 rounded"
+                  />
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {formatBytes(entry.result_size)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {entry.stale === 1 && (
+                      <Badge variant="secondary" className="text-xs">
+                        Stale
+                      </Badge>
+                    )}
+                    {entry.compressed === 1 && (
+                      <Badge variant="outline" className="text-xs">
+                        Compressed
+                      </Badge>
+                    )}
+                    {entry.shared === 1 && (
+                      <Badge variant="outline" className="text-xs">
+                        Shared
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {new Date(entry.expires_at).toLocaleString()}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody isLoading={isLoading}>
-              {sortedEntries.map((entry, idx) => (
-                <TableRow key={entry.key_hash || idx}>
-                  <TableCell>
-                    <TruncatedCell
-                      value={entry.query}
-                      maxWidth={400}
-                      className="bg-muted px-2 py-1 rounded"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatBytes(entry.result_size)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {entry.stale === 1 && (
-                        <Badge variant="secondary" className="text-xs">
-                          Stale
-                        </Badge>
-                      )}
-                      {entry.compressed === 1 && (
-                        <Badge variant="outline" className="text-xs">
-                          Compressed
-                        </Badge>
-                      )}
-                      {entry.shared === 1 && (
-                        <Badge variant="outline" className="text-xs">
-                          Shared
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(entry.expires_at).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+            ))}
+          </TableBody>
+        </Table>
+      </TableWrapper>
     </div>
   );
 }

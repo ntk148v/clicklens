@@ -9,6 +9,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -149,119 +150,110 @@ export function PartsTab({ database, table }: PartsTabProps) {
           </CardContent>
         </Card>
       </div>
-
       {/* Parts Table */}
-      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
-        <div className="flex-1 border rounded-md overflow-hidden relative">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "partition" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("partition", dir)}
-                >
-                  Partition
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={sortColumn === "name" ? sortDirection : null}
-                  onSort={(dir) => updateSort("name", dir)}
-                >
-                  Part Name
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "part_type" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("part_type", dir)}
-                >
-                  Type
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={sortColumn === "rows" ? sortDirection : null}
-                  onSort={(dir) => updateSort("rows", dir)}
-                >
-                  Rows
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "bytes_on_disk" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("bytes_on_disk", dir)}
-                >
-                  Size
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "compression_ratio" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("compression_ratio", dir)}
-                >
-                  Compression
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "modification_time" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("modification_time", dir)}
-                >
-                  Modified
-                </SortableTableHead>
+      <TableWrapper>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableTableHead
+                currentSort={sortColumn === "partition" ? sortDirection : null}
+                onSort={(dir) => updateSort("partition", dir)}
+              >
+                Partition
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "name" ? sortDirection : null}
+                onSort={(dir) => updateSort("name", dir)}
+              >
+                Part Name
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "part_type" ? sortDirection : null}
+                onSort={(dir) => updateSort("part_type", dir)}
+              >
+                Type
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "rows" ? sortDirection : null}
+                onSort={(dir) => updateSort("rows", dir)}
+              >
+                Rows
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "bytes_on_disk" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("bytes_on_disk", dir)}
+              >
+                Size
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "compression_ratio" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("compression_ratio", dir)}
+              >
+                Compression
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={
+                  sortColumn === "modification_time" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("modification_time", dir)}
+              >
+                Modified
+              </SortableTableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody isLoading={isLoading}>
+            {paginatedParts.map((part) => (
+              <TableRow key={part.name}>
+                <TableCell>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {part.partition}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-mono text-xs">{part.name}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      part.part_type === "Wide" ? "default" : "secondary"
+                    }
+                    className="text-xs"
+                  >
+                    {part.part_type}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {formatNumber(part.rows)}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {formatBytes(part.bytes_on_disk)}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {part.compression_ratio
+                    ? `${(part.compression_ratio * 100).toFixed(1)}%`
+                    : "—"}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {new Date(part.modification_time).toLocaleString()}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody isLoading={isLoading}>
-              {paginatedParts.map((part) => (
-                <TableRow key={part.name}>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {part.partition}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {part.name}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        part.part_type === "Wide" ? "default" : "secondary"
-                      }
-                      className="text-xs"
-                    >
-                      {part.part_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatNumber(part.rows)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatBytes(part.bytes_on_disk)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {part.compression_ratio
-                      ? `${(part.compression_ratio * 100).toFixed(1)}%`
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(part.modification_time).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <PaginationControls
-          page={page}
-          totalPages={totalPages}
-          totalItems={data.parts.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
-      </Card>
+            ))}
+          </TableBody>
+        </Table>
+      </TableWrapper>{" "}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        totalItems={data.parts.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

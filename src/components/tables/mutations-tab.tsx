@@ -9,6 +9,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,110 +160,108 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
       </div>
 
       {/* Mutations Table */}
-      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
-        <div className="flex-1 border rounded-md overflow-hidden relative">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "mutation_id" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("mutation_id", dir)}
-                >
-                  Mutation ID
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={sortColumn === "is_done" ? sortDirection : null}
-                  onSort={(dir) => updateSort("is_done", dir)}
-                >
-                  Status
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "parts_to_do" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("parts_to_do", dir)}
-                >
-                  Parts To Do
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "create_time" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("create_time", dir)}
-                >
-                  Created
-                </SortableTableHead>
-                <SortableTableHead
-                  className="min-w-[300px]"
-                  currentSort={sortColumn === "command" ? sortDirection : null}
-                  onSort={(dir) => updateSort("command", dir)}
-                >
-                  Command
-                </SortableTableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody isLoading={isLoading}>
-              {paginatedMutations.map((mutation) => {
-                const isFailed = !!mutation.latest_fail_reason;
-                const isDone = mutation.is_done === 1;
-                return (
-                  <TableRow key={mutation.mutation_id}>
-                    <TableCell className="font-mono text-xs">
-                      {mutation.mutation_id}
-                    </TableCell>
-                    <TableCell>
-                      {isFailed ? (
-                        <Badge variant="destructive" className="text-xs">
-                          Failed
-                        </Badge>
-                      ) : isDone ? (
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-green-600 border-green-600"
-                        >
-                          Done
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          Pending ({mutation.parts_to_do} parts)
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {mutation.parts_to_do}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(mutation.create_time).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <TruncatedCell
-                        value={mutation.command}
-                        maxWidth={400}
-                        className="bg-muted px-2 py-1 rounded"
-                      />
-                      {isFailed && (
-                        <div className="text-xs text-red-500 mt-1">
-                          Error: {mutation.latest_fail_reason}
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-        <PaginationControls
-          page={page}
-          totalPages={totalPages}
-          totalItems={data.mutations.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
-      </Card>
+      <TableWrapper>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableTableHead
+                currentSort={
+                  sortColumn === "mutation_id" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("mutation_id", dir)}
+              >
+                Mutation ID
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "is_done" ? sortDirection : null}
+                onSort={(dir) => updateSort("is_done", dir)}
+              >
+                Status
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={
+                  sortColumn === "parts_to_do" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("parts_to_do", dir)}
+              >
+                Parts To Do
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={
+                  sortColumn === "create_time" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("create_time", dir)}
+              >
+                Created
+              </SortableTableHead>
+              <SortableTableHead
+                className="min-w-[300px]"
+                currentSort={sortColumn === "command" ? sortDirection : null}
+                onSort={(dir) => updateSort("command", dir)}
+              >
+                Command
+              </SortableTableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody isLoading={isLoading}>
+            {paginatedMutations.map((mutation) => {
+              const isFailed = !!mutation.latest_fail_reason;
+              const isDone = mutation.is_done === 1;
+              return (
+                <TableRow key={mutation.mutation_id}>
+                  <TableCell className="font-mono text-xs">
+                    {mutation.mutation_id}
+                  </TableCell>
+                  <TableCell>
+                    {isFailed ? (
+                      <Badge variant="destructive" className="text-xs">
+                        Failed
+                      </Badge>
+                    ) : isDone ? (
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-green-600 border-green-600"
+                      >
+                        Done
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Pending ({mutation.parts_to_do} parts)
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {mutation.parts_to_do}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(mutation.create_time).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <TruncatedCell
+                      value={mutation.command}
+                      maxWidth={400}
+                      className="bg-muted px-2 py-1 rounded"
+                    />
+                    {isFailed && (
+                      <div className="text-xs text-red-500 mt-1">
+                        Error: {mutation.latest_fail_reason}
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableWrapper>
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        totalItems={data.mutations.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

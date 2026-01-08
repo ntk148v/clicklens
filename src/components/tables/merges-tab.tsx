@@ -8,6 +8,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -121,113 +122,105 @@ export function MergesTab({ database, table }: MergesTabProps) {
       </div>
 
       {/* Merges Table */}
-      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
-        <div className="flex-1 border rounded-md overflow-hidden relative">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "result_part_name" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("result_part_name", dir)}
-                >
-                  Result Part
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={
-                    sortColumn === "merge_type" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("merge_type", dir)}
-                >
-                  Type
-                </SortableTableHead>
-                <SortableTableHead
-                  className="min-w-[150px]"
-                  currentSort={sortColumn === "progress" ? sortDirection : null}
-                  onSort={(dir) => updateSort("progress", dir)}
-                >
-                  Progress
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "num_parts" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("num_parts", dir)}
-                >
-                  Parts
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "rows_written" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("rows_written", dir)}
-                >
-                  Rows
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "memory_usage" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("memory_usage", dir)}
-                >
-                  Memory
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={sortColumn === "elapsed" ? sortDirection : null}
-                  onSort={(dir) => updateSort("elapsed", dir)}
-                >
-                  Elapsed
-                </SortableTableHead>
+      <TableWrapper>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableTableHead
+                currentSort={
+                  sortColumn === "result_part_name" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("result_part_name", dir)}
+              >
+                Result Part
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "merge_type" ? sortDirection : null}
+                onSort={(dir) => updateSort("merge_type", dir)}
+              >
+                Type
+              </SortableTableHead>
+              <SortableTableHead
+                className="min-w-[150px]"
+                currentSort={sortColumn === "progress" ? sortDirection : null}
+                onSort={(dir) => updateSort("progress", dir)}
+              >
+                Progress
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "num_parts" ? sortDirection : null}
+                onSort={(dir) => updateSort("num_parts", dir)}
+              >
+                Parts
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "rows_written" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("rows_written", dir)}
+              >
+                Rows
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "memory_usage" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("memory_usage", dir)}
+              >
+                Memory
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={sortColumn === "elapsed" ? sortDirection : null}
+                onSort={(dir) => updateSort("elapsed", dir)}
+              >
+                Elapsed
+              </SortableTableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody isLoading={isLoading}>
+            {sortedMerges.map((merge, idx) => (
+              <TableRow key={idx}>
+                <TableCell className="font-mono text-xs">
+                  {merge.result_part_name}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={merge.is_mutation === 1 ? "secondary" : "default"}
+                    className="text-xs"
+                  >
+                    {merge.is_mutation === 1 ? "Mutation" : merge.merge_type}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Progress value={merge.progress * 100} className="h-2" />
+                    <span className="text-xs font-mono w-12 text-right">
+                      {(merge.progress * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {merge.num_parts}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {formatNumber(merge.rows_written)} /{" "}
+                  {formatNumber(merge.rows_read)}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {formatBytes(merge.memory_usage)}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {merge.elapsed.toFixed(1)}s
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody isLoading={isLoading}>
-              {sortedMerges.map((merge, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className="font-mono text-xs">
-                    {merge.result_part_name}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        merge.is_mutation === 1 ? "secondary" : "default"
-                      }
-                      className="text-xs"
-                    >
-                      {merge.is_mutation === 1 ? "Mutation" : merge.merge_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={merge.progress * 100} className="h-2" />
-                      <span className="text-xs font-mono w-12 text-right">
-                        {(merge.progress * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {merge.num_parts}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatNumber(merge.rows_written)} /{" "}
-                    {formatNumber(merge.rows_read)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatBytes(merge.memory_usage)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {merge.elapsed.toFixed(1)}s
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+            ))}
+          </TableBody>
+        </Table>
+      </TableWrapper>
     </div>
   );
 }

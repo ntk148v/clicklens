@@ -9,6 +9,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,92 +151,88 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
       </div>
 
       {/* Columns Table */}
-      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
-        <div className="flex-1 border rounded-md overflow-hidden relative">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  className="min-w-[150px]"
-                  currentSort={sortColumn === "column" ? sortDirection : null}
-                  onSort={(dir) => updateSort("column", dir)}
-                >
-                  Column
-                </SortableTableHead>
-                <SortableTableHead
-                  currentSort={sortColumn === "type" ? sortDirection : null}
-                  onSort={(dir) => updateSort("type", dir)}
-                >
-                  Type
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "bytes_on_disk" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("bytes_on_disk", dir)}
-                >
-                  Size
-                </SortableTableHead>
-                <SortableTableHead className="min-w-[150px]" sortable={false}>
-                  Size %
-                </SortableTableHead>
-                <SortableTableHead
-                  className="text-right"
-                  currentSort={
-                    sortColumn === "compression_ratio" ? sortDirection : null
-                  }
-                  onSort={(dir) => updateSort("compression_ratio", dir)}
-                >
-                  Compression
-                </SortableTableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody isLoading={isLoading}>
-              {paginatedColumns.map((col) => {
-                const sizePercent =
-                  maxBytes > 0
-                    ? (Number(col.bytes_on_disk) / maxBytes) * 100
-                    : 0;
-                return (
-                  <TableRow key={col.column}>
-                    <TableCell className="font-mono font-medium">
-                      {col.column}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono text-xs">
-                        {col.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatBytes(col.bytes_on_disk)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={sizePercent} className="h-2" />
-                        <span className="text-xs text-muted-foreground w-12 text-right">
-                          {sizePercent.toFixed(1)}%
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {(col.compression_ratio * 100).toFixed(1)}%
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-        <PaginationControls
-          page={page}
-          totalPages={totalPages}
-          totalItems={data.columns.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
-      </Card>
+      <TableWrapper>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableTableHead
+                className="min-w-[150px]"
+                currentSort={sortColumn === "column" ? sortDirection : null}
+                onSort={(dir) => updateSort("column", dir)}
+              >
+                Column
+              </SortableTableHead>
+              <SortableTableHead
+                currentSort={sortColumn === "type" ? sortDirection : null}
+                onSort={(dir) => updateSort("type", dir)}
+              >
+                Type
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "bytes_on_disk" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("bytes_on_disk", dir)}
+              >
+                Size
+              </SortableTableHead>
+              <SortableTableHead className="min-w-[150px]" sortable={false}>
+                Size %
+              </SortableTableHead>
+              <SortableTableHead
+                className="text-right"
+                currentSort={
+                  sortColumn === "compression_ratio" ? sortDirection : null
+                }
+                onSort={(dir) => updateSort("compression_ratio", dir)}
+              >
+                Compression
+              </SortableTableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody isLoading={isLoading}>
+            {paginatedColumns.map((col) => {
+              const sizePercent =
+                maxBytes > 0 ? (Number(col.bytes_on_disk) / maxBytes) * 100 : 0;
+              return (
+                <TableRow key={col.column}>
+                  <TableCell className="font-mono font-medium">
+                    {col.column}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {col.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatBytes(col.bytes_on_disk)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Progress value={sizePercent} className="h-2" />
+                      <span className="text-xs text-muted-foreground w-12 text-right">
+                        {sizePercent.toFixed(1)}%
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {(col.compression_ratio * 100).toFixed(1)}%
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableWrapper>
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        totalItems={data.columns.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { RecordDetailSheet } from "@/components/ui/record-detail-sheet";
+import { Card } from "@/components/ui/card";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -233,6 +234,27 @@ function ClickableTableRow({
   );
 }
 
+function TableWrapper({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card
+      className={cn(
+        "flex-1 flex flex-col overflow-hidden border-none shadow-none",
+        className
+      )}
+    >
+      <div className="flex-1 border rounded-md overflow-hidden relative">
+        {children}
+      </div>
+    </Card>
+  );
+}
+
 export {
   Table,
   TableHeader,
@@ -244,4 +266,5 @@ export {
   TableCaption,
   SortableTableHead,
   ClickableTableRow,
+  TableWrapper,
 };

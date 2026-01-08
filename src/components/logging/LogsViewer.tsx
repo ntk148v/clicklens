@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { SystemLogsTable } from "./SystemLogsTable";
+import { TableWrapper } from "@/components/ui/table";
 import { RefreshControl } from "@/components/monitoring/refresh-control";
 import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
 import type { LogEntry } from "@/lib/hooks/use-logs";
@@ -230,14 +231,12 @@ export function LogsViewer() {
       )}
 
       {/* Logs Table */}
-      <div className="flex-1 border rounded-md overflow-hidden relative">
-        <div className="absolute inset-0 overflow-auto">
-          <SystemLogsTable
-            logs={logs}
-            isLoading={isLoading && logs.length === 0}
-          />
-        </div>
-      </div>
+      <TableWrapper>
+        <SystemLogsTable
+          logs={logs}
+          isLoading={isLoading && logs.length === 0}
+        />
+      </TableWrapper>
 
       {/* Stats */}
       <div className="text-xs text-muted-foreground">

@@ -11,6 +11,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -344,150 +345,144 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none">
-              <div className="flex-1 border rounded-md overflow-hidden relative">
-                <Table>
-                  <TableHeader>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortableTableHead
+                      className="w-[200px]"
+                      currentSort={sortColumn === "name" ? sortDirection : null}
+                      onSort={(dir) => updateSort("name", dir)}
+                    >
+                      Name
+                    </SortableTableHead>
+                    <SortableTableHead
+                      currentSort={
+                        sortColumn === "auth_type" ? sortDirection : null
+                      }
+                      onSort={(dir) => updateSort("auth_type", dir)}
+                    >
+                      Auth Type
+                    </SortableTableHead>
+                    <SortableTableHead sortable={false}>
+                      Assigned Roles
+                    </SortableTableHead>
+                    <SortableTableHead className="w-[100px]" sortable={false}>
+                      Actions
+                    </SortableTableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedUsers.length === 0 ? (
                     <TableRow>
-                      <SortableTableHead
-                        className="w-[200px]"
-                        currentSort={
-                          sortColumn === "name" ? sortDirection : null
-                        }
-                        onSort={(dir) => updateSort("name", dir)}
+                      <TableCell
+                        colSpan={4}
+                        className="text-center text-muted-foreground py-8"
                       >
-                        Name
-                      </SortableTableHead>
-                      <SortableTableHead
-                        currentSort={
-                          sortColumn === "auth_type" ? sortDirection : null
-                        }
-                        onSort={(dir) => updateSort("auth_type", dir)}
-                      >
-                        Auth Type
-                      </SortableTableHead>
-                      <SortableTableHead sortable={false}>
-                        Assigned Roles
-                      </SortableTableHead>
-                      <SortableTableHead className="w-[100px]" sortable={false}>
-                        Actions
-                      </SortableTableHead>
+                        No users found
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedUsers.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={4}
-                          className="text-center text-muted-foreground py-8"
-                        >
-                          No users found
+                  ) : (
+                    paginatedUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            {user.name}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-xs"
+                          >
+                            {user.auth_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.assigned_roles &&
+                          user.assigned_roles.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {user.assigned_roles.map((role) => (
+                                <Badge
+                                  key={role}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  {role}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">
+                              No roles assigned
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  disabled={deleting === user.name}
+                                >
+                                  {deleting === user.name ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Delete User
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete user{" "}
+                                    <strong>{user.name}</strong>? This action
+                                    cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleDelete(user.name)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      paginatedUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <User className="w-4 h-4 text-muted-foreground" />
-                              {user.name}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="font-mono text-xs"
-                            >
-                              {user.auth_type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {user.assigned_roles &&
-                            user.assigned_roles.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {user.assigned_roles.map((role) => (
-                                  <Badge
-                                    key={role}
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    <Shield className="w-3 h-3 mr-1" />
-                                    {role}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                No roles assigned
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditDialog(user)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    disabled={deleting === user.name}
-                                  >
-                                    {deleting === user.name ? (
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="w-4 h-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete User
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete user{" "}
-                                      <strong>{user.name}</strong>? This action
-                                      cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      onClick={() => handleDelete(user.name)}
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              <PaginationControls
-                page={page}
-                totalPages={totalPages}
-                totalItems={users.length}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
-            </Card>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              totalItems={users.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
       </div>

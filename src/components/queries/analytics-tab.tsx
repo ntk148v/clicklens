@@ -16,6 +16,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -197,13 +198,13 @@ export function AnalyticsTab() {
           </TabsTrigger>
         </TabsList>
 
-        <Card className="mt-4 flex-1 overflow-hidden border-none shadow-none flex flex-col">
-          <CardHeader className="px-0">
-            <CardTitle className="text-sm">
+        <div className="mt-4 flex-1 flex flex-col overflow-hidden">
+          <div className="flex flex-col space-y-1.5 p-6 px-0">
+            <h3 className="font-semibold leading-none tracking-tight text-sm">
               Top Query Patterns (Last 7 Days)
-            </CardTitle>
-          </CardHeader>
-          <div className="flex-1 border rounded-md overflow-hidden relative">
+            </h3>
+          </div>
+          <TableWrapper className="mt-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -304,16 +305,16 @@ export function AnalyticsTab() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        </Card>
-        <PaginationControls
-          page={page}
-          totalPages={totalPages}
-          totalItems={sortedQueries.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+          </TableWrapper>
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={sortedQueries.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </Tabs>
     </div>
   );
