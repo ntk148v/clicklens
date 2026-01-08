@@ -26,8 +26,10 @@ export const sessionOptions: SessionOptions = {
     "complex_password_at_least_32_characters_long_for_security",
   cookieName: "clicklens-session",
   cookieOptions: {
-    // secure: true in production
-    secure: process.env.NODE_ENV === "production",
+    // secure: true in production, unless disabled explicitly (e.g. for non-https deployments)
+    secure:
+      process.env.NODE_ENV === "production" &&
+      process.env.DISABLE_SECURE_COOKIES !== "true",
     httpOnly: true,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7, // 1 week

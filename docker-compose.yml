@@ -9,4 +9,5 @@ services:
       - ./.env.local:/app/.env.local
     environment:
       - NODE_ENV=production
+      - DISABLE_SECURE_COOKIES=true
     restart: unless-stopped
