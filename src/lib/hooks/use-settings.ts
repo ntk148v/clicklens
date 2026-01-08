@@ -16,7 +16,7 @@ export interface ClickHouseSetting {
 interface UseSettingsResponse {
   settings: ClickHouseSetting[];
   isLoading: boolean;
-  error: any;
+  error: string | null;
   updateSetting: (name: string, value: string | number) => Promise<void>;
   mutate: () => Promise<void>;
 }
@@ -52,7 +52,7 @@ export function useSettings(
     } finally {
       setIsLoading(false);
     }
-  }, [search]);
+  }, [search, scope]);
 
   useEffect(() => {
     fetchData();

@@ -28,7 +28,7 @@ interface ReplicationTabProps {
 export function ReplicationTab({
   refreshInterval = 30000,
 }: ReplicationTabProps) {
-  const { data, isLoading, error, refetch } = useReplicas({ refreshInterval });
+  const { data, isLoading, error } = useReplicas({ refreshInterval });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -40,14 +40,16 @@ export function ReplicationTab({
     "desc"
   );
 
-  const sortedReplicas = useMemo(() => {
-    if (!data?.replicas) return [];
+  const replicas = data?.replicas;
 
-    return [...data.replicas].sort((a, b) => {
+  const sortedReplicas = useMemo(() => {
+    if (!replicas) return [];
+
+    return [...replicas].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
@@ -56,7 +58,7 @@ export function ReplicationTab({
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [data?.replicas, sortColumn, sortDirection]);
+  }, [replicas, sortColumn, sortDirection]);
 
   const updateSort = (column: string, direction: "asc" | "desc" | null) => {
     setSortColumn(column);
@@ -70,9 +72,9 @@ export function ReplicationTab({
   }, [sortedReplicas, page, pageSize]);
 
   const totalPages = useMemo(() => {
-    if (!data?.replicas) return 0;
-    return Math.ceil(data.replicas.length / pageSize);
-  }, [data?.replicas, pageSize]);
+    if (!replicas) return 0;
+    return Math.ceil(replicas.length / pageSize);
+  }, [replicas, pageSize]);
 
   if (error) {
     return (
@@ -99,14 +101,14 @@ export function ReplicationTab({
   };
 
   // If no replicas found
-  if (!isLoading && data?.replicas.length === 0) {
+  if (!isLoading && replicas?.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center">
         <Database className="w-12 h-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-medium mb-2">No Replicated Tables</h3>
         <p className="text-muted-foreground max-w-md">
-          Your cluster doesn't have any replicated tables yet. Replicated tables
-          use ReplicatedMergeTree engine family and require ZooKeeper or
+          Your cluster doesn&apos;t have any replicated tables yet. Replicated
+          tables use ReplicatedMergeTree engine family and require ZooKeeper or
           ClickHouse Keeper.
         </p>
       </div>

@@ -22,19 +22,10 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Copy,
-  Download,
-} from "lucide-react";
+import { Copy, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "@/components/monitoring";
-import { Card } from "../ui/card";
 
 interface ColumnMeta {
   name: string;
@@ -48,7 +39,7 @@ interface QueryStatistics {
 }
 
 interface ResultGridProps {
-  data: any[]; // Changed from Record<string, unknown>[] to support compact array rows
+  data: unknown[];
   meta: ColumnMeta[];
   statistics?: QueryStatistics;
   totalRows?: number;
@@ -110,18 +101,18 @@ export function ResultGrid({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>("onChange");
 
-  const columns = useMemo<ColumnDef<any>[]>(() => {
+  const columns = useMemo<ColumnDef<unknown>[]>(() => {
     return meta.map((col, idx) => ({
       id: `${String(col.name)}_${idx}`,
-      accessorFn: (row: any) => {
+      accessorFn: (row: unknown) => {
         // Handle both array (streamed) and object (legacy/static) formats if necessary
         // But for this tab, it's likely array now.
         // Safety check if row is array
         if (Array.isArray(row)) return row[idx];
         // Fallback for object-based rows (if any legacy path remains)
-        return row[col.name];
+        return (row as Record<string, unknown>)[col.name];
       },
-      header: ({ column }) => (
+      header: () => (
         <div className="flex items-center gap-1">
           <span className="font-semibold">{col.name}</span>
           <Badge
@@ -170,7 +161,18 @@ export function ResultGrid({
   const copyToClipboard = async () => {
     const headers = meta.map((c) => c.name).join("\t");
     const rows = data.map((row) =>
-      meta.map((c) => formatCellValue(row[c.name])).join("\t")
+      meta
+        .map((c, idx) => {
+          let value: unknown;
+          if (Array.isArray(row)) {
+            value = row[idx];
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            value = (row as any)[c.name];
+          }
+          return formatCellValue(value);
+        })
+        .join("\t")
     );
     const text = [headers, ...rows].join("\n");
     await navigator.clipboard.writeText(text);
@@ -180,10 +182,17 @@ export function ResultGrid({
     const headers = meta.map((c) => `"${c.name}"`).join(",");
     const rows = data.map((row) =>
       meta
-        .map((c) => {
-          const value = formatCellValue(row[c.name]);
-          return `"${value.replace(/"/g, '""')}"`;
+        .map((c, idx) => {
+          let value: unknown;
+          if (Array.isArray(row)) {
+            value = row[idx];
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            value = (row as any)[c.name];
+          }
+          return formatCellValue(value);
         })
+        .map((v) => `"${v.replace(/"/g, '""')}"`)
         .join(",")
     );
     const csv = [headers, ...rows].join("\n");
@@ -291,7 +300,8 @@ export function ResultGrid({
             {table.getRowModel().rows.map((row, rowIndex) => (
               <ClickableTableRow
                 key={row.id}
-                record={data[page * pageSize + rowIndex]}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                record={data[page * pageSize + rowIndex] as any}
                 columns={meta}
                 rowIndex={page * pageSize + rowIndex}
                 sheetTitle="Query Result"

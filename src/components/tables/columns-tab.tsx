@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PaginationControls } from "@/components/monitoring";
 import { useTableColumns } from "@/lib/hooks/use-table-explorer";
-import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
+import { formatBytes } from "@/lib/hooks/use-monitoring";
 
 interface ColumnsTabProps {
   database: string;
@@ -38,14 +38,15 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
     "desc"
   );
 
+  const columns = data?.columns;
   const sortedColumns = useMemo(() => {
-    if (!data?.columns) return [];
+    if (!columns) return [];
 
-    return [...data.columns].sort((a, b) => {
+    return [...columns].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
@@ -54,7 +55,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [data?.columns, sortColumn, sortDirection]);
+  }, [columns, sortColumn, sortDirection]);
 
   const paginatedColumns = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -67,15 +68,15 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
   };
 
   const totalPages = useMemo(() => {
-    if (!data?.columns) return 0;
-    return Math.ceil(data.columns.length / pageSize);
-  }, [data?.columns, pageSize]);
+    if (!columns) return 0;
+    return Math.ceil(columns.length / pageSize);
+  }, [columns, pageSize]);
 
   // Calculate max size for progress bar
   const maxBytes = useMemo(() => {
-    if (!data?.columns) return 0;
-    return Math.max(...data.columns.map((c) => Number(c.bytes_on_disk)));
-  }, [data?.columns]);
+    if (!columns) return 0;
+    return Math.max(...columns.map((c) => Number(c.bytes_on_disk)));
+  }, [columns]);
 
   if (isLoading) {
     return (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bookmark, Play, Trash2, Calendar, FileCode } from "lucide-react";
+import { Bookmark, Play } from "lucide-react";
 import { useTabsStore } from "@/lib/store/tabs";
 import { type SavedQuery } from "@/app/api/saved-queries/route";
 
@@ -47,7 +47,9 @@ export function SavedQueries({ onSelect }: SavedQueriesProps) {
   };
 
   if (loading) {
-    return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+    return (
+      <div className="p-4 text-center text-muted-foreground">Loading...</div>
+    );
   }
 
   if (error) {
@@ -77,7 +79,7 @@ export function SavedQueries({ onSelect }: SavedQueriesProps) {
           className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
           onClick={fetchQueries}
         >
-           <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full opacity-50" />
+          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full opacity-50" />
         </Button>
       </div>
 
@@ -91,31 +93,31 @@ export function SavedQueries({ onSelect }: SavedQueriesProps) {
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">{query.name}</span>
                 <span className="text-xs text-muted-foreground">
-                    {new Date(query.created_at).toLocaleDateString()}
+                  {new Date(query.created_at).toLocaleDateString()}
                 </span>
               </div>
-              
+
               {query.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                      {query.description}
-                  </p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {query.description}
+                </p>
               )}
 
               {/* SQL Preview */}
               <div className="bg-muted/50 p-2 rounded text-xs font-mono line-clamp-3 text-muted-foreground">
-                  {query.sql}
+                {query.sql}
               </div>
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-1">
-                <Button 
-                    size="sm" 
-                    variant="secondary" 
-                    className="h-7 text-xs w-full"
-                    onClick={() => handleSelect(query.sql, query.name)}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 text-xs w-full"
+                  onClick={() => handleSelect(query.sql, query.name)}
                 >
-                    <Play className="w-3 h-3 mr-1" />
-                    Load
+                  <Play className="w-3 h-3 mr-1" />
+                  Load
                 </Button>
               </div>
             </div>

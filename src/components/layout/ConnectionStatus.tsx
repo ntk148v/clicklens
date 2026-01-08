@@ -23,27 +23,27 @@ export function ConnectionStatus() {
     loading: true,
   });
 
-  const checkConnection = async () => {
-    setStatus((prev) => ({ ...prev, loading: true }));
-    try {
-      const response = await fetch("/api/clickhouse/ping");
-      const data = await response.json();
-      setStatus({
-        connected: data.connected,
-        version: data.version,
-        loading: false,
-        error: data.error,
-      });
-    } catch (error) {
-      setStatus({
-        connected: false,
-        loading: false,
-        error: error instanceof Error ? error.message : "Connection failed",
-      });
-    }
-  };
-
   useEffect(() => {
+    const checkConnection = async () => {
+      setStatus((prev) => ({ ...prev, loading: true }));
+      try {
+        const response = await fetch("/api/clickhouse/ping");
+        const data = await response.json();
+        setStatus({
+          connected: data.connected,
+          version: data.version,
+          loading: false,
+          error: data.error,
+        });
+      } catch (error) {
+        setStatus({
+          connected: false,
+          loading: false,
+          error: error instanceof Error ? error.message : "Connection failed",
+        });
+      }
+    };
+
     checkConnection();
     // No auto-refresh - individual pages handle their own refresh
   }, []);

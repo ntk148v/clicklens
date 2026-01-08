@@ -17,16 +17,6 @@ import { PaginationControls } from "@/components/monitoring";
 import { useTableMutations } from "@/lib/hooks/use-table-explorer";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 
-type Mutation = {
-  mutation_id: string;
-  command: string;
-  create_time: string;
-  parts_to_do: number;
-  is_done: number;
-  latest_fail_reason: string;
-  block_numbers: { count: number };
-};
-
 interface MutationsTabProps {
   database: string;
   table: string;
@@ -47,15 +37,17 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
     "desc"
   );
 
-  const sortedMutations = useMemo(() => {
-    if (!data?.mutations) return [];
+  const mutations = data?.mutations;
 
-    return [...data.mutations].sort((a, b) => {
+  const sortedMutations = useMemo(() => {
+    if (!mutations) return [];
+
+    return [...mutations].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
       // Type safety hack: assume keys exist
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
@@ -64,7 +56,7 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [data?.mutations, sortColumn, sortDirection]);
+  }, [mutations, sortColumn, sortDirection]);
 
   const paginatedMutations = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -77,9 +69,9 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
   };
 
   const totalPages = useMemo(() => {
-    if (!data?.mutations) return 0;
-    return Math.ceil(data.mutations.length / pageSize);
-  }, [data?.mutations, pageSize]);
+    if (!mutations) return 0;
+    return Math.ceil(mutations.length / pageSize);
+  }, [mutations, pageSize]);
 
   if (isLoading) {
     return (

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   AlertCircle,
-  CheckCircle2,
   XCircle,
   Database,
   Eye,

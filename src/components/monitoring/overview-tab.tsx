@@ -12,8 +12,6 @@ import {
   Layers,
   Activity,
   Cpu,
-  HardDrive,
-  Network,
   Database,
   HeartPulse,
 } from "lucide-react";
@@ -38,11 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  StatusDot,
-  MultiSeriesChart,
-  MetricChart,
-} from "@/components/monitoring";
+import { MultiSeriesChart, MetricChart } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
 import { formatUptime, useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type {
@@ -122,7 +116,6 @@ function transformToSingleSeries(data: TimeSeriesPoint[]) {
 }
 
 export function OverviewTab({
-  refreshInterval = 30000,
   timeRange: initialTimeRange = 60,
 }: OverviewTabProps) {
   const [data, setData] = useState<DashboardData | null>(null);

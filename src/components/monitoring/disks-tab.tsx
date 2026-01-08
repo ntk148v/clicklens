@@ -50,7 +50,7 @@ interface DisksTabProps {
 }
 
 export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
-  const { data, isLoading, error, refetch } = useDisks({ refreshInterval });
+  const { data, isLoading, error } = useDisks({ refreshInterval });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -62,14 +62,16 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
     "desc"
   );
 
-  const sortedDisks = useMemo(() => {
-    if (!data?.disks) return [];
+  const disks = data?.disks;
 
-    return [...data.disks].sort((a, b) => {
+  const sortedDisks = useMemo(() => {
+    if (!disks) return [];
+
+    return [...disks].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
@@ -78,7 +80,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [data?.disks, sortColumn, sortDirection]);
+  }, [disks, sortColumn, sortDirection]);
 
   const updateSort = (column: string, direction: "asc" | "desc" | null) => {
     setSortColumn(column);
@@ -92,9 +94,9 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
   }, [sortedDisks, page, pageSize]);
 
   const totalPages = useMemo(() => {
-    if (!data?.disks) return 0;
-    return Math.ceil(data.disks.length / pageSize);
-  }, [data?.disks, pageSize]);
+    if (!disks) return 0;
+    return Math.ceil(disks.length / pageSize);
+  }, [disks, pageSize]);
 
   if (error) {
     return (

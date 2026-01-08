@@ -10,7 +10,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTableReplicas } from "@/lib/hooks/use-table-explorer";
-import { formatNumber } from "@/lib/hooks/use-monitoring";
 
 interface ReplicasTabProps {
   database: string;

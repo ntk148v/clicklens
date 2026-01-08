@@ -91,6 +91,9 @@ export function useSystemLogs(filters: LogFilters = {}): UseLogsResult {
     filters.search,
     filters.level,
     filters.minTime,
+    filters.component,
+    filters.maxTime,
+    filters.mode,
   ]);
 
   useEffect(() => {

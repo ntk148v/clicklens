@@ -23,7 +23,7 @@ interface MergesTabProps {
 }
 
 export function MergesTab({ database, table }: MergesTabProps) {
-  const { data, isLoading, error, refetch } = useTableMerges(database, table);
+  const { data, isLoading, error } = useTableMerges(database, table);
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string | undefined>("elapsed");
@@ -31,14 +31,16 @@ export function MergesTab({ database, table }: MergesTabProps) {
     "desc"
   );
 
-  const sortedMerges = useMemo(() => {
-    if (!data?.merges) return [];
+  const merges = data?.merges;
 
-    return [...data.merges].sort((a, b) => {
+  const sortedMerges = useMemo(() => {
+    if (!merges) return [];
+
+    return [...merges].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
@@ -47,7 +49,7 @@ export function MergesTab({ database, table }: MergesTabProps) {
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [data?.merges, sortColumn, sortDirection]);
+  }, [merges, sortColumn, sortDirection]);
 
   const updateSort = (column: string, direction: "asc" | "desc" | null) => {
     setSortColumn(column);

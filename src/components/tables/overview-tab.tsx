@@ -3,10 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Database, HardDrive, Layers, Key, Hash } from "lucide-react";
-import {
-  useTableOverview,
-  type TableOverview,
-} from "@/lib/hooks/use-table-explorer";
+import { useTableOverview } from "@/lib/hooks/use-table-explorer";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 
 interface OverviewTabProps {
@@ -79,11 +76,6 @@ export function OverviewTab({ database, table }: OverviewTabProps) {
       </div>
     );
   }
-
-  const compressionRatio =
-    data.total_bytes > 0 && data.avg_row_size
-      ? ((1 - data.avg_row_size / 100) * 100).toFixed(1)
-      : "N/A";
 
   return (
     <div className="space-y-6 p-4">

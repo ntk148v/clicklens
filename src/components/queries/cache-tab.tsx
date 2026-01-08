@@ -17,7 +17,6 @@ import { useQueryCache } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import type { QueryCacheEntry } from "@/lib/hooks/use-query-analytics";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export function CacheTab() {
   const { data, isLoading, error } = useQueryCache();
@@ -80,8 +79,8 @@ export function CacheTab() {
         <AlertCircle className="h-12 w-12 mb-4 opacity-50" />
         <p>Query Cache Not Available</p>
         <p className="text-sm mt-2 max-w-md text-center">
-          Query cache is available in ClickHouse 23.4+. Make sure it's enabled
-          in your server configuration.
+          Query cache is available in ClickHouse 23.4+. Make sure it&apos;s
+          enabled in your server configuration.
         </p>
         <code className="text-xs bg-muted px-3 py-2 rounded font-mono mt-4">
           SET use_query_cache = 1

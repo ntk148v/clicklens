@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type {
-  ClusterOverview,
   MetricsResponse,
   ReplicaStatus,
   ReplicaSummary,
   OperationsResponse,
   HealthSummary,
   MonitoringApiResponse,
-  DiskInfo,
 } from "@/lib/clickhouse/monitoring";
 
 // =============================================================================
@@ -89,8 +87,6 @@ function useMonitoringData<T>(
 // Specific monitoring hooks
 // =============================================================================
 
-
-
 export function useMetrics(
   params?: { category?: string; type?: string },
   options?: UseMonitoringDataOptions
@@ -100,7 +96,9 @@ export function useMetrics(
   if (params?.type) searchParams.set("type", params.type);
 
   const queryString = searchParams.toString();
-  const endpoint = `/api/clickhouse/monitoring/metrics${queryString ? `?${queryString}` : ""}`;
+  const endpoint = `/api/clickhouse/monitoring/metrics${
+    queryString ? `?${queryString}` : ""
+  }`;
 
   return useMonitoringData<MetricsResponse>(endpoint, options);
 }
@@ -169,8 +167,6 @@ export function useDisks(options?: UseMonitoringDataOptions) {
 // =============================================================================
 // Utility hooks
 // =============================================================================
-
-
 
 // =============================================================================
 // Format utilities

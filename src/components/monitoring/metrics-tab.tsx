@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Search, Filter, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -130,11 +130,15 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
 
   const { data, isLoading, error } = useMetrics(undefined, { refreshInterval });
 
+  const metrics = data?.metrics;
+  const asyncMetrics = data?.asyncMetrics;
+  const events = data?.events;
+
   // Filter metrics based on search and category
   const filteredMetrics = useMemo(() => {
-    if (!data?.metrics) return [];
+    if (!metrics) return [];
 
-    return data.metrics.filter((m) => {
+    return metrics.filter((m) => {
       const matchesSearch =
         search === "" ||
         m.metric.toLowerCase().includes(search.toLowerCase()) ||
@@ -142,60 +146,64 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
       const matchesCategory = category === "all" || m.category === category;
       return matchesSearch && matchesCategory;
     });
-  }, [data?.metrics, search, category]);
+  }, [metrics, search, category]);
 
   // Filter async metrics
   const filteredAsyncMetrics = useMemo(() => {
-    if (!data?.asyncMetrics) return [];
+    if (!asyncMetrics) return [];
 
-    return data.asyncMetrics.filter(
+    return asyncMetrics.filter(
       (m) =>
         search === "" ||
         m.metric.toLowerCase().includes(search.toLowerCase()) ||
         m.description.toLowerCase().includes(search.toLowerCase())
     );
-  }, [data?.asyncMetrics, search]);
+  }, [asyncMetrics, search]);
 
   // Filter events
   const filteredEvents = useMemo(() => {
-    if (!data?.events) return [];
+    if (!events) return [];
 
-    return data.events.filter(
+    return events.filter(
       (e) =>
         search === "" ||
         e.event.toLowerCase().includes(search.toLowerCase()) ||
         e.description.toLowerCase().includes(search.toLowerCase())
     );
-  }, [data?.events, search]);
+  }, [events, search]);
 
   // Sorting logic helper
-  const sortData = <T extends Record<string, any>>(items: T[]) => {
-    if (!sortConfig.direction || !sortConfig.column) return items;
+  const sortData = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <T extends Record<string, any>>(items: T[]) => {
+      if (!sortConfig.direction || !sortConfig.column) return items;
 
-    return [...items].sort((a, b) => {
-      const aValue = a[sortConfig.column];
-      const bValue = b[sortConfig.column];
+      return [...items].sort((a, b) => {
+        const aValue = a[sortConfig.column];
+        const bValue = b[sortConfig.column];
 
-      if (aValue === bValue) return 0;
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
+        if (aValue === bValue) return 0;
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
 
-      const comparison = aValue < bValue ? -1 : 1;
-      return sortConfig.direction === "asc" ? comparison : -comparison;
-    });
-  };
+        const comparison = aValue < bValue ? -1 : 1;
+        return sortConfig.direction === "asc" ? comparison : -comparison;
+      });
+    },
+    [sortConfig]
+  );
 
   const sortedMetrics = useMemo(
     () => sortData(filteredMetrics),
-    [filteredMetrics, sortConfig]
+    [filteredMetrics, sortData]
   );
   const sortedAsyncMetrics = useMemo(
     () => sortData(filteredAsyncMetrics),
-    [filteredAsyncMetrics, sortConfig]
+    [filteredAsyncMetrics, sortData]
   );
   const sortedEvents = useMemo(
     () => sortData(filteredEvents),
-    [filteredEvents, sortConfig]
+    [filteredEvents, sortData]
   );
 
   // Paginated data

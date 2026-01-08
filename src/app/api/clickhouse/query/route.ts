@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const stream = resultSet.stream();
+    const stream = (resultSet as any).stream();
     let rowsRead = 0;
     let limitReached = false;
     let meta: { name: string; type: string }[] = [];

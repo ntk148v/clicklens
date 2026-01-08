@@ -45,7 +45,7 @@ interface OperationsTabProps {
 }
 
 export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
-  const { data, isLoading, error, refetch } = useOperations({
+  const { data, isLoading, error } = useOperations({
     refreshInterval,
   });
 
@@ -65,24 +65,27 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
   const updateMutationSort = (col: string, dir: "asc" | "desc" | null) =>
     setMutationSort({ col, dir });
 
+  const merges = data?.merges;
+  const mutations = data?.mutations;
+
   const sortedMerges = useMemo(() => {
-    if (!data?.merges) return [];
-    return [...data.merges].sort((a, b) => {
+    if (!merges) return [];
+    return [...merges].sort((a, b) => {
       if (!mergeSort.dir) return 0;
-      const aVal = (a as any)[mergeSort.col];
-      const bVal = (b as any)[mergeSort.col];
+      const aVal = a[mergeSort.col as keyof typeof a];
+      const bVal = b[mergeSort.col as keyof typeof b];
       if (aVal === bVal) return 0;
       const cmp = (aVal ?? 0) < (bVal ?? 0) ? -1 : 1;
       return mergeSort.dir === "asc" ? cmp : -cmp;
     });
-  }, [data?.merges, mergeSort]);
+  }, [merges, mergeSort]);
 
   const sortedMutations = useMemo(() => {
-    if (!data?.mutations) return [];
-    return [...data.mutations].sort((a, b) => {
+    if (!mutations) return [];
+    return [...mutations].sort((a, b) => {
       if (!mutationSort.dir) return 0;
-      const aVal = (a as any)[mutationSort.col];
-      const bVal = (b as any)[mutationSort.col];
+      const aVal = a[mutationSort.col as keyof typeof a];
+      const bVal = b[mutationSort.col as keyof typeof b];
       if (aVal === bVal) return 0;
       // Handle strings safely
       if (typeof aVal === "string" && typeof bVal === "string") {
@@ -93,7 +96,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
       const cmp = (aVal ?? 0) < (bVal ?? 0) ? -1 : 1;
       return mutationSort.dir === "asc" ? cmp : -cmp;
     });
-  }, [data?.mutations, mutationSort]);
+  }, [mutations, mutationSort]);
 
   if (error) {
     return (

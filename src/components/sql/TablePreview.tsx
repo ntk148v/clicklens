@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Database, Columns } from "lucide-react";
+import { Database, Columns } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PaginationControls } from "../monitoring";
 
@@ -48,33 +47,33 @@ export function TablePreview({ database, table }: TablePreviewProps) {
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
-    fetchData(previewTab);
-  }, [database, table, previewTab]);
-
-  const fetchData = async (type: "data" | "structure") => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/clickhouse/tables/${encodeURIComponent(
-          table
-        )}?database=${encodeURIComponent(database)}&type=${type}`
-      );
-      const result = await res.json();
-      if (result.success) {
-        if (type === "structure" && result.columns) {
-          setColumns(result.columns);
-        } else if (type === "data" && result.data) {
-          setData(result.data);
-          setMeta(result.meta || []);
-          setCurrentPage(0);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/clickhouse/tables/${encodeURIComponent(
+            table
+          )}?database=${encodeURIComponent(database)}&type=${previewTab}`
+        );
+        const result = await res.json();
+        if (result.success) {
+          if (previewTab === "structure" && result.columns) {
+            setColumns(result.columns);
+          } else if (previewTab === "data" && result.data) {
+            setData(result.data);
+            setMeta(result.meta || []);
+            setCurrentPage(0);
+          }
         }
+      } catch (error) {
+        console.error("Error fetching table data:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching table data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchData();
+  }, [database, table, previewTab]);
 
   const totalPages = Math.ceil(data.length / pageSize);
   const paginatedData = data.slice(

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { useRunningQueries } from "@/lib/hooks/use-query-analytics";
-import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
+import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import type { RunningQuery } from "@/lib/hooks/use-query-analytics";
 

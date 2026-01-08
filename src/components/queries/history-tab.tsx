@@ -1,17 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Loader2,
-  Filter,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  X,
-} from "lucide-react";
+import { Filter, AlertCircle, CheckCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -99,7 +92,7 @@ export function HistoryTab({
     [page, pageSize, userFilter, minDuration, queryType, status, fingerprint]
   );
 
-  const { data, isLoading, error } = useQueryHistory(filters);
+  const { data, error } = useQueryHistory(filters);
 
   // Client-side sorting of the fetched page
   // Note: For true global sorting, API needs update.

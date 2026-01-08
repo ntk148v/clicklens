@@ -14,7 +14,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import type { LogEntry } from "@/lib/hooks/use-logs";
-import { cn } from "@/lib/utils";
 
 interface SystemLogsTableProps {
   logs: LogEntry[];
@@ -136,7 +135,7 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
             logs.map((log, index) => (
               <ClickableTableRow
                 key={`${log.timestamp}_${index}`}
-                record={log as any}
+                record={log as unknown as Record<string, unknown>}
                 columns={columns}
                 rowIndex={index}
                 sheetTitle="Log Details"

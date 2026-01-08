@@ -3,14 +3,7 @@
 import { useTabsStore } from "@/lib/store/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  Trash2,
-  Database,
-  Cpu,
-} from "lucide-react";
+import { Clock, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth";
 
@@ -131,7 +124,8 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span>
-                      Read: {entry.rowsRead || 0} rows ({formatBytes(entry.bytesRead || 0)})
+                      Read: {entry.rowsRead || 0} rows (
+                      {formatBytes(entry.bytesRead || 0)})
                     </span>
                   </div>
                 </div>
@@ -149,7 +143,7 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
                 title="Click to use query"
               >
                 <div className="text-xs font-mono text-foreground line-clamp-3 break-all">
-                   {entry.sql}
+                  {entry.sql}
                 </div>
               </button>
             </div>

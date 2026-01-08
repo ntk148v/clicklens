@@ -80,7 +80,8 @@ export class ClickHouseClientImpl implements ClickHouseClient {
     });
     // The key in JSON is "version()"
     const json = await result.json<{ data: Record<string, string>[] }>();
-    const rows = json.data as any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = (json as any).data as Record<string, string>[];
     return rows[0]["version()"];
   }
 
@@ -113,8 +114,10 @@ export class ClickHouseClientImpl implements ClickHouseClient {
 
     return this.client.query({
       query: sql,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       format: (options?.format as any) || "JSON",
       query_id: options?.query_id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       clickhouse_settings: settings as any,
     });
   }

@@ -2,9 +2,6 @@
  * Common types for ClickHouse clients (HTTP and Native)
  */
 
-import { type ClickHouseConfig } from "../config";
-import { type ClickHouseError } from "../types";
-
 export { isClickHouseError } from "../types";
 export type { ClickHouseError } from "../types";
 export type { ClickHouseConfig } from "../config";
@@ -68,7 +65,7 @@ export interface ClickHouseClient {
       format?: string;
       clickhouse_settings?: Record<string, unknown>;
     }
-  ): Promise<any>; // returning any to avoid deep type dependencies for now, or use complex type
+  ): Promise<unknown>; // returning unknown to avoid deep type dependencies for now, or use complex type
 
   explain(sql: string): Promise<string[]>;
 }
