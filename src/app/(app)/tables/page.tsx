@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth";
 import { Header } from "@/components/layout";
 import { DatabaseSelector } from "@/components/sql";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
@@ -44,6 +46,16 @@ interface TableInfo {
 }
 
 export default function TablesPage() {
+  const { permissions, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Permission guard
+  useEffect(() => {
+    if (!authLoading && !permissions?.canBrowseTables) {
+      router.push("/");
+    }
+  }, [authLoading, permissions, router]);
+
   // Use the SQL browser store for database selection and tables
   const { selectedDatabase, tables, loadingTables } = useSqlBrowserStore();
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -66,6 +78,15 @@ export default function TablesPage() {
     // For table data, this refreshes the tab content
     setRefreshKey((k) => k + 1);
   };
+
+  // Show loading while checking permissions
+  if (authLoading || !permissions?.canBrowseTables) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

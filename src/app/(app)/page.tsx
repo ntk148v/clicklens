@@ -70,6 +70,12 @@ export default function HomePage() {
     if (feature.title === "Cluster Health") {
       return permissions?.canViewCluster;
     }
+    if (feature.title === "SQL Console") {
+      return permissions?.canExecuteQueries;
+    }
+    if (feature.title === "Table Explorer") {
+      return permissions?.canBrowseTables;
+    }
     return true;
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout";
 import {
   SqlEditor,
@@ -63,11 +64,19 @@ interface QueryResult {
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory } =
     useTabsStore();
-  const { user } = useAuth();
+  const { user, permissions, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+
+  // Permission guard
+  useEffect(() => {
+    if (!authLoading && !permissions?.canExecuteQueries) {
+      router.push("/");
+    }
+  }, [authLoading, permissions, router]);
 
   // Local state for pagination per tab
   // map of tabId -> { page: number, pageSize: number }
@@ -79,6 +88,15 @@ export default function SqlConsolePage() {
   useEffect(() => {
     initializeTabs();
   }, []);
+
+  // Show loading while checking permissions
+  if (authLoading || !permissions?.canExecuteQueries) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeQueryTab = activeTab?.type === "query" ? activeTab : null;

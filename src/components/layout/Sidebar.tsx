@@ -134,14 +134,14 @@ const navigation = [
     href: "/sql",
     icon: Terminal,
     description: "Execute SQL queries",
-    requiresPermission: null, // Always visible
+    requiresPermission: "canExecuteQueries" as const,
   },
   {
     name: "Tables",
     href: "/tables",
     icon: Database,
     description: "Browse databases and tables",
-    requiresPermission: null,
+    requiresPermission: "canBrowseTables" as const,
   },
   {
     name: "Queries",

@@ -14,6 +14,8 @@ interface PermissionsResponse {
     canViewProcesses: boolean;
     canKillQueries: boolean;
     canViewCluster: boolean;
+    canBrowseTables: boolean;
+    canExecuteQueries: boolean;
     username: string;
   };
   error?: string;
@@ -103,6 +105,10 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         client.query("SELECT 1 FROM system.processes LIMIT 1"),
         // view cluster probe (system.metrics)
         client.query("SELECT 1 FROM system.metrics LIMIT 1"),
+        // browse tables probe (system.tables)
+        client.query("SELECT 1 FROM system.tables LIMIT 1"),
+        // execute queries probe (simple SELECT)
+        client.query("SELECT 1"),
       ]),
     ]);
 
@@ -116,6 +122,8 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     let canManageUsers = false;
     let canViewProcesses = false;
     let canViewCluster = false;
+    let canBrowseTables = false;
+    let canExecuteQueries = false;
 
     if (featuresResult.status === "fulfilled") {
       const results = featuresResult.value;
@@ -128,6 +136,12 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
 
       // Index 2: canViewCluster
       if (results[2].status === "fulfilled") canViewCluster = true;
+
+      // Index 3: canBrowseTables
+      if (results[3].status === "fulfilled") canBrowseTables = true;
+
+      // Index 4: canExecuteQueries
+      if (results[4].status === "fulfilled") canExecuteQueries = true;
     }
 
     // Check permissions based on effective roles (including inherited)
@@ -146,6 +160,11 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       canViewCluster = effectiveRoles.has("clicklens_cluster_monitor");
     }
 
+    // 4. Table Explorer: via clicklens_table_explorer role
+    if (!canBrowseTables) {
+      canBrowseTables = effectiveRoles.has("clicklens_table_explorer");
+    }
+
     // Check Kill Query
     const canKillQueries =
       canManageUsers || effectiveRoles.has("clicklens_query_monitor");
@@ -157,6 +176,8 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canViewProcesses,
         canKillQueries,
         canViewCluster,
+        canBrowseTables,
+        canExecuteQueries,
         username: config.username,
       },
     });
