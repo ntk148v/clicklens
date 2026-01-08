@@ -197,7 +197,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
                 maxBytes > 0 ? (Number(col.bytes_on_disk) / maxBytes) * 100 : 0;
               return (
                 <TableRow key={col.column}>
-                  <TableCell className="font-mono font-medium">
+                  <TableCell className="font-mono font-medium text-xs">
                     {col.column}
                   </TableCell>
                   <TableCell>
@@ -224,15 +224,17 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
             })}
           </TableBody>
         </Table>
+        <div className="p-2 border-t">
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={data.columns.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </TableWrapper>
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        totalItems={data.columns.length}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
     </div>
   );
 }

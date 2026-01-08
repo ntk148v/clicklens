@@ -9,6 +9,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { StatCard, PaginationControls } from "@/components/monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
@@ -193,7 +194,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
       )}
 
       {/* Disks Table */}
-      <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
+      <TableWrapper>
         <Table>
           <TableHeader>
             <TableRow>
@@ -334,19 +335,19 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
               paginatedDisks.map((disk, idx) => (
                 <TableRow key={`${disk.node}-${disk.name}-${idx}`}>
                   {isMultiNode && (
-                    <TableCell>
+                    <TableCell className="text-xs">
                       <TruncatedCell value={disk.node} maxWidth={100} />
                     </TableCell>
                   )}
-                  <TableCell className="font-mono font-medium">
+                  <TableCell className="font-mono font-medium text-xs">
                     {disk.name}
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs px-2 py-1 rounded-full bg-muted">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted">
                       {disk.type}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-xs">
                     <TruncatedCell
                       value={disk.path}
                       maxWidth={150}
@@ -357,10 +358,10 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
                     <div className="flex items-center gap-2">
                       <DiskUsageBar
                         percentage={disk.usedPercentage || 0}
-                        className="flex-1"
+                        className="flex-1 h-2"
                       />
                       <span
-                        className={`text-xs font-mono w-12 text-right ${
+                        className={`text-[10px] font-mono w-8 text-right ${
                           (disk.usedPercentage || 0) >= 90
                             ? "text-red-500"
                             : (disk.usedPercentage || 0) >= 75
@@ -372,24 +373,24 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-xs">
                     {formatBytes(disk.totalSpace)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-xs">
                     {formatBytes(disk.usedSpace)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-xs">
                     {formatBytes(disk.freeSpace)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-xs">
                     {disk.compressedBytes
                       ? formatBytes(disk.compressedBytes)
                       : "-"}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-xs">
                     {formatCompressionRatio(disk.compressionRatio)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-xs">
                     {disk.partsCount?.toLocaleString() || "-"}
                   </TableCell>
                 </TableRow>
@@ -398,7 +399,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
           </TableBody>
         </Table>
         {/* Pagination */}
-        <div className="p-4 border-t">
+        <div className="p-2 border-t">
           <PaginationControls
             page={page}
             totalPages={totalPages}
@@ -408,7 +409,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
             onPageSizeChange={setPageSize}
           />
         </div>
-      </div>
+      </TableWrapper>
 
       {/* Info */}
       <div className="p-4 rounded-lg bg-muted border">

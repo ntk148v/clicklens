@@ -180,7 +180,7 @@ export function CacheTab() {
           <TableBody isLoading={isLoading}>
             {sortedEntries.map((entry, idx) => (
               <TableRow key={entry.key_hash || idx}>
-                <TableCell>
+                <TableCell className="text-xs">
                   <TruncatedCell
                     value={entry.query}
                     maxWidth={400}

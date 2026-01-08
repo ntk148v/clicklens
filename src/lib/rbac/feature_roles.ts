@@ -98,11 +98,20 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "Grants CREATE TABLE, DROP TABLE, ALTER TABLE, TRUNCATE, and OPTIMIZE globally. " +
       "Use with data privileges to restrict to specific databases.",
     grants: [
-      "GRANT CREATE TABLE ON *.* TO `clicklens_table_admin`",
-      "GRANT DROP TABLE ON *.* TO `clicklens_table_admin`",
-      "GRANT ALTER TABLE ON *.* TO `clicklens_table_admin`",
       "GRANT TRUNCATE ON *.* TO `clicklens_table_admin`",
       "GRANT OPTIMIZE ON *.* TO `clicklens_table_admin`",
+    ],
+  },
+  {
+    id: "clicklens_settings_admin",
+    name: "Settings Viewer",
+    description: "View system and server settings",
+    details:
+      "Grants SELECT on system.settings and system.server_settings globally. " +
+      "Allows varying settings for current user scope.",
+    grants: [
+      "GRANT SELECT ON system.settings TO `clicklens_settings_admin`",
+      "GRANT SELECT ON system.server_settings TO `clicklens_settings_admin`",
     ],
   },
 ];
@@ -196,6 +205,12 @@ export function checkConfiguredFeature(
       // Needs generic table DDL
       ["CREATE TABLE", "DROP TABLE", "ALTER TABLE"].includes(g.access_type) &&
       (!g.database || g.database === "*"),
+
+    clicklens_settings_admin: (g) =>
+      // Needs SELECT on system.settings
+      g.access_type === "SELECT" &&
+      g.database === "system" &&
+      g.table === "settings",
   };
 
   const check = criteria[featureId];

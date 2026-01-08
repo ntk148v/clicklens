@@ -135,7 +135,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
             <TableBody isLoading={loading}>
               {columns.map((col) => (
                 <TableRow key={col.name}>
-                  <TableCell className="font-mono font-medium">
+                  <TableCell className="font-mono font-medium text-xs">
                     {col.name}
                   </TableCell>
                   <TableCell>

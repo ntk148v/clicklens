@@ -245,15 +245,17 @@ export function PartsTab({ database, table }: PartsTabProps) {
             ))}
           </TableBody>
         </Table>
-      </TableWrapper>{" "}
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        totalItems={data.parts.length}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+        <div className="p-2 border-t">
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={data.parts.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
+      </TableWrapper>
     </div>
   );
 }
