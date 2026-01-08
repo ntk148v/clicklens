@@ -24,6 +24,7 @@ import {
   Clock,
   TrendingUp,
   Shield,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -158,6 +159,13 @@ const navigation = [
     description: "Cluster health and metrics",
     requiresPermission: "canViewCluster" as const,
     subItems: monitoringItems,
+  },
+  {
+    name: "Logging",
+    href: "/logging",
+    icon: ScrollText,
+    description: "Search server logs",
+    requiresPermission: "canViewCluster" as const,
   },
   {
     name: "Access",

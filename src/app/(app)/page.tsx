@@ -17,6 +17,7 @@ import {
   Server,
   Users,
   ArrowRight,
+  ScrollText,
 } from "lucide-react";
 
 const features = [
@@ -54,6 +55,12 @@ const features = [
     href: "/access/users",
     icon: Users,
   },
+  {
+    title: "Logging",
+    description: "View system and query logs to debug issues.",
+    href: "/logging",
+    icon: ScrollText,
+  },
 ];
 
 export default function HomePage() {
@@ -68,6 +75,9 @@ export default function HomePage() {
       return permissions?.canViewProcesses;
     }
     if (feature.title === "Cluster Health") {
+      return permissions?.canViewCluster;
+    }
+    if (feature.title === "Logging") {
       return permissions?.canViewCluster;
     }
     if (feature.title === "SQL Console") {
