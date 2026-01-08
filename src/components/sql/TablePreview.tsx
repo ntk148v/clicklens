@@ -122,11 +122,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
 
       {/* Content */}
       <div className="flex-1 min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : previewTab === "structure" ? (
+        {previewTab === "structure" ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -136,7 +132,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                 <TableHead>Comment</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={loading}>
               {columns.map((col) => (
                 <TableRow key={col.name}>
                   <TableCell className="font-mono font-medium">
@@ -174,7 +170,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                 ))}
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={loading}>
               {paginatedData.map((row, i) => (
                 <TableRow key={i}>
                   {meta.map((col) => (

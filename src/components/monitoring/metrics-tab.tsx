@@ -339,7 +339,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                   </SortableTableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody isLoading={isLoading}>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>

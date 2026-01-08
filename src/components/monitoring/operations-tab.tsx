@@ -240,7 +240,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
                   </SortableTableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody isLoading={isLoading}>
                 {sortedMerges.map((m, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-mono text-sm">

@@ -213,7 +213,7 @@ export function PartsTab({ database, table }: PartsTabProps) {
                 </SortableTableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={isLoading}>
               {paginatedParts.map((part) => (
                 <TableRow key={part.name}>
                   <TableCell>

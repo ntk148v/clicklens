@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 interface SystemLogsTableProps {
   logs: LogEntry[];
-  isLoading: boolean;
+  isLoading?: boolean;
 }
 
 // Stylish badge colors for 6 log levels
@@ -119,14 +119,6 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8 text-muted-foreground">
-        Loading logs...
-      </div>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -137,7 +129,7 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
           <TableHead>Message</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
+      <TableBody isLoading={isLoading}>
         {logs.length > 0 ? (
           logs.map((log, index) => (
             <ClickableTableRow

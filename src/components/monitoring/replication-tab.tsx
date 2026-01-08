@@ -213,7 +213,7 @@ export function ReplicationTab({
               </SortableTableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody isLoading={isLoading}>
             {isLoading
               ? Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>

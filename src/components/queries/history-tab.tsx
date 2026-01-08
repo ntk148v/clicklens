@@ -312,9 +312,7 @@ export function HistoryTab({
                 </SortableTableHead>
               </TableRow>
             </TableHeader>
-            <TableBody
-              className={isLoading ? "opacity-50 pointer-events-none" : ""}
-            >
+            <TableBody>
               {sortedHistory.length > 0 ? (
                 sortedHistory.map((query, index) => (
                   <ClickableTableRow
@@ -386,14 +384,7 @@ export function HistoryTab({
               ) : (
                 <TableRow>
                   <TableCell colSpan={9} className="h-24 text-center">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        <span className="ml-2">Loading...</span>
-                      </div>
-                    ) : (
-                      "No queries found"
-                    )}
+                    No queries found
                   </TableCell>
                 </TableRow>
               )}

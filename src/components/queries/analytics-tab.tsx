@@ -82,7 +82,7 @@ export function AnalyticsTab() {
     setSortDirection(direction);
   };
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -257,7 +257,7 @@ export function AnalyticsTab() {
                   </SortableTableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody isLoading={isLoading}>
                 {paginatedQueries.map((query, idx) => (
                   <TableRow key={query.normalized_query_hash || idx}>
                     <TableCell>

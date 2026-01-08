@@ -87,7 +87,7 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -184,7 +184,7 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
                 <TableHead className="w-[80px]">Action</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={isLoading}>
               {sortedQueries.map((query) => (
                 <TableRow key={query.query_id}>
                   <TableCell>

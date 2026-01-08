@@ -280,7 +280,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
               </SortableTableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody isLoading={isLoading}>
             {isLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>

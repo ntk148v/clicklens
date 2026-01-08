@@ -191,7 +191,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
                 </SortableTableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={isLoading}>
               {paginatedColumns.map((col) => {
                 const sizePercent =
                   maxBytes > 0

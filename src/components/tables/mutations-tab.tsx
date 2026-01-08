@@ -203,7 +203,7 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
                 </SortableTableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={isLoading}>
               {paginatedMutations.map((mutation) => {
                 const isFailed = !!mutation.latest_fail_reason;
                 const isDone = mutation.is_done === 1;

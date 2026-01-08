@@ -185,7 +185,7 @@ export function MergesTab({ database, table }: MergesTabProps) {
                 </SortableTableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody isLoading={isLoading}>
               {sortedMerges.map((merge, idx) => (
                 <TableRow key={idx}>
                   <TableCell className="font-mono text-xs">

@@ -882,6 +882,7 @@ export default function SqlConsolePage() {
                       onPageChange={handlePageChange}
                       onPageSizeChange={handlePageSizeChange}
                       className="h-full"
+                      isLoading={activeQueryTab.isRunning}
                     />
                   ) : activeQueryTab.explainResult ? (
                     <ExplainVisualizer

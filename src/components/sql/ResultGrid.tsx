@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "@/components/monitoring";
+import { Card } from "../ui/card";
 
 interface ColumnMeta {
   name: string;
@@ -55,6 +56,7 @@ interface ResultGridProps {
   pageSize?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  isLoading?: boolean;
 }
 
 // ... imports and helper functions ...
@@ -102,6 +104,7 @@ export function ResultGrid({
   pageSize = 100,
   onPageChange,
   onPageSizeChange,
+  isLoading,
 }: ResultGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>("onChange");
@@ -253,7 +256,6 @@ export function ResultGrid({
         </div>
       )}
 
-      {/* Table */}
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -283,7 +285,7 @@ export function ResultGrid({
             </TableRow>
           ))}
         </TableHeader>
-        <TableBody>
+        <TableBody isLoading={isLoading}>
           {table.getRowModel().rows.map((row, rowIndex) => (
             <ClickableTableRow
               key={row.id}
