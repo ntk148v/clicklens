@@ -11,6 +11,7 @@ import {
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
+import { generateUUID } from "@/lib/utils";
 import {
   ensureMetadataInfrastructure,
   METADATA_DB,
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     const client = createClientWithConfig(config);
     await ensureMetadataInfrastructure();
 
-    const id = crypto.randomUUID();
+    const id = generateUUID();
     const safeSql = sql.replace(/'/g, "''");
     const safeName = name.replace(/'/g, "''");
     const safeDesc = description.replace(/'/g, "''");

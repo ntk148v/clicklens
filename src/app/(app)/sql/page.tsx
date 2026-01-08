@@ -45,6 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { generateUUID } from "@/lib/utils";
 
 // import type { QueryResponse } from "@/app/api/clickhouse/query/route"; // Removed
 
@@ -106,7 +107,7 @@ export default function SqlConsolePage() {
 
       if (statements.length === 0) return;
 
-      const queryId = crypto.randomUUID();
+      const queryId = generateUUID();
       updateTab(tab.id, { isRunning: true, error: null, queryId });
 
       // Update active page
@@ -399,7 +400,7 @@ export default function SqlConsolePage() {
 
     if (!statement) return;
 
-    const queryId = crypto.randomUUID();
+    const queryId = generateUUID();
     updateTab(tab.id, { isRunning: true, error: null, queryId });
 
     try {
