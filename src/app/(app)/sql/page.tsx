@@ -89,15 +89,6 @@ export default function SqlConsolePage() {
     initializeTabs();
   }, []);
 
-  // Show loading while checking permissions
-  if (authLoading || !permissions?.canExecuteQueries) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeQueryTab = activeTab?.type === "query" ? activeTab : null;
 
@@ -660,6 +651,15 @@ export default function SqlConsolePage() {
     },
     [activeTabId, activeQueryTab, updateTab]
   );
+
+  // Show loading while checking permissions
+  if (authLoading || !permissions?.canExecuteQueries) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

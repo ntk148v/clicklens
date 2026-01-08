@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Expand } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { RecordDetailSheet } from "@/components/ui/record-detail-sheet";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -164,6 +166,64 @@ function SortableTableHead({
   );
 }
 
+// Clickable Table Row with Record Detail Sheet
+export interface ClickableTableRowProps extends React.ComponentProps<"tr"> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  record?: Record<string, any> | unknown[] | null;
+  columns?: Array<{ name: string; type: string }>;
+  rowIndex?: number;
+  sheetTitle?: string;
+  expandable?: boolean;
+}
+
+function ClickableTableRow({
+  className,
+  children,
+  record,
+  columns = [],
+  rowIndex,
+  sheetTitle = "Record Details",
+  expandable = true,
+  ...props
+}: ClickableTableRowProps) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  if (!expandable || !record || columns.length === 0) {
+    return (
+      <TableRow className={className} {...props}>
+        {children}
+      </TableRow>
+    );
+  }
+
+  return (
+    <>
+      <tr
+        data-slot="table-row"
+        className={cn(
+          "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
+          className
+        )}
+        onClick={() => setSheetOpen(true)}
+        {...props}
+      >
+        {children}
+        <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
+          <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </td>
+      </tr>
+      <RecordDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        record={record}
+        columns={columns}
+        title={sheetTitle}
+        rowIndex={rowIndex}
+      />
+    </>
+  );
+}
+
 export {
   Table,
   TableHeader,
@@ -174,4 +234,5 @@ export {
   TableCell,
   TableCaption,
   SortableTableHead,
+  ClickableTableRow,
 };

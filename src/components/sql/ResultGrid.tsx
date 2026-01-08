@@ -18,6 +18,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  ClickableTableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -283,8 +284,14 @@ export function ResultGrid({
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id} className="hover:bg-muted/50">
+          {table.getRowModel().rows.map((row, rowIndex) => (
+            <ClickableTableRow
+              key={row.id}
+              record={data[page * pageSize + rowIndex]}
+              columns={meta}
+              rowIndex={page * pageSize + rowIndex}
+              sheetTitle="Query Result"
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell
                   key={cell.id}
@@ -293,7 +300,7 @@ export function ResultGrid({
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
               ))}
-            </TableRow>
+            </ClickableTableRow>
           ))}
         </TableBody>
       </Table>

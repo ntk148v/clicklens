@@ -20,6 +20,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  ClickableTableRow,
 } from "@/components/ui/table";
 import {
   Select,
@@ -309,8 +310,24 @@ export function HistoryTab() {
             </TableHeader>
             <TableBody>
               {sortedHistory.length > 0 ? (
-                sortedHistory.map((query) => (
-                  <TableRow key={query.query_id}>
+                sortedHistory.map((query, index) => (
+                  <ClickableTableRow
+                    key={query.query_id}
+                    record={query}
+                    columns={[
+                      { name: "query_id", type: "String" },
+                      { name: "query", type: "String" },
+                      { name: "user", type: "String" },
+                      { name: "event_time", type: "DateTime" },
+                      { name: "query_duration_ms", type: "UInt64" },
+                      { name: "read_rows", type: "UInt64" },
+                      { name: "read_bytes", type: "UInt64" },
+                      { name: "memory_usage", type: "UInt64" },
+                      { name: "exception", type: "String" },
+                    ]}
+                    rowIndex={index}
+                    sheetTitle="Query Details"
+                  >
                     <TableCell className="font-mono text-xs">
                       <TruncatedCell value={query.query_id} maxWidth={150} />
                     </TableCell>
@@ -358,7 +375,7 @@ export function HistoryTab() {
                         </Badge>
                       )}
                     </TableCell>
-                  </TableRow>
+                  </ClickableTableRow>
                 ))
               ) : (
                 <TableRow>
