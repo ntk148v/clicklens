@@ -6,6 +6,18 @@ import { useAuth } from "@/components/auth";
 import { Header } from "@/components/layout";
 import { HistoryTab } from "@/components/queries";
 import { Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+
+function HistoryTabWrapper() {
+  const searchParams = useSearchParams();
+  const initialFingerprint = searchParams.get("fingerprint") || "";
+  return (
+    <HistoryTab
+      initialFingerprint={initialFingerprint}
+      searchParams={searchParams}
+    />
+  );
+}
 
 export default function QueryHistoryPage() {
   const { permissions, isLoading: authLoading } = useAuth();
@@ -36,7 +48,7 @@ export default function QueryHistoryPage() {
             </div>
           }
         >
-          <HistoryTab />
+          <HistoryTabWrapper />
         </Suspense>
       </div>
     </div>

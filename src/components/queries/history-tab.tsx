@@ -35,16 +35,24 @@ import {
   type QueryHistoryEntry,
 } from "@/lib/hooks/use-query-analytics";
 import { formatDuration, formatBytes } from "@/lib/hooks/use-monitoring";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 
 const DEFAULT_PAGE_SIZE = 50;
 
-export function HistoryTab() {
-  const searchParams = useSearchParams();
+import { ReadonlyURLSearchParams } from "next/navigation";
+
+interface HistoryTabProps {
+  initialFingerprint?: string;
+  searchParams?: ReadonlyURLSearchParams;
+}
+
+export function HistoryTab({
+  initialFingerprint = "",
+  searchParams,
+}: HistoryTabProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const initialFingerprint = searchParams.get("fingerprint") || "";
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -123,14 +131,6 @@ export function HistoryTab() {
     if (!data?.total) return 0;
     return Math.ceil(data.total / pageSize);
   }, [data?.total, pageSize]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -216,9 +216,13 @@ export function HistoryTab() {
               className="h-4 w-4 rounded-full ml-1 hover:bg-muted/50"
               onClick={() => {
                 setFingerprint("");
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete("fingerprint");
-                router.replace(`${pathname}?${params.toString()}`);
+                if (searchParams) {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("fingerprint");
+                  router.replace(`${pathname}?${params.toString()}`);
+                } else {
+                  router.replace(`${pathname}`);
+                }
               }}
             >
               <X className="h-3 w-3" />
@@ -308,7 +312,9 @@ export function HistoryTab() {
                 </SortableTableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody
+              className={isLoading ? "opacity-50 pointer-events-none" : ""}
+            >
               {sortedHistory.length > 0 ? (
                 sortedHistory.map((query, index) => (
                   <ClickableTableRow
@@ -380,7 +386,14 @@ export function HistoryTab() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={9} className="h-24 text-center">
-                    No queries found
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="ml-2">Loading...</span>
+                      </div>
+                    ) : (
+                      "No queries found"
+                    )}
                   </TableCell>
                 </TableRow>
               )}
