@@ -261,7 +261,7 @@ export function AnalyticsTab() {
               <TableBody isLoading={isLoading}>
                 {paginatedQueries.map((query, idx) => (
                   <TableRow key={query.normalized_query_hash || idx}>
-                    <TableCell>
+                    <TableCell className="text-xs">
                       <button
                         className="text-left w-full hover:bg-muted/50 rounded p-1 transition-colors group"
                         onClick={() =>
@@ -284,7 +284,7 @@ export function AnalyticsTab() {
                         {new Date(query.last_event_time).toLocaleString()}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs">
                       <Badge variant="secondary" className="text-xs">
                         {query.user}
                       </Badge>
@@ -305,15 +305,17 @@ export function AnalyticsTab() {
                 ))}
               </TableBody>
             </Table>
+            <div className="p-2 border-t">
+              <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                totalItems={sortedQueries.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
           </TableWrapper>
-          <PaginationControls
-            page={page}
-            totalPages={totalPages}
-            totalItems={sortedQueries.length}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
         </div>
       </Tabs>
     </div>

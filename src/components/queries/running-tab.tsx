@@ -185,7 +185,7 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
           <TableBody isLoading={isLoading}>
             {sortedQueries.map((query) => (
               <TableRow key={query.query_id}>
-                <TableCell>
+                <TableCell className="text-xs">
                   <TruncatedCell
                     value={query.query}
                     maxWidth={400}

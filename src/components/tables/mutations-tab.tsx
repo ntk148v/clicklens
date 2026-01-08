@@ -236,7 +236,7 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
                   <TableCell className="text-xs text-muted-foreground">
                     {new Date(mutation.create_time).toLocaleString()}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-xs">
                     <TruncatedCell
                       value={mutation.command}
                       maxWidth={400}
@@ -253,15 +253,17 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
             })}
           </TableBody>
         </Table>
+        <div className="p-2 border-t">
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            totalItems={data.mutations.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </TableWrapper>
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        totalItems={data.mutations.length}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
     </div>
   );
 }

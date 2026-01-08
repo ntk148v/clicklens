@@ -17,6 +17,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -297,7 +298,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
           value="metrics"
           className="mt-4 flex-1 min-h-0 flex flex-col"
         >
-          <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
+          <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -369,21 +370,23 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 ) : (
                   paginatedMetrics.map((m) => (
                     <TableRow key={m.metric}>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-xs font-medium">
                         {m.metric}
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant="secondary"
-                          className={categoryColors[m.category]}
+                          className={`${
+                            categoryColors[m.category]
+                          } px-1.5 py-0.5 text-[10px]`}
                         >
                           {categoryLabels[m.category]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono text-xs">
                         {formatMetricValue(m.metric, m.value)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-muted-foreground text-xs">
                         {m.description}
                       </TableCell>
                     </TableRow>
@@ -391,7 +394,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 )}
               </TableBody>
             </Table>
-            <div className="p-4 border-t">
+            <div className="p-2 border-t">
               <PaginationControls
                 page={metricsPage}
                 totalPages={metricsTotalPages}
@@ -401,14 +404,14 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 onPageSizeChange={setPageSize}
               />
             </div>
-          </div>
+          </TableWrapper>
         </TabsContent>
 
         <TabsContent
           value="async"
           className="mt-4 flex-1 min-h-0 flex flex-col"
         >
-          <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
+          <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -466,13 +469,13 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 ) : (
                   paginatedAsyncMetrics.map((m) => (
                     <TableRow key={m.metric}>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-xs font-medium">
                         {m.metric}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono text-xs">
                         {formatMetricValue(m.metric, m.value)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-muted-foreground text-xs">
                         {m.description}
                       </TableCell>
                     </TableRow>
@@ -480,7 +483,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 )}
               </TableBody>
             </Table>
-            <div className="p-4 border-t">
+            <div className="p-2 border-t">
               <PaginationControls
                 page={asyncPage}
                 totalPages={asyncTotalPages}
@@ -490,14 +493,14 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 onPageSizeChange={setPageSize}
               />
             </div>
-          </div>
+          </TableWrapper>
         </TabsContent>
 
         <TabsContent
           value="events"
           className="mt-4 flex-1 min-h-0 flex flex-col"
         >
-          <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
+          <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -555,13 +558,13 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 ) : (
                   paginatedEvents.map((e) => (
                     <TableRow key={e.event}>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-xs font-medium">
                         {e.event}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono text-xs">
                         {formatMetricValue(e.event, e.value)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-muted-foreground text-xs">
                         {e.description}
                       </TableCell>
                     </TableRow>
@@ -569,7 +572,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 )}
               </TableBody>
             </Table>
-            <div className="p-4 border-t">
+            <div className="p-2 border-t">
               <PaginationControls
                 page={eventsPage}
                 totalPages={eventsTotalPages}
@@ -579,7 +582,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 onPageSizeChange={setPageSize}
               />
             </div>
-          </div>
+          </TableWrapper>
         </TabsContent>
       </Tabs>
     </div>

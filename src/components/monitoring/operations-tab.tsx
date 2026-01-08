@@ -8,6 +8,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { useState, useMemo } from "react";
 import { StatCard } from "@/components/monitoring";
@@ -169,7 +170,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
             <GitMerge className="w-5 h-5" />
             Active Merges
           </h3>
-          <div className="rounded-md border h-[400px] flex flex-col overflow-hidden">
+          <TableWrapper className="h-[400px]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -243,45 +244,47 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
               <TableBody isLoading={isLoading}>
                 {sortedMerges.map((m, i) => (
                   <TableRow key={i}>
-                    <TableCell className="font-mono text-sm">
+                    <TableCell className="font-mono text-xs font-medium">
                       <TruncatedCell
                         value={`${m.database}.${m.table}`}
                         maxWidth={200}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs">
                       <TruncatedCell
                         value={m.resultPartName}
                         maxWidth={150}
                         className="text-muted-foreground"
                       />
                     </TableCell>
-                    <TableCell className="text-center">{m.numParts}</TableCell>
+                    <TableCell className="text-center text-xs">
+                      {m.numParts}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <ProgressBar
                           value={m.progress * 100}
-                          className="flex-1"
+                          className="flex-1 h-2"
                         />
-                        <span className="text-xs font-mono w-10 text-right">
+                        <span className="text-[10px] font-mono w-10 text-right">
                           {Math.round(m.progress * 100)}%
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
+                    <TableCell className="text-right font-mono text-xs">
                       {formatDuration(m.elapsed * 1000)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
+                    <TableCell className="text-right font-mono text-xs">
                       {formatBytes(m.totalSizeBytesCompressed)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
+                    <TableCell className="text-right font-mono text-xs">
                       {formatBytes(m.memoryUsage)}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableWrapper>
         </div>
       )}
 
@@ -292,7 +295,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
             <Scissors className="w-5 h-5" />
             Active Mutations
           </h3>
-          <div className="rounded-md border h-[400px] flex flex-col overflow-hidden">
+          <TableWrapper className="h-[400px]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -349,23 +352,23 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
               <TableBody>
                 {sortedMutations.map((m, i) => (
                   <TableRow key={i}>
-                    <TableCell className="font-mono text-sm">
+                    <TableCell className="font-mono text-xs font-medium">
                       <TruncatedCell
                         value={`${m.database}.${m.table}`}
                         maxWidth={200}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs">
                       <TruncatedCell value={m.mutationId} maxWidth={120} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs">
                       <TruncatedCell
                         value={m.command}
                         maxWidth={200}
                         className="text-muted-foreground"
                       />
                     </TableCell>
-                    <TableCell className="text-center font-mono">
+                    <TableCell className="text-center font-mono text-xs">
                       {m.partsToDo}
                     </TableCell>
                     <TableCell className="text-center">
@@ -379,14 +382,14 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
                         <StatusBadge status="ok" label="Running" size="sm" />
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-xs text-muted-foreground">
                       {m.createTime}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableWrapper>
 
           {/* Show failed mutation details */}
           {data?.mutations.some((m) => m.latestFailReason) && (

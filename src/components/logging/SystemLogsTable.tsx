@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
   ClickableTableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
@@ -120,56 +121,58 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
   };
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[140px]">Time</TableHead>
-          <TableHead className="w-[80px]">Level</TableHead>
-          <TableHead className="w-[150px]">Component</TableHead>
-          <TableHead>Message</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody isLoading={isLoading}>
-        {logs.length > 0 ? (
-          logs.map((log, index) => (
-            <ClickableTableRow
-              key={`${log.timestamp}_${index}`}
-              record={log as any}
-              columns={columns}
-              rowIndex={index}
-              sheetTitle="Log Details"
-            >
-              <TableCell className="font-mono text-xs whitespace-nowrap">
-                <div className="flex flex-col">
-                  <span>{formatTime(log.timestamp)}</span>
-                  <span className="text-muted-foreground text-[10px]">
-                    {formatDate(log.timestamp)}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>{getLevelBadge(log.type)}</TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                <TruncatedCell value={log.component} maxWidth={150} />
-              </TableCell>
-              <TableCell>
-                <div className="max-w-[600px]">
-                  <TruncatedCell
-                    value={log.message}
-                    maxWidth={600}
-                    className="font-mono text-xs"
-                  />
-                </div>
-              </TableCell>
-            </ClickableTableRow>
-          ))
-        ) : (
+    <TableWrapper>
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={4} className="h-24 text-center">
-              No logs found
-            </TableCell>
+            <TableHead className="w-[140px]">Time</TableHead>
+            <TableHead className="w-[80px]">Level</TableHead>
+            <TableHead className="w-[150px]">Component</TableHead>
+            <TableHead>Message</TableHead>
           </TableRow>
-        )}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody isLoading={isLoading}>
+          {logs.length > 0 ? (
+            logs.map((log, index) => (
+              <ClickableTableRow
+                key={`${log.timestamp}_${index}`}
+                record={log as any}
+                columns={columns}
+                rowIndex={index}
+                sheetTitle="Log Details"
+              >
+                <TableCell className="font-mono text-xs whitespace-nowrap">
+                  <div className="flex flex-col">
+                    <span>{formatTime(log.timestamp)}</span>
+                    <span className="text-muted-foreground text-[10px]">
+                      {formatDate(log.timestamp)}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>{getLevelBadge(log.type)}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  <TruncatedCell value={log.component} maxWidth={150} />
+                </TableCell>
+                <TableCell>
+                  <div className="max-w-[600px]">
+                    <TruncatedCell
+                      value={log.message}
+                      maxWidth={600}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                </TableCell>
+              </ClickableTableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={4} className="h-24 text-center">
+                No logs found
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TableWrapper>
   );
 }

@@ -8,6 +8,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
 } from "@/components/ui/table";
 import {
   StatCard,
@@ -149,7 +150,7 @@ export function ReplicationTab({
       </div>
 
       {/* Replicas Table */}
-      <div className="rounded-md border flex-1 min-h-0 overflow-hidden flex flex-col">
+      <TableWrapper>
         <Table>
           <TableHeader>
             <TableRow>
@@ -255,13 +256,13 @@ export function ReplicationTab({
                       <TableCell>
                         <StatusDot status={replicaStatus} />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-xs font-medium">
                         <TruncatedCell value={r.database} maxWidth={150} />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-xs font-medium">
                         <TruncatedCell value={r.table} maxWidth={200} />
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center text-xs">
                         {r.isLeader ? (
                           <span className="text-green-600 dark:text-green-400">
                             ✓
@@ -270,7 +271,7 @@ export function ReplicationTab({
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center text-xs">
                         {r.isReadonly ? (
                           <StatusBadge
                             status="critical"
@@ -281,10 +282,10 @@ export function ReplicationTab({
                           <span className="text-muted-foreground">No</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
+                      <TableCell className="text-right font-mono text-xs">
                         {formatNumber(r.queueSize)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right text-xs">
                         <span
                           className={
                             r.absoluteDelay >= 60
@@ -297,7 +298,7 @@ export function ReplicationTab({
                           {formatDelay(r.absoluteDelay)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
+                      <TableCell className="text-right font-mono text-xs">
                         {r.activeReplicas}/{r.totalReplicas}
                       </TableCell>
                     </TableRow>
@@ -305,7 +306,7 @@ export function ReplicationTab({
                 })}
           </TableBody>
         </Table>
-        <div className="p-4 border-t">
+        <div className="p-2 border-t">
           <PaginationControls
             page={page}
             totalPages={totalPages}
@@ -315,7 +316,7 @@ export function ReplicationTab({
             onPageSizeChange={setPageSize}
           />
         </div>
-      </div>
+      </TableWrapper>
 
       {/* Info */}
       <div className="p-4 rounded-lg bg-muted border">
