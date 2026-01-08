@@ -8,6 +8,7 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
+  ClickableTableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -217,13 +218,14 @@ export function SettingsTable({
                     Actions
                   </SortableTableHead>
                 )}
+                <SortableTableHead className="w-8" sortable={false} />
               </TableRow>
             </TableHeader>
             <TableBody isLoading={isLoading && settings.length === 0}>
               {isLoading && settings.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={scope === "server" ? 7 : 6}
+                    colSpan={scope === "server" ? 8 : 7}
                     className="h-24 text-center"
                   >
                     Loading...
@@ -231,7 +233,23 @@ export function SettingsTable({
                 </TableRow>
               ) : (
                 paginatedSettings.map((setting) => (
-                  <TableRow key={setting.name}>
+                  <ClickableTableRow
+                    key={setting.name}
+                    record={setting}
+                    columns={[
+                      { name: "name", type: "String" },
+                      { name: "value", type: "String" },
+                      { name: "default", type: "String" },
+                      { name: "type", type: "String" },
+                      { name: "description", type: "String" },
+                      { name: "min", type: "String" },
+                      { name: "max", type: "String" },
+                      { name: "readonly", type: "UInt8" },
+                      { name: "is_hot_reloadable", type: "UInt8" },
+                    ]}
+                    rowIndex={0} // Index not critical for display but required by type? Checked: optional
+                    sheetTitle="Setting Details"
+                  >
                     <TableCell className="font-medium font-mono text-sm">
                       <TruncatedCell value={setting.name} maxWidth={250} />
                     </TableCell>
@@ -288,20 +306,23 @@ export function SettingsTable({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => openEditDialog(setting)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(setting);
+                            }}
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
                         )}
                       </TableCell>
                     )}
-                  </TableRow>
+                  </ClickableTableRow>
                 ))
               )}
               {!isLoading && settings.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={scope === "server" ? 7 : 6}
+                    colSpan={scope === "server" ? 8 : 7}
                     className="h-24 text-center text-muted-foreground"
                   >
                     No settings found
