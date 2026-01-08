@@ -35,11 +35,20 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   );
 }
 
-function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
+interface TableBodyProps extends React.ComponentProps<"tbody"> {
+  isLoading?: boolean;
+}
+
+function TableBody({ className, isLoading, ...props }: TableBodyProps) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
+      className={cn(
+        "[&_tr:last-child]:border-0",
+        isLoading &&
+          "opacity-50 pointer-events-none select-none transition-opacity duration-200",
+        className
+      )}
       {...props}
     />
   );
