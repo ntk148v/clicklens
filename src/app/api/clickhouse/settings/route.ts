@@ -16,29 +16,45 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
+    const scope = searchParams.get("scope") || "session";
 
     const client = createClientWithConfig(config);
 
-    // Fetch from system.settings
-    // We also fetch system.server_settings separately or union them if needed,
-    // but typically user configurable settings are in system.settings
     const safeSearch = search.replace(/'/g, "''");
+    let query = "";
 
-    // Using manual JSON formatting appended to query if wrapper doesn't handle options object
-    const query = `
-      SELECT
-        name,
-        value,
-        changed,
-        description,
-        type,
-        min,
-        max,
-        readonly
-      FROM system.settings
-      WHERE name ILIKE '%${safeSearch}%'
-      ORDER BY name ASC
-    `;
+    if (scope === "server") {
+      // Fetch from system.server_settings
+      query = `
+        SELECT
+          name,
+          value,
+          default,
+          changed,
+          description,
+          type,
+          changeable_without_restart as is_hot_reloadable
+        FROM system.server_settings
+        WHERE name ILIKE '%${safeSearch}%'
+        ORDER BY name ASC
+      `;
+    } else {
+      // Default: Fetch from system.settings (Session settings)
+      query = `
+        SELECT
+          name,
+          value,
+          changed,
+          description,
+          type,
+          min,
+          max,
+          readonly
+        FROM system.settings
+        WHERE name ILIKE '%${safeSearch}%'
+        ORDER BY name ASC
+      `;
+    }
 
     // Note: The wrapper only takes (sql, options?). It does not take an object with 'query' field.
     // However, createClientWithConfig returns ClickHouseClientImpl which mimics @clickhouse/client interface PARTIALLY?

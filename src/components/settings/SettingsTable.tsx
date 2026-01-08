@@ -8,31 +8,41 @@ import {
   SortableTableHead,
   TableHeader,
   TableRow,
-  TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, Edit2, RotateCcw } from "lucide-react";
+import { Search, Edit2, Loader2 } from "lucide-react";
 import { useSettings, ClickHouseSetting } from "@/lib/hooks/use-settings";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-
-import { PaginationControls } from "@/components/monitoring";
+import { Card } from "@/components/ui/card";
+import { PaginationControls } from "@/components/monitoring/pagination-controls";
+import { TruncatedCell } from "@/components/ui/truncated-cell";
 
 const DEFAULT_PAGE_SIZE = 50;
 
-export function SettingsTable() {
+interface SettingsTableProps {
+  scope?: "session" | "server";
+  readOnly?: boolean;
+}
+
+export function SettingsTable({
+  scope = "session",
+  readOnly = false,
+}: SettingsTableProps) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const { settings, isLoading, updateSetting } = useSettings(debouncedSearch);
+  const { settings, isLoading, updateSetting } = useSettings(
+    debouncedSearch,
+    scope
+  );
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -53,10 +63,6 @@ export function SettingsTable() {
   // Handle search with debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
-    // Simple debounce could be here, or just basic delay logic,
-    // but for simplicity we rely on manual Enter or implicit local state filtering if list is small.
-    // However, the hook takes a search param, so we should update debouncedSearch.
-    // implementing a simple timeout for debounce
   };
 
   // Effect to debounce search would be better, but for now let's just use onBlur or Enter
@@ -116,10 +122,8 @@ export function SettingsTable() {
     try {
       setIsUpdating(true);
       await updateSetting(editingSetting.name, newValue);
-      // toast.success(`Updated ${editingSetting.name}`);
       setEditingSetting(null);
     } catch (error) {
-      // toast.error(error instanceof Error ? error.message : "Failed to update setting");
       console.error(error);
       alert(
         error instanceof Error ? error.message : "Failed to update setting"
@@ -130,12 +134,12 @@ export function SettingsTable() {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="space-y-4 h-full flex flex-col">
       <div className="flex items-center space-x-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search settings..."
+            placeholder={`Search ${scope} settings...`}
             value={search}
             onChange={handleSearchChange}
             onKeyDown={handleKeyDown}
@@ -143,125 +147,179 @@ export function SettingsTable() {
             className="pl-8"
           />
         </div>
+        <div className="ml-auto">
+          <Badge variant="outline" className="border-none bg-muted/50">
+            {settings.length} settings
+          </Badge>
+        </div>
       </div>
 
-      <TableWrapper>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead
-                currentSort={sortColumn === "name" ? sortDirection : null}
-                onSort={(dir) => updateSort("name", dir)}
-                className="w-[300px]"
-              >
-                Name
-              </SortableTableHead>
-              <SortableTableHead
-                currentSort={sortColumn === "value" ? sortDirection : null}
-                onSort={(dir) => updateSort("value", dir)}
-                className="w-[200px]"
-              >
-                Value
-              </SortableTableHead>
-              <SortableTableHead
-                currentSort={sortColumn === "type" ? sortDirection : null}
-                onSort={(dir) => updateSort("type", dir)}
-                className="w-[150px]"
-              >
-                Type
-              </SortableTableHead>
-              <SortableTableHead
-                currentSort={sortColumn === "changed" ? sortDirection : null}
-                onSort={(dir) => updateSort("changed", dir)}
-                className="w-[100px]"
-              >
-                Modified
-              </SortableTableHead>
-              <SortableTableHead className="flex-1" sortable={false}>
-                Description
-              </SortableTableHead>
-              <SortableTableHead className="w-[100px]" sortable={false}>
-                Actions
-              </SortableTableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody isLoading={isLoading && settings.length === 0}>
-            {/* Optimistic loading support or standard overlay */}
-            {isLoading && settings.length === 0 ? (
-              // Explicit empty state loaded by TableBody if handled, but TableBody expects children
-              // We will let TableBody handle empty children with isLoading=true
+      <Card className="flex-1 overflow-hidden border-none shadow-none flex flex-col">
+        <div className="flex-1 border rounded-md overflow-auto relative">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  Loading...
-                </TableCell>
+                <SortableTableHead
+                  currentSort={sortColumn === "name" ? sortDirection : null}
+                  onSort={(dir) => updateSort("name", dir)}
+                  className="w-[300px]"
+                >
+                  Name
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "value" ? sortDirection : null}
+                  onSort={(dir) => updateSort("value", dir)}
+                  className="w-[200px]"
+                >
+                  Value
+                </SortableTableHead>
+                {scope === "server" && (
+                  <SortableTableHead
+                    currentSort={
+                      sortColumn === "default" ? sortDirection : null
+                    }
+                    onSort={(dir) => updateSort("default", dir)}
+                    className="w-[200px]"
+                  >
+                    Default
+                  </SortableTableHead>
+                )}
+                <SortableTableHead
+                  currentSort={sortColumn === "type" ? sortDirection : null}
+                  onSort={(dir) => updateSort("type", dir)}
+                  className="w-[150px]"
+                >
+                  Type
+                </SortableTableHead>
+                <SortableTableHead
+                  currentSort={sortColumn === "changed" ? sortDirection : null}
+                  onSort={(dir) => updateSort("changed", dir)}
+                  className="w-[100px]"
+                >
+                  Modified
+                </SortableTableHead>
+                {scope === "server" && (
+                  <SortableTableHead
+                    currentSort={
+                      sortColumn === "is_hot_reloadable" ? sortDirection : null
+                    }
+                    onSort={(dir) => updateSort("is_hot_reloadable", dir)}
+                    className="w-[100px]"
+                  >
+                    Hot Reload
+                  </SortableTableHead>
+                )}
+                <SortableTableHead className="flex-1" sortable={false}>
+                  Description
+                </SortableTableHead>
+                {!readOnly && scope === "session" && (
+                  <SortableTableHead className="w-[100px]" sortable={false}>
+                    Actions
+                  </SortableTableHead>
+                )}
               </TableRow>
-            ) : (
-              paginatedSettings.map((setting) => (
-                <TableRow key={setting.name}>
+            </TableHeader>
+            <TableBody isLoading={isLoading && settings.length === 0}>
+              {isLoading && settings.length === 0 ? (
+                <TableRow>
                   <TableCell
-                    className="font-medium font-mono text-sm"
-                    title={setting.name}
+                    colSpan={scope === "server" ? 7 : 6}
+                    className="h-24 text-center"
                   >
-                    {setting.name}
-                  </TableCell>
-                  <TableCell
-                    className="font-mono text-sm max-w-[200px] truncate"
-                    title={setting.value}
-                  >
-                    {setting.value}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {setting.type}
-                  </TableCell>
-                  <TableCell>
-                    {setting.changed === 1 && (
-                      <Badge variant="secondary" className="text-xs">
-                        Modified
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className="text-sm text-muted-foreground max-w-[400px] truncate"
-                    title={setting.description}
-                  >
-                    {setting.description}
-                  </TableCell>
-                  <TableCell>
-                    {setting.readonly === 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(setting)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    Loading...
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-            {!isLoading && settings.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No settings found
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableWrapper>
-
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        totalItems={settings.length}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+              ) : (
+                paginatedSettings.map((setting) => (
+                  <TableRow key={setting.name}>
+                    <TableCell className="font-medium font-mono text-sm">
+                      <TruncatedCell value={setting.name} maxWidth={250} />
+                    </TableCell>
+                    <TableCell className="font-mono text-sm max-w-[200px]">
+                      <TruncatedCell value={setting.value} maxWidth={200} />
+                    </TableCell>
+                    {scope === "server" && (
+                      <TableCell className="font-mono text-sm max-w-[200px] text-muted-foreground">
+                        {setting.default ? (
+                          <TruncatedCell
+                            value={setting.default}
+                            maxWidth={200}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {setting.type}
+                    </TableCell>
+                    <TableCell>
+                      {setting.changed === 1 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Modified
+                        </Badge>
+                      )}
+                    </TableCell>
+                    {scope === "server" && (
+                      <TableCell>
+                        {setting.is_hot_reloadable === 1 ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-green-200 text-green-700 bg-green-50"
+                          >
+                            Yes
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            No
+                          </span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-sm text-muted-foreground max-w-[400px]">
+                      <TruncatedCell
+                        value={setting.description}
+                        maxWidth={400}
+                      />
+                    </TableCell>
+                    {!readOnly && scope === "session" && (
+                      <TableCell>
+                        {setting.readonly === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(setting)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
+              {!isLoading && settings.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={scope === "server" ? 7 : 6}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No settings found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          totalItems={settings.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      </Card>
 
       <Dialog
         open={!!editingSetting}
@@ -269,12 +327,7 @@ export function SettingsTable() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Setting</DialogTitle>
-            <DialogDescription>
-              Update value for{" "}
-              <code className="text-primary">{editingSetting?.name}</code>. This
-              will be applied to the current user.
-            </DialogDescription>
+            <DialogTitle>Edit Setting: {editingSetting?.name}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
@@ -289,17 +342,16 @@ export function SettingsTable() {
               />
             </div>
             {editingSetting?.min && (
-              <div className="text-xs text-muted-foreground text-center">
+              <div className="text-sm text-muted-foreground text-center">
                 Min: {editingSetting.min}, Max: {editingSetting.max}
               </div>
             )}
+            <div className="text-sm text-muted-foreground">
+              {editingSetting?.description}
+            </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditingSetting(null)}
-              disabled={isUpdating}
-            >
+            <Button variant="outline" onClick={() => setEditingSetting(null)}>
               Cancel
             </Button>
             <Button onClick={handleUpdate} disabled={isUpdating}>

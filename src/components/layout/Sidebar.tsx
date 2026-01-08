@@ -129,6 +129,22 @@ const accessItems = [
   },
 ];
 
+// Settings sub-navigation items
+const settingsItems = [
+  {
+    name: "Session",
+    href: "/settings/session",
+    icon: User,
+    description: "User session settings",
+  },
+  {
+    name: "Server",
+    href: "/settings/server",
+    icon: Server,
+    description: "Server configuration",
+  },
+];
+
 // Main navigation items with permission requirements
 const navigation = [
   {
@@ -182,6 +198,7 @@ const navigation = [
     icon: Settings,
     description: "System and server settings",
     requiresPermission: "canViewSettings" as const,
+    subItems: settingsItems,
   },
 ];
 
@@ -193,6 +210,7 @@ export function Sidebar() {
       Monitoring: pathname.startsWith("/monitoring"),
       Queries: pathname.startsWith("/queries"),
       Access: pathname.startsWith("/access"),
+      Settings: pathname.startsWith("/settings"),
     })
   );
   const { user, permissions, logout, isLoading } = useAuth();

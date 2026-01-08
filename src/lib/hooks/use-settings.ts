@@ -8,7 +8,9 @@ export interface ClickHouseSetting {
   type: string;
   min?: string | null;
   max?: string | null;
-  readonly: number; // 0 or 1
+  readonly?: number; // 0 or 1 (session-only)
+  default?: string; // (server-only)
+  is_hot_reloadable?: number; // 0 or 1 (server-only)
 }
 
 interface UseSettingsResponse {
@@ -19,7 +21,12 @@ interface UseSettingsResponse {
   mutate: () => Promise<void>;
 }
 
-export function useSettings(search: string = ""): UseSettingsResponse {
+export type SettingsScope = "session" | "server";
+
+export function useSettings(
+  search: string = "",
+  scope: SettingsScope = "session"
+): UseSettingsResponse {
   const [settings, setSettings] = useState<ClickHouseSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +36,9 @@ export function useSettings(search: string = ""): UseSettingsResponse {
     setError(null);
     try {
       const response = await fetch(
-        `/api/clickhouse/settings?search=${encodeURIComponent(search)}`
+        `/api/clickhouse/settings?search=${encodeURIComponent(
+          search
+        )}&scope=${scope}`
       );
       const data = await response.json();
 
