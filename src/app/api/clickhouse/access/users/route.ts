@@ -278,20 +278,22 @@ export async function PUT(
       const newRoles = body.roles;
 
       // Revoke removed roles
-      for (const role of currentRoles) {
-        if (!newRoles.includes(role)) {
-          try {
-            await client.command(
-              `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`
-            );
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            console.error(
-              `Failed to revoke role ${role} from user ${body.name}:`,
-              msg
-            );
-            errors.push(`Failed to revoke role ${role}: ${msg}`);
-          }
+      const rolesToRevoke = currentRoles.filter(
+        (role) => !newRoles.includes(role)
+      );
+
+      for (const role of rolesToRevoke) {
+        try {
+          await client.command(
+            `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`
+          );
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(
+            `Failed to revoke role ${role} from user ${body.name}:`,
+            msg
+          );
+          errors.push(`Failed to revoke role ${role}: ${msg}`);
         }
       }
 
