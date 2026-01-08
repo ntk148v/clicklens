@@ -25,6 +25,7 @@ import {
   TrendingUp,
   Shield,
   ScrollText,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -174,6 +175,13 @@ const navigation = [
     description: "Users, roles, and grants",
     requiresPermission: "canManageUsers" as const,
     subItems: accessItems,
+  },
+  {
+    name: "Settings",
+    href: "/settings",
+    icon: Settings,
+    description: "System and server settings",
+    requiresPermission: "canViewSettings" as const,
   },
 ];
 

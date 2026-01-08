@@ -16,6 +16,7 @@ interface PermissionsResponse {
     canViewCluster: boolean;
     canBrowseTables: boolean;
     canExecuteQueries: boolean;
+    canViewSettings: boolean;
     username: string;
   };
   error?: string;
@@ -109,6 +110,8 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         client.query("SELECT 1 FROM system.tables LIMIT 1"),
         // execute queries probe (simple SELECT)
         client.query("SELECT 1"),
+        // view settings probe (system.settings)
+        client.query("SELECT 1 FROM system.settings LIMIT 1"),
       ]),
     ]);
 
@@ -123,7 +126,9 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     let canViewProcesses = false;
     let canViewCluster = false;
     let canBrowseTables = false;
+
     let canExecuteQueries = false;
+    let canViewSettings = false;
 
     if (featuresResult.status === "fulfilled") {
       const results = featuresResult.value;
@@ -142,6 +147,9 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
 
       // Index 4: canExecuteQueries
       if (results[4].status === "fulfilled") canExecuteQueries = true;
+
+      // Index 5: canViewSettings
+      if (results[5].status === "fulfilled") canViewSettings = true;
     }
 
     // Check permissions based on effective roles (including inherited)
@@ -165,6 +173,11 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       canBrowseTables = effectiveRoles.has("clicklens_table_explorer");
     }
 
+    // 5. Settings Viewer: via clicklens_settings_admin role
+    if (!canViewSettings) {
+      canViewSettings = effectiveRoles.has("clicklens_settings_admin");
+    }
+
     // Check Kill Query
     const canKillQueries =
       canManageUsers || effectiveRoles.has("clicklens_query_monitor");
@@ -178,6 +191,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canViewCluster,
         canBrowseTables,
         canExecuteQueries,
+        canViewSettings,
         username: config.username,
       },
     });

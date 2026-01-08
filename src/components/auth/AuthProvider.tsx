@@ -23,6 +23,7 @@ interface Permissions {
   canViewCluster: boolean;
   canBrowseTables: boolean;
   canExecuteQueries: boolean;
+  canViewSettings: boolean;
 }
 
 interface AuthContextType {
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           canViewCluster: data.permissions.canViewCluster,
           canBrowseTables: data.permissions.canBrowseTables,
           canExecuteQueries: data.permissions.canExecuteQueries,
+          canViewSettings: data.permissions.canViewSettings,
         });
       }
     } catch (error) {
