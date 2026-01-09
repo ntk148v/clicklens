@@ -15,6 +15,7 @@ Below is a **practical, opinionated ruleset** you can use as **Antigravity / Cur
    - Use `bun` for package management, scripts, and execution.
    - Do not introduce `npm`, `yarn`, or `pnpm` unless explicitly required.
    - Use `bun.lockb` as the single source of dependency truth.
+   - Run `bun lint` and `bun run build` after change to validate.
 
 2. **Node compatibility awareness**
 
