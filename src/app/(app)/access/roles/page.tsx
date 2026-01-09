@@ -14,6 +14,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -768,6 +769,11 @@ export default function RolesPage() {
                 onPageSizeChange={setPageSize}
               />
             </div>
+
+            <DataSourceBadge
+              sources={["system.roles", "system.grants"]}
+              description="Roles are groups of privileges that can be assigned to users or other roles."
+            />
           </>
         )}
       </div>

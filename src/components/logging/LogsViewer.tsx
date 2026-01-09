@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { SystemLogsTable } from "./SystemLogsTable";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { RefreshControl } from "@/components/monitoring/refresh-control";
 import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
 import type { LogEntry } from "@/lib/hooks/use-logs";
@@ -253,6 +254,17 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
         {newestTimestamp &&
           ` • Latest: ${new Date(newestTimestamp).toLocaleTimeString()}`}
       </div>
+
+      <DataSourceBadge
+        sources={[
+          source === "text_log" ? "system.text_log" : "system.crash_log",
+        ]}
+        description={
+          source === "text_log"
+            ? "Contains general server logs."
+            : "Contains server crash logs. The table does not exist in the database by default, it is created only when fatal errors occur."
+        }
+      />
     </div>
   );
 }
