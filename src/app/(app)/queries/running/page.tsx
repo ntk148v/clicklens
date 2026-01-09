@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 export default function RunningQueriesPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const [refreshInterval, setRefreshInterval] = useState(5);
+  const [refreshInterval, setRefreshInterval] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function RunningQueriesPage() {
             intervals={[5, 10, 30, 60]}
             interval={refreshInterval}
             onIntervalChange={setRefreshInterval}
-            defaultInterval={5}
+            defaultInterval={0}
           />
         }
       />

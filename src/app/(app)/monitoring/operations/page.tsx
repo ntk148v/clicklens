@@ -11,6 +11,7 @@ export default function MonitoringOperationsPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [interval, setInterval] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !permissions?.canViewCluster) {
@@ -38,7 +39,8 @@ export default function MonitoringOperationsPage() {
           <RefreshControl
             onRefresh={handleRefresh}
             intervals={[5, 10, 30, 60]}
-            defaultInterval={10}
+            interval={interval}
+            onIntervalChange={setInterval}
           />
         }
       />
@@ -46,7 +48,7 @@ export default function MonitoringOperationsPage() {
       <div className="flex-1 p-6 overflow-auto">
         <OperationsTab
           key={`operations-${refreshKey}`}
-          refreshInterval={10000}
+          refreshInterval={interval * 1000}
         />
       </div>
     </div>

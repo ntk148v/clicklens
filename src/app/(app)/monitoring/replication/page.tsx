@@ -11,6 +11,7 @@ export default function MonitoringReplicationPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [interval, setInterval] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !permissions?.canViewCluster) {
@@ -38,7 +39,8 @@ export default function MonitoringReplicationPage() {
           <RefreshControl
             onRefresh={handleRefresh}
             intervals={[10, 30, 60, 120]}
-            defaultInterval={30}
+            interval={interval}
+            onIntervalChange={setInterval}
           />
         }
       />
@@ -46,7 +48,7 @@ export default function MonitoringReplicationPage() {
       <div className="flex-1 p-6 overflow-auto">
         <ReplicationTab
           key={`replication-${refreshKey}`}
-          refreshInterval={30000}
+          refreshInterval={interval * 1000}
         />
       </div>
     </div>
