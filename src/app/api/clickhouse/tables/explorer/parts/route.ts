@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export interface PartInfo {
   partition: string;
@@ -116,8 +117,14 @@ export async function GET(
     }
 
     const client = createClientWithConfig(lensConfig);
+    const clusterName = await getClusterName(client);
+
     const safeDatabase = database.replace(/'/g, "''");
     const safeTable = table.replace(/'/g, "''");
+
+    const tableSource = clusterName
+      ? `clusterAllReplicas('${clusterName}', system.parts)`
+      : "system.parts";
 
     const result = await client.query<PartInfo>(`
       SELECT
@@ -132,7 +139,7 @@ export async function GET(
         marks,
         toString(modification_time) as modification_time,
         is_frozen
-      FROM system.parts
+      FROM ${tableSource}
       WHERE database = '${safeDatabase}' AND table = '${safeTable}' AND active = 1
       ORDER BY bytes_on_disk DESC
     `);

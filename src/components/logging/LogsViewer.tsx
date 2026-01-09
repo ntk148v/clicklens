@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { SystemLogsTable } from "./SystemLogsTable";
-import { TableWrapper } from "@/components/ui/table";
 import { RefreshControl } from "@/components/monitoring/refresh-control";
 import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
 import type { LogEntry } from "@/lib/hooks/use-logs";

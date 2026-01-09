@@ -1,7 +1,7 @@
 /**
  * ClickHouse Monitoring SQL Queries
  * Pre-built queries for fetching monitoring data from system tables
- * 
+ *
  * Cluster-aware queries use clusterAllReplicas() to aggregate data from all nodes.
  * Single-node queries are also available as fallback.
  */
@@ -108,7 +108,10 @@ SELECT
 // =============================================================================
 
 // Query throughput over time - cluster-aware
-export const getQueriesPerMinuteQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+export const getQueriesPerMinuteQuery = (
+  intervalMinutes: number = 60,
+  clusterName?: string
+) => {
   if (clusterName) {
     return `
 SELECT
@@ -137,7 +140,10 @@ ORDER BY timestamp
 };
 
 // Inserted rows per minute - cluster-aware
-export const getInsertedRowsPerMinuteQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+export const getInsertedRowsPerMinuteQuery = (
+  intervalMinutes: number = 60,
+  clusterName?: string
+) => {
   if (clusterName) {
     return `
 SELECT
@@ -166,7 +172,10 @@ ORDER BY timestamp
 };
 
 // Selected bytes per minute - cluster-aware
-export const getSelectedBytesPerMinuteQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+export const getSelectedBytesPerMinuteQuery = (
+  intervalMinutes: number = 60,
+  clusterName?: string
+) => {
   if (clusterName) {
     return `
 SELECT
@@ -195,7 +204,10 @@ ORDER BY timestamp
 };
 
 // Memory usage over time - cluster-aware
-export const getMemoryUsageHistoryQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+export const getMemoryUsageHistoryQuery = (
+  intervalMinutes: number = 60,
+  clusterName?: string
+) => {
   if (clusterName) {
     return `
 SELECT
@@ -228,7 +240,10 @@ ORDER BY timestamp
 // =============================================================================
 
 // Per-node queries per minute
-export const getPerNodeQueriesQuery = (intervalMinutes: number = 60, clusterName: string) => `
+export const getPerNodeQueriesQuery = (
+  intervalMinutes: number = 60,
+  clusterName: string
+) => `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -243,7 +258,10 @@ SETTINGS skip_unavailable_shards = 1
 `;
 
 // Per-node memory usage
-export const getPerNodeMemoryQuery = (intervalMinutes: number = 60, clusterName: string) => `
+export const getPerNodeMemoryQuery = (
+  intervalMinutes: number = 60,
+  clusterName: string
+) => `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -258,7 +276,10 @@ SETTINGS skip_unavailable_shards = 1
 `;
 
 // Per-node inserted rows
-export const getPerNodeInsertedRowsQuery = (intervalMinutes: number = 60, clusterName: string) => `
+export const getPerNodeInsertedRowsQuery = (
+  intervalMinutes: number = 60,
+  clusterName: string
+) => `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -273,7 +294,10 @@ SETTINGS skip_unavailable_shards = 1
 `;
 
 // Per-node selected bytes
-export const getPerNodeSelectedBytesQuery = (intervalMinutes: number = 60, clusterName: string) => `
+export const getPerNodeSelectedBytesQuery = (
+  intervalMinutes: number = 60,
+  clusterName: string
+) => `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -287,9 +311,11 @@ ORDER BY timestamp, node
 SETTINGS skip_unavailable_shards = 1
 `;
 
-
 // Query duration percentiles over time - cluster-aware
-export const getQueryDurationHistoryQuery = (intervalMinutes: number = 60, clusterName?: string) => {
+export const getQueryDurationHistoryQuery = (
+  intervalMinutes: number = 60,
+  clusterName?: string
+) => {
   if (clusterName) {
     return `
 SELECT
@@ -365,18 +391,18 @@ WHERE
     category === "query"
       ? "metric LIKE '%Query%' OR metric LIKE '%Select%'"
       : category === "connection"
-        ? "metric LIKE '%Connection%' OR metric LIKE '%TCP%' OR metric LIKE '%HTTP%'"
-        : category === "memory"
-          ? "metric LIKE '%Memory%'"
-          : category === "merge"
-            ? "metric LIKE '%Merge%'"
-            : category === "replication"
-              ? "metric LIKE '%Replica%' OR metric LIKE '%ZooKeeper%' OR metric LIKE '%Keeper%'"
-              : category === "insert"
-                ? "metric LIKE '%Insert%' OR metric LIKE '%Write%'"
-                : category === "io"
-                  ? "metric LIKE '%Read%' OR metric LIKE '%IO%' OR metric LIKE '%Disk%'"
-                  : "1=1"
+      ? "metric LIKE '%Connection%' OR metric LIKE '%TCP%' OR metric LIKE '%HTTP%'"
+      : category === "memory"
+      ? "metric LIKE '%Memory%'"
+      : category === "merge"
+      ? "metric LIKE '%Merge%'"
+      : category === "replication"
+      ? "metric LIKE '%Replica%' OR metric LIKE '%ZooKeeper%' OR metric LIKE '%Keeper%'"
+      : category === "insert"
+      ? "metric LIKE '%Insert%' OR metric LIKE '%Write%'"
+      : category === "io"
+      ? "metric LIKE '%Read%' OR metric LIKE '%IO%' OR metric LIKE '%Disk%'"
+      : "1=1"
   }
 ORDER BY metric
 `;
@@ -385,7 +411,11 @@ ORDER BY metric
 // Replication Queries
 // =============================================================================
 
-export const REPLICAS_QUERY = `
+export const getReplicasQuery = (clusterName?: string) => {
+  const table = clusterName
+    ? `clusterAllReplicas('${clusterName}', system.replicas)`
+    : "system.replicas";
+  return `
 SELECT
   database,
   table,
@@ -413,11 +443,19 @@ SELECT
   absolute_delay AS absoluteDelay,
   total_replicas AS totalReplicas,
   active_replicas AS activeReplicas
-FROM system.replicas
+FROM ${table}
 ORDER BY database, table
 `;
+};
 
-export const REPLICA_SUMMARY_QUERY = `
+// @deprecated Use getReplicasQuery instead
+export const REPLICAS_QUERY = getReplicasQuery();
+
+export const getReplicaSummaryQuery = (clusterName?: string) => {
+  const table = clusterName
+    ? `clusterAllReplicas('${clusterName}', system.replicas)`
+    : "system.replicas";
+  return `
 SELECT
   count() AS totalTables,
   countIf(is_leader) AS leaderCount,
@@ -425,14 +463,22 @@ SELECT
   countIf(absolute_delay > 0) AS delayedCount,
   max(absolute_delay) AS maxDelay,
   sum(queue_size) AS totalQueueSize
-FROM system.replicas
+FROM ${table}
 `;
+};
+
+// @deprecated Use getReplicaSummaryQuery instead
+export const REPLICA_SUMMARY_QUERY = getReplicaSummaryQuery();
 
 // =============================================================================
 // Running Queries & Operations
 // =============================================================================
 
-export const RUNNING_QUERIES_QUERY = `
+export const getRunningQueriesQuery = (clusterName?: string) => {
+  const table = clusterName
+    ? `clusterAllReplicas('${clusterName}', system.processes)`
+    : "system.processes";
+  return `
 SELECT
   query_id,
   user,
@@ -451,12 +497,20 @@ SELECT
   formatReadableSize(memory_usage) AS memory_readable,
   formatReadableSize(read_bytes) AS read_bytes_readable,
   formatReadableQuantity(read_rows) AS read_rows_readable
-FROM system.processes
+FROM ${table}
 WHERE is_cancelled = 0
 ORDER BY elapsed DESC
 `;
+};
 
-export const MERGES_QUERY = `
+// @deprecated Use getRunningQueriesQuery instead
+export const RUNNING_QUERIES_QUERY = getRunningQueriesQuery();
+
+export const getMergesQuery = (clusterName?: string) => {
+  const table = clusterName
+    ? `clusterAllReplicas('${clusterName}', system.merges)`
+    : "system.merges";
+  return `
 SELECT
   database,
   table,
@@ -474,11 +528,19 @@ SELECT
   merge_type,
   formatReadableSize(total_size_bytes_compressed) AS size_readable,
   formatReadableTimeDelta(elapsed) AS elapsed_readable
-FROM system.merges
+FROM ${table}
 ORDER BY elapsed DESC
 `;
+};
 
-export const MUTATIONS_QUERY = `
+// @deprecated Use getMergesQuery instead
+export const MERGES_QUERY = getMergesQuery();
+
+export const getMutationsQuery = (clusterName?: string) => {
+  const table = clusterName
+    ? `clusterAllReplicas('${clusterName}', system.mutations)`
+    : "system.mutations";
+  return `
 SELECT
   database,
   table,
@@ -491,10 +553,14 @@ SELECT
   latest_fail_reason AS latestFailReason,
   parts_to_do AS partsToDo,
   formatReadableTimeDelta(dateDiff('second', create_time, now())) AS elapsed_readable
-FROM system.mutations
+FROM ${table}
 WHERE NOT is_done
 ORDER BY create_time DESC
 `;
+};
+
+// @deprecated Use getMutationsQuery instead
+export const MUTATIONS_QUERY = getMutationsQuery();
 
 // Merge summary for operations dashboard
 export const MERGE_SUMMARY_QUERY = `
@@ -514,7 +580,6 @@ SELECT
 FROM system.mutations
 WHERE NOT is_done
 `;
-
 
 // =============================================================================
 // Health Check Queries
@@ -723,7 +788,7 @@ export const KEEPER_HEALTH_QUERY = `
 SELECT
   (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperSession') > 0 AS is_connected,
   (SELECT coalesce(value, 0) FROM system.metrics WHERE metric = 'ZooKeeperHardwareExceptions') AS hardware_exceptions,
-  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperWaitMicroseconds') / 
+  (SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperWaitMicroseconds') /
     nullIf((SELECT coalesce(value, 0) FROM system.events WHERE event = 'ZooKeeperTransactions'), 0) AS avg_latency_us
 `;
 
@@ -731,10 +796,7 @@ SELECT
 // Query Performance Queries
 // =============================================================================
 
-
-
 // Legacy aliases for backward compatibility
-
 
 // =============================================================================
 // Cluster Nodes Queries
@@ -806,7 +868,10 @@ const createDashboardQuery = (
 // --- ClickHouse Specific Metrics ---
 
 // Queries per second
-export const getDashboardQueriesPerSecQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardQueriesPerSecQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -834,7 +899,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Queries running (from metric_log if available, fallback to query_log)
-export const getDashboardQueriesRunningQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardQueriesRunningQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -860,7 +928,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Merges running
-export const getDashboardMergesRunningQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardMergesRunningQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -886,7 +957,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Selected rows per second
-export const getDashboardSelectedRowsQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardSelectedRowsQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -914,7 +988,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Inserted rows per second
-export const getDashboardInsertedRowsQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardInsertedRowsQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -942,7 +1019,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Max parts per partition
-export const getDashboardMaxPartsQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardMaxPartsQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -972,7 +1052,10 @@ SETTINGS skip_unavailable_shards = 1
 // --- System Health Specific Metrics ---
 
 // Memory tracked (bytes)
-export const getDashboardMemoryQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardMemoryQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -998,7 +1081,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // CPU usage (user + system time, normalized to cores)
-export const getDashboardCPUQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardCPUQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -1026,7 +1112,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // IO Wait
-export const getDashboardIOWaitQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardIOWaitQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -1054,7 +1143,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Filesystem used (bytes)
-export const getDashboardFilesystemQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardFilesystemQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,
@@ -1082,7 +1174,10 @@ SETTINGS skip_unavailable_shards = 1
 };
 
 // Network received bytes/sec
-export const getDashboardNetworkQuery = (minutes: number = 60, clusterName?: string) => {
+export const getDashboardNetworkQuery = (
+  minutes: number = 60,
+  clusterName?: string
+) => {
   const singleNode = `
 SELECT
   toStartOfInterval(event_time, INTERVAL 1 minute) AS t,

@@ -11,6 +11,8 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
+import { getRunningQueriesQuery } from "@/lib/clickhouse/monitoring/queries";
 
 export interface RunningQuery {
   query_id: string;
@@ -83,23 +85,11 @@ export async function GET(): Promise<NextResponse<RunningQueriesResponse>> {
     }
 
     const client = createClientWithConfig(lensConfig);
+    const clusterName = await getClusterName(client);
 
-    const result = await client.query<RunningQuery>(`
-      SELECT
-        query_id,
-        user,
-        query,
-        elapsed,
-        read_rows,
-        read_bytes,
-        memory_usage,
-        is_initial_query,
-        current_database,
-        client_name
-      FROM system.processes
-      WHERE is_initial_query = 1
-      ORDER BY elapsed DESC
-    `);
+    const result = await client.query<RunningQuery>(
+      getRunningQueriesQuery(clusterName)
+    );
 
     return NextResponse.json({
       success: true,

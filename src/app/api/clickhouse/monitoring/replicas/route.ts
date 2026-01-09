@@ -7,19 +7,22 @@ import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
 import {
-  REPLICAS_QUERY,
   REPLICA_SUMMARY_QUERY,
+  getReplicasQuery,
   type ReplicaStatus,
   type ReplicaSummary,
   type MonitoringApiResponse,
 } from "@/lib/clickhouse/monitoring";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 interface ReplicasResponse {
   replicas: ReplicaStatus[];
   summary: ReplicaSummary;
 }
 
-export async function GET(): Promise<NextResponse<MonitoringApiResponse<ReplicasResponse>>> {
+export async function GET(): Promise<
+  NextResponse<MonitoringApiResponse<ReplicasResponse>>
+> {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -39,10 +42,11 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<Replicas
     }
 
     const client = createClientWithConfig(config);
+    const clusterName = await getClusterName(client);
 
     // Fetch replicas and summary in parallel
     const [replicasResult, summaryResult] = await Promise.all([
-      client.query<ReplicaStatus>(REPLICAS_QUERY),
+      client.query<ReplicaStatus>(getReplicasQuery(clusterName)),
       client.query<ReplicaSummary>(REPLICA_SUMMARY_QUERY),
     ]);
 

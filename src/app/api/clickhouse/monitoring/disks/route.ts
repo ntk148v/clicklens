@@ -6,8 +6,8 @@
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import {
-  CLUSTERS_LIST_QUERY,
   getDashboardDisksQuery,
   getDisksWithPartsQuery,
   type MonitoringApiResponse,
@@ -36,10 +36,6 @@ interface PartsInfo {
   compressionRatio: number;
 }
 
-interface ClusterRow {
-  cluster: string;
-}
-
 interface DiskSummary {
   totalDisks: number;
   totalSpace: number;
@@ -62,7 +58,9 @@ interface DisksResponse {
   clusterName?: string;
 }
 
-export async function GET(): Promise<NextResponse<MonitoringApiResponse<DisksResponse>>> {
+export async function GET(): Promise<
+  NextResponse<MonitoringApiResponse<DisksResponse>>
+> {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -84,19 +82,7 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<DisksRes
     const client = createClientWithConfig(config);
 
     // Detect cluster
-    let clusterName: string | undefined;
-    try {
-      const clustersResult = await client.query<ClusterRow>(CLUSTERS_LIST_QUERY);
-      const clusters = clustersResult.data
-        .map((r) => r.cluster)
-        .filter((c) => !c.startsWith("_") && !c.startsWith("all_groups."));
-      
-      if (clusters.length > 0) {
-        clusterName = clusters.includes("default") ? "default" : clusters[0];
-      }
-    } catch {
-      // Cluster detection failed, continue as single-node
-    }
+    const clusterName = await getClusterName(client);
 
     // Fetch disks and parts in parallel
     const [disksResult, partsResult] = await Promise.all([
@@ -133,9 +119,10 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<DisksRes
       totalFree: enhancedDisks.reduce((sum, d) => sum + d.freeSpace, 0),
       overallUsedPercentage: 0,
     };
-    summary.overallUsedPercentage = summary.totalSpace > 0
-      ? Math.round((summary.totalUsed / summary.totalSpace) * 10000) / 100
-      : 0;
+    summary.overallUsedPercentage =
+      summary.totalSpace > 0
+        ? Math.round((summary.totalUsed / summary.totalSpace) * 10000) / 100
+        : 0;
 
     return NextResponse.json({
       success: true,
