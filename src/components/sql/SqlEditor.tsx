@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useTheme } from "next-themes";
 import {
   EditorView,
@@ -12,12 +12,18 @@ import {
 import { EditorState, Compartment } from "@codemirror/state";
 import { sql, SQLDialect } from "@codemirror/lang-sql";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  completionKeymap,
+  CompletionContext,
+  type Completion,
+} from "@codemirror/autocomplete";
 import {
   syntaxHighlighting,
-  defaultHighlightStyle,
+  HighlightStyle,
   bracketMatching,
 } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 
 // ClickHouse SQL dialect with common functions and keywords
 const clickhouseDialect = SQLDialect.define({
@@ -60,8 +66,46 @@ const clickhouseDialect = SQLDialect.define({
   `,
 });
 
-// Light theme for SQL editor
-const lightTheme = EditorView.theme(
+// Light theme highlight style using @lezer/highlight tags
+const lightHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: "#9333ea", fontWeight: "600" },
+  { tag: tags.string, color: "#16a34a" },
+  { tag: tags.number, color: "#2563eb" },
+  { tag: tags.comment, color: "#737373", fontStyle: "italic" },
+  { tag: tags.operator, color: "#0ea5e9" },
+  { tag: tags.punctuation, color: "#525252" },
+  { tag: tags.variableName, color: "#171717" },
+  { tag: tags.typeName, color: "#dc2626" },
+  { tag: tags.function(tags.variableName), color: "#ea580c" },
+  { tag: tags.propertyName, color: "#171717" },
+  { tag: tags.bool, color: "#2563eb" },
+  { tag: tags.null, color: "#737373" },
+  { tag: tags.className, color: "#dc2626" },
+  { tag: tags.definition(tags.variableName), color: "#171717" },
+  { tag: tags.special(tags.string), color: "#16a34a" },
+]);
+
+// Dark theme highlight style using @lezer/highlight tags
+const darkHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: "#faff69", fontWeight: "600" },
+  { tag: tags.string, color: "#86efac" },
+  { tag: tags.number, color: "#93c5fd" },
+  { tag: tags.comment, color: "#6b7280", fontStyle: "italic" },
+  { tag: tags.operator, color: "#f9a8d4" },
+  { tag: tags.punctuation, color: "#d4d4d8" },
+  { tag: tags.variableName, color: "#f5f5f5" },
+  { tag: tags.typeName, color: "#fdba74" },
+  { tag: tags.function(tags.variableName), color: "#c4b5fd" },
+  { tag: tags.propertyName, color: "#f5f5f5" },
+  { tag: tags.bool, color: "#93c5fd" },
+  { tag: tags.null, color: "#6b7280" },
+  { tag: tags.className, color: "#fdba74" },
+  { tag: tags.definition(tags.variableName), color: "#f5f5f5" },
+  { tag: tags.special(tags.string), color: "#86efac" },
+]);
+
+// Light editor theme (non-syntax styles)
+const lightEditorTheme = EditorView.theme(
   {
     "&": {
       height: "100%",
@@ -69,7 +113,7 @@ const lightTheme = EditorView.theme(
       backgroundColor: "#fafafa",
     },
     ".cm-content": {
-      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      fontFamily: "ui-monospace, monospace",
       padding: "8px 0",
       caretColor: "#171717",
     },
@@ -95,15 +139,6 @@ const lightTheme = EditorView.theme(
     ".cm-line": {
       padding: "0 8px",
     },
-    ".cm-keyword": { color: "#9333ea" },
-    ".cm-string": { color: "#16a34a" },
-    ".cm-number": { color: "#2563eb" },
-    ".cm-comment": { color: "#737373", fontStyle: "italic" },
-    ".cm-operator": { color: "#0ea5e9" },
-    ".cm-punctuation": { color: "#525252" },
-    ".cm-variableName": { color: "#171717" },
-    ".cm-typeName": { color: "#dc2626" },
-    ".cm-function": { color: "#ea580c" },
     ".cm-tooltip": {
       backgroundColor: "#ffffff",
       border: "1px solid #e5e5e5",
@@ -112,7 +147,7 @@ const lightTheme = EditorView.theme(
     },
     ".cm-tooltip-autocomplete": {
       "& > ul": {
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "ui-monospace, monospace",
         fontSize: "12px",
       },
       "& > ul > li[aria-selected]": {
@@ -124,71 +159,82 @@ const lightTheme = EditorView.theme(
   { dark: false }
 );
 
-// Dark theme for SQL editor - ClickHouse inspired (black + yellow)
-const darkTheme = EditorView.theme(
+// Dark editor theme (non-syntax styles)
+const darkEditorTheme = EditorView.theme(
   {
     "&": {
       height: "100%",
       fontSize: "13px",
-      backgroundColor: "#141414",
+      backgroundColor: "#0a0a0a",
     },
     ".cm-content": {
-      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      fontFamily: "ui-monospace, monospace",
       padding: "8px 0",
-      caretColor: "#faff69",
+      caretColor: "#facc15",
     },
     ".cm-cursor, .cm-dropCursor": {
-      borderLeftColor: "#faff69",
+      borderLeftColor: "#facc15",
+      borderLeftWidth: "2px",
     },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       {
-        backgroundColor: "#faff6930",
+        backgroundColor: "#facc1530",
       },
     ".cm-gutters": {
-      backgroundColor: "#1d1d1d",
-      color: "#737373",
+      backgroundColor: "#0f0f0f",
+      color: "#525252",
       border: "none",
-      borderRight: "1px solid #2a2a2a",
+      borderRight: "1px solid #262626",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "#1f1f1f",
+      backgroundColor: "#171717",
       color: "#a3a3a3",
     },
     ".cm-activeLine": {
-      backgroundColor: "#1f1f1f",
+      backgroundColor: "#171717",
     },
     ".cm-line": {
       padding: "0 8px",
     },
-    // Bright, readable syntax colors for dark theme
-    ".cm-keyword": { color: "#faff69", fontWeight: "500" }, // Yellow - ClickHouse accent
-    ".cm-string": { color: "#4ade80" }, // Green
-    ".cm-number": { color: "#60a5fa" }, // Blue
-    ".cm-comment": { color: "#737373", fontStyle: "italic" },
-    ".cm-operator": { color: "#f472b6" }, // Pink
-    ".cm-punctuation": { color: "#d4d4d4" }, // Light gray
-    ".cm-variableName": { color: "#e2e8f0" }, // Very light gray
-    ".cm-typeName": { color: "#fb923c" }, // Orange
-    ".cm-function": { color: "#a78bfa" }, // Purple
     ".cm-tooltip": {
-      backgroundColor: "#1f1f1f",
-      border: "1px solid #2a2a2a",
+      backgroundColor: "#171717",
+      border: "1px solid #262626",
       borderRadius: "6px",
-      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.3)",
+      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.5)",
     },
     ".cm-tooltip-autocomplete": {
       "& > ul": {
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "ui-monospace, monospace",
         fontSize: "12px",
+        maxHeight: "300px",
+      },
+      "& > ul > li": {
+        padding: "4px 8px",
       },
       "& > ul > li[aria-selected]": {
-        backgroundColor: "#faff6920",
+        backgroundColor: "#facc1525",
         color: "#fafafa",
       },
+    },
+    ".cm-completionIcon": {
+      opacity: 0.7,
+    },
+    ".cm-completionLabel": {
+      color: "#e5e5e5",
+    },
+    ".cm-completionDetail": {
+      color: "#737373",
+      fontStyle: "italic",
+      marginLeft: "8px",
     },
   },
   { dark: true }
 );
+
+interface TableInfo {
+  name: string;
+  engine?: string;
+}
 
 interface SqlEditorProps {
   value: string;
@@ -199,7 +245,14 @@ interface SqlEditorProps {
   onExplain?: () => void;
   placeholder?: string;
   readOnly?: boolean;
+  databases?: string[];
+  tables?: TableInfo[];
+  selectedDatabase?: string | null;
 }
+
+// Keywords that should trigger table/database suggestions
+const TABLE_KEYWORDS = ["from", "join", "into", "table", "update"];
+const DATABASE_KEYWORDS = ["use", "database"];
 
 export function SqlEditor({
   value,
@@ -210,11 +263,16 @@ export function SqlEditor({
   onExplain,
   placeholder = "Enter SQL query...",
   readOnly = false,
+  databases = [],
+  tables = [],
+  selectedDatabase,
 }: SqlEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const readOnlyCompartment = useRef(new Compartment());
   const themeCompartment = useRef(new Compartment());
+  const highlightCompartment = useRef(new Compartment());
+  const completionCompartment = useRef(new Compartment());
   const { resolvedTheme } = useTheme();
 
   // Store callbacks in refs so keymap always has latest values
@@ -256,6 +314,107 @@ export function SqlEditor({
     },
   ]);
 
+  // Custom completion source for databases and tables
+  const schemaCompletions = useMemo(() => {
+    return (context: CompletionContext) => {
+      // Get the text before the cursor
+      const line = context.state.doc.lineAt(context.pos);
+      const textBefore = line.text
+        .slice(0, context.pos - line.from)
+        .toLowerCase();
+
+      // Check if we're after a relevant keyword
+      const words = textBefore.split(/\s+/);
+      const lastWord = words[words.length - 1] || "";
+      const prevWord = words[words.length - 2] || "";
+
+      // Check for database.table pattern (e.g., "from default.")
+      const dotMatch = textBefore.match(/(\w+)\.\s*$/);
+      if (dotMatch) {
+        // Suggest tables for the specified database
+        // Note: Currently tables don't have database info, so we show all tables
+        // In the future, this could filter by database if table metadata includes db
+        void dotMatch[1]; // dbName - for future database-aware filtering
+        const matchingTables = tables;
+
+        if (matchingTables.length > 0) {
+          return {
+            from: context.pos,
+            options: matchingTables.map(
+              (t): Completion => ({
+                label: t.name,
+                type: "class",
+                detail: t.engine || "table",
+                boost: 2,
+              })
+            ),
+          };
+        }
+      }
+
+      // Check if previous word triggers table suggestions
+      if (TABLE_KEYWORDS.includes(prevWord) && !lastWord.includes(".")) {
+        const options: Completion[] = [];
+
+        // Add tables from current database
+        tables.forEach((t) => {
+          options.push({
+            label: t.name,
+            type: "class",
+            detail: t.engine || "table",
+            boost: 2,
+          });
+        });
+
+        // Add databases with dot for cross-database queries
+        databases.forEach((db) => {
+          options.push({
+            label: db + ".",
+            type: "namespace",
+            detail: "database",
+            boost: 1,
+          });
+        });
+
+        if (options.length > 0) {
+          // Find where the current word starts
+          const wordMatch = textBefore.match(/(\w*)$/);
+          const from = context.pos - (wordMatch?.[1]?.length || 0);
+
+          return {
+            from,
+            options: options.filter((o) =>
+              o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+            ),
+          };
+        }
+      }
+
+      // Check if previous word triggers database suggestions
+      if (DATABASE_KEYWORDS.includes(prevWord)) {
+        const wordMatch = textBefore.match(/(\w*)$/);
+        const from = context.pos - (wordMatch?.[1]?.length || 0);
+
+        return {
+          from,
+          options: databases
+            .map(
+              (db): Completion => ({
+                label: db,
+                type: "namespace",
+                detail: "database",
+              })
+            )
+            .filter((o) =>
+              o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+            ),
+        };
+      }
+
+      return null;
+    };
+  }, [databases, tables]);
+
   const updateListener = useCallback(
     (update: {
       docChanged: boolean;
@@ -287,10 +446,20 @@ export function SqlEditor({
         highlightActiveLineGutter(),
         history(),
         bracketMatching(),
-        autocompletion(),
+        completionCompartment.current.of(
+          autocompletion({
+            override: [schemaCompletions],
+            defaultKeymap: true,
+          })
+        ),
         sql({ dialect: clickhouseDialect }),
-        syntaxHighlighting(defaultHighlightStyle),
-        themeCompartment.current.of(isDark ? darkTheme : lightTheme),
+        // Use our custom highlight styles instead of defaultHighlightStyle
+        highlightCompartment.current.of(
+          syntaxHighlighting(isDark ? darkHighlightStyle : lightHighlightStyle)
+        ),
+        themeCompartment.current.of(
+          isDark ? darkEditorTheme : lightEditorTheme
+        ),
         executeKeymap,
         keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
@@ -318,18 +487,38 @@ export function SqlEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update theme when it changes
+  // Update theme and highlighting when it changes
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
 
     const isDark = resolvedTheme === "dark";
     editor.dispatch({
-      effects: themeCompartment.current.reconfigure(
-        isDark ? darkTheme : lightTheme
-      ),
+      effects: [
+        themeCompartment.current.reconfigure(
+          isDark ? darkEditorTheme : lightEditorTheme
+        ),
+        highlightCompartment.current.reconfigure(
+          syntaxHighlighting(isDark ? darkHighlightStyle : lightHighlightStyle)
+        ),
+      ],
     });
   }, [resolvedTheme]);
+
+  // Update autocompletion when databases/tables change
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.dispatch({
+      effects: completionCompartment.current.reconfigure(
+        autocompletion({
+          override: [schemaCompletions],
+          defaultKeymap: true,
+        })
+      ),
+    });
+  }, [schemaCompletions]);
 
   // Update content when value changes externally
   useEffect(() => {
