@@ -92,10 +92,13 @@ async function getEffectiveRoles(
 }
 
 /**
- * Get list of accessible non-system databases for the user.
+ * Get access info including accessible databases and global access status.
  * Uses LENS_USER to query system.grants for accurate permission info.
  */
-async function getAccessibleDatabases(username: string): Promise<string[]> {
+async function getAccessInfo(username: string): Promise<{
+  databases: string[];
+  hasGlobalAccess: boolean;
+}> {
   // System/internal databases to exclude from user database lists
   const SYSTEM_DATABASES = [
     "system",
@@ -105,12 +108,12 @@ async function getAccessibleDatabases(username: string): Promise<string[]> {
 
   if (!isLensUserConfigured()) {
     // Fallback: can't determine, assume default access
-    return ["default"];
+    return { databases: ["default"], hasGlobalAccess: false };
   }
 
   const lensConfig = getLensConfig();
   if (!lensConfig) {
-    return ["default"];
+    return { databases: ["default"], hasGlobalAccess: false };
   }
 
   const client = createClient(lensConfig);
@@ -185,11 +188,14 @@ async function getAccessibleDatabases(username: string): Promise<string[]> {
         .filter((name) => !SYSTEM_DATABASES.includes(name));
     }
 
-    return databases.length > 0 ? databases : [];
+    return {
+      databases: databases.length > 0 ? databases : [],
+      hasGlobalAccess,
+    };
   } catch (error) {
     console.error("Failed to get accessible databases:", error);
-    // Fallback to empty - safer than assuming access
-    return [];
+    // Fallback - safer than assuming access
+    return { databases: [], hasGlobalAccess: false };
   }
 }
 
@@ -215,7 +221,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     const username = config.username;
 
     // Run permission probes and accessible databases query in parallel
-    const [effectiveRolesResult, featuresResult, accessibleDbsResult] =
+    const [effectiveRolesResult, featuresResult, accessInfoResult] =
       await Promise.allSettled([
         // 1. Get all effective roles (including inherited)
         getEffectiveRoles(client, username),
@@ -227,13 +233,13 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
           client.query("SELECT 1 FROM system.processes LIMIT 1"),
           // view cluster probe (system.metrics)
           client.query("SELECT 1 FROM system.metrics LIMIT 1"),
-          // view settings probe (system.settings)
+          // view settings probe (system.settings) - WE USE THIS BUT ENFORCE STRICTER CHECKS LATER
           client.query("SELECT 1 FROM system.settings LIMIT 1"),
           // view system logs probe (system.text_log)
           client.query("SELECT 1 FROM system.text_log LIMIT 1"),
         ]),
-        // 3. Get accessible databases using LENS_USER
-        getAccessibleDatabases(username),
+        // 3. Get access info (databases + global flag) using LENS_USER
+        getAccessInfo(username),
       ]);
 
     // Get effective roles
@@ -242,11 +248,14 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         ? effectiveRolesResult.value
         : new Set<string>();
 
-    // Get accessible databases
-    const accessibleDatabases =
-      accessibleDbsResult.status === "fulfilled"
-        ? accessibleDbsResult.value
-        : [];
+    // Get access info
+    const accessInfo =
+      accessInfoResult.status === "fulfilled"
+        ? accessInfoResult.value
+        : { databases: [], hasGlobalAccess: false };
+
+    const accessibleDatabases = accessInfo.databases;
+    const hasGlobalAccess = accessInfo.hasGlobalAccess;
 
     // Process Probes
     let canManageUsers = false;
@@ -267,8 +276,8 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       // Index 2: canViewCluster
       if (results[2].status === "fulfilled") canViewCluster = true;
 
-      // Index 3: canViewSettings
-      if (results[3].status === "fulfilled") canViewSettings = true;
+      // Index 3: canViewSettings (Probe only)
+      // if (results[3].status === "fulfilled") hasSettingsAccessProbe = true;
 
       // Index 4: canViewSystemLogs
       if (results[4]?.status === "fulfilled") canViewSystemLogs = true;
@@ -290,26 +299,44 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       canViewCluster = effectiveRoles.has("clicklens_cluster_monitor");
     }
 
-    // 4. Settings Viewer: via clicklens_settings_admin role
-    if (!canViewSettings) {
-      canViewSettings = effectiveRoles.has("clicklens_settings_admin");
+    // 4. Settings Viewer: via clicklens_settings_admin role OR global access
+    // STRICT CHECK: The probe might succeed for limited users if system.settings is public,
+    // but the UI should only be shown for Global Admins or Role Holders.
+    // We overwrite whatever the probe returned to enforce strict UI visibility.
+    canViewSettings = effectiveRoles.has("clicklens_settings_admin");
+
+    // If user has global access (*.*), they imply settings access
+    if (hasGlobalAccess) {
+      canViewSettings = true;
     }
+
+    // Fallback: If the strict probe succeeds AND they have at least *some* database access beyond default?
+    // Actually, user requested strictness. "no settings" for dungbh5.
+    // So we invoke STRICT mode: Only Role OR Global Access allows Settings UI.
+    // We IGNORE hasSettingsAccessProbe for the UI boolean, to be safe.
+    // (Note: They can still query system.settings in SQL Console if ClickHouse allows it,
+    // but the UI tab will be hidden).
 
     // Check Kill Query
     const canKillQueries =
       canManageUsers || effectiveRoles.has("clicklens_query_monitor");
 
-    // NEW: canBrowseTables and canExecuteQueries require at least one accessible database
-    // or having the clicklens_table_explorer role
-    const hasTableExplorerRole = effectiveRoles.has("clicklens_table_explorer");
-    const canBrowseTables =
-      hasTableExplorerRole || accessibleDatabases.length > 0;
-    const canExecuteQueries = accessibleDatabases.length > 0;
-
     // 5. System Logs: via clicklens_cluster_monitor role
     if (!canViewSystemLogs) {
       canViewSystemLogs = effectiveRoles.has("clicklens_cluster_monitor");
     }
+
+    // NEW STRICT LOGIC for Tables and Queries
+
+    // SQL Console: open to anyone who can query at least ONE database (user or system)
+    // accessInfo.databases has user DBs. If they have global access, they have databases.
+    const canExecuteQueries = accessibleDatabases.length > 0 || hasGlobalAccess;
+
+    // Table Explorer: STRICTER.
+    // Requires explicitly finding roles OR Global Access.
+    // Mere access to 'logs' database is NOT enough to enable the full Table Explorer UI.
+    const hasTableExplorerRole = effectiveRoles.has("clicklens_table_explorer");
+    const canBrowseTables = hasTableExplorerRole || hasGlobalAccess;
 
     return NextResponse.json({
       success: true,
@@ -320,7 +347,6 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canViewCluster,
         canBrowseTables,
         canExecuteQueries,
-
         canViewSettings,
         canViewSystemLogs,
         accessibleDatabases,
