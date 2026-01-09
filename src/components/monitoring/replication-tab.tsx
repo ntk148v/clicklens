@@ -10,11 +10,9 @@ import {
   TableRow,
   TableWrapper,
 } from "@/components/ui/table";
-import {
-  StatCard,
-  PaginationControls,
-  TruncatedCell,
-} from "@/components/monitoring";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
+import { PaginationControls } from "./pagination-controls";
+import { StatCard, TruncatedCell } from "@/components/monitoring";
 import { StatusBadge, StatusDot } from "@/components/monitoring";
 import { useReplicas, formatNumber } from "@/lib/hooks/use-monitoring";
 import { useState, useMemo } from "react";
@@ -321,14 +319,11 @@ export function ReplicationTab({
       </TableWrapper>
 
       {/* Info */}
-      <div className="p-4 rounded-lg bg-muted border">
-        <p className="text-xs text-muted-foreground">
-          Data sourced from{" "}
-          <code className="text-primary">system.replicas</code>. The delay
-          column shows the replication lag in seconds. A value greater than 10
-          seconds indicates the replica may be falling behind.
-        </p>
-      </div>
+      {/* Info */}
+      <DataSourceBadge
+        sources={["system.replicas"]}
+        description="The delay column shows the replication lag in seconds. A value greater than 10 seconds indicates the replica may be falling behind."
+      />
     </div>
   );
 }

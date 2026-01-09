@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig } from "@/lib/clickhouse";
+import { createClient } from "@/lib/clickhouse";
 
 export const runtime = "nodejs";
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     let sql = body.sql;
     if (typeof body.page === "number") {

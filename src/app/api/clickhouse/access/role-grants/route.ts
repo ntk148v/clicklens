@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 
 interface RoleGrant {
   user_name: string | null;
@@ -33,7 +33,7 @@ export async function GET(): Promise<NextResponse<RoleGrantsResponse>> {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     const result = await client.query<RoleGrant>(`
       SELECT
@@ -108,7 +108,7 @@ export async function POST(
       sql += " WITH ADMIN OPTION";
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.command(sql);
 
     return NextResponse.json({ success: true });
@@ -163,7 +163,7 @@ export async function DELETE(
 
     const sql = `REVOKE ${quoteIdentifier(body.roleName)} FROM ${grantee}`;
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.command(sql);
 
     return NextResponse.json({ success: true });

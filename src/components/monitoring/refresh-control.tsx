@@ -27,7 +27,7 @@ export function RefreshControl({
   intervals = [5, 10, 30, 60],
   interval,
   onIntervalChange,
-  defaultInterval = 30,
+  defaultInterval = 0,
   isLoading = false,
   className,
 }: RefreshControlProps) {

@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   isClickHouseError,
   type SystemRole,
   type SystemGrant,
@@ -48,7 +48,7 @@ import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 // Ensure feature roles exist (auto-create on first access)
 async function ensureFeatureRoles(
-  client: ReturnType<typeof createClientWithConfig>
+  client: ReturnType<typeof createClient>
 ): Promise<void> {
   try {
     // Check which feature roles exist
@@ -125,7 +125,7 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Auto-create feature roles if missing
     await ensureFeatureRoles(client);
@@ -297,7 +297,7 @@ export async function POST(
       }
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const quotedRole = quoteIdentifier(body.name);
 
     // Create the role
@@ -414,7 +414,7 @@ export async function PUT(
       }
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const quotedRole = quoteIdentifier(body.name);
 
     // Get current inherited roles
@@ -549,7 +549,7 @@ export async function DELETE(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.command(`DROP ROLE IF EXISTS ${quoteIdentifier(body.name)}`);
 
     return NextResponse.json({ success: true });

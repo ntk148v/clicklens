@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { Badge } from "@/components/ui/badge";
 import { StatCard, StatusDot } from "@/components/monitoring";
 import type {
@@ -312,15 +313,10 @@ export function ClusterTab({ refreshInterval = 30000 }: ClusterTabProps) {
         )}
 
         {/* Info footer */}
-        <div className="p-4 rounded-lg bg-muted border">
-          <p className="text-xs text-muted-foreground">
-            Data sourced from{" "}
-            <code className="text-primary">system.clusters</code>. Shows all
-            configured cluster nodes with their shard and replica assignments.
-            Green indicates active nodes, yellow indicates nodes with errors,
-            red indicates inactive nodes.
-          </p>
-        </div>
+        <DataSourceBadge
+          sources={["system.clusters"]}
+          description="Shows all configured cluster nodes with their shard and replica assignments. Green indicates active nodes, yellow indicates nodes with errors, red indicates inactive nodes."
+        />
       </div>
     </TooltipProvider>
   );

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   getLensConfig,
   isLensUserConfigured,
   isClickHouseError,
@@ -101,7 +101,7 @@ export async function GET(
       });
     }
 
-    const client = createClientWithConfig(lensConfig);
+    const client = createClient(lensConfig);
 
     // Determine sort order based on metric
     let orderBy = "total_duration_ms DESC";

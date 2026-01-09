@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") || "";
     const scope = searchParams.get("scope") || "session";
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     const safeSearch = search.replace(/'/g, "''");
     let query = "";
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     }
 
     // Note: The wrapper only takes (sql, options?). It does not take an object with 'query' field.
-    // However, createClientWithConfig returns ClickHouseClientImpl which mimics @clickhouse/client interface PARTIALLY?
+    // However, createClient returns ClickHouseClientImpl which mimics @clickhouse/client interface PARTIALLY?
     // src/lib/clickhouse/clients/types.ts defines query(sql, options).
     // It DOES NOT support 'format' in options?
     // Wait, queryStream does support format. query() does not listed it in types.
@@ -108,7 +108,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Use ALTER USER to persist setting for the current user
     // Note: This requires privileges to ALTER USER

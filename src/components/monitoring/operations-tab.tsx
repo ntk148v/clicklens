@@ -19,6 +19,7 @@ import {
   formatDuration,
 } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/monitoring";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 
 // Progress bar component
 function ProgressBar({
@@ -416,14 +417,11 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
       )}
 
       {/* Info */}
-      <div className="p-4 rounded-lg bg-muted border">
-        <p className="text-xs text-muted-foreground">
-          Data sourced from <code className="text-primary">system.merges</code>{" "}
-          and <code className="text-primary">system.mutations</code>. Merges
-          combine smaller parts into larger ones for efficient storage.
-          Mutations are ALTER TABLE operations that modify data.
-        </p>
-      </div>
+      {/* Info */}
+      <DataSourceBadge
+        sources={["system.merges", "system.mutations"]}
+        description="Merges combine smaller parts into larger ones for efficient storage. Mutations are ALTER TABLE operations that modify data."
+      />
     </div>
   );
 }

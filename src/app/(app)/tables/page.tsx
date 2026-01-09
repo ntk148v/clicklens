@@ -29,6 +29,7 @@ import {
   Code,
   AlertCircle,
 } from "lucide-react";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import {
   OverviewTab,
   PartsTab,
@@ -268,6 +269,11 @@ export default function TablesPage() {
             </Card>
           </Tabs>
         )}
+
+        <DataSourceBadge
+          sources={["system.tables", "system.columns", "system.parts"]}
+          description="Basic table metadata."
+        />
       </div>
     </div>
   );

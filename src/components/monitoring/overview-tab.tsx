@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSeriesChart, MetricChart } from "@/components/monitoring";
 import { StatusBadge } from "@/components/monitoring";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { formatUptime, useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type {
   MonitoringApiResponse,
@@ -470,14 +471,15 @@ export function OverviewTab({
       </section>
 
       {/* Info footer */}
-      <div className="p-4 rounded-lg bg-muted border">
-        <p className="text-xs text-muted-foreground">
-          Data from <code className="text-primary">system.metric_log</code>,{" "}
-          <code className="text-primary">system.asynchronous_metric_log</code>,
-          and <code className="text-primary">system.query_log</code>.
-          {isMultiNode && " Per-node metrics shown for cluster mode."}
-        </p>
-      </div>
+      {/* Info footer */}
+      <DataSourceBadge
+        sources={[
+          "system.metric_log",
+          "system.asynchronous_metric_log",
+          "system.query_log",
+        ]}
+        clusterAware={Boolean(isMultiNode)}
+      />
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   Shield,
   ScrollText,
   Settings,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -144,6 +145,22 @@ const settingsItems = [
   },
 ];
 
+// Logging sub-navigation items
+const loggingItems = [
+  {
+    name: "Server Logs",
+    href: "/logging/server",
+    icon: ScrollText,
+    description: "General server logs",
+  },
+  {
+    name: "Crash Logs",
+    href: "/logging/crash",
+    icon: AlertTriangle,
+    description: "Server crash history",
+  },
+];
+
 // Main navigation items with permission requirements
 const navigation = [
   {
@@ -176,12 +193,14 @@ const navigation = [
     requiresPermission: "canViewCluster" as const,
     subItems: monitoringItems,
   },
+
   {
     name: "Logging",
     href: "/logging",
     icon: ScrollText,
     description: "Search server logs",
-    requiresPermission: "canViewCluster" as const,
+    requiresPermission: "canViewSystemLogs" as const, // Updated permission
+    subItems: loggingItems,
   },
   {
     name: "Access",
@@ -210,6 +229,7 @@ export function Sidebar() {
       Queries: pathname.startsWith("/queries"),
       Access: pathname.startsWith("/access"),
       Settings: pathname.startsWith("/settings"),
+      Logging: pathname.startsWith("/logging"),
     })
   );
   const { user, permissions, logout, isLoading } = useAuth();
@@ -436,6 +456,16 @@ export function Sidebar() {
                     </p>
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/profile"
+                    className="flex items-center cursor-pointer"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}

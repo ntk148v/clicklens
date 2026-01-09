@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   isClickHouseError,
   getLensConfig,
   isLensUserConfigured,
@@ -25,6 +25,7 @@ interface PermissionsResponse {
     canBrowseTables: boolean;
     canExecuteQueries: boolean;
     canViewSettings: boolean;
+    canViewSystemLogs: boolean;
     accessibleDatabases: string[];
     username: string;
   };
@@ -35,7 +36,7 @@ interface PermissionsResponse {
  * Recursively resolve all effective roles for a user, including inherited roles.
  */
 async function getEffectiveRoles(
-  client: ReturnType<typeof createClientWithConfig>,
+  client: ReturnType<typeof createClient>,
   username: string
 ): Promise<Set<string>> {
   const effectiveRoles = new Set<string>();
@@ -112,7 +113,7 @@ async function getAccessibleDatabases(username: string): Promise<string[]> {
     return ["default"];
   }
 
-  const client = createClientWithConfig(lensConfig);
+  const client = createClient(lensConfig);
   const safeUser = username.replace(/'/g, "''");
 
   try {
@@ -210,7 +211,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const username = config.username;
 
     // Run permission probes and accessible databases query in parallel
@@ -228,6 +229,8 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
           client.query("SELECT 1 FROM system.metrics LIMIT 1"),
           // view settings probe (system.settings)
           client.query("SELECT 1 FROM system.settings LIMIT 1"),
+          // view system logs probe (system.text_log)
+          client.query("SELECT 1 FROM system.text_log LIMIT 1"),
         ]),
         // 3. Get accessible databases using LENS_USER
         getAccessibleDatabases(username),
@@ -250,6 +253,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     let canViewProcesses = false;
     let canViewCluster = false;
     let canViewSettings = false;
+    let canViewSystemLogs = false;
 
     if (featuresResult.status === "fulfilled") {
       const results = featuresResult.value;
@@ -265,6 +269,9 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
 
       // Index 3: canViewSettings
       if (results[3].status === "fulfilled") canViewSettings = true;
+
+      // Index 4: canViewSystemLogs
+      if (results[4]?.status === "fulfilled") canViewSystemLogs = true;
     }
 
     // Check permissions based on effective roles (including inherited)
@@ -299,6 +306,11 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       hasTableExplorerRole || accessibleDatabases.length > 0;
     const canExecuteQueries = accessibleDatabases.length > 0;
 
+    // 5. System Logs: via clicklens_cluster_monitor role
+    if (!canViewSystemLogs) {
+      canViewSystemLogs = effectiveRoles.has("clicklens_cluster_monitor");
+    }
+
     return NextResponse.json({
       success: true,
       permissions: {
@@ -308,7 +320,9 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canViewCluster,
         canBrowseTables,
         canExecuteQueries,
+
         canViewSettings,
+        canViewSystemLogs,
         accessibleDatabases,
         username,
       },

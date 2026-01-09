@@ -11,6 +11,7 @@ import {
   ClickableTableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Edit2, Loader2 } from "lucide-react";
@@ -382,6 +383,15 @@ export function SettingsTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DataSourceBadge
+        sources={["system.settings"]}
+        description={
+          scope === "server"
+            ? "Global server configuration."
+            : "Settings for the current session. Changes affect only this session."
+        }
+      />
     </div>
   );
 }

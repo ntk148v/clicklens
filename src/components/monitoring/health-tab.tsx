@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { StatusBadge } from "@/components/monitoring";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { useHealthChecks, formatNumber } from "@/lib/hooks/use-monitoring";
 import type { HealthStatus, HealthCheck } from "@/lib/clickhouse/monitoring";
 
@@ -126,13 +127,14 @@ export function HealthTab({ refreshInterval = 30000 }: HealthTabProps) {
       </div>
 
       {/* Info */}
-      <div className="p-4 rounded-lg bg-muted border">
-        <p className="text-xs text-muted-foreground">
-          Health checks are based on ClickHouse best practices and monitor
-          critical metrics like replica status, parts count, insert delays, and
-          ZooKeeper connectivity. Thresholds are configurable in the API.
-        </p>
-      </div>
+      <DataSourceBadge
+        sources={[
+          "system.processes",
+          "system.asynchronous_metrics",
+          "system.events",
+        ]}
+        description="Health checks are based on ClickHouse best practices and monitor critical metrics like replica status, parts count, insert delays, and ZooKeeper connectivity. Thresholds are configurable in the API."
+      />
     </div>
   );
 }

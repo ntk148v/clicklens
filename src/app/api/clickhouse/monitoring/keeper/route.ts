@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
   KEEPER_METRICS_QUERY,
   type MonitoringApiResponse,
@@ -73,7 +73,7 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<KeeperDa
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const result = await client.query<KeeperMetricsRow>(KEEPER_METRICS_QUERY);
 
     const metrics = result.data[0];

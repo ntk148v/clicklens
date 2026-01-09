@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
   CLUSTERS_LIST_QUERY,
   CLUSTER_SUMMARY_QUERY,
@@ -139,7 +139,7 @@ export async function GET(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const { searchParams } = new URL(request.url);
     const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
 

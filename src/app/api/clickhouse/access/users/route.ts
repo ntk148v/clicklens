@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   isClickHouseError,
   type SystemUser,
 } from "@/lib/clickhouse";
@@ -34,7 +34,7 @@ export async function GET(): Promise<NextResponse<UsersResponse>> {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Get users
     const usersResult = await client.query<SystemUser>(`
@@ -131,7 +131,7 @@ export async function POST(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const quotedUser = quoteIdentifier(body.name);
 
     // Build CREATE USER statement
@@ -236,7 +236,7 @@ export async function PUT(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const quotedUser = quoteIdentifier(body.name);
 
     // Update password if provided
@@ -391,7 +391,7 @@ export async function DELETE(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.command(`DROP USER IF EXISTS ${quoteIdentifier(body.name)}`);
 
     return NextResponse.json({ success: true });

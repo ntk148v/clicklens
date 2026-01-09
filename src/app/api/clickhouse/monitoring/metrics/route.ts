@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
   METRICS_QUERY,
   ASYNC_METRICS_QUERY,
@@ -43,7 +43,7 @@ export async function GET(
     const category = searchParams.get("category");
     const type = searchParams.get("type"); // metrics, async, events, or all
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Fetch based on type parameter
     const shouldFetchMetrics = !type || type === "all" || type === "metrics";

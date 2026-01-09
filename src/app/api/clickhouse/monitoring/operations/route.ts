@@ -5,17 +5,18 @@
 
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
-  MERGES_QUERY,
-  MUTATIONS_QUERY,
   MERGE_SUMMARY_QUERY,
   MUTATION_SUMMARY_QUERY,
+  getMergesQuery,
+  getMutationsQuery,
   type MergeInfo,
   type MutationInfo,
   type OperationsResponse,
   type MonitoringApiResponse,
 } from "@/lib/clickhouse/monitoring";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 interface MergeSummaryRow {
   activeMerges: number;
@@ -43,7 +44,9 @@ interface MutationRow {
   latestFailReason: string;
 }
 
-export async function GET(): Promise<NextResponse<MonitoringApiResponse<OperationsResponse>>> {
+export async function GET(): Promise<
+  NextResponse<MonitoringApiResponse<OperationsResponse>>
+> {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -62,12 +65,18 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<Operatio
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
+    const clusterName = await getClusterName(client);
 
     // Fetch all data in parallel
-    const [mergesResult, mutationsResult, mergeSummaryResult, mutationSummaryResult] = await Promise.all([
-      client.query<MergeInfo>(MERGES_QUERY),
-      client.query<MutationRow>(MUTATIONS_QUERY),
+    const [
+      mergesResult,
+      mutationsResult,
+      mergeSummaryResult,
+      mutationSummaryResult,
+    ] = await Promise.all([
+      client.query<MergeInfo>(getMergesQuery(clusterName)),
+      client.query<MutationRow>(getMutationsQuery(clusterName)),
       client.query<MergeSummaryRow>(MERGE_SUMMARY_QUERY),
       client.query<MutationSummaryRow>(MUTATION_SUMMARY_QUERY),
     ]);

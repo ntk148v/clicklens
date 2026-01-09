@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   getLensConfig,
   isLensUserConfigured,
   isClickHouseError,
@@ -103,7 +103,7 @@ export async function GET(
         return NextResponse.json({ success: true, columns: [] });
       }
 
-      const client = createClientWithConfig(lensConfig);
+      const client = createClient(lensConfig);
 
       const result = await client.query(`
         SELECT 
@@ -139,7 +139,7 @@ export async function GET(
         );
       }
 
-      const client = createClientWithConfig(userConfig);
+      const client = createClient(userConfig);
 
       const result = await client.query(
         `SELECT * FROM \`${safeDatabase}\`.\`${safeTable}\` LIMIT 100`

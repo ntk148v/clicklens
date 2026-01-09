@@ -11,7 +11,7 @@ export default function MonitoringDisksPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [interval, setInterval] = useState(30);
+  const [interval, setInterval] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !permissions?.canViewCluster) {

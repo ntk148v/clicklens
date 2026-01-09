@@ -15,6 +15,7 @@ import { StatCard, PaginationControls } from "@/components/monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import { StatusBadge } from "@/components/monitoring";
 import { Badge } from "@/components/ui/badge";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { useDisks, formatBytes } from "@/lib/hooks/use-monitoring";
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -414,14 +415,12 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
       </TableWrapper>
 
       {/* Info */}
-      <div className="p-4 rounded-lg bg-muted border">
-        <p className="text-xs text-muted-foreground">
-          Data from <code className="text-primary">system.disks</code> and{" "}
-          <code className="text-primary">system.parts</code>.
-          {data?.clusterName && " Cluster-aware: showing all nodes."} Disk usage
-          above 75% shows a warning, above 90% is critical.
-        </p>
-      </div>
+      {/* Info */}
+      <DataSourceBadge
+        sources={["system.disks", "system.parts"]}
+        description="Disk usage above 75% shows a warning, above 90% is critical."
+        clusterAware={Boolean(data?.clusterName)}
+      />
     </div>
   );
 }

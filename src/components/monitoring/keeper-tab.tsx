@@ -9,17 +9,17 @@ import {
   Clock,
   Activity,
   Trash2,
+  Zap,
   FileEdit,
   Search,
   List,
   Layers,
-  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/monitoring";
-import { StatusBadge } from "@/components/monitoring";
+import { StatCard, StatusBadge } from "@/components/monitoring";
 import { formatNumber } from "@/lib/hooks/use-monitoring";
 import type { MonitoringApiResponse } from "@/lib/clickhouse/monitoring";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 
 interface KeeperData {
   isConnected: boolean;
@@ -271,15 +271,11 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
       </section>
 
       {/* Info */}
-      <div className="p-4 rounded-lg bg-muted border">
-        <p className="text-xs text-muted-foreground">
-          Data sourced from <code className="text-primary">system.metrics</code>{" "}
-          and <code className="text-primary">system.events</code> tables.
-          ZooKeeper/Keeper is used for distributed coordination in ClickHouse
-          cluster. High latency or exceptions may indicate cluster coordination
-          issues.
-        </p>
-      </div>
+      {/* Info */}
+      <DataSourceBadge
+        sources={["system.metrics", "system.events"]}
+        description="ZooKeeper/Keeper is used for distributed coordination in ClickHouse cluster. High latency or exceptions may indicate cluster coordination issues."
+      />
     </div>
   );
 }

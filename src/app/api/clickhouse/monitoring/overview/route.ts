@@ -1,7 +1,7 @@
 /**
  * API route for cluster overview metrics with time-series data
  * GET /api/clickhouse/monitoring/overview
- * 
+ *
  * Supports cluster-aware queries when a cluster is detected.
  * Query params:
  *   - timeRange: number (minutes, default 60)
@@ -10,14 +10,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import {
   OVERVIEW_QUERY,
   QUERY_METRICS_QUERY,
   MEMORY_METRICS_QUERY,
   MERGE_METRICS_QUERY,
   THROUGHPUT_METRICS_QUERY,
-  CLUSTERS_LIST_QUERY,
   CLUSTER_SUMMARY_QUERY,
   getQueriesPerMinuteQuery,
   getInsertedRowsPerMinuteQuery,
@@ -86,10 +86,6 @@ interface PerNodeTimeSeriesPoint {
   timestamp: string;
   node: string;
   value: number;
-}
-
-interface ClusterRow {
-  cluster: string;
 }
 
 interface ClusterSummaryRow {
@@ -186,28 +182,20 @@ export async function GET(
     const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
     let clusterName = searchParams.get("cluster") || undefined;
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Auto-detect cluster if not specified
     if (!clusterName) {
-      try {
-        const clustersResult = await client.query<ClusterRow>(CLUSTERS_LIST_QUERY);
-        if (clustersResult.data.length > 0) {
-          // Use 'default' cluster if available, otherwise use first one
-          const defaultCluster = clustersResult.data.find(c => c.cluster === 'default');
-          clusterName = defaultCluster?.cluster || clustersResult.data[0].cluster;
-        }
-      } catch {
-        // Ignore cluster detection errors, proceed with single-node mode
-        clusterName = undefined;
-      }
+      clusterName = await getClusterName(client);
     }
 
     // Fetch cluster summary if we have a cluster
     let clusterSummary: ClusterSummaryRow | null = null;
     if (clusterName) {
       try {
-        const summaryResult = await client.query<ClusterSummaryRow>(CLUSTER_SUMMARY_QUERY);
+        const summaryResult = await client.query<ClusterSummaryRow>(
+          CLUSTER_SUMMARY_QUERY
+        );
         clusterSummary = summaryResult.data[0] || null;
       } catch {
         // Ignore cluster summary errors
@@ -233,10 +221,18 @@ export async function GET(
       client.query<MergeMetricsRow>(MERGE_METRICS_QUERY),
       client.query<ThroughputMetricsRow>(THROUGHPUT_METRICS_QUERY),
       // Time series queries with cluster awareness
-      client.query<TimeSeriesPoint>(getQueriesPerMinuteQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getInsertedRowsPerMinuteQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getSelectedBytesPerMinuteQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getMemoryUsageHistoryQuery(timeRange, clusterName)),
+      client.query<TimeSeriesPoint>(
+        getQueriesPerMinuteQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getInsertedRowsPerMinuteQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getSelectedBytesPerMinuteQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getMemoryUsageHistoryQuery(timeRange, clusterName)
+      ),
     ]);
 
     const overview = overviewResult.data[0];
@@ -314,16 +310,24 @@ export async function GET(
           perNodeInsertedResult,
           perNodeSelectedResult,
         ] = await Promise.all([
-          client.query<PerNodeTimeSeriesPoint>(getPerNodeQueriesQuery(timeRange, clusterName)),
-          client.query<PerNodeTimeSeriesPoint>(getPerNodeMemoryQuery(timeRange, clusterName)),
-          client.query<PerNodeTimeSeriesPoint>(getPerNodeInsertedRowsQuery(timeRange, clusterName)),
-          client.query<PerNodeTimeSeriesPoint>(getPerNodeSelectedBytesQuery(timeRange, clusterName)),
+          client.query<PerNodeTimeSeriesPoint>(
+            getPerNodeQueriesQuery(timeRange, clusterName)
+          ),
+          client.query<PerNodeTimeSeriesPoint>(
+            getPerNodeMemoryQuery(timeRange, clusterName)
+          ),
+          client.query<PerNodeTimeSeriesPoint>(
+            getPerNodeInsertedRowsQuery(timeRange, clusterName)
+          ),
+          client.query<PerNodeTimeSeriesPoint>(
+            getPerNodeSelectedBytesQuery(timeRange, clusterName)
+          ),
         ]);
 
         // Extract unique node names from all per-node data
         const nodeSet = new Set<string>();
-        perNodeQueriesResult.data.forEach(p => nodeSet.add(p.node));
-        perNodeMemoryResult.data.forEach(p => nodeSet.add(p.node));
+        perNodeQueriesResult.data.forEach((p) => nodeSet.add(p.node));
+        perNodeMemoryResult.data.forEach((p) => nodeSet.add(p.node));
 
         dashboard.perNodeTimeSeries = {
           queries: perNodeQueriesResult.data,

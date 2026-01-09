@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   getLensConfig,
   isLensUserConfigured,
   isClickHouseError,
@@ -88,7 +88,7 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
       });
     }
 
-    const client = createClientWithConfig(lensConfig);
+    const client = createClient(lensConfig);
 
     try {
       // Check if query_cache table exists (requires ClickHouse 23.4+)

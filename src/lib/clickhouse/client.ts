@@ -45,8 +45,3 @@ export function createClient(config?: ClickHouseConfig): ClickHouseClient {
 
   return new ClickHouseClientImpl(resolvedConfig);
 }
-
-/**
- * @deprecated Use createClient() instead
- */
-export const createClientWithConfig = createClient;

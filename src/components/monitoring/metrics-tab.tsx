@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "./pagination-controls";
 import { useMetrics, formatBytes } from "@/lib/hooks/use-monitoring";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import type { MetricCategory } from "@/lib/clickhouse/monitoring";
 
 interface MetricsTabProps {
@@ -593,6 +594,16 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
           </TableWrapper>
         </TabsContent>
       </Tabs>
+
+      {/* Info footer */}
+      <DataSourceBadge
+        sources={[
+          "system.metrics",
+          "system.asynchronous_metrics",
+          "system.events",
+        ]}
+        description="Metrics are instantaneous values, async metrics are periodic samples, and events are cumulative counters."
+      />
     </div>
   );
 }
