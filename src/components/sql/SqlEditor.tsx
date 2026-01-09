@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import {
   EditorView,
@@ -254,6 +254,108 @@ interface SqlEditorProps {
 const TABLE_KEYWORDS = ["from", "join", "into", "table", "update"];
 const DATABASE_KEYWORDS = ["use", "database"];
 
+// Create schema completion source - uses refs to avoid recreating
+function createSchemaCompletionSource(
+  tablesRef: React.RefObject<TableInfo[]>,
+  databasesRef: React.RefObject<string[]>
+) {
+  return (context: CompletionContext) => {
+    const tables = tablesRef.current || [];
+    const databases = databasesRef.current || [];
+
+    // Only provide completions if we have schema data
+    if (tables.length === 0 && databases.length === 0) {
+      return null;
+    }
+
+    // Get the text before the cursor
+    const line = context.state.doc.lineAt(context.pos);
+    const textBefore = line.text
+      .slice(0, context.pos - line.from)
+      .toLowerCase();
+
+    // Check if we're after a relevant keyword
+    const words = textBefore.split(/\s+/);
+    const lastWord = words[words.length - 1] || "";
+    const prevWord = words[words.length - 2] || "";
+
+    // Check for database.table pattern (e.g., "from default.")
+    const dotMatch = textBefore.match(/(\w+)\.\s*$/);
+    if (dotMatch && tables.length > 0) {
+      return {
+        from: context.pos,
+        options: tables.map(
+          (t): Completion => ({
+            label: t.name,
+            type: "class",
+            detail: t.engine || "table",
+          })
+        ),
+      };
+    }
+
+    // Check if previous word triggers table suggestions
+    if (TABLE_KEYWORDS.includes(prevWord) && !lastWord.includes(".")) {
+      const options: Completion[] = [];
+
+      // Add tables from current database
+      tables.forEach((t) => {
+        options.push({
+          label: t.name,
+          type: "class",
+          detail: t.engine || "table",
+        });
+      });
+
+      // Add databases with dot for cross-database queries
+      databases.forEach((db) => {
+        options.push({
+          label: db + ".",
+          type: "namespace",
+          detail: "database",
+        });
+      });
+
+      if (options.length > 0) {
+        const wordMatch = textBefore.match(/(\w*)$/);
+        const from = context.pos - (wordMatch?.[1]?.length || 0);
+
+        const filtered = options.filter((o) =>
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+        );
+
+        if (filtered.length > 0) {
+          return { from, options: filtered };
+        }
+      }
+    }
+
+    // Check if previous word triggers database suggestions
+    if (DATABASE_KEYWORDS.includes(prevWord) && databases.length > 0) {
+      const wordMatch = textBefore.match(/(\w*)$/);
+      const from = context.pos - (wordMatch?.[1]?.length || 0);
+
+      const filtered = databases
+        .map(
+          (db): Completion => ({
+            label: db,
+            type: "namespace",
+            detail: "database",
+          })
+        )
+        .filter((o) =>
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+        );
+
+      if (filtered.length > 0) {
+        return { from, options: filtered };
+      }
+    }
+
+    return null;
+  };
+}
+
 export function SqlEditor({
   value,
   onChange,
@@ -265,27 +367,50 @@ export function SqlEditor({
   readOnly = false,
   databases = [],
   tables = [],
-  selectedDatabase,
 }: SqlEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const readOnlyCompartment = useRef(new Compartment());
   const themeCompartment = useRef(new Compartment());
   const highlightCompartment = useRef(new Compartment());
-  const completionCompartment = useRef(new Compartment());
   const { resolvedTheme } = useTheme();
 
-  // Store callbacks in refs so keymap always has latest values
+  // Use refs for all callbacks to ensure EditorView always has latest versions
+  const onChangeRef = useRef(onChange);
+  const onCursorChangeRef = useRef(onCursorChange);
   const onExecuteRef = useRef(onExecute);
   const onExecuteAtCursorRef = useRef(onExecuteAtCursor);
   const onExplainRef = useRef(onExplain);
 
-  // Keep refs updated with latest props
+  // Use refs for schema data to avoid recreating completion source
+  const tablesRef = useRef<TableInfo[]>(tables);
+  const databasesRef = useRef<string[]>(databases);
+
+  // Track if we're syncing from external value to prevent loops
+  const isSyncingRef = useRef(false);
+
+  // Keep all refs updated with latest props
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onCursorChangeRef.current = onCursorChange;
+  }, [onCursorChange]);
+
   useEffect(() => {
     onExecuteRef.current = onExecute;
     onExecuteAtCursorRef.current = onExecuteAtCursor;
     onExplainRef.current = onExplain;
   }, [onExecute, onExecuteAtCursor, onExplain]);
+
+  useEffect(() => {
+    tablesRef.current = tables;
+  }, [tables]);
+
+  useEffect(() => {
+    databasesRef.current = databases;
+  }, [databases]);
 
   // Handle Ctrl+Enter to execute, Shift+Enter for execute at cursor
   const executeKeymap = keymap.of([
@@ -314,129 +439,27 @@ export function SqlEditor({
     },
   ]);
 
-  // Custom completion source for databases and tables
-  const schemaCompletions = useMemo(() => {
-    return (context: CompletionContext) => {
-      // Get the text before the cursor
-      const line = context.state.doc.lineAt(context.pos);
-      const textBefore = line.text
-        .slice(0, context.pos - line.from)
-        .toLowerCase();
-
-      // Check if we're after a relevant keyword
-      const words = textBefore.split(/\s+/);
-      const lastWord = words[words.length - 1] || "";
-      const prevWord = words[words.length - 2] || "";
-
-      // Check for database.table pattern (e.g., "from default.")
-      const dotMatch = textBefore.match(/(\w+)\.\s*$/);
-      if (dotMatch) {
-        // Suggest tables for the specified database
-        // Note: Currently tables don't have database info, so we show all tables
-        // In the future, this could filter by database if table metadata includes db
-        void dotMatch[1]; // dbName - for future database-aware filtering
-        const matchingTables = tables;
-
-        if (matchingTables.length > 0) {
-          return {
-            from: context.pos,
-            options: matchingTables.map(
-              (t): Completion => ({
-                label: t.name,
-                type: "class",
-                detail: t.engine || "table",
-                boost: 2,
-              })
-            ),
-          };
-        }
-      }
-
-      // Check if previous word triggers table suggestions
-      if (TABLE_KEYWORDS.includes(prevWord) && !lastWord.includes(".")) {
-        const options: Completion[] = [];
-
-        // Add tables from current database
-        tables.forEach((t) => {
-          options.push({
-            label: t.name,
-            type: "class",
-            detail: t.engine || "table",
-            boost: 2,
-          });
-        });
-
-        // Add databases with dot for cross-database queries
-        databases.forEach((db) => {
-          options.push({
-            label: db + ".",
-            type: "namespace",
-            detail: "database",
-            boost: 1,
-          });
-        });
-
-        if (options.length > 0) {
-          // Find where the current word starts
-          const wordMatch = textBefore.match(/(\w*)$/);
-          const from = context.pos - (wordMatch?.[1]?.length || 0);
-
-          return {
-            from,
-            options: options.filter((o) =>
-              o.label.toLowerCase().startsWith(lastWord.toLowerCase())
-            ),
-          };
-        }
-      }
-
-      // Check if previous word triggers database suggestions
-      if (DATABASE_KEYWORDS.includes(prevWord)) {
-        const wordMatch = textBefore.match(/(\w*)$/);
-        const from = context.pos - (wordMatch?.[1]?.length || 0);
-
-        return {
-          from,
-          options: databases
-            .map(
-              (db): Completion => ({
-                label: db,
-                type: "namespace",
-                detail: "database",
-              })
-            )
-            .filter((o) =>
-              o.label.toLowerCase().startsWith(lastWord.toLowerCase())
-            ),
-        };
-      }
-
-      return null;
-    };
-  }, [databases, tables]);
-
-  const updateListener = useCallback(
-    (update: {
-      docChanged: boolean;
-      state: EditorState;
-      selectionSet: boolean;
-    }) => {
-      if (update.docChanged) {
-        onChange(update.state.doc.toString());
-      }
-      // Report cursor position changes
-      if (update.selectionSet || update.docChanged) {
-        const pos = update.state.selection.main.head;
-        onCursorChange?.(pos);
-      }
-    },
-    [onChange, onCursorChange]
+  // Create stable completion source
+  const schemaCompletionSource = useRef(
+    createSchemaCompletionSource(tablesRef, databasesRef)
   );
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const isDark = resolvedTheme === "dark";
+
+    // Update listener that uses refs to always get latest callbacks
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged && !isSyncingRef.current) {
+        const newValue = update.state.doc.toString();
+        onChangeRef.current(newValue);
+      }
+      if (update.selectionSet || update.docChanged) {
+        const pos = update.state.selection.main.head;
+        onCursorChangeRef.current?.(pos);
+      }
+    });
 
     const state = EditorState.create({
       doc: value,
@@ -446,12 +469,12 @@ export function SqlEditor({
         highlightActiveLineGutter(),
         history(),
         bracketMatching(),
-        completionCompartment.current.of(
-          autocompletion({
-            override: [schemaCompletions],
-            defaultKeymap: true,
-          })
-        ),
+        // Autocompletion with schema suggestions
+        autocompletion({
+          override: [schemaCompletionSource.current],
+          activateOnTyping: false, // Only trigger on Ctrl+Space
+          defaultKeymap: true,
+        }),
         sql({ dialect: clickhouseDialect }),
         // Use our custom highlight styles instead of defaultHighlightStyle
         highlightCompartment.current.of(
@@ -463,7 +486,7 @@ export function SqlEditor({
         executeKeymap,
         keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
-        EditorView.updateListener.of(updateListener),
+        updateListener,
         EditorView.contentAttributes.of({
           "aria-label": "SQL Editor",
         }),
@@ -505,28 +528,15 @@ export function SqlEditor({
     });
   }, [resolvedTheme]);
 
-  // Update autocompletion when databases/tables change
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    editor.dispatch({
-      effects: completionCompartment.current.reconfigure(
-        autocompletion({
-          override: [schemaCompletions],
-          defaultKeymap: true,
-        })
-      ),
-    });
-  }, [schemaCompletions]);
-
-  // Update content when value changes externally
+  // Update content when value changes externally (e.g., tab switch)
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
 
     const currentValue = editor.state.doc.toString();
     if (currentValue !== value) {
+      // Prevent the update listener from calling onChange
+      isSyncingRef.current = true;
       editor.dispatch({
         changes: {
           from: 0,
@@ -534,6 +544,7 @@ export function SqlEditor({
           insert: value,
         },
       });
+      isSyncingRef.current = false;
     }
   }, [value]);
 
