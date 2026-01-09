@@ -12,6 +12,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableWrapper,
+  ClickableTableRow,
 } from "@/components/ui/table";
 import { Database, Columns } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -81,6 +83,15 @@ export function TablePreview({ database, table }: TablePreviewProps) {
     (currentPage + 1) * pageSize
   );
 
+  // Convert columns to meta format for ClickableTableRow
+  const structureMeta = [
+    { name: "name", type: "String" },
+    { name: "type", type: "String" },
+    { name: "default_kind", type: "String" },
+    { name: "default_expression", type: "String" },
+    { name: "comment", type: "String" },
+  ];
+
   return (
     <Card className="flex flex-col h-full border-0 rounded-none">
       {/* Header */}
@@ -90,6 +101,11 @@ export function TablePreview({ database, table }: TablePreviewProps) {
           <span className="text-sm font-medium">
             {database}.{table}
           </span>
+          {previewTab === "data" && (
+            <span className="text-xs text-muted-foreground">
+              (showing first 100 rows)
+            </span>
+          )}
         </div>
         <div className="flex rounded-md border overflow-hidden">
           <Button
@@ -119,8 +135,8 @@ export function TablePreview({ database, table }: TablePreviewProps) {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-h-0">
+      {/* Content - TableWrapper for proper scrolling */}
+      <TableWrapper className="flex-1 min-h-0">
         {previewTab === "structure" ? (
           <Table>
             <TableHeader>
@@ -129,32 +145,38 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                 <TableHead>Type</TableHead>
                 <TableHead>Default</TableHead>
                 <TableHead>Comment</TableHead>
+                <TableHead className="w-8" /> {/* Expand icon column */}
               </TableRow>
             </TableHeader>
             <TableBody isLoading={loading}>
-              {columns.map((col) => (
-                <TableRow key={col.name}>
-                  <TableCell className="font-mono font-medium text-xs">
-                    {col.name}
-                  </TableCell>
+              {columns.map((col, index) => (
+                <ClickableTableRow
+                  key={col.name}
+                  record={col}
+                  columns={structureMeta}
+                  rowIndex={index}
+                  sheetTitle={`Column: ${col.name}`}
+                  expandable={true}
+                >
+                  <TableCell className="font-medium">{col.name}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="font-mono text-xs">
                       {col.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
+                  <TableCell className="text-muted-foreground">
                     {col.default_kind ? (
-                      <code>
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded">
                         {col.default_kind}: {col.default_expression}
                       </code>
                     ) : (
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
+                  <TableCell className="text-muted-foreground">
                     {col.comment || "—"}
                   </TableCell>
-                </TableRow>
+                </ClickableTableRow>
               ))}
             </TableBody>
           </Table>
@@ -167,35 +189,35 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                     {col.name}
                   </TableHead>
                 ))}
+                <TableHead className="w-8" /> {/* Expand icon column */}
               </TableRow>
             </TableHeader>
             <TableBody isLoading={loading}>
               {paginatedData.map((row, i) => (
-                <TableRow key={i}>
+                <ClickableTableRow
+                  key={i}
+                  record={row}
+                  columns={meta}
+                  rowIndex={currentPage * pageSize + i}
+                  sheetTitle={`Row ${currentPage * pageSize + i + 1}`}
+                  expandable={true}
+                >
                   {meta.map((col) => (
                     <TableCell
                       key={col.name}
-                      className="font-mono text-xs max-w-[200px] truncate"
+                      className="max-w-[200px] truncate"
                     >
                       {formatCellValue(row[col.name])}
                     </TableCell>
                   ))}
-                </TableRow>
+                </ClickableTableRow>
               ))}
             </TableBody>
           </Table>
         )}
-      </div>
+      </TableWrapper>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-1.5 border-t text-xs text-muted-foreground bg-muted/30">
-        <span>
-          {previewTab === "data"
-            ? `${data.length} rows`
-            : `${columns.length} columns`}
-        </span>
-      </div>
-      {previewTab === "data" && (
+      {previewTab === "data" && totalPages > 0 && (
         <PaginationControls
           page={currentPage + 1}
           totalPages={totalPages}
