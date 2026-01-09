@@ -24,6 +24,7 @@ interface Permissions {
   canBrowseTables: boolean;
   canExecuteQueries: boolean;
   canViewSettings: boolean;
+  canViewSystemLogs: boolean;
   accessibleDatabases: string[];
 }
 
@@ -83,6 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           canBrowseTables: data.permissions.canBrowseTables,
           canExecuteQueries: data.permissions.canExecuteQueries,
           canViewSettings: data.permissions.canViewSettings,
+          canViewSystemLogs: data.permissions.canViewSystemLogs,
           accessibleDatabases: data.permissions.accessibleDatabases || [],
         });
       }

@@ -66,7 +66,11 @@ function getMinTime(range: TimeRange): string | undefined {
   return now.toISOString();
 }
 
-export function LogsViewer() {
+interface LogsViewerProps {
+  source?: "text_log" | "crash_log";
+}
+
+export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
   // Filters
   const [search, setSearch] = useState("");
   const [component, setComponent] = useState("");
@@ -81,8 +85,9 @@ export function LogsViewer() {
       component,
       level,
       minTime: getMinTime(timeRange),
+      source,
     }),
-    [search, component, level, timeRange]
+    [search, component, level, timeRange, source]
   );
 
   // Fetch function for the hook
@@ -90,9 +95,16 @@ export function LogsViewer() {
     async (params: typeof fetchParams & { sinceTimestamp?: string }) => {
       const urlParams = new URLSearchParams();
       urlParams.set("limit", "1000");
+      urlParams.set("source", params.source);
+
       if (params.search) urlParams.set("search", params.search);
       if (params.component) urlParams.set("component", params.component);
-      if (params.level && params.level !== "All")
+      // Level filter only for text_log
+      if (
+        params.source === "text_log" &&
+        params.level &&
+        params.level !== "All"
+      )
         urlParams.set("level", params.level);
 
       // Use sinceTimestamp for incremental, minTime for full reload
@@ -138,7 +150,7 @@ export function LogsViewer() {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [source]); // Reload when source changes
 
   // Handle filter apply - do full reload
   const handleApplyFilters = (e?: React.FormEvent) => {
@@ -149,7 +161,8 @@ export function LogsViewer() {
   return (
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">System Logs</h2>
+        <div />{" "}
+        {/* Spacer for title if needed or just remove justified-between */}
         <RefreshControl
           interval={refreshInterval}
           onIntervalChange={setRefreshInterval}
@@ -184,19 +197,21 @@ export function LogsViewer() {
           </SelectContent>
         </Select>
 
-        {/* Level Filter */}
-        <Select value={level} onValueChange={(v) => setLevel(v as LogLevel)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Level" />
-          </SelectTrigger>
-          <SelectContent>
-            {LOG_LEVELS.map((l) => (
-              <SelectItem key={l} value={l}>
-                {l === "All" ? "All Levels" : l}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Level Filter - only for text_log */}
+        {source === "text_log" && (
+          <Select value={level} onValueChange={(v) => setLevel(v as LogLevel)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Level" />
+            </SelectTrigger>
+            <SelectContent>
+              {LOG_LEVELS.map((l) => (
+                <SelectItem key={l} value={l}>
+                  {l === "All" ? "All Levels" : l}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Component Input */}
         <Input

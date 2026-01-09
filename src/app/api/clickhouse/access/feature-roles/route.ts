@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
   FEATURE_ROLES,
   FEATURE_ROLE_PREFIX,
@@ -35,7 +35,7 @@ export async function GET(): Promise<NextResponse<FeatureRolesResponse>> {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Check which feature roles exist in ClickHouse
     const result = await client.query<{ name: string }>(`
@@ -81,7 +81,7 @@ export async function POST(): Promise<
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const created: string[] = [];
 
     // Create each feature role with its privileges
@@ -117,7 +117,10 @@ export async function POST(): Promise<
           "GRANT SELECT ON system.asynchronous_metrics TO `clicklens_cluster_monitor`",
           "GRANT SELECT ON system.settings TO `clicklens_cluster_monitor`",
           "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor`",
+          "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor`",
           "GRANT SELECT ON system.parts TO `clicklens_cluster_monitor`",
+          "GRANT SELECT ON system.text_log TO `clicklens_cluster_monitor`",
+          "GRANT SELECT ON system.crash_log TO `clicklens_cluster_monitor`",
         ],
       },
       {
