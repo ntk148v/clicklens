@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
   REPLICA_SUMMARY_QUERY,
   getReplicasQuery,
@@ -41,7 +41,7 @@ export async function GET(): Promise<
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const clusterName = await getClusterName(client);
 
     // Fetch replicas and summary in parallel

@@ -3,7 +3,7 @@
  * Handles creation and management of metadata tables in ClickHouse
  */
 
-import { createClientWithConfig } from "./client";
+import { createClient } from "./client";
 import { getLensConfig, isLensUserConfigured } from "./config";
 
 const METADATA_DB = "clicklens_metadata";
@@ -34,7 +34,7 @@ export async function ensureMetadataInfrastructure() {
   const config = getLensConfig();
   if (!config) return;
 
-  const client = createClientWithConfig(config);
+  const client = createClient(config);
 
   try {
     // Create database

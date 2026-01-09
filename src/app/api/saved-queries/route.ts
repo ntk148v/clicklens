@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
@@ -45,7 +45,7 @@ export async function GET() {
 
   try {
     const config = getLensConfig();
-    const client = createClientWithConfig(config!); // Checked by isLensUserConfigured
+    const client = createClient(config!); // Checked by isLensUserConfigured
 
     // Ensure table exists (idempotent, fast enough to check or cache)
     // For now we just run it, assuming it's cheap IF NOT EXISTS
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await ensureMetadataInfrastructure();
 
     const id = generateUUID();

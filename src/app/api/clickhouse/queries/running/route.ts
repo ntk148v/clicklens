@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   getLensConfig,
   isLensUserConfigured,
   isClickHouseError,
@@ -84,7 +84,7 @@ export async function GET(): Promise<NextResponse<RunningQueriesResponse>> {
       });
     }
 
-    const client = createClientWithConfig(lensConfig);
+    const client = createClient(lensConfig);
     const clusterName = await getClusterName(client);
 
     const result = await client.query<RunningQuery>(

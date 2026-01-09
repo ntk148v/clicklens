@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
   HEALTH_CHECKS_QUERY,
   type HealthCheck,
@@ -126,7 +126,7 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<HealthSu
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     const result = await client.query<HealthCheckRow>(HEALTH_CHECKS_QUERY);
 
     const now = new Date().toISOString();

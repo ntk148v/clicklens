@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import {
   OVERVIEW_QUERY,
@@ -182,7 +182,7 @@ export async function GET(
     const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
     let clusterName = searchParams.get("cluster") || undefined;
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     // Auto-detect cluster if not specified
     if (!clusterName) {

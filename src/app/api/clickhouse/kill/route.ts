@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 
 interface KillRequest {
   queryId: string;
@@ -40,7 +40,7 @@ export async function POST(
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.killQuery(body.queryId);
 
     return NextResponse.json({ success: true });

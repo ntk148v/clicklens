@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
@@ -69,7 +69,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       });
     }
 
-    const client = createClientWithConfig(lensConfig);
+    const client = createClient(lensConfig);
     const safeUser = session.user.username.replace(/'/g, "''");
 
     try {

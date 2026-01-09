@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import {
-  createClientWithConfig,
+  createClient,
   isClickHouseError,
   type SystemGrant,
 } from "@/lib/clickhouse";
@@ -30,7 +30,7 @@ export async function GET(): Promise<NextResponse<GrantsResponse>> {
       );
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     const result = await client.query<SystemGrant>(`
       SELECT
@@ -122,7 +122,7 @@ export async function POST(
       sql += " WITH GRANT OPTION";
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.command(sql);
 
     return NextResponse.json({ success: true });
@@ -190,7 +190,7 @@ export async function DELETE(
 
     const sql = `REVOKE ${body.accessType} ${target} FROM ${grantee}`;
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
     await client.command(sql);
 
     return NextResponse.json({ success: true });

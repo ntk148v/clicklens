@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClientWithConfig } from "@/lib/clickhouse";
+import { createClient } from "@/lib/clickhouse";
 
 export interface PingResponse {
   connected: boolean;
@@ -27,7 +27,7 @@ export async function GET(): Promise<NextResponse<PingResponse>> {
       });
     }
 
-    const client = createClientWithConfig(config);
+    const client = createClient(config);
 
     const isConnected = await client.ping();
 
