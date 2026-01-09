@@ -53,15 +53,23 @@ export async function POST(request: NextRequest) {
       sql = `SELECT * FROM (${cleanSql}) LIMIT ${pageSize} OFFSET ${offset}`;
     }
 
+    // Build ClickHouse settings with optional database context
+    const clickhouseSettings: Record<string, unknown> = {
+      max_result_rows: MAX_ROWS + 1,
+      result_overflow_mode: "break",
+    };
+
+    // If database is provided, set it as the default database for the query
+    if (body.database && typeof body.database === "string") {
+      clickhouseSettings.database = body.database;
+    }
+
     // Get the ClickHouse stream
     const resultSet = await client.queryStream(sql, {
       timeout: body.timeout,
       query_id: body.query_id,
       format: "JSONCompactEachRowWithNamesAndTypes",
-      clickhouse_settings: {
-        max_result_rows: MAX_ROWS + 1,
-        result_overflow_mode: "break",
-      },
+      clickhouse_settings: clickhouseSettings,
     });
 
     const stream = (

@@ -18,6 +18,7 @@ import {
   type ExplainType,
 } from "@/components/sql";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
+import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useAuth } from "@/components/auth";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -65,6 +66,7 @@ interface QueryResult {
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory } =
     useTabsStore();
+  const { selectedDatabase, databases, tables } = useSqlBrowserStore();
   const { user, permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -140,6 +142,7 @@ export default function SqlConsolePage() {
               query_id: queryId,
               page: page,
               pageSize: pageSize,
+              database: selectedDatabase,
             }),
           });
 
@@ -329,7 +332,7 @@ export default function SqlConsolePage() {
         });
       }
     },
-    [getActiveQueryTab, updateTab, addToHistory, user]
+    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase]
   );
 
   const handlePageChange = useCallback(
@@ -407,7 +410,11 @@ export default function SqlConsolePage() {
       const response = await fetch("/api/clickhouse/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: statement, query_id: queryId }),
+        body: JSON.stringify({
+          sql: statement,
+          query_id: queryId,
+          database: selectedDatabase,
+        }),
       });
 
       if (!response.ok || !response.body) {
@@ -530,7 +537,14 @@ export default function SqlConsolePage() {
         error: "Network error",
       });
     }
-  }, [getActiveQueryTab, updateTab, addToHistory, user, cursorPosition]);
+  }, [
+    getActiveQueryTab,
+    updateTab,
+    addToHistory,
+    user,
+    cursorPosition,
+    selectedDatabase,
+  ]);
 
   const handleExplain = useCallback(
     async (type: ExplainType) => {
@@ -568,6 +582,7 @@ export default function SqlConsolePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sql: query,
+            database: selectedDatabase,
           }),
         });
 
@@ -639,7 +654,7 @@ export default function SqlConsolePage() {
         });
       }
     },
-    [getActiveQueryTab, updateTab]
+    [getActiveQueryTab, updateTab, selectedDatabase]
   );
 
   const handleHistorySelect = useCallback(
@@ -847,6 +862,9 @@ export default function SqlConsolePage() {
                     onExecuteAtCursor={handleExecuteAtCursor}
                     onCursorChange={handleCursorChange}
                     readOnly={activeQueryTab.isRunning}
+                    databases={databases}
+                    tables={tables}
+                    selectedDatabase={selectedDatabase}
                   />
                 </div>
 
@@ -890,20 +908,159 @@ export default function SqlConsolePage() {
                       data={activeQueryTab.explainResult.data}
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                      <FileText className="w-12 h-12 mb-4 opacity-30" />
-                      <p className="text-sm">No results yet</p>
-                      <p className="text-xs mt-1">
-                        Press{" "}
-                        <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
-                          Ctrl
-                        </kbd>
-                        +
-                        <kbd className="px-1.5 py-0.5 rounded bg-muted border font-mono text-xs">
-                          Enter
-                        </kbd>{" "}
-                        to run your query
-                      </p>
+                    <div className="flex flex-col items-center justify-center h-full p-8 overflow-auto">
+                      <div className="max-w-2xl w-full space-y-6">
+                        {/* Welcome Header */}
+                        <div className="text-center space-y-2">
+                          <h2 className="text-xl font-semibold">
+                            Welcome to SQL Console
+                          </h2>
+                          <p className="text-sm text-muted-foreground">
+                            Write and execute ClickHouse SQL queries
+                          </p>
+                        </div>
+
+                        {/* Keyboard Shortcuts */}
+                        <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                          <h3 className="text-sm font-medium">
+                            Keyboard Shortcuts
+                          </h3>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">
+                                Run all queries
+                              </span>
+                              <div className="flex gap-1">
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Ctrl
+                                </kbd>
+                                <span>+</span>
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Enter
+                                </kbd>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">
+                                Run at cursor
+                              </span>
+                              <div className="flex gap-1">
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Shift
+                                </kbd>
+                                <span>+</span>
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Enter
+                                </kbd>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">
+                                Explain query
+                              </span>
+                              <div className="flex gap-1">
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Ctrl
+                                </kbd>
+                                <span>+</span>
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Shift
+                                </kbd>
+                                <span>+</span>
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  E
+                                </kbd>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">
+                                Autocomplete
+                              </span>
+                              <div className="flex gap-1">
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Ctrl
+                                </kbd>
+                                <span>+</span>
+                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
+                                  Space
+                                </kbd>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Documentation Links */}
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-medium">
+                            ClickHouse Documentation
+                          </h3>
+                          <div className="grid grid-cols-3 gap-3">
+                            <a
+                              href="https://clickhouse.com/docs/en/sql-reference"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col items-center p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors group"
+                            >
+                              <FileText className="w-6 h-6 mb-2 text-muted-foreground group-hover:text-foreground" />
+                              <span className="text-sm font-medium">
+                                SQL Reference
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Syntax & statements
+                              </span>
+                            </a>
+                            <a
+                              href="https://clickhouse.com/docs/en/sql-reference/functions"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col items-center p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors group"
+                            >
+                              <Play className="w-6 h-6 mb-2 text-muted-foreground group-hover:text-foreground" />
+                              <span className="text-sm font-medium">
+                                Functions
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Built-in functions
+                              </span>
+                            </a>
+                            <a
+                              href="https://clickhouse.com/docs/en/sql-reference/data-types"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col items-center p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors group"
+                            >
+                              <AlertCircle className="w-6 h-6 mb-2 text-muted-foreground group-hover:text-foreground" />
+                              <span className="text-sm font-medium">
+                                Data Types
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Type reference
+                              </span>
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Quick Examples */}
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-medium">
+                            Quick Examples
+                          </h3>
+                          <div className="space-y-2 text-xs font-mono bg-muted/50 rounded-lg p-4">
+                            <p className="text-muted-foreground">
+                              -- Show all databases
+                            </p>
+                            <p>SHOW DATABASES;</p>
+                            <p className="text-muted-foreground mt-2">
+                              -- Show tables in current database
+                            </p>
+                            <p>SHOW TABLES;</p>
+                            <p className="text-muted-foreground mt-2">
+                              -- Query system metrics
+                            </p>
+                            <p>SELECT * FROM system.metrics LIMIT 10;</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

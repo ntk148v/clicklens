@@ -141,8 +141,7 @@
   pre,
   code,
   .font-mono {
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace,
-      monospace;
+    font-family: "ui-monospace, monospace";
   }
 }
 
