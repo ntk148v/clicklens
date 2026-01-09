@@ -130,7 +130,26 @@ export async function GET(
       ORDER BY bytes_on_disk DESC
     `);
 
-    const columns = result.data as unknown as ColumnStats[];
+    let columns = result.data as unknown as ColumnStats[];
+
+    // Fallback: if no parts_columns data, query system.columns for basic info
+    // This handles views, empty tables, and other table types without parts
+    if (columns.length === 0) {
+      const fallbackResult = await client.query<ColumnStats>(`
+        SELECT
+          name AS column,
+          type,
+          0 AS rows,
+          0 AS bytes_on_disk,
+          0 AS compressed_bytes,
+          0 AS uncompressed_bytes,
+          0 AS compression_ratio
+        FROM system.columns
+        WHERE database = '${safeDatabase}' AND table = '${safeTable}'
+        ORDER BY position
+      `);
+      columns = fallbackResult.data as unknown as ColumnStats[];
+    }
 
     // Compute summary
     const summary = {
