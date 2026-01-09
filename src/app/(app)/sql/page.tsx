@@ -18,6 +18,7 @@ import {
   type ExplainType,
 } from "@/components/sql";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
+import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useAuth } from "@/components/auth";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -65,6 +66,7 @@ interface QueryResult {
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory } =
     useTabsStore();
+  const { selectedDatabase } = useSqlBrowserStore();
   const { user, permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -140,6 +142,7 @@ export default function SqlConsolePage() {
               query_id: queryId,
               page: page,
               pageSize: pageSize,
+              database: selectedDatabase,
             }),
           });
 
@@ -329,7 +332,7 @@ export default function SqlConsolePage() {
         });
       }
     },
-    [getActiveQueryTab, updateTab, addToHistory, user]
+    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase]
   );
 
   const handlePageChange = useCallback(
@@ -407,7 +410,11 @@ export default function SqlConsolePage() {
       const response = await fetch("/api/clickhouse/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: statement, query_id: queryId }),
+        body: JSON.stringify({
+          sql: statement,
+          query_id: queryId,
+          database: selectedDatabase,
+        }),
       });
 
       if (!response.ok || !response.body) {
@@ -530,7 +537,14 @@ export default function SqlConsolePage() {
         error: "Network error",
       });
     }
-  }, [getActiveQueryTab, updateTab, addToHistory, user, cursorPosition]);
+  }, [
+    getActiveQueryTab,
+    updateTab,
+    addToHistory,
+    user,
+    cursorPosition,
+    selectedDatabase,
+  ]);
 
   const handleExplain = useCallback(
     async (type: ExplainType) => {
@@ -568,6 +582,7 @@ export default function SqlConsolePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sql: query,
+            database: selectedDatabase,
           }),
         });
 
@@ -639,7 +654,7 @@ export default function SqlConsolePage() {
         });
       }
     },
-    [getActiveQueryTab, updateTab]
+    [getActiveQueryTab, updateTab, selectedDatabase]
   );
 
   const handleHistorySelect = useCallback(
