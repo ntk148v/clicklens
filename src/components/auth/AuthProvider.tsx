@@ -24,6 +24,7 @@ interface Permissions {
   canBrowseTables: boolean;
   canExecuteQueries: boolean;
   canViewSettings: boolean;
+  accessibleDatabases: string[];
 }
 
 interface AuthContextType {
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           canBrowseTables: data.permissions.canBrowseTables,
           canExecuteQueries: data.permissions.canExecuteQueries,
           canViewSettings: data.permissions.canViewSettings,
+          accessibleDatabases: data.permissions.accessibleDatabases || [],
         });
       }
     } catch (error) {

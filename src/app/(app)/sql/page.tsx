@@ -668,10 +668,30 @@ export default function SqlConsolePage() {
   );
 
   // Show loading while checking permissions
-  if (authLoading || !permissions?.canExecuteQueries) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show permission denied if user cannot execute queries
+  if (!permissions?.canExecuteQueries) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+        <AlertCircle className="h-16 w-16 opacity-50" />
+        <div className="text-center">
+          <h2 className="text-lg font-semibold">Access Denied</h2>
+          <p className="text-sm mt-2 max-w-md">
+            You don&apos;t have permission to access the SQL Console. Your
+            ClickHouse user account doesn&apos;t have SELECT access to any
+            databases.
+          </p>
+          <p className="text-xs mt-4 text-muted-foreground/70">
+            Contact your administrator to request database access.
+          </p>
+        </div>
       </div>
     );
   }
