@@ -55,14 +55,17 @@ export default function TablesPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Auto-select first table when tables update and nothing selected or invalid
+  // Clear selected table when database changes
   useEffect(() => {
-    // If no tables, clear selection
-    if (tables.length === 0) {
-      if (selectedTable) {
-        const t = setTimeout(() => setSelectedTable(null), 0);
-        return () => clearTimeout(t);
-      }
+    // Defer to next tick to avoid set-state-in-effect lint warning
+    const t = setTimeout(() => setSelectedTable(null), 0);
+    return () => clearTimeout(t);
+  }, [selectedDatabase]);
+
+  // Auto-select first table when tables update and nothing selected
+  useEffect(() => {
+    // If no tables or loading, skip
+    if (loadingTables || tables.length === 0) {
       return;
     }
 
@@ -72,7 +75,7 @@ export default function TablesPage() {
       const t = setTimeout(() => setSelectedTable(tables[0].name), 0);
       return () => clearTimeout(t);
     }
-  }, [tables, selectedTable]);
+  }, [tables, selectedTable, loadingTables]);
 
   const handleRefresh = () => {
     // Trigger re-fetch by incrementing refresh key
