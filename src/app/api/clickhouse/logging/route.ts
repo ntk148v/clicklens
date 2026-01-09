@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export async function GET(request: Request) {
   try {
@@ -20,7 +21,15 @@ export async function GET(request: Request) {
     const component = searchParams.get("component");
     const minTime = searchParams.get("minTime");
 
+    const client = createClientWithConfig(config);
+    const clusterName = await getClusterName(client);
+
     // Build query for system.text_log
+    // Use clusterAllReplicas if cluster is available, otherwise query local system table
+    const tableSource = clusterName
+      ? `clusterAllReplicas('${clusterName}', system.text_log)`
+      : "system.text_log";
+
     let query = `
       SELECT
         event_time_microseconds as timestamp,
@@ -33,7 +42,7 @@ export async function GET(request: Request) {
         query_id,
         source_file,
         source_line
-      FROM system.text_log
+      FROM ${tableSource}
     `;
 
     const whereConditions: string[] = [];
@@ -70,7 +79,6 @@ export async function GET(request: Request) {
 
     query += ` ORDER BY event_time_microseconds DESC LIMIT ${limit}`;
 
-    const client = createClientWithConfig(config);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resultSet = await client.query<any>(query);
 

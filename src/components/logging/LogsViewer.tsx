@@ -231,12 +231,7 @@ export function LogsViewer() {
       )}
 
       {/* Logs Table */}
-      <TableWrapper>
-        <SystemLogsTable
-          logs={logs}
-          isLoading={isLoading && logs.length === 0}
-        />
-      </TableWrapper>
+      <SystemLogsTable logs={logs} isLoading={isLoading && logs.length === 0} />
 
       {/* Stats */}
       <div className="text-xs text-muted-foreground">
