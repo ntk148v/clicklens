@@ -5,7 +5,7 @@
  * specific UI features. They are managed by code and not user-editable.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClientWithConfig, isClickHouseError } from "@/lib/clickhouse";
 import {
@@ -68,9 +68,7 @@ export async function GET(): Promise<NextResponse<FeatureRolesResponse>> {
 }
 
 // POST: Setup/install feature roles (requires ACCESS MANAGEMENT)
-export async function POST(
-  request: NextRequest
-): Promise<
+export async function POST(): Promise<
   NextResponse<{ success: boolean; error?: string; created?: string[] }>
 > {
   try {

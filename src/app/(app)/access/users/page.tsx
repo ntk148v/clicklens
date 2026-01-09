@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Dialog,
   DialogContent,
@@ -55,7 +55,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Users,
   Shield,
   RefreshCw,
   AlertCircle,
@@ -67,7 +66,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { SystemUser, SystemRole } from "@/lib/clickhouse";
-import Link from "next/link";
 import { PaginationControls } from "@/components/monitoring";
 
 interface UserWithRoles extends SystemUser {
@@ -97,10 +95,12 @@ export default function UsersPage() {
     return [...users].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
+      if (aValue === undefined || aValue === null) return 1;
+      if (bValue === undefined || bValue === null) return -1;
 
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;

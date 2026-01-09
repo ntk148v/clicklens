@@ -17,15 +17,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -38,7 +37,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -74,7 +72,6 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import {
-  Users,
   Shield,
   RefreshCw,
   AlertCircle,
@@ -89,7 +86,6 @@ import {
   Check,
 } from "lucide-react";
 import {
-  FEATURE_ROLES,
   DATA_PRIVILEGES,
   getFeatureRole,
   isRestrictedDatabase,
@@ -98,7 +94,6 @@ import {
   type DataPrivilegeType,
 } from "@/lib/rbac";
 import type { SystemRole } from "@/lib/clickhouse";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { PaginationControls } from "@/components/monitoring";
 
@@ -444,10 +439,12 @@ export default function RolesPage() {
     return [...userRoles].sort((a, b) => {
       if (!sortColumn || !sortDirection) return 0;
 
-      const aValue = (a as any)[sortColumn];
-      const bValue = (b as any)[sortColumn];
+      const aValue = a[sortColumn as keyof typeof a];
+      const bValue = b[sortColumn as keyof typeof b];
 
       if (aValue === bValue) return 0;
+      if (aValue === undefined || aValue === null) return 1;
+      if (bValue === undefined || bValue === null) return -1;
 
       const comparison = aValue < bValue ? -1 : 1;
       return sortDirection === "asc" ? comparison : -comparison;

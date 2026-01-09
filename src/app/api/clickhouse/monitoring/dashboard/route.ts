@@ -1,12 +1,12 @@
 /**
  * API route for ClickHouse Cloud-style dashboard metrics
  * GET /api/clickhouse/monitoring/dashboard
- * 
+ *
  * Returns time-series data for:
- * - ClickHouse Specific: queries/sec, queries running, merges running, 
+ * - ClickHouse Specific: queries/sec, queries running, merges running,
  *   selected rows/sec, inserted rows/sec, max parts
  * - System Health: memory tracked, CPU, IO wait, filesystem, network
- * 
+ *
  * Query params:
  *   - timeRange: number (minutes, default 60)
  */
@@ -145,25 +145,25 @@ export async function GET(
 
     // Detect cluster
     let clusterName: string | undefined;
-    let clusterSummary: ClusterSummaryRow | undefined;
     let clusterNodes: NodeRow[] = [];
 
     try {
-      const clustersResult = await client.query<ClusterRow>(CLUSTERS_LIST_QUERY);
+      const clustersResult = await client.query<ClusterRow>(
+        CLUSTERS_LIST_QUERY
+      );
       const clusters = clustersResult.data
         .map((r) => r.cluster)
         .filter((c) => !c.startsWith("_") && !c.startsWith("all_groups."));
-      
+
       if (clusters.length > 0) {
         // Prefer 'default' cluster if available
         clusterName = clusters.includes("default") ? "default" : clusters[0];
-        
-        const [summaryResult, nodesResult] = await Promise.all([
+
+        const [, nodesResult] = await Promise.all([
           client.query<ClusterSummaryRow>(CLUSTER_SUMMARY_QUERY),
           client.query<NodeRow>(CLUSTER_NODES_QUERY),
         ]);
-        
-        clusterSummary = summaryResult.data[0];
+
         clusterNodes = nodesResult.data.filter(
           (n) => n.cluster === clusterName
         );
@@ -190,25 +190,46 @@ export async function GET(
       filesystemResult,
       networkResult,
     ] = await Promise.all([
-      client.query<TimeSeriesPoint>(getDashboardQueriesPerSecQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardQueriesRunningQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardMergesRunningQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardSelectedRowsQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardInsertedRowsQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardMaxPartsQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardMemoryQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardCPUQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardIOWaitQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardFilesystemQuery(timeRange, clusterName)),
-      client.query<TimeSeriesPoint>(getDashboardNetworkQuery(timeRange, clusterName)),
+      client.query<TimeSeriesPoint>(
+        getDashboardQueriesPerSecQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardQueriesRunningQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardMergesRunningQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardSelectedRowsQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardInsertedRowsQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardMaxPartsQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardMemoryQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardCPUQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardIOWaitQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardFilesystemQuery(timeRange, clusterName)
+      ),
+      client.query<TimeSeriesPoint>(
+        getDashboardNetworkQuery(timeRange, clusterName)
+      ),
     ]);
 
     // Extract unique node names
     const nodeSet = new Set<string>();
-    [
-      ...queriesPerSecResult.data,
-      ...memoryResult.data,
-    ].forEach((p) => nodeSet.add(p.node));
+    [...queriesPerSecResult.data, ...memoryResult.data].forEach((p) =>
+      nodeSet.add(p.node)
+    );
     const nodes = Array.from(nodeSet).sort();
 
     // Build response
@@ -241,7 +262,7 @@ export async function GET(
       const activeNodes = clusterNodes.filter((n) => n.is_active === 1).length;
       const totalNodes = clusterNodes.length;
       const shards = new Set(clusterNodes.map((n) => n.shard_num)).size;
-      
+
       dashboard.cluster = {
         name: clusterName,
         totalNodes,

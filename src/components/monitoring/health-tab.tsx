@@ -8,7 +8,7 @@ import {
   Shield,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/monitoring";
+
 import { StatusBadge } from "@/components/monitoring";
 import { useHealthChecks, formatNumber } from "@/lib/hooks/use-monitoring";
 import type { HealthStatus, HealthCheck } from "@/lib/clickhouse/monitoring";
@@ -25,7 +25,7 @@ const statusIcons: Record<HealthStatus, React.ReactNode> = {
 };
 
 export function HealthTab({ refreshInterval = 30000 }: HealthTabProps) {
-  const { data, isLoading, error, refetch } = useHealthChecks({
+  const { data, isLoading, error } = useHealthChecks({
     refreshInterval,
   });
 

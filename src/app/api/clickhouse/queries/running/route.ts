@@ -3,7 +3,7 @@
  * GET /api/clickhouse/queries/running
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
   createClientWithConfig,
@@ -36,9 +36,7 @@ interface RunningQueriesResponse {
   };
 }
 
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse<RunningQueriesResponse>> {
+export async function GET(): Promise<NextResponse<RunningQueriesResponse>> {
   try {
     const session = await getSession();
     if (!session.isLoggedIn || !session.user) {

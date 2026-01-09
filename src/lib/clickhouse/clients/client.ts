@@ -103,7 +103,7 @@ export class ClickHouseClientImpl implements ClickHouseClient {
       format?: string;
       clickhouse_settings?: Record<string, unknown>;
     }
-  ): Promise<any> {
+  ): Promise<unknown> {
     const settings: Record<string, unknown> = {
       ...(options?.clickhouse_settings || {}),
     };

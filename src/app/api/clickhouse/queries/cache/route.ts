@@ -3,7 +3,7 @@
  * GET /api/clickhouse/queries/cache
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
   createClientWithConfig,
@@ -42,9 +42,7 @@ interface QueryCacheResponse {
   };
 }
 
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse<QueryCacheResponse>> {
+export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
   try {
     const session = await getSession();
     if (!session.isLoggedIn || !session.user) {

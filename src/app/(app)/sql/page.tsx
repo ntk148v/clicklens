@@ -50,7 +50,7 @@ import { generateUUID } from "@/lib/utils";
 // import type { QueryResponse } from "@/app/api/clickhouse/query/route"; // Removed
 
 interface QueryResult {
-  data: any[]; // Can be Record<string, unknown>[] or any[][]
+  data: unknown[]; // Can be Record<string, unknown>[] or any[][]
   meta: Array<{ name: string; type: string }>;
   rows: number;
   rows_before_limit_at_least?: number;
@@ -152,7 +152,7 @@ export default function SqlConsolePage() {
 
           // Initialize incremental result for this statement
           let currentMeta: Array<{ name: string; type: string }> = [];
-          let currentData: Record<string, unknown>[] = [];
+          const currentData: Record<string, unknown>[] = [];
           let currentStatistics = {
             elapsed: 0,
             rows_read: 0,
@@ -218,7 +218,7 @@ export default function SqlConsolePage() {
                       meta: currentMeta,
                       rows: currentData.length,
                       statistics: currentStatistics,
-                    } as any, // partial update workaround
+                    } as unknown as QueryResult, // partial update workaround
                   });
                 } else if (event.type === "done") {
                   limitReached = event.limit_reached;
@@ -418,7 +418,7 @@ export default function SqlConsolePage() {
       const decoder = new TextDecoder();
 
       let currentMeta: Array<{ name: string; type: string }> = [];
-      let currentData: Record<string, unknown>[] = [];
+      const currentData: Record<string, unknown>[] = [];
       let currentStatistics = {
         elapsed: 0,
         rows_read: 0,
@@ -557,7 +557,6 @@ export default function SqlConsolePage() {
 
       try {
         let query = "";
-        let format = undefined;
 
         // Remove existing EXPLAIN prefix if present to avoid double explain
         // Regex handles "EXPLAIN", "EXPLAIN AST", "EXPLAIN PLAN", etc.
@@ -618,7 +617,7 @@ export default function SqlConsolePage() {
             } else if (event.type === "error") {
               throw new Error(event.error.message);
             }
-          } catch (e) {
+          } catch {
             // ignore
           }
         }

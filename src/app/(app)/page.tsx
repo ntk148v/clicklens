@@ -140,10 +140,10 @@ export default function HomePage() {
         <div className="mt-8 p-4 rounded-lg bg-muted border">
           <h3 className="text-sm font-medium mb-2">Getting Started</h3>
           <p className="text-sm text-muted-foreground">
-            You're connected to ClickHouse using your login credentials. Your
-            permissions in this UI are determined by your ClickHouse user's
-            grants and roles. Use the sidebar to navigate between features, or
-            click any card above to get started.
+            You&apos;re connected to ClickHouse using your login credentials.
+            Your permissions in this UI are determined by your ClickHouse
+            user&apos;s grants and roles. Use the sidebar to navigate between
+            features, or click any card above to get started.
           </p>
         </div>
       </div>

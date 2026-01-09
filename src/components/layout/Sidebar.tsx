@@ -17,7 +17,6 @@ import {
   Gauge,
   GitBranch,
   Cog,
-  HeartPulse,
   HardDrive,
   LayoutDashboard,
   Zap,

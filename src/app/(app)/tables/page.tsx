@@ -38,13 +38,6 @@ import {
   DdlTab,
 } from "@/components/tables";
 
-interface TableInfo {
-  name: string;
-  engine: string;
-  total_rows: number;
-  total_bytes: number;
-}
-
 export default function TablesPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -62,14 +55,22 @@ export default function TablesPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Auto-select first table when tables update and nothing selected
+  // Auto-select first table when tables update and nothing selected or invalid
   useEffect(() => {
-    if (tables.length > 0 && !selectedTable) {
-      setSelectedTable(tables[0].name);
-    }
-    // If we switched db and tables are empty, reset selection
+    // If no tables, clear selection
     if (tables.length === 0) {
-      setSelectedTable(null);
+      if (selectedTable) {
+        const t = setTimeout(() => setSelectedTable(null), 0);
+        return () => clearTimeout(t);
+      }
+      return;
+    }
+
+    // If no selection, select first
+    if (!selectedTable) {
+      // Defer to next tick to avoid set-state-in-effect
+      const t = setTimeout(() => setSelectedTable(tables[0].name), 0);
+      return () => clearTimeout(t);
     }
   }, [tables, selectedTable]);
 

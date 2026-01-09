@@ -64,7 +64,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const stream = (resultSet as any).stream();
+    const stream = (
+      resultSet as unknown as { stream: () => AsyncIterable<unknown> }
+    ).stream();
     let rowsRead = 0;
     let limitReached = false;
     let meta: { name: string; type: string }[] = [];
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
         const encoder = new TextEncoder();
 
         // Helper to push JSON
-        const push = (data: any) => {
+        const push = (data: unknown) => {
           controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
         };
 
@@ -83,7 +85,6 @@ export async function POST(request: NextRequest) {
           let lineCount = 0;
           let colNames: string[] = [];
 
-          // @ts-ignore
           for await (const chunk of stream) {
             const items = Array.isArray(chunk) ? chunk : [chunk];
 
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
               ) {
                 try {
                   data = JSON.parse(data.text);
-                } catch (e) {
+                } catch {
                   // keep as is if parse fails
                 }
               }

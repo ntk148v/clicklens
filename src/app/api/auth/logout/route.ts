@@ -6,11 +6,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
-import {
-  sessionOptions,
-  type SessionData,
-  defaultSession,
-} from "@/lib/auth/session";
+import { sessionOptions, type SessionData } from "@/lib/auth/session";
 
 export async function POST(): Promise<NextResponse> {
   const cookieStore = await cookies();

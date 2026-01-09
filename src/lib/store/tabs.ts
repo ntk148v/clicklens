@@ -22,7 +22,7 @@ interface QueryTab {
   name: string;
   sql: string;
   result: {
-    data: Record<string, unknown>[];
+    data: unknown[];
     meta: Array<{ name: string; type: string }>;
     rows: number;
     rows_before_limit_at_least?: number;
