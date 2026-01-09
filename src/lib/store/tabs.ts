@@ -75,6 +75,7 @@ interface TabsState {
   // History actions
   addToHistory: (entry: Omit<QueryHistoryEntry, "id" | "timestamp">) => void;
   clearHistory: () => void;
+  reset: () => void;
 }
 
 function generateId(): string {
@@ -219,6 +220,10 @@ export const useTabsStore = create<TabsState>()(
 
       clearHistory: () => {
         set({ history: [] });
+      },
+
+      reset: () => {
+        set({ tabs: [], activeTabId: null, history: [] });
       },
     }),
     {

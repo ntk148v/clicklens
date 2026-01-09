@@ -9,6 +9,8 @@ import {
   ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useSqlBrowserStore } from "@/lib/store/sql-browser";
+import { useTabsStore } from "@/lib/store/tabs";
 
 interface User {
   host: string;
@@ -159,6 +161,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await fetch("/api/auth/logout", { method: "POST" });
       setUser(null);
       setPermissions(null);
+
+      // Clear client-side stores
+      useSqlBrowserStore.getState().reset();
+      useTabsStore.getState().reset();
+
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);

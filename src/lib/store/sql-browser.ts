@@ -50,6 +50,7 @@ interface SqlBrowserState {
   ) => Promise<void>;
   setPreviewTab: (tab: "data" | "structure") => void;
   toggleSidebar: () => void;
+  reset: () => void;
 }
 
 export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
@@ -201,5 +202,22 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
 
   toggleSidebar: () => {
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
+  },
+
+  reset: () => {
+    set({
+      databases: [],
+      selectedDatabase: null,
+      loadingDatabases: false,
+      tables: [],
+      loadingTables: false,
+      selectedTable: null,
+      tableColumns: [],
+      tableData: [],
+      tableMeta: [],
+      loadingTablePreview: false,
+      previewTab: "data",
+      tablesCache: {},
+    });
   },
 }));

@@ -15,9 +15,14 @@ export async function POST(): Promise<NextResponse> {
     sessionOptions
   );
 
-  session.isLoggedIn = false;
-  session.user = undefined;
-  await session.save();
+  session.destroy();
 
+  // Create a response that clears the cookie
+  // Note: session.destroy() in iron-session handles the cookie logic if we save?
+  // Actually, session.destroy() removes the session data.
+  // We should also return a response.
+
+  // Iron-session v8: session.destroy() wipes the object.
+  // We need to return the response.
   return NextResponse.json({ success: true });
 }
