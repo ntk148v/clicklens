@@ -11,8 +11,10 @@ import { type ClickHouseClient, type ClickHouseQueryResult } from "./types";
  */
 export class ClickHouseClientImpl implements ClickHouseClient {
   private client: OfficialClickHouseClient;
+  private settings?: Record<string, unknown>;
 
   constructor(config: ClickHouseConfig) {
+    this.settings = config.settings;
     this.client = createClient({
       url: buildConnectionUrl(config),
       username: config.username,
@@ -27,15 +29,24 @@ export class ClickHouseClientImpl implements ClickHouseClient {
 
   async query<T = Record<string, unknown>>(
     sql: string,
-    options?: { timeout?: number; query_id?: string }
+    options?: {
+      timeout?: number;
+      query_id?: string;
+      clickhouse_settings?: Record<string, unknown>;
+    }
   ): Promise<ClickHouseQueryResult<T>> {
     const resultSet = await this.client.query({
       query: sql,
       format: "JSON",
       query_id: options?.query_id,
-      clickhouse_settings: options?.timeout
-        ? { max_execution_time: options.timeout }
-        : undefined,
+      clickhouse_settings: {
+        date_time_output_format: "iso",
+        ...(this.settings || {}),
+        ...(options?.clickhouse_settings || {}),
+        ...(options?.timeout
+          ? { max_execution_time: options.timeout }
+          : undefined),
+      },
     });
 
     const result = await resultSet.json<{
@@ -105,6 +116,7 @@ export class ClickHouseClientImpl implements ClickHouseClient {
     }
   ): Promise<unknown> {
     const settings: Record<string, unknown> = {
+      ...(this.settings || {}),
       ...(options?.clickhouse_settings || {}),
     };
 

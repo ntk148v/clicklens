@@ -165,3 +165,25 @@ export async function copyToClipboard(
 
   return success;
 }
+
+/**
+ * Format a DateTime value (including ISO strings from ClickHouse) to local time.
+ * Handles both ISO strings "2024-01-01T10:00:00+00:00" and regular strings if they look like dates.
+ */
+export function formatDateTime(
+  value: string | number | Date | null | undefined
+): string {
+  if (value === null || value === undefined) return "—";
+
+  try {
+    const date = new Date(value);
+    // valid date?
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleString();
+    }
+  } catch {
+    // ignore
+  }
+
+  return String(value);
+}

@@ -23,6 +23,8 @@ export interface ClickHouseConfig {
   username: string;
   password: string;
   database: string;
+  /** ClickHouse query settings to apply to all queries */
+  settings?: Record<string, unknown>;
 }
 
 /**

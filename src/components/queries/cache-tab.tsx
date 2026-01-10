@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQueryCache } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { formatDateTime } from "@/lib/utils";
 import type { QueryCacheEntry } from "@/lib/hooks/use-query-analytics";
 
 export function CacheTab() {
@@ -209,7 +210,7 @@ export function CacheTab() {
                   </div>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(entry.expires_at).toLocaleString()}
+                  {formatDateTime(entry.expires_at)}
                 </TableCell>
               </TableRow>
             ))}

@@ -144,6 +144,7 @@ export default function SqlConsolePage() {
               page: page,
               pageSize: pageSize,
               database: selectedDatabase,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             }),
           });
 
@@ -415,6 +416,7 @@ export default function SqlConsolePage() {
           sql: statement,
           query_id: queryId,
           database: selectedDatabase,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 
@@ -584,6 +586,7 @@ export default function SqlConsolePage() {
           body: JSON.stringify({
             sql: query,
             database: selectedDatabase,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           }),
         });
 

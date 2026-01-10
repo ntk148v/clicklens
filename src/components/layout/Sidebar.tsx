@@ -247,6 +247,15 @@ const resourcesItems = [
     description: "View source code",
     external: true,
   },
+  {
+    name: "v" + process.env.NEXT_PUBLIC_APP_VERSION,
+    href:
+      "https://github.com/ntk148v/clicklens/releases/tag/v" +
+      process.env.NEXT_PUBLIC_APP_VERSION,
+    icon: ScrollText,
+    description: "View version",
+    requiresPermission: "canViewVersion" as const,
+  },
 ];
 
 export function Sidebar() {

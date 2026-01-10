@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Download } from "lucide-react";
-import { cn, copyToClipboard } from "@/lib/utils";
+import { cn, copyToClipboard, formatDateTime } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "@/components/monitoring";
 
 interface ColumnMeta {
@@ -75,6 +75,14 @@ function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "object") return JSON.stringify(value);
+
+  if (typeof value === "string") {
+    // Try to detect if it's an ISO date string
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+      return formatDateTime(value);
+    }
+  }
+
   return String(value);
 }
 

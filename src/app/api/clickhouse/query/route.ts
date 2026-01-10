@@ -42,7 +42,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = createClient(config);
+    // If timezone is provided, include it in the client configuration
+    const settings: Record<string, unknown> = {};
+    if (body.timezone && typeof body.timezone === "string") {
+      settings.session_timezone = body.timezone;
+    }
+
+    const client = createClient({ ...config, settings });
 
     let sql = body.sql;
     if (typeof body.page === "number") {
@@ -57,6 +63,7 @@ export async function POST(request: NextRequest) {
     const clickhouseSettings: Record<string, unknown> = {
       max_result_rows: MAX_ROWS + 1,
       result_overflow_mode: "break",
+      date_time_output_format: "iso",
     };
 
     // If database is provided, set it as the default database for the query
