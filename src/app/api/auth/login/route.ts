@@ -111,6 +111,8 @@ export async function POST(
     session.user = {
       username: body.username,
       password: body.password || "",
+      host: config.host || process.env.CLICKHOUSE_HOST,
+      database: config.database || "default",
     };
     await session.save();
 

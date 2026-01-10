@@ -10,6 +10,8 @@ export interface SessionResponse {
   isLoggedIn: boolean;
   user?: {
     username: string;
+    host?: string;
+    database?: string;
   };
 }
 
@@ -24,6 +26,8 @@ export async function GET(): Promise<NextResponse<SessionResponse>> {
     isLoggedIn: true,
     user: {
       username: session.user.username,
+      host: session.user.host,
+      database: session.user.database,
     },
   });
 }

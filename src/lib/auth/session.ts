@@ -13,6 +13,8 @@ export interface SessionData {
   user?: {
     username: string;
     password: string;
+    host?: string;
+    database?: string;
   };
 }
 
