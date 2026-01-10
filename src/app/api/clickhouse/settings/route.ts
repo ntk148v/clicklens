@@ -110,13 +110,26 @@ export async function PUT(request: Request) {
 
     const client = createClient(config);
 
+    // First, get the current username since ALTER USER requires a literal name
+    const userResult = await client.query("SELECT currentUser() AS user");
+    const currentUsername = userResult.data?.[0]?.user;
+
+    if (!currentUsername) {
+      return NextResponse.json(
+        { success: false, error: "Could not determine current user" },
+        { status: 500 }
+      );
+    }
+
     // Use ALTER USER to persist setting for the current user
     // Note: This requires privileges to ALTER USER
     // We sanitize input manually as the client wrapper expects a string
     const safeName = name.replace(/[^a-zA-Z0-9_.]/g, ""); // Strict allowlist for setting name
     const safeValue = String(value).replace(/'/g, "''");
+    // Sanitize username as well to prevent injection
+    const safeUsername = currentUsername.replace(/`/g, "``");
 
-    const query = `ALTER USER CURRENT_USER SETTINGS ${safeName} = '${safeValue}'`;
+    const query = `ALTER USER \`${safeUsername}\` SETTINGS ${safeName} = '${safeValue}'`;
 
     await client.command(query);
 
@@ -126,6 +139,23 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     console.error("Error updating setting:", error);
+
+    // Check for readonly storage error (users defined in XML config)
+    const errorMessage = isClickHouseError(error)
+      ? error.userMessage || error.message
+      : String(error);
+
+    if (errorMessage.includes("storage is readonly")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Cannot modify settings for this user. The user is defined in ClickHouse's XML configuration file (users.xml), which is readonly. To change settings for this user, modify the XML configuration file directly.",
+        },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

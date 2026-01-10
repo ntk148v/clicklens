@@ -62,6 +62,9 @@ export function SettingsTable({
   const [newValue, setNewValue] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Error state for edit modal
+  const [editError, setEditError] = useState<string | null>(null);
+
   // Handle search with debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -116,6 +119,7 @@ export function SettingsTable({
   const openEditDialog = (setting: ClickHouseSetting) => {
     setEditingSetting(setting);
     setNewValue(setting.value);
+    setEditError(null); // Clear any previous error
   };
 
   const handleUpdate = async () => {
@@ -123,13 +127,13 @@ export function SettingsTable({
 
     try {
       setIsUpdating(true);
+      setEditError(null);
       await updateSetting(editingSetting.name, newValue);
       setEditingSetting(null);
     } catch (error) {
-      console.error(error);
-      alert(
-        error instanceof Error ? error.message : "Failed to update setting"
-      );
+      const message =
+        error instanceof Error ? error.message : "Failed to update setting";
+      setEditError(message);
     } finally {
       setIsUpdating(false);
     }
@@ -371,6 +375,11 @@ export function SettingsTable({
             <div className="text-sm text-muted-foreground">
               {editingSetting?.description}
             </div>
+            {editError && (
+              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                {editError}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingSetting(null)}>
