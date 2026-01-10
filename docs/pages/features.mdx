@@ -1,40 +1,58 @@
 # Features
 
-ClickLens comes packed with features to manage your ClickHouse environment.
+ClickLens provides a comprehensive suite of tools designed to make ClickHouse management efficient, secure, and insightful.
 
-## 🖥️ SQL Console
+## SQL Console
 
-A fully-featured SQL editor with:
+The SQL Console is the heart of ClickLens, built for both power users and newcomers.
 
-- Syntax highlighting for ClickHouse SQL.
-- Result visualization.
-- Query history.
-- Export capabilities.
+- **Smart Autocompletion**: Context-aware suggestions for databases, tables, and columns. It understands your current query context to provide relevant completions.
+- **Formatted Visualization**: Results are displayed in a rich, interactive grid with support for sorting, filtering, and data type formatting.
+- **Multiple Tabs**: Work on multiple queries simultaneously.
+- **Query History**: Automatically saves your execution history for quick access to past queries.
+- **Export**: easy export of results to CSV or JSON.
 
-## 📊 Monitoring
+## Role-Based Access Control (RBAC)
 
-Real-time dashboards for:
+ClickLens implements a **Strict RBAC** model that seamlessly integrates with ClickHouse's native permission system. We follow the [ChistaData Best Practices for RBAC](https://chistadata.com/best-practices-for-clickhouses-role-based-access-control/) to ensure security and compliance.
 
-- **Metrics**: CPU, Memory, Disk usage.
-- **Queries**: Currently running queries, slow queries, and query history.
-- **Disks**: Storage usage breakdown.
-- **Logs**: Server logs and crash logs viewer.
+### Permission Proxy Model
 
-## 🗄️ Database Explorer
+Unlike many UIs that run as a "superuser" and hide features via obscurity, ClickLens acts as a **transparent proxy** for the logged-in user.
 
-- **Tables**: Browse tables across all databases.
-- **Preview**: Quick data preview.
-- **Schema**: View table schema, columns, and types.
+1.  **User Identity**: Every query executed in the console or by background monitoring tools runs with the **exact credentials and permissions** of the logged-in user.
+2.  **No Privilege Escalation**: If a user cannot run `SELECT * FROM system.settings` in the CLI, they cannot see the Settings page in ClickLens.
+3.  **Strict UI Adaptation**: The interface dynamically adapts based on granular capabilities:
+    - **Table Explorer**: Visible only if the user has the `clicklens_table_explorer` role or global access. Mere `SELECT` permission on a single database does not grant browsing rights for the entire cluster.
+    - **Settings**: Visible only to users with the `clicklens_settings_admin` role.
+    - **Monitoring**: Metrics and logs are secured behind specific roles (`clicklens_cluster_monitor`, `clicklens_query_monitor`).
 
-## 🛡️ Access Control
+### Introspection Logic
 
-manage your ClickHouse security:
+To provide a smooth user experience without requiring every user to have introspection permissions (like reading `system.grants`), ClickLens uses a specialized service account (if configured) to safely query metadata _about_ the user, while ensuring the user can only _act_ within their own boundaries.
 
-- **Users**: Create, modify, and delete users.
-- **Roles**: complex RBAC management.
-- **Profiles**: Manage settings profiles.
+## Monitoring & Observability
 
-## ⚙️ Settings
+Gain deep insights into your cluster's performance with real-time dashboards.
 
-- System settings management.
-- Cluster configuration overview.
+- **Cluster Overview**: Real-time metrics on CPU, Memory, and active connections.
+- **Query Monitoring**: View currently running queries, kill runaway processes, and analyze query performance history.
+- **Server Logs**: A searchable viewer for `system.text_log`, allowing you to debug issues without SSH access.
+- **Crash Logs**: Dedicated viewer for `system.crash_log` to diagnose server stability issues.
+- **Disc Usage**: Visualize storage distribution across databases and tables.
+
+## Database Explorer
+
+Navigate your data hierarchy with ease while respecting strict permission boundaries.
+
+- **Schema Viewer**: Inspect table structures, column types, and engine configs.
+- **Data Preview**: Quickly sample data without writing queries.
+- **Smart Search**: Filter tables and databases instantly.
+
+## User Management
+
+A GUI for ClickHouse's native user and role management.
+
+- **User Administration**: Create, update, and remove users.
+- **Role Assignment**: Graphically assign roles and privileges.
+- **Profile Management**: Configure settings profiles and quotas.

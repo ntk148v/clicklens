@@ -1,26 +1,39 @@
 # Architecture
 
-ClickLens is built with a modern web stack designed for performance and maintainability.
+ClickLens is built with a modern web stack designed for performance, security, and maintainability.
 
-## Tech Stack
+## Technology Stack
 
-- **Frontend Framework**: [Next.js 15+](https://nextjs.org/) (App Router).
+- **Frontend Framework**: [Next.js](https://nextjs.org/) (App Router & Server Actions).
 - **Runtime & Package Manager**: [Bun](https://bun.sh/).
 - **UI Components**: [Radix UI](https://www.radix-ui.com/) & [Shadcn UI](https://ui.shadcn.com/).
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/).
 - **State Management**: [Zustand](https://github.com/pmndrs/zustand).
-- **Data Fetching**: [SWR](https://swr.vercel.app/) / React Server Components.
+- **Data Fetching**: [SWR](https://swr.vercel.app/).
 - **Database Driver**: Official [ClickHouse JS Client](https://github.com/ClickHouse/clickhouse-js).
 
-## Project Structure
+## Security Model
 
-- `src/app`: Next.js App Router pages.
-- `src/components`: Reusable UI components.
-- `src/lib`: Utilities, hooks, and client definitions.
-- `src/app/api`: Backend API routes handling ClickHouse connections.
+ClickLens differs from standard database GUIs by enforcing a strict security model that respects ClickHouse's native access controls.
 
-## Security
+### The Access Proxy Pattern
 
-- ClickLens acts as a secure proxy to ClickHouse.
-- Credentials are handled securely via environment variables or session-based login.
-- RBAC enforcement ensures users only access what they are permitted to.
+ClickLens operates as a "double-layered" proxy to ensure both usability and security:
+
+1.  **Action Layer (User Context)**:
+    All operational actions—executing generic SQL queries, creating users, killing queries—are performed using a Next.js ClickHouse client instantiated with the **current user's session credentials**. This guarantees that the ClickHouse server enforces all permissions, quotas, and row-level security policies directly.
+
+2.  **Metadata Layer (Service Context)**:
+    Some metadata operations required to render the UI (like listing all roles to display a dropdown, or checking specific grant permutations) require permissions that standard users often lack. ClickLens utilizes a "Lens User" (a service account with introspection privileges) to fetch this _metadata_.
+    - **Important**: This layer is **strictly read-only** and restricted to system tables (`system.grants`, `system.users`, etc.). It never exposes data or executes actions on behalf of the user.
+
+### Why This Matters
+
+This architecture allows you to give developers a "read-only" account in ClickHouse (e.g., `SELECT` on `logs.*`) and have ClickLens automatically restrict their UI:
+
+- They can query the `logs` database.
+- They **cannot** see the "Settings" tab (restricted to `clicklens_settings_admin`).
+- They **cannot** browse tables in the `finance` database.
+- They **cannot** kill queries running by other users.
+
+This "Strict RBAC UI" approach prevents the common issue of UI tools over-exposing features that the underlying database user technically shouldn't access or see.
