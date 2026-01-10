@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       query = `
         SELECT
           event_time as timestamp,
-          toString(type) as type,
+          toString(type) as event_type,
           user as component,
           concat('Auth: ', toString(auth_type), ', Remote: ', toString(client_address), ', Client: ', client_name) as message,
           concat('Interface: ', toString(interface), ', Session ID: ', session_id, if(failure_reason != '', concat(', Reason: ', failure_reason), '')) as details,
@@ -110,10 +110,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // Level filter (only for text_log)
-    if (source === "text_log" && level && level !== "All") {
+    // Level/Type filter (text_log uses level, session_log uses type)
+    if (level && level !== "All") {
       const safeLevel = level.replace(/'/g, "''");
-      whereConditions.push(`level = '${safeLevel}'`);
+      if (source === "text_log") {
+        whereConditions.push(`level = '${safeLevel}'`);
+      } else if (source === "session_log") {
+        whereConditions.push(`type = '${safeLevel}'`);
+      }
     }
 
     // Time filter
@@ -141,10 +145,18 @@ export async function GET(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resultSet = await client.query<any>(query);
 
+    // Map result rows to standard LogEntry format
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = resultSet.data.map((row: any) => ({
+      ...row,
+      // For session_log, we aliased `type` as `event_type` to avoid ambiguity
+      type: row.event_type || row.type,
+    }));
+
     return NextResponse.json({
       success: true,
       data: {
-        data: resultSet.data,
+        data: data,
         rows: resultSet.rows || resultSet.data.length,
       },
     });

@@ -33,7 +33,7 @@ function getEventTypeBadge(type: string) {
     );
   }
 
-  if (type === "SessionStart") {
+  if (type === "LoginSuccess") {
     return (
       <Badge className="bg-green-600 text-white hover:bg-green-600 border-0">
         {type}
@@ -41,7 +41,7 @@ function getEventTypeBadge(type: string) {
     );
   }
 
-  if (type === "SessionLogout") {
+  if (type === "Logout") {
     return (
       <Badge className="bg-gray-500 text-white hover:bg-gray-500 border-0">
         {type}

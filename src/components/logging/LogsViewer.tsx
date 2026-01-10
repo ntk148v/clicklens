@@ -39,6 +39,8 @@ const LOG_LEVELS: LogLevel[] = [
   "All",
 ];
 
+const SESSION_EVENTS = ["All", "LoginSuccess", "LoginFailure", "Logout"];
+
 // Calculate time range start
 function getMinTime(range: TimeRange): string | undefined {
   if (range === "all") return undefined;
@@ -102,9 +104,9 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
 
       if (params.search) urlParams.set("search", params.search);
       if (params.component) urlParams.set("component", params.component);
-      // Level filter only for text_log
+      // Level filter (text_log) or Event Type filter (session_log)
       if (
-        params.source === "text_log" &&
+        (params.source === "text_log" || params.source === "session_log") &&
         params.level &&
         params.level !== "All"
       )
@@ -199,6 +201,22 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
             <SelectItem value="all">All Time</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Event Type Filter - for session_log */}
+        {source === "session_log" && (
+          <Select value={level} onValueChange={(v) => setLevel(v as LogLevel)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Event Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {SESSION_EVENTS.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {e === "All" ? "All Events" : e}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Level Filter - only for text_log */}
         {source === "text_log" && (
