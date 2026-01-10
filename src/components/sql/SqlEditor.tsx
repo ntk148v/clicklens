@@ -248,54 +248,294 @@ interface SqlEditorProps {
   databases?: string[];
   tables?: TableInfo[];
   selectedDatabase?: string | null;
+  getColumns?: ColumnFetcher;
 }
 
 // Keywords that should trigger table/database suggestions
 const TABLE_KEYWORDS = ["from", "join", "into", "table", "update"];
 const DATABASE_KEYWORDS = ["use", "database"];
 
-// Create schema completion source - uses refs to avoid recreating
+// SQL keywords for immediate autocomplete suggestions
+const SQL_KEYWORDS = [
+  // DQL
+  "SELECT",
+  "FROM",
+  "WHERE",
+  "AND",
+  "OR",
+  "NOT",
+  "IN",
+  "LIKE",
+  "BETWEEN",
+  "IS",
+  "NULL",
+  "AS",
+  "ON",
+  "JOIN",
+  "LEFT",
+  "RIGHT",
+  "INNER",
+  "OUTER",
+  "FULL",
+  "CROSS",
+  "USING",
+  "NATURAL",
+  "GROUP",
+  "BY",
+  "ORDER",
+  "ASC",
+  "DESC",
+  "LIMIT",
+  "OFFSET",
+  "HAVING",
+  "DISTINCT",
+  "ALL",
+  "ANY",
+  "UNION",
+  "INTERSECT",
+  "EXCEPT",
+  "EXISTS",
+  "CASE",
+  "WHEN",
+  "THEN",
+  "ELSE",
+  "END",
+  // DML
+  "INSERT",
+  "INTO",
+  "VALUES",
+  "UPDATE",
+  "SET",
+  "DELETE",
+  // DDL
+  "CREATE",
+  "DROP",
+  "ALTER",
+  "TABLE",
+  "DATABASE",
+  "VIEW",
+  "INDEX",
+  "IF",
+  "ENGINE",
+  "PARTITION",
+  "PRIMARY",
+  "KEY",
+  "TRUNCATE",
+  // ClickHouse specific
+  "FORMAT",
+  "WITH",
+  "SETTINGS",
+  "MATERIALIZED",
+  "FINAL",
+  "SAMPLE",
+  "PREWHERE",
+  "GLOBAL",
+  "ARRAY",
+  "EXPLAIN",
+  "DESCRIBE",
+  "SHOW",
+  "USE",
+  "SYSTEM",
+  "KILL",
+  "QUERY",
+  "MUTATIONS",
+  "PROCESSES",
+  "ATTACH",
+  "DETACH",
+  "OPTIMIZE",
+  "RENAME",
+  "EXCHANGE",
+  "TEMPORARY",
+  "LIVE",
+  "DICTIONARY",
+  "FUNCTION",
+  "GRANT",
+  "REVOKE",
+  "ROLE",
+  "USER",
+  "CAST",
+];
+
+// ClickHouse data types for autocomplete
+const SQL_TYPES = [
+  "UInt8",
+  "UInt16",
+  "UInt32",
+  "UInt64",
+  "UInt128",
+  "UInt256",
+  "Int8",
+  "Int16",
+  "Int32",
+  "Int64",
+  "Int128",
+  "Int256",
+  "Float32",
+  "Float64",
+  "Decimal",
+  "Decimal32",
+  "Decimal64",
+  "Decimal128",
+  "String",
+  "FixedString",
+  "UUID",
+  "Date",
+  "Date32",
+  "DateTime",
+  "DateTime64",
+  "Enum8",
+  "Enum16",
+  "Array",
+  "Tuple",
+  "Map",
+  "Nullable",
+  "LowCardinality",
+  "Bool",
+  "Boolean",
+  "IPv4",
+  "IPv6",
+  "JSON",
+  "Object",
+];
+
+// Import context analyzer and function completions
+import { analyzeContext, extractTableName } from "@/lib/sql-context";
+import { getFunctionCompletions } from "@/lib/clickhouse-functions";
+import type { AutocompleteColumnInfo } from "@/lib/store/sql-browser";
+
+// Column fetch function type (passed in via ref)
+type ColumnFetcher = (
+  database: string,
+  table: string
+) => Promise<AutocompleteColumnInfo[]>;
+
+// Create enhanced schema completion source with context awareness
 function createSchemaCompletionSource(
   tablesRef: React.RefObject<TableInfo[]>,
-  databasesRef: React.RefObject<string[]>
+  databasesRef: React.RefObject<string[]>,
+  selectedDatabaseRef: React.RefObject<string | null>,
+  getColumnsRef: React.RefObject<ColumnFetcher | null>
 ) {
-  return (context: CompletionContext) => {
+  // Cache for pending column fetches to avoid duplicate requests
+  const pendingFetches = new Map<string, Promise<AutocompleteColumnInfo[]>>();
+
+  return async (context: CompletionContext) => {
     const tables = tablesRef.current || [];
     const databases = databasesRef.current || [];
+    const selectedDatabase = selectedDatabaseRef.current || "default";
+    const getColumns = getColumnsRef.current;
 
-    // Only provide completions if we have schema data
-    if (tables.length === 0 && databases.length === 0) {
-      return null;
-    }
+    // Get the full document content and cursor position
+    const fullText = context.state.doc.toString();
+    const cursorPos = context.pos;
 
-    // Get the text before the cursor
+    // Analyze SQL context
+    const sqlContext = analyzeContext(fullText, cursorPos);
+
+    // Get the text before the cursor for word matching
     const line = context.state.doc.lineAt(context.pos);
     const textBefore = line.text
       .slice(0, context.pos - line.from)
       .toLowerCase();
 
-    // Check if we're after a relevant keyword
     const words = textBefore.split(/\s+/);
     const lastWord = words[words.length - 1] || "";
-    const prevWord = words[words.length - 2] || "";
+    const wordMatch = textBefore.match(/(\w*)$/);
+    const from = context.pos - (wordMatch?.[1]?.length || 0);
 
-    // Check for database.table pattern (e.g., "from default.")
-    const dotMatch = textBefore.match(/(\w+)\.\s*$/);
-    if (dotMatch && tables.length > 0) {
-      return {
-        from: context.pos,
-        options: tables.map(
-          (t): Completion => ({
-            label: t.name,
-            type: "class",
-            detail: t.engine || "table",
-          })
-        ),
-      };
+    // Handle dot completion (alias. or table. or database.)
+    if (sqlContext.type === "AFTER_DOT" && sqlContext.precedingWord) {
+      const prefix = sqlContext.precedingWord.toLowerCase();
+      const options: Completion[] = [];
+
+      // Check if it's a table alias -> show columns
+      const aliasTarget = sqlContext.aliases.get(prefix);
+      if (aliasTarget && getColumns) {
+        const { database, table } = extractTableName(aliasTarget);
+        const db = database || selectedDatabase;
+
+        // Use cached fetch or start new one
+        const cacheKey = `${db}.${table}`;
+        let columnsPromise = pendingFetches.get(cacheKey);
+        if (!columnsPromise) {
+          columnsPromise = getColumns(db, table);
+          pendingFetches.set(cacheKey, columnsPromise);
+          // Clean up cache after fetch completes
+          columnsPromise.finally(() => pendingFetches.delete(cacheKey));
+        }
+
+        try {
+          const columns = await columnsPromise;
+          columns.forEach((col) => {
+            options.push({
+              label: col.name,
+              type: "property",
+              detail: col.type,
+              info: col.is_in_primary_key
+                ? "🔑 Primary Key"
+                : col.is_in_sorting_key
+                ? "📊 Sorting Key"
+                : undefined,
+              boost: col.is_in_primary_key ? 2 : col.is_in_sorting_key ? 1 : 0,
+            });
+          });
+        } catch (e) {
+          console.error("Failed to fetch columns for completion", e);
+        }
+      }
+
+      // Check if it's a database name -> show tables from THAT database
+      const matchingDb = databases.find(
+        (d) => d.toLowerCase() === prefix.toLowerCase()
+      );
+      if (matchingDb) {
+        // Fetch tables for this specific database from API
+        try {
+          const res = await fetch(
+            `/api/clickhouse/tables?database=${encodeURIComponent(matchingDb)}`
+          );
+          const data = await res.json();
+          if (data.success && data.data) {
+            (data.data as TableInfo[]).forEach((t) => {
+              options.push({
+                label: t.name,
+                type: "class",
+                detail: t.engine || "table",
+              });
+            });
+          }
+        } catch (e) {
+          // Fallback to current tables if fetch fails
+          console.error("Failed to fetch tables for database:", e);
+          tables.forEach((t) => {
+            options.push({
+              label: t.name,
+              type: "class",
+              detail: t.engine || "table",
+            });
+          });
+        }
+      }
+
+      if (options.length > 0) {
+        return { from: context.pos, options };
+      }
     }
 
-    // Check if previous word triggers table suggestions
-    if (TABLE_KEYWORDS.includes(prevWord) && !lastWord.includes(".")) {
+    // Handle function context - show function completions
+    if (sqlContext.type === "IN_FUNCTION" || lastWord.length >= 2) {
+      const funcCompletions = getFunctionCompletions();
+      const filtered = funcCompletions.filter((f) =>
+        f.label.toLowerCase().startsWith(lastWord.toLowerCase())
+      );
+
+      if (filtered.length > 0 && lastWord.length >= 2) {
+        return { from, options: filtered };
+      }
+    }
+
+    // Handle table/join context
+    if (sqlContext.type === "AFTER_FROM" || sqlContext.type === "AFTER_JOIN") {
       const options: Completion[] = [];
 
       // Add tables from current database
@@ -317,24 +557,82 @@ function createSchemaCompletionSource(
       });
 
       if (options.length > 0) {
-        const wordMatch = textBefore.match(/(\w*)$/);
-        const from = context.pos - (wordMatch?.[1]?.length || 0);
-
         const filtered = options.filter((o) =>
           o.label.toLowerCase().startsWith(lastWord.toLowerCase())
         );
+        if (filtered.length > 0 || lastWord === "") {
+          return { from, options: filtered.length > 0 ? filtered : options };
+        }
+      }
+    }
 
+    // Handle SELECT/WHERE context - suggest columns from known tables
+    if (
+      (sqlContext.type === "AFTER_SELECT" ||
+        sqlContext.type === "AFTER_WHERE" ||
+        sqlContext.type === "AFTER_GROUP_BY" ||
+        sqlContext.type === "AFTER_ORDER_BY") &&
+      sqlContext.tables.length > 0 &&
+      getColumns &&
+      lastWord.length >= 1
+    ) {
+      const options: Completion[] = [];
+
+      // Get columns from all referenced tables
+      for (const tableRef of sqlContext.tables.slice(0, 3)) {
+        // Limit to 3 tables
+        const db = tableRef.database || selectedDatabase;
+        const cacheKey = `${db}.${tableRef.table}`;
+
+        let columnsPromise = pendingFetches.get(cacheKey);
+        if (!columnsPromise) {
+          columnsPromise = getColumns(db, tableRef.table);
+          pendingFetches.set(cacheKey, columnsPromise);
+          columnsPromise.finally(() => pendingFetches.delete(cacheKey));
+        }
+
+        try {
+          const columns = await columnsPromise;
+          columns.forEach((col) => {
+            // If there's an alias, suggest alias.column format
+            const prefix =
+              tableRef.alias ||
+              (sqlContext.tables.length > 1 ? tableRef.table : "");
+            const label = prefix ? `${prefix}.${col.name}` : col.name;
+
+            // Avoid duplicates
+            if (!options.some((o) => o.label === label)) {
+              options.push({
+                label,
+                type: "property",
+                detail: `${col.type}${
+                  tableRef.alias ? ` (${tableRef.table})` : ""
+                }`,
+                boost: col.is_in_primary_key
+                  ? 2
+                  : col.is_in_sorting_key
+                  ? 1
+                  : 0,
+              });
+            }
+          });
+        } catch {
+          // Silently fail - column fetch may fail for various reasons
+        }
+      }
+
+      if (options.length > 0) {
+        const filtered = options.filter((o) =>
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+        );
         if (filtered.length > 0) {
           return { from, options: filtered };
         }
       }
     }
 
-    // Check if previous word triggers database suggestions
-    if (DATABASE_KEYWORDS.includes(prevWord) && databases.length > 0) {
-      const wordMatch = textBefore.match(/(\w*)$/);
-      const from = context.pos - (wordMatch?.[1]?.length || 0);
-
+    // Handle database keyword context
+    if (sqlContext.type === "AFTER_DATABASE_KEYWORD" && databases.length > 0) {
       const filtered = databases
         .map(
           (db): Completion => ({
@@ -349,6 +647,117 @@ function createSchemaCompletionSource(
 
       if (filtered.length > 0) {
         return { from, options: filtered };
+      }
+    }
+
+    // Fallback: Check legacy keyword triggers
+    const prevWord = words[words.length - 2] || "";
+
+    if (TABLE_KEYWORDS.includes(prevWord) && !lastWord.includes(".")) {
+      const options: Completion[] = [];
+
+      tables.forEach((t) => {
+        options.push({
+          label: t.name,
+          type: "class",
+          detail: t.engine || "table",
+        });
+      });
+
+      databases.forEach((db) => {
+        options.push({
+          label: db + ".",
+          type: "namespace",
+          detail: "database",
+        });
+      });
+
+      if (options.length > 0) {
+        const filtered = options.filter((o) =>
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+        );
+
+        if (filtered.length > 0) {
+          return { from, options: filtered };
+        }
+      }
+    }
+
+    if (DATABASE_KEYWORDS.includes(prevWord) && databases.length > 0) {
+      const filtered = databases
+        .map(
+          (db): Completion => ({
+            label: db,
+            type: "namespace",
+            detail: "database",
+          })
+        )
+        .filter((o) =>
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+        );
+
+      if (filtered.length > 0) {
+        return { from, options: filtered };
+      }
+    }
+
+    // Default: Return keywords, types, and functions when user starts typing
+    // This enables suggestions like 's' -> SELECT, SHOW, SET, etc.
+    if (lastWord.length >= 1) {
+      const options: Completion[] = [];
+
+      // Add matching SQL keywords
+      SQL_KEYWORDS.forEach((kw) => {
+        if (kw.toLowerCase().startsWith(lastWord.toLowerCase())) {
+          options.push({
+            label: kw,
+            type: "keyword",
+            boost: 2, // Keywords have higher priority
+          });
+        }
+      });
+
+      // Add matching data types
+      SQL_TYPES.forEach((t) => {
+        if (t.toLowerCase().startsWith(lastWord.toLowerCase())) {
+          options.push({
+            label: t,
+            type: "type",
+            detail: "type",
+            boost: 1,
+          });
+        }
+      });
+
+      // Add matching functions
+      const funcCompletions = getFunctionCompletions();
+      funcCompletions.forEach((f) => {
+        if (f.label.toLowerCase().startsWith(lastWord.toLowerCase())) {
+          options.push(f);
+        }
+      });
+
+      // Add matching tables if available
+      tables.forEach((t) => {
+        if (t.name.toLowerCase().startsWith(lastWord.toLowerCase())) {
+          options.push({
+            label: t.name,
+            type: "class",
+            detail: t.engine || "table",
+          });
+        }
+      });
+
+      if (options.length > 0) {
+        // Sort by boost (higher first), then alphabetically
+        options.sort((a, b) => {
+          const boostA = (a as { boost?: number }).boost || 0;
+          const boostB = (b as { boost?: number }).boost || 0;
+          if (boostB !== boostA) return boostB - boostA;
+          return a.label.localeCompare(b.label);
+        });
+
+        return { from, options: options.slice(0, 20) }; // Limit to 20 suggestions
       }
     }
 
@@ -367,6 +776,8 @@ export function SqlEditor({
   readOnly = false,
   databases = [],
   tables = [],
+  selectedDatabase = null,
+  getColumns,
 }: SqlEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
@@ -385,6 +796,8 @@ export function SqlEditor({
   // Use refs for schema data to avoid recreating completion source
   const tablesRef = useRef<TableInfo[]>(tables);
   const databasesRef = useRef<string[]>(databases);
+  const selectedDatabaseRef = useRef<string | null>(selectedDatabase);
+  const getColumnsRef = useRef<ColumnFetcher | null>(getColumns || null);
 
   // Track if we're syncing from external value to prevent loops
   const isSyncingRef = useRef(false);
@@ -411,6 +824,14 @@ export function SqlEditor({
   useEffect(() => {
     databasesRef.current = databases;
   }, [databases]);
+
+  useEffect(() => {
+    selectedDatabaseRef.current = selectedDatabase;
+  }, [selectedDatabase]);
+
+  useEffect(() => {
+    getColumnsRef.current = getColumns || null;
+  }, [getColumns]);
 
   // Handle Ctrl+Enter to execute, Shift+Enter for execute at cursor
   const executeKeymap = keymap.of([
@@ -439,9 +860,14 @@ export function SqlEditor({
     },
   ]);
 
-  // Create stable completion source
+  // Create stable completion source with all refs
   const schemaCompletionSource = useRef(
-    createSchemaCompletionSource(tablesRef, databasesRef)
+    createSchemaCompletionSource(
+      tablesRef,
+      databasesRef,
+      selectedDatabaseRef,
+      getColumnsRef
+    )
   );
 
   useEffect(() => {
@@ -472,7 +898,7 @@ export function SqlEditor({
         // Autocompletion with schema suggestions
         autocompletion({
           override: [schemaCompletionSource.current],
-          activateOnTyping: false, // Only trigger on Ctrl+Space
+          activateOnTyping: true, // Show suggestions as user types
           defaultKeymap: true,
         }),
         sql({ dialect: clickhouseDialect }),

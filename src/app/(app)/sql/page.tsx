@@ -66,7 +66,8 @@ interface QueryResult {
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory } =
     useTabsStore();
-  const { selectedDatabase, databases, tables } = useSqlBrowserStore();
+  const { selectedDatabase, databases, tables, getColumnsForTable } =
+    useSqlBrowserStore();
   const { user, permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -885,6 +886,7 @@ export default function SqlConsolePage() {
                     databases={databases}
                     tables={tables}
                     selectedDatabase={selectedDatabase}
+                    getColumns={getColumnsForTable}
                   />
                 </div>
 

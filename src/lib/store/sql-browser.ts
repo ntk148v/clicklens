@@ -18,6 +18,20 @@ interface ColumnInfo {
   comment: string;
 }
 
+// Lightweight column info for autocomplete (from schema/columns API)
+export interface AutocompleteColumnInfo {
+  name: string;
+  type: string;
+  is_in_primary_key: boolean;
+  is_in_sorting_key: boolean;
+  comment: string;
+}
+
+interface ColumnsCacheEntry {
+  columns: AutocompleteColumnInfo[];
+  timestamp: number;
+}
+
 interface SqlBrowserState {
   // Databases
   databases: string[];
@@ -28,6 +42,9 @@ interface SqlBrowserState {
   tables: TableInfo[];
   loadingTables: boolean;
   tablesCache: Record<string, TableInfo[]>;
+
+  // Columns cache for autocomplete (with TTL)
+  columnsCache: Record<string, ColumnsCacheEntry>;
 
   // Selected table preview
   selectedTable: string | null;
@@ -51,7 +68,16 @@ interface SqlBrowserState {
   setPreviewTab: (tab: "data" | "structure") => void;
   toggleSidebar: () => void;
   reset: () => void;
+  // Column caching for autocomplete
+  getColumnsForTable: (
+    database: string,
+    table: string
+  ) => Promise<AutocompleteColumnInfo[]>;
+  invalidateColumnsCache: (pattern?: string) => void;
 }
+
+// TTL for columns cache (5 minutes)
+const COLUMNS_CACHE_TTL = 5 * 60 * 1000;
 
 export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
   databases: [],
@@ -68,6 +94,7 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
   sidebarCollapsed: false,
 
   tablesCache: {},
+  columnsCache: {},
 
   fetchDatabases: async () => {
     set({ loadingDatabases: true });
@@ -218,6 +245,67 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
       loadingTablePreview: false,
       previewTab: "data",
       tablesCache: {},
+      columnsCache: {},
     });
+  },
+
+  getColumnsForTable: async (
+    database: string,
+    table: string
+  ): Promise<AutocompleteColumnInfo[]> => {
+    const cacheKey = `${database}.${table}`;
+    const { columnsCache } = get();
+    const cached = columnsCache[cacheKey];
+
+    // Check if cache is valid (within TTL)
+    if (cached && Date.now() - cached.timestamp < COLUMNS_CACHE_TTL) {
+      return cached.columns;
+    }
+
+    // Fetch from API
+    try {
+      const res = await fetch(
+        `/api/clickhouse/schema/columns?database=${encodeURIComponent(
+          database
+        )}&table=${encodeURIComponent(table)}`
+      );
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const columns = data.data as AutocompleteColumnInfo[];
+
+        // Update cache
+        set((state) => ({
+          columnsCache: {
+            ...state.columnsCache,
+            [cacheKey]: { columns, timestamp: Date.now() },
+          },
+        }));
+
+        return columns;
+      }
+    } catch (e) {
+      console.error("Failed to fetch columns for autocomplete", e);
+    }
+
+    return [];
+  },
+
+  invalidateColumnsCache: (pattern?: string) => {
+    if (!pattern) {
+      set({ columnsCache: {} });
+      return;
+    }
+
+    const { columnsCache } = get();
+    const newCache: Record<string, ColumnsCacheEntry> = {};
+
+    for (const [key, value] of Object.entries(columnsCache)) {
+      if (!key.startsWith(pattern)) {
+        newCache[key] = value;
+      }
+    }
+
+    set({ columnsCache: newCache });
   },
 }));
