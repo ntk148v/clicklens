@@ -5,6 +5,7 @@ import { Loader2, Code, Copy, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { copyToClipboard } from "@/lib/utils";
 
 interface DdlTabProps {
   database: string;
@@ -76,9 +77,11 @@ export function DdlTab({ database, table }: DdlTabProps) {
 
   const handleCopy = async () => {
     if (ddl) {
-      await navigator.clipboard.writeText(ddl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const success = await copyToClipboard(ddl);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     }
   };
 

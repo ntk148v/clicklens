@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Copy, Check, FileJson } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 
 interface ColumnMeta {
   name: string;
@@ -79,9 +79,11 @@ function CopyButton({ text, className }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -143,7 +145,7 @@ export function RecordDetailSheet({
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => navigator.clipboard.writeText(jsonString)}
+              onClick={() => copyToClipboard(jsonString)}
             >
               <FileJson className="h-4 w-4" />
               Copy JSON

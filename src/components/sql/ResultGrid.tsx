@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Download } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "@/components/monitoring";
 
 interface ColumnMeta {
@@ -159,7 +159,7 @@ export function ResultGrid({
     columnResizeMode,
   });
 
-  const copyToClipboard = async () => {
+  const handleCopyToClipboard = async () => {
     const headers = meta.map((c) => c.name).join("\t");
     const rows = data.map((row) =>
       meta
@@ -176,7 +176,7 @@ export function ResultGrid({
         .join("\t")
     );
     const text = [headers, ...rows].join("\n");
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
   };
 
   const downloadCsv = () => {
@@ -249,7 +249,7 @@ export function ResultGrid({
               variant="ghost"
               size="sm"
               className="h-7 text-xs"
-              onClick={copyToClipboard}
+              onClick={handleCopyToClipboard}
             >
               <Copy className="w-3 h-3 mr-1" />
               Copy

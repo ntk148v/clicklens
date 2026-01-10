@@ -127,7 +127,7 @@ export async function PUT(request: Request) {
     const safeName = name.replace(/[^a-zA-Z0-9_.]/g, ""); // Strict allowlist for setting name
     const safeValue = String(value).replace(/'/g, "''");
     // Sanitize username as well to prevent injection
-    const safeUsername = currentUsername.replace(/`/g, "``");
+    const safeUsername = String(currentUsername).replace(/`/g, "``");
 
     const query = `ALTER USER \`${safeUsername}\` SETTINGS ${safeName} = '${safeValue}'`;
 
