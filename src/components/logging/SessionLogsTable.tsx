@@ -71,17 +71,12 @@ export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
     []
   );
 
-  // Format timestamp for display
+  // Format timestamp for display using local time
   const formatTime = (ts: string) => {
     try {
       const date = new Date(ts);
       if (isNaN(date.getTime())) return ts;
-      return date.toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
+      return date.toLocaleTimeString();
     } catch {
       return ts;
     }
@@ -91,10 +86,7 @@ export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
     try {
       const date = new Date(ts);
       if (isNaN(date.getTime())) return "";
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
+      return date.toLocaleDateString();
     } catch {
       return "";
     }

@@ -27,15 +27,23 @@ export class ClickHouseClientImpl implements ClickHouseClient {
 
   async query<T = Record<string, unknown>>(
     sql: string,
-    options?: { timeout?: number; query_id?: string }
+    options?: {
+      timeout?: number;
+      query_id?: string;
+      clickhouse_settings?: Record<string, unknown>;
+    }
   ): Promise<ClickHouseQueryResult<T>> {
     const resultSet = await this.client.query({
       query: sql,
       format: "JSON",
       query_id: options?.query_id,
-      clickhouse_settings: options?.timeout
-        ? { max_execution_time: options.timeout }
-        : undefined,
+      clickhouse_settings: {
+        date_time_output_format: "iso",
+        ...(options?.clickhouse_settings || {}),
+        ...(options?.timeout
+          ? { max_execution_time: options.timeout }
+          : undefined),
+      },
     });
 
     const result = await resultSet.json<{

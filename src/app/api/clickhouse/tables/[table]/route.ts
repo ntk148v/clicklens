@@ -61,6 +61,7 @@ export async function GET(
     const { table } = await params;
     const { searchParams } = new URL(request.url);
     const database = searchParams.get("database");
+    const timezone = searchParams.get("timezone");
     const type = searchParams.get("type") || "structure";
 
     if (!database) {
@@ -106,13 +107,13 @@ export async function GET(
       const client = createClient(lensConfig);
 
       const result = await client.query(`
-        SELECT 
+        SELECT
           name,
           type,
           default_kind,
           default_expression,
           comment
-        FROM system.columns 
+        FROM system.columns
         WHERE database = '${safeDatabase}' AND table = '${safeTable}'
         ORDER BY position
       `);
@@ -142,7 +143,13 @@ export async function GET(
       const client = createClient(userConfig);
 
       const result = await client.query(
-        `SELECT * FROM \`${safeDatabase}\`.\`${safeTable}\` LIMIT 100`
+        `SELECT * FROM \`${safeDatabase}\`.\`${safeTable}\` LIMIT 100`,
+        {
+          clickhouse_settings: {
+            date_time_output_format: "iso",
+            ...(timezone ? { session_timezone: timezone } : {}),
+          },
+        }
       );
 
       return NextResponse.json({

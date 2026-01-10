@@ -30,6 +30,7 @@ import {
 import { formatDuration, formatBytes } from "@/lib/hooks/use-monitoring";
 import { useRouter, usePathname } from "next/navigation";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { formatDateTime } from "@/lib/utils";
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -339,7 +340,7 @@ export function HistoryTab({
                     </TableCell>
                     <TableCell className="text-xs">{query.user}</TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap text-right">
-                      {new Date(query.event_time).toLocaleString()}
+                      {formatDateTime(query.event_time)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {formatDuration(query.query_duration_ms)}

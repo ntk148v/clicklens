@@ -36,6 +36,7 @@ import { PaginationControls } from "@/components/monitoring";
 
 const DEFAULT_PAGE_SIZE = 50;
 
+import { formatDateTime } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 export function AnalyticsTab() {
@@ -280,8 +281,7 @@ export function AnalyticsTab() {
                         </span>
                       </button>
                       <span className="text-xs text-muted-foreground mt-1 block px-1">
-                        Last run:{" "}
-                        {new Date(query.last_event_time).toLocaleString()}
+                        Last run: {formatDateTime(query.last_event_time)}
                       </span>
                     </TableCell>
                     <TableCell className="text-xs">

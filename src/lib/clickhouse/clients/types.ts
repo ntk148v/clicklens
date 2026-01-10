@@ -31,6 +31,7 @@ export interface ClickHouseClient {
     options?: {
       timeout?: number;
       query_id?: string;
+      clickhouse_settings?: Record<string, unknown>;
     }
   ): Promise<ClickHouseQueryResult<T>>;
 

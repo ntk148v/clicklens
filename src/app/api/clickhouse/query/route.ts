@@ -57,7 +57,13 @@ export async function POST(request: NextRequest) {
     const clickhouseSettings: Record<string, unknown> = {
       max_result_rows: MAX_ROWS + 1,
       result_overflow_mode: "break",
+      date_time_output_format: "iso",
     };
+
+    // If timezone is provided, set it in settings
+    if (body.timezone && typeof body.timezone === "string") {
+      clickhouseSettings.session_timezone = body.timezone;
+    }
 
     // If database is provided, set it as the default database for the query
     if (body.database && typeof body.database === "string") {

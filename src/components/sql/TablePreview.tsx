@@ -16,7 +16,7 @@ import {
   ClickableTableRow,
 } from "@/components/ui/table";
 import { Database, Columns } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { PaginationControls } from "../monitoring";
 
 interface ColumnInfo {
@@ -36,6 +36,14 @@ function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "object") return JSON.stringify(value);
+
+  if (typeof value === "string") {
+    // Try to detect if it's an ISO date string
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+      return formatDateTime(value);
+    }
+  }
+
   return String(value);
 }
 
@@ -55,7 +63,11 @@ export function TablePreview({ database, table }: TablePreviewProps) {
         const res = await fetch(
           `/api/clickhouse/tables/${encodeURIComponent(
             table
-          )}?database=${encodeURIComponent(database)}&type=${previewTab}`
+          )}?database=${encodeURIComponent(
+            database
+          )}&type=${previewTab}&timezone=${encodeURIComponent(
+            Intl.DateTimeFormat().resolvedOptions().timeZone
+          )}`
         );
         const result = await res.json();
         if (result.success) {
