@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQueryCache } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
-import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import { formatDateTime } from "@/lib/utils";
 import type { QueryCacheEntry } from "@/lib/hooks/use-query-analytics";

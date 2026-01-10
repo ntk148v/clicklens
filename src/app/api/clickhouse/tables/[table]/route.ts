@@ -140,14 +140,42 @@ export async function GET(
         );
       }
 
-      const client = createClient(userConfig);
+      // If timezone is provided, include it in the client configuration
+      const settings: Record<string, unknown> = {};
+      if (timezone) {
+        settings.session_timezone = timezone;
+      }
+
+      const client = createClient({ ...userConfig, settings });
+
+      const safeDatabase = database || "default";
+      const safeTable = table;
+
+      // Basic protection against SQL injection (though generic driver handles params, table names often don't support params)
+      // Check if table/db names contain only safe characters (alphanumeric, underscore, dash)
+      if (
+        !/^[a-zA-Z0-9_\-]+$/.test(safeDatabase) ||
+        !/^[a-zA-Z0-9_\-.]+$/.test(safeTable)
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 400,
+              message: "Invalid table or database name",
+              type: "BAD_REQUEST",
+              userMessage: "Invalid table or database name",
+            },
+          },
+          { status: 400 }
+        );
+      }
 
       const result = await client.query(
         `SELECT * FROM \`${safeDatabase}\`.\`${safeTable}\` LIMIT 100`,
         {
           clickhouse_settings: {
             date_time_output_format: "iso",
-            ...(timezone ? { session_timezone: timezone } : {}),
           },
         }
       );
