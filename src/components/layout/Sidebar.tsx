@@ -26,6 +26,8 @@ import {
   ScrollText,
   Settings,
   AlertTriangle,
+  Github,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -217,6 +219,24 @@ const navigation = [
     description: "System and server settings",
     requiresPermission: "canViewSettings" as const,
     subItems: settingsItems,
+  },
+];
+
+// Resource navigation items
+const resourcesItems = [
+  {
+    name: "Documentation",
+    href: "https://github.com/ntk148v/clicklens#readme",
+    icon: BookOpen,
+    description: "Read the documentation",
+    external: true,
+  },
+  {
+    name: "GitHub",
+    href: "https://github.com/ntk148v/clicklens",
+    icon: Github,
+    description: "View source code",
+    external: true,
   },
 ];
 
@@ -422,6 +442,45 @@ export function Sidebar() {
             return <div key={item.name}>{linkContent}</div>;
           })}
         </nav>
+
+        {/* Resources */}
+        <div className="p-2 border-t border-sidebar-border space-y-1">
+          {resourcesItems.map((item) => {
+            const Icon = item.icon;
+            const linkContent = (
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span>{item.name}</span>}
+              </a>
+            );
+
+            if (collapsed) {
+              return (
+                <Tooltip key={item.name}>
+                  <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                  <TooltipContent
+                    side="right"
+                    className="bg-popover border-border"
+                  >
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return <div key={item.name}>{linkContent}</div>;
+          })}
+        </div>
 
         {/* User dropdown and collapse toggle */}
         <div className="p-2 border-t border-sidebar-border space-y-2">
