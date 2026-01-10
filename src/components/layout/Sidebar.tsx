@@ -154,12 +154,21 @@ const loggingItems = [
     href: "/logging/server",
     icon: ScrollText,
     description: "General server logs",
+    requiresPermission: "canViewServerLogs" as const,
   },
   {
     name: "Crash Logs",
     href: "/logging/crash",
     icon: AlertTriangle,
     description: "Server crash history",
+    requiresPermission: "canViewCrashLogs" as const,
+  },
+  {
+    name: "Session Log",
+    href: "/logging/session",
+    icon: User,
+    description: "Login / logout history",
+    requiresPermission: "canViewSessionLogs" as const,
   },
 ];
 
@@ -296,7 +305,17 @@ export function Sidebar() {
               ? pathname.startsWith(item.href)
               : pathname.startsWith(item.href);
             const Icon = item.icon;
-            const hasSubItems = item.subItems && item.subItems.length > 0;
+            // Filter sub-items based on permissions
+            const visibleSubItems = item.subItems?.filter((subItem) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const req = (subItem as any).requiresPermission;
+              if (!req) return true;
+              if (!permissions) return false;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              return (permissions as any)[req];
+            });
+
+            const hasSubItems = visibleSubItems && visibleSubItems.length > 0;
             const isExpanded = expandedItems[item.name];
 
             // If it's a monitoring item with sub-items
@@ -337,7 +356,7 @@ export function Sidebar() {
                     >
                       <DropdownMenuLabel>{item.name}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {item.subItems?.map((subItem) => (
+                      {visibleSubItems?.map((subItem) => (
                         <DropdownMenuItem key={subItem.name} asChild>
                           <Link
                             href={subItem.href}
@@ -380,7 +399,7 @@ export function Sidebar() {
 
                   {isExpanded && (
                     <div className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
-                      {item.subItems?.map((subItem) => {
+                      {visibleSubItems?.map((subItem) => {
                         const SubIcon = subItem.icon;
                         const isSubActive = pathname === subItem.href;
 

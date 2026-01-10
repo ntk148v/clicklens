@@ -27,6 +27,9 @@ interface Permissions {
   canExecuteQueries: boolean;
   canViewSettings: boolean;
   canViewSystemLogs: boolean;
+  canViewServerLogs: boolean;
+  canViewCrashLogs: boolean;
+  canViewSessionLogs: boolean;
   accessibleDatabases: string[];
 }
 
@@ -87,6 +90,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           canExecuteQueries: data.permissions.canExecuteQueries,
           canViewSettings: data.permissions.canViewSettings,
           canViewSystemLogs: data.permissions.canViewSystemLogs,
+          canViewServerLogs: data.permissions.canViewServerLogs,
+          canViewCrashLogs: data.permissions.canViewCrashLogs,
+          canViewSessionLogs: data.permissions.canViewSessionLogs,
           accessibleDatabases: data.permissions.accessibleDatabases || [],
         });
       }

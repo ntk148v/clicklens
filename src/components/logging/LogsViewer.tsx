@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { SystemLogsTable } from "./SystemLogsTable";
+import { SessionLogsTable } from "./SessionLogsTable";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { RefreshControl } from "@/components/monitoring/refresh-control";
 import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
@@ -35,7 +36,10 @@ const LOG_LEVELS: LogLevel[] = [
   "Information",
   "Debug",
   "Trace",
+  "All",
 ];
+
+const SESSION_EVENTS = ["All", "LoginSuccess", "LoginFailure", "Logout"];
 
 // Calculate time range start
 function getMinTime(range: TimeRange): string | undefined {
@@ -68,7 +72,7 @@ function getMinTime(range: TimeRange): string | undefined {
 }
 
 interface LogsViewerProps {
-  source?: "text_log" | "crash_log";
+  source?: "text_log" | "crash_log" | "session_log";
 }
 
 export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
@@ -100,9 +104,9 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
 
       if (params.search) urlParams.set("search", params.search);
       if (params.component) urlParams.set("component", params.component);
-      // Level filter only for text_log
+      // Level filter (text_log) or Event Type filter (session_log)
       if (
-        params.source === "text_log" &&
+        (params.source === "text_log" || params.source === "session_log") &&
         params.level &&
         params.level !== "All"
       )
@@ -198,6 +202,22 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
           </SelectContent>
         </Select>
 
+        {/* Event Type Filter - for session_log */}
+        {source === "session_log" && (
+          <Select value={level} onValueChange={(v) => setLevel(v as LogLevel)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Event Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {SESSION_EVENTS.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {e === "All" ? "All Events" : e}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         {/* Level Filter - only for text_log */}
         {source === "text_log" && (
           <Select value={level} onValueChange={(v) => setLevel(v as LogLevel)}>
@@ -216,7 +236,7 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
 
         {/* Component Input */}
         <Input
-          placeholder="Component..."
+          placeholder={source === "session_log" ? "User..." : "Component..."}
           value={component}
           onChange={(e) => setComponent(e.target.value)}
           className="w-[150px]"
@@ -246,7 +266,17 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
       )}
 
       {/* Logs Table */}
-      <SystemLogsTable logs={logs} isLoading={isLoading && logs.length === 0} />
+      {source === "session_log" ? (
+        <SessionLogsTable
+          logs={logs}
+          isLoading={isLoading && logs.length === 0}
+        />
+      ) : (
+        <SystemLogsTable
+          logs={logs}
+          isLoading={isLoading && logs.length === 0}
+        />
+      )}
 
       {/* Stats */}
       <div className="text-xs text-muted-foreground">
@@ -257,12 +287,18 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
 
       <DataSourceBadge
         sources={[
-          source === "text_log" ? "system.text_log" : "system.crash_log",
+          source === "text_log"
+            ? "system.text_log"
+            : source === "crash_log"
+            ? "system.crash_log"
+            : "system.session_log",
         ]}
         description={
           source === "text_log"
             ? "Contains general server logs."
-            : "Contains server crash logs. The table does not exist in the database by default, it is created only when fatal errors occur."
+            : source === "crash_log"
+            ? "Contains server crash logs. The table does not exist in the database by default, it is created only when fatal errors occur."
+            : "Contains information about all successful and failed login and logout events."
         }
       />
     </div>

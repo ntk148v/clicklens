@@ -26,6 +26,9 @@ interface PermissionsResponse {
     canExecuteQueries: boolean;
     canViewSettings: boolean;
     canViewSystemLogs: boolean;
+    canViewServerLogs: boolean;
+    canViewCrashLogs: boolean;
+    canViewSessionLogs: boolean;
     accessibleDatabases: string[];
     username: string;
   };
@@ -235,8 +238,12 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
           client.query("SELECT 1 FROM system.metrics LIMIT 1"),
           // view settings probe (system.settings) - WE USE THIS BUT ENFORCE STRICTER CHECKS LATER
           client.query("SELECT 1 FROM system.settings LIMIT 1"),
-          // view system logs probe (system.text_log)
+          // view server logs probe (system.text_log)
           client.query("SELECT 1 FROM system.text_log LIMIT 1"),
+          // view crash logs probe
+          client.query("SELECT 1 FROM system.crash_log LIMIT 1"),
+          // view session logs probe
+          client.query("SELECT 1 FROM system.session_log LIMIT 1"),
         ]),
         // 3. Get access info (databases + global flag) using LENS_USER
         getAccessInfo(username),
@@ -262,7 +269,9 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     let canViewProcesses = false;
     let canViewCluster = false;
     let canViewSettings = false;
-    let canViewSystemLogs = false;
+    let canViewServerLogs = false;
+    let canViewCrashLogs = false;
+    let canViewSessionLogs = false;
 
     if (featuresResult.status === "fulfilled") {
       const results = featuresResult.value;
@@ -279,8 +288,12 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       // Index 3: canViewSettings (Probe only)
       // if (results[3].status === "fulfilled") hasSettingsAccessProbe = true;
 
-      // Index 4: canViewSystemLogs
-      if (results[4]?.status === "fulfilled") canViewSystemLogs = true;
+      // Index 4: canViewServerLogs
+      if (results[4]?.status === "fulfilled") canViewServerLogs = true;
+      // Index 5: canViewCrashLogs
+      if (results[5]?.status === "fulfilled") canViewCrashLogs = true;
+      // Index 6: canViewSessionLogs
+      if (results[6]?.status === "fulfilled") canViewSessionLogs = true;
     }
 
     // Check permissions based on effective roles (including inherited)
@@ -321,10 +334,16 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     const canKillQueries =
       canManageUsers || effectiveRoles.has("clicklens_query_monitor");
 
-    // 5. System Logs: via clicklens_cluster_monitor role
-    if (!canViewSystemLogs) {
-      canViewSystemLogs = effectiveRoles.has("clicklens_cluster_monitor");
-    }
+    // 5. Logging: via clicklens_cluster_monitor role OR global access
+    const hasMonitorRole = effectiveRoles.has("clicklens_cluster_monitor");
+    const hasLogAccess = hasMonitorRole || hasGlobalAccess;
+
+    if (!canViewServerLogs) canViewServerLogs = hasLogAccess;
+    if (!canViewCrashLogs) canViewCrashLogs = hasLogAccess;
+    if (!canViewSessionLogs) canViewSessionLogs = hasLogAccess;
+
+    const canViewSystemLogs =
+      canViewServerLogs || canViewCrashLogs || canViewSessionLogs;
 
     // NEW STRICT LOGIC for Tables and Queries
 
@@ -349,6 +368,9 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canExecuteQueries,
         canViewSettings,
         canViewSystemLogs,
+        canViewServerLogs,
+        canViewCrashLogs,
+        canViewSessionLogs,
         accessibleDatabases,
         username,
       },
