@@ -36,7 +36,6 @@ const LOG_LEVELS: LogLevel[] = [
   "Information",
   "Debug",
   "Trace",
-  "All",
 ];
 
 const SESSION_EVENTS = ["All", "LoginSuccess", "LoginFailure", "Logout"];
