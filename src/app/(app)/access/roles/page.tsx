@@ -97,6 +97,7 @@ import {
 import type { SystemRole } from "@/lib/clickhouse";
 import { cn } from "@/lib/utils";
 import { PaginationControls } from "@/components/monitoring";
+import { useToast } from "@/components/ui/use-toast";
 
 interface RoleWithPrivileges extends SystemRole {
   isFeatureRole: boolean;
@@ -122,6 +123,7 @@ interface TableInfo {
 export default function RolesPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [roles, setRoles] = useState<RoleWithPrivileges[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -335,6 +337,12 @@ export default function RolesPage() {
 
       if (data.success) {
         setDialogOpen(false);
+        toast({
+          title: isEditing ? "Role updated" : "Role created",
+          description: `Role ${formData.name.trim()} has been ${
+            isEditing ? "updated" : "created"
+          } successfully.`,
+        });
         fetchRoles();
       } else {
         setDialogError(
@@ -361,9 +369,18 @@ export default function RolesPage() {
       const data = await response.json();
 
       if (data.success) {
+        toast({
+          title: "Role deleted",
+          description: `Role ${roleName} has been deleted.`,
+        });
         fetchRoles();
       } else {
-        setError(data.error || "Failed to delete role");
+        toast({
+          variant: "destructive",
+          title: "Failed to delete role",
+          description:
+            data.error || "An error occurred while deleting the role.",
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");

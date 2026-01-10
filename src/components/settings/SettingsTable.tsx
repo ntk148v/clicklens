@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { PaginationControls } from "@/components/monitoring/pagination-controls";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { useToast } from "@/components/ui/use-toast";
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -64,6 +65,9 @@ export function SettingsTable({
 
   // Error state for edit modal
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Toast notifications
+  const { toast } = useToast();
 
   // Handle search with debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,6 +133,10 @@ export function SettingsTable({
       setIsUpdating(true);
       setEditError(null);
       await updateSetting(editingSetting.name, newValue);
+      toast({
+        title: "Setting updated",
+        description: `Setting ${editingSetting.name} has been updated.`,
+      });
       setEditingSetting(null);
     } catch (error) {
       const message =

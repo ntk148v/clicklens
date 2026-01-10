@@ -19,6 +19,7 @@ import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
 
 import {
   Card,
@@ -76,6 +77,7 @@ interface UserWithRoles extends SystemUser {
 export default function UsersPage() {
   const { permissions, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [roles, setRoles] = useState<SystemRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,6 +240,12 @@ export default function UsersPage() {
 
       if (data.success) {
         setDialogOpen(false);
+        toast({
+          title: isEditing ? "User updated" : "User created",
+          description: `User ${formData.name} has been ${
+            isEditing ? "updated" : "created"
+          } successfully.`,
+        });
         fetchData();
       } else {
         setDialogError(
@@ -264,9 +272,18 @@ export default function UsersPage() {
       const data = await response.json();
 
       if (data.success) {
+        toast({
+          title: "User deleted",
+          description: `User ${userName} has been deleted.`,
+        });
         fetchData();
       } else {
-        setError(data.error || "Failed to delete user");
+        toast({
+          variant: "destructive",
+          title: "Failed to delete user",
+          description:
+            data.error || "An error occurred while deleting the user.",
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
