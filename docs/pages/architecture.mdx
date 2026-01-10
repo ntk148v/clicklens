@@ -1,0 +1,26 @@
+# Architecture
+
+ClickLens is built with a modern web stack designed for performance and maintainability.
+
+## Tech Stack
+
+- **Frontend Framework**: [Next.js 15+](https://nextjs.org/) (App Router).
+- **Runtime & Package Manager**: [Bun](https://bun.sh/).
+- **UI Components**: [Radix UI](https://www.radix-ui.com/) & [Shadcn UI](https://ui.shadcn.com/).
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/).
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand).
+- **Data Fetching**: [SWR](https://swr.vercel.app/) / React Server Components.
+- **Database Driver**: Official [ClickHouse JS Client](https://github.com/ClickHouse/clickhouse-js).
+
+## Project Structure
+
+- `src/app`: Next.js App Router pages.
+- `src/components`: Reusable UI components.
+- `src/lib`: Utilities, hooks, and client definitions.
+- `src/app/api`: Backend API routes handling ClickHouse connections.
+
+## Security
+
+- ClickLens acts as a secure proxy to ClickHouse.
+- Credentials are handled securely via environment variables or session-based login.
+- RBAC enforcement ensures users only access what they are permitted to.

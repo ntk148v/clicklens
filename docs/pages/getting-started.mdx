@@ -1,0 +1,49 @@
+# Getting Started
+
+This guide will help you set up ClickLens locally or for production.
+
+## Prerequisites
+
+- **Node.js**: v20 or higher.
+- **Bun**: We use Bun as our primary runtime and package manager.
+- **ClickHouse**: You need access to a ClickHouse server (local or cloud).
+
+## Running Locally
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/ntk148v/clicklens.git
+    cd clicklens
+    ```
+
+2.  **Install dependencies:**
+
+    ```bash
+    bun install
+    ```
+
+3.  **Configure Environment:**
+
+    Copy the `.env.local.sample` to `.env.local` (or create it) and configure your ClickHouse credentials.
+
+    ```bash
+    cp .env.sample .env.local
+    ```
+
+4.  **Start Dev Server:**
+
+    ```bash
+    bun dev
+    ```
+
+    Open [http://localhost:3000](http://localhost:3000) to view the app.
+
+## Docker
+
+You can also run ClickLens using Docker.
+
+```bash
+docker build -t clicklens .
+docker run -p 3000:3000 clicklens
+```

@@ -1,0 +1,47 @@
+# Deployment
+
+## Static Export
+
+ClickLens is a dynamic application (Next.js App Router with Server Actions/API Routes), so it expects to be run as a Node.js/Bun application.
+
+## Docker
+
+The recommended way to deploy ClickLens in production is via Docker.
+
+### Dockerfile
+
+We provide an optimized `Dockerfile` using multi-stage builds.
+
+```dockerfile
+# Build stage
+FROM oven/bun:1 as builder
+WORKDIR /app
+COPY . .
+RUN bun install
+RUN bun run build
+
+# Runner stage
+FROM node:20-alpine AS runner
+WORKDIR /app
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+### Docker Compose
+
+```yaml
+version: "3"
+services:
+  clicklens:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - CLICKHOUSE_HOST=http://your-clickhouse-host:8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=password
+```
