@@ -4,6 +4,8 @@ import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export async function GET(request: Request) {
+  let source = "text_log";
+
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
     const level = searchParams.get("level");
     const component = searchParams.get("component");
     const minTime = searchParams.get("minTime");
-    const source = searchParams.get("source") || "text_log"; // "text_log" or "crash_log"
+    source = searchParams.get("source") || "text_log"; // "text_log" or "crash_log"
 
     const client = createClient(config);
     const clusterName = await getClusterName(client);
@@ -43,6 +45,25 @@ export async function GET(request: Request) {
           query_id,
           source_file,
           source_line
+        FROM ${tableSource}
+      `;
+    } else if (source === "session_log") {
+      const tableSource = clusterName
+        ? `clusterAllReplicas('${clusterName}', system.session_log)`
+        : "system.session_log";
+
+      query = `
+        SELECT
+          event_time as timestamp,
+          toString(type) as type,
+          user as component,
+          concat('Auth: ', toString(auth_type), ', Remote: ', toString(client_address), ', Client: ', client_name) as message,
+          concat('Interface: ', toString(interface), ', Session ID: ', session_id, if(failure_reason != '', concat(', Reason: ', failure_reason), '')) as details,
+          event_time,
+          client_hostname as thread_name,
+          session_id as query_id,
+          '' as source_file,
+          0 as source_line
         FROM ${tableSource}
       `;
     } else {
@@ -82,6 +103,8 @@ export async function GET(request: Request) {
         // but consistent UI might send it. Let's filter on thread_name or something relevant if needed?
         // Mapped component is 'signal'
         whereConditions.push(`toString(signal) ILIKE '%${safeComponent}%'`);
+      } else if (source === "session_log") {
+        whereConditions.push(`user ILIKE '%${safeComponent}%'`);
       } else {
         whereConditions.push(`logger_name ILIKE '%${safeComponent}%'`);
       }
@@ -97,7 +120,9 @@ export async function GET(request: Request) {
     if (minTime) {
       const safeMin = minTime.replace(/'/g, "''");
       const timeCol =
-        source === "crash_log" ? "event_time" : "event_time_microseconds";
+        source === "crash_log" || source === "session_log"
+          ? "event_time"
+          : "event_time_microseconds";
       whereConditions.push(
         `${timeCol} > parseDateTimeBestEffort('${safeMin}')`
       );
@@ -108,7 +133,9 @@ export async function GET(request: Request) {
     }
 
     const orderCol =
-      source === "crash_log" ? "event_time" : "event_time_microseconds";
+      source === "crash_log" || source === "session_log"
+        ? "event_time"
+        : "event_time_microseconds";
     query += ` ORDER BY ${orderCol} DESC LIMIT ${limit}`;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,11 +150,28 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Failed to fetch logs:", error);
+
+    if (isClickHouseError(error)) {
+      // Handle UNKNOWN_TABLE (60) specifically for session_log
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const code = (error as any).code;
+      if ((code === 60 || code === "60") && source === "session_log") {
+        return NextResponse.json({
+          success: false,
+          error:
+            "Session logging is not enabled on this server. Please configure 'session_log' in config.xml.",
+        });
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: error.userMessage || "Failed to fetch logs",
+      });
+    }
+
     return NextResponse.json({
       success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage
-        : "Failed to fetch logs",
+      error: "Failed to fetch logs",
     });
   }
 }
