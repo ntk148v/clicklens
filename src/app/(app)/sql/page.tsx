@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
+import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout";
 import {
@@ -15,6 +16,7 @@ import {
   SaveQueryDialog,
   ExplainButton,
   ExplainVisualizer,
+  TimeRangeSelector,
   type ExplainType,
 } from "@/components/sql";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
@@ -661,6 +663,88 @@ export default function SqlConsolePage() {
     [getActiveQueryTab, updateTab, selectedDatabase]
   );
 
+  const handleApplyTimeRange = useCallback(
+    (start: Date, end: Date, columnName: string) => {
+      const tab = getActiveQueryTab();
+      if (!tab || tab.isRunning) return;
+
+      const formatSqlDate = (d: Date) => {
+        const pad = (n: number) => n.toString().padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+          d.getDate()
+        )} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      };
+
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const startStr = formatSqlDate(start);
+      const endStr = formatSqlDate(end);
+
+      const safeColumn = columnName.trim() || "event_time";
+      const timeClause = `${safeColumn} BETWEEN toDateTime('${startStr}', '${timezone}') AND toDateTime('${endStr}', '${timezone}')`;
+
+      const currentSql = tab.sql;
+
+      // Logic to find insertion point
+      // We want to insert before GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, SETTINGS, FORMAT
+      // But after WHERE (if exists) or after FROM/joins if no WHERE exists.
+
+      // Simple strategy:
+      // 1. Identify the effective "end" of the query (before trailing semicolon)
+      // 2. Scan for the first occurrence of modifying clauses (GROUP BY, etc)
+      // 3. If found, insert before that.
+      // 4. If not found, insert at end.
+      // 5. Detect if 'WHERE' exists before the insertion point to determine prefix (AND vs WHERE).
+
+      const trailingSemiRegex = /;\s*$/;
+      const hasTrailingSemi = trailingSemiRegex.test(currentSql);
+      const sqlBody = currentSql.replace(trailingSemiRegex, "");
+
+      // Keywords that typically come AFTER WHERE
+      // We look for them only if they are NOT inside quotes/parens (simplified check)
+      const clausesRegex =
+        /\b(GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|SETTINGS|FORMAT|WINDOW)\b/i;
+      const match = clausesRegex.exec(sqlBody);
+
+      let insertIndex = sqlBody.length; // Default to end
+      if (match) {
+        insertIndex = match.index;
+      }
+
+      const textBefore = sqlBody.slice(0, insertIndex);
+      // Check if WHERE exists in the text before insertion point.
+      // We need to be careful about subqueries, but for a simplified editor scope:
+      // Check for the *last* WHERE that isn't followed by a matching closer?
+      // Simplified: Check for WHERE keyword in the specific statement scope.
+
+      const hasWhere = /\bWHERE\b/i.test(textBefore);
+
+      // Determine prefix
+      // If we are appending to 'WHERE ... ' -> ' AND '
+      // If we are appending to 'FROM table ' -> ' WHERE '
+      const prefix = hasWhere ? " AND " : " WHERE ";
+
+      // Handle whitespace
+      const preppedPrefix =
+        (textBefore.endsWith(" ") ? "" : " ") + prefix.trim() + " ";
+
+      const newSql =
+        textBefore +
+        preppedPrefix +
+        timeClause +
+        " " +
+        sqlBody.slice(insertIndex) +
+        (hasTrailingSemi ? ";" : "");
+
+      updateTab(tab.id, { sql: newSql });
+
+      toast({
+        title: "Time range inserted",
+        description: `Using column '${safeColumn}'. Applied correctly to query structure.`,
+      });
+    },
+    [getActiveQueryTab, updateTab]
+  );
+
   const handleHistorySelect = useCallback(
     (sql: string) => {
       if (activeTabId && activeQueryTab) {
@@ -732,6 +816,13 @@ export default function SqlConsolePage() {
 
           <ExplainButton
             onExplain={handleExplain}
+            disabled={!activeQueryTab || activeQueryTab.isRunning}
+          />
+
+          <Separator orientation="vertical" className="h-6 mx-2" />
+
+          <TimeRangeSelector
+            onApply={handleApplyTimeRange}
             disabled={!activeQueryTab || activeQueryTab.isRunning}
           />
 

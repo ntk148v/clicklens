@@ -6,6 +6,7 @@ export { DatabaseSelector } from "./DatabaseSelector";
 export { TableSidebar } from "./TableSidebar";
 export * from "./ExplainButton";
 export * from "./ExplainVisualizer";
+export * from "./TimeRangeSelector";
 export { TablePreview } from "./TablePreview";
 export { SavedQueries } from "./SavedQueries";
 export { SaveQueryDialog } from "./SaveQueryDialog";
