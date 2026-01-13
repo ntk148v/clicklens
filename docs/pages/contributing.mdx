@@ -1,0 +1,86 @@
+# Contributing to ClickLens
+
+We love your input! We want to make contributing to ClickLens as easy and transparent as possible, whether it's:
+
+- Reporting a bug
+- Discussing the current state of the code
+- Submitting a fix
+- Proposing new features
+
+## Tech Stack
+
+ClickLens is built with a modern stack:
+
+- **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
+- **Runtime & Package Manager**: [Bun](https://bun.sh/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Components**: [Radix UI](https://www.radix-ui.com/)
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
+- **Validation**: [Zod](https://zod.dev/)
+
+## Development Workflow
+
+### 1. Prerequisites
+
+Ensure you have [Bun](https://bun.sh/) installed effectively.
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+### 2. Setup
+
+Clone the repo and install dependencies:
+
+```bash
+git clone https://github.com/ntk148v/clicklens.git
+cd clicklens
+bun install
+```
+
+### 3. Environment
+
+Copy the sample environment file:
+
+```bash
+cp env.sample .env.local
+```
+
+You will need a running ClickHouse instance. Update `.env.local` with your connection details.
+
+### 4. Running Locally
+
+Start the development server:
+
+```bash
+bun dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000).
+
+### 5. Code Quality
+
+We use `eslint` for linting. Please ensure your code passes linting before submitting a PR.
+
+```bash
+bun lint
+```
+
+### 6. Building
+
+To verify that your changes build correctly for production:
+
+```bash
+bun run build
+```
+
+## Pull Request Process
+
+1.  Update the `README.md` with details of changes to the interface, this includes new environment variables, exposed ports, useful file locations and container parameters.
+2.  Increase the version numbers in any examples files and the README.md to the new version that this Pull Request would represent.
+3.  You may merge the Pull Request in once you have the sign-off of two other developers, or if you do not have permission to do that, you may request the second reviewer to merge it for you.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under its MIT License.

@@ -1,5 +1,33 @@
 # Architecture
 
+ClickLens uses a server-first architecture to ensure security and performance.
+
+```mermaid
+graph TD
+    User[User Browser]
+
+    subgraph "ClickLens (Next.js App)"
+        UI[Client Components]
+        Server[Server Components / API Routes]
+        Session[Iron Session Auth]
+    end
+
+    subgraph "ClickHouse"
+        CH_HTTP[HTTP Interface :8123]
+        System[System Tables]
+        Data[User Data]
+    end
+
+    User -->|Interaction| UI
+    UI -->|Next.js Server Actions/API| Server
+    Server -->|Auth Check| Session
+
+    Server -->|Metadata Queries (LENS_USER)| System
+    Server -->|Data Queries (User Creds)| Data
+
+    note[LENS_USER has read-only access<br/>to system tables for schema introspection]
+```
+
 ClickLens is built with a modern web stack designed for performance, security, and maintainability.
 
 ## Technology Stack

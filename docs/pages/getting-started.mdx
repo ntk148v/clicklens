@@ -8,6 +8,21 @@ This guide will help you set up ClickLens locally or for production.
 - **Bun**: We use Bun as our primary runtime and package manager.
 - **ClickHouse**: You need access to a ClickHouse server (local or cloud).
 
+### Permissions (LENS_USER)
+
+ClickLens requires a service account (`LENS_USER`) to query system metadata (databases, tables, columns). This allows the application to show schema information without leaking user credentials for these background tasks.
+
+**Required Permissions:**
+The `LENS_USER` needs `SELECT` permission on `system.*` tables.
+
+```sql
+-- Create the user
+CREATE USER lensuser IDENTIFIED BY 'secure_password';
+
+-- Grant read access to system tables
+GRANT SELECT ON system.* TO lensuser;
+```
+
 ## Running Locally
 
 1.  **Clone the repository:**
