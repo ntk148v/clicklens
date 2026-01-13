@@ -25,6 +25,7 @@ import {
   Shield,
   ScrollText,
   Settings,
+  Search,
   AlertTriangle,
   Github,
   BookOpen,
@@ -204,7 +205,13 @@ const navigation = [
     requiresPermission: "canViewCluster" as const,
     subItems: monitoringItems,
   },
-
+  {
+    name: "Discover",
+    href: "/discover",
+    icon: Search,
+    description: "Explore logs and events",
+    requiresPermission: "canViewSystemLogs" as const,
+  },
   {
     name: "Logging",
     href: "/logging",
