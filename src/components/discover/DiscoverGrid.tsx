@@ -25,6 +25,7 @@ import { ArrowUpDown, Expand } from "lucide-react";
 import type { DiscoverRow } from "@/lib/types/discover";
 import type { ColumnMetadata } from "@/lib/types/discover";
 import { cn } from "@/lib/utils";
+import { TruncatedCell } from "@/components/monitoring";
 
 interface DiscoverGridProps {
   rows: DiscoverRow[];
@@ -50,33 +51,13 @@ function isDateOnlyType(type: string): boolean {
 }
 
 // Format cell value based on type
+// Format cell value based on type
 function formatCellValue(value: unknown, type: string): React.ReactNode {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground italic">null</span>;
   }
 
-  // Date/DateTime - keep original ISO format for consistency
-  // Date: 2026-01-14
-  // DateTime: 2026-01-14T03:41:49Z
-  // DateTime64: 2026-01-14T03:41:49.487495Z
-  if (
-    (isDateOnlyType(type) || isDateTimeType(type)) &&
-    typeof value === "string"
-  ) {
-    return value; // Keep as-is from ClickHouse
-  }
-
-  // Object/Array - show as JSON
-  if (typeof value === "object") {
-    return (
-      <code className="text-xs bg-muted px-1 py-0.5 rounded">
-        {JSON.stringify(value).slice(0, 100)}
-        {JSON.stringify(value).length > 100 && "..."}
-      </code>
-    );
-  }
-
-  // Boolean
+  // Boolean - Keep generic badge style
   if (typeof value === "boolean") {
     return (
       <Badge variant={value ? "default" : "secondary"}>
@@ -85,22 +66,32 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
     );
   }
 
-  // Number
-  if (typeof value === "number") {
-    return <span className="font-mono">{value.toLocaleString()}</span>;
+  // Determine styling
+  let className = "";
+  if (typeof value === "number")
+    className = "text-right font-mono text-blue-600";
+
+  // Convert to string for display
+  let displayValue = String(value);
+
+  // Object/Array - JSON stringify
+  if (typeof value === "object") {
+    displayValue = JSON.stringify(value);
+  } else if (typeof value === "number") {
+    displayValue = value.toLocaleString();
   }
 
-  // String - truncate long values
-  const strValue = String(value);
-  if (strValue.length > 200) {
-    return (
-      <span className="truncate max-w-[300px] inline-block" title={strValue}>
-        {strValue.slice(0, 200)}...
-      </span>
-    );
+  // Date/DateTime - keep original ISO format
+  if (
+    (isDateOnlyType(type) || isDateTimeType(type)) &&
+    typeof value === "string"
+  ) {
+    // Keep as-is
   }
 
-  return strValue;
+  return (
+    <TruncatedCell value={displayValue} className={className} maxWidth={300} />
+  );
 }
 
 // Log level badge
@@ -299,7 +290,7 @@ export function DiscoverGrid({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="py-2 text-sm max-w-[400px] truncate"
+                      className="py-1.5 px-4 font-mono text-sm border-r last:border-r-0"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
