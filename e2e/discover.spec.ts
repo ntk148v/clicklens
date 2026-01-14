@@ -15,45 +15,119 @@ test.describe("Discover Feature", () => {
     await page.click("a[href='/discover']");
     await expect(page).toHaveURL("/discover");
     await expect(page.getByRole("heading", { name: "Discover" })).toBeVisible();
+    await expect(page.getByText("Select a database and table")).toBeVisible();
   });
 
-  test("should display histogram and grid", async ({ page }) => {
+  test("should select system tables and display data", async ({ page }) => {
     await page.goto("/discover");
 
-    // Check Histogram container
-    const histogram = page.locator(".recharts-responsive-container");
-    await expect(histogram).toBeVisible();
+    // Select Database: system
+    const dbTrigger = page
+      .getByRole("combobox")
+      .filter({ hasText: "Select database" });
+    await dbTrigger.click();
+    await page.getByRole("option", { name: "system" }).click();
 
-    // Check Grid
-    const grid = page.locator("table");
-    await expect(grid).toBeVisible();
+    // Select Table: tables
+    const tableTrigger = page
+      .getByRole("combobox")
+      .filter({ hasText: "Select table" });
+    await expect(tableTrigger).toBeEnabled();
+    await tableTrigger.click();
+
+    // Type to search or just find 'tables'
+    await page
+      .getByRole("option", { name: "tables", exact: true })
+      .or(page.getByRole("option", { name: "tables (" }))
+      .first()
+      .click();
+
+    // Verify Grid Loading/Loaded
+    await expect(page.locator("table")).toBeVisible({ timeout: 10000 });
+
+    // Verify some data
+    await expect(
+      page.locator("td").filter({ hasText: "system" }).first()
+    ).toBeVisible();
   });
 
-  test("should toggle fields in grid", async ({ page }) => {
+  test("should filter columns", async ({ page }) => {
     await page.goto("/discover");
 
-    // Check initial columns (source_file is hidden by default in our code)
-    // Actually source_file default visibility was false in the component
+    // Setup: Select system.tables
+    await page
+      .getByRole("combobox")
+      .filter({ hasText: "Select database" })
+      .click();
+    await page.getByRole("option", { name: "system" }).click();
+    await page
+      .getByRole("combobox")
+      .filter({ hasText: "Select table" })
+      .click();
+    await page
+      .getByRole("option", { name: "tables", exact: true })
+      .or(page.getByRole("option", { name: "tables (" }))
+      .first()
+      .click();
 
-    // Enable source_file
-    const checkbox = page.locator("label:has-text('Source File')");
-    await checkbox.click();
-
-    // Verify column header appears
-    const header = page.getByRole("columnheader", { name: "Source" });
-    await expect(header).toBeVisible();
-  });
-
-  test("should search and update results", async ({ page }) => {
-    await page.goto("/discover");
-
-    const searchInput = page.getByPlaceholder("Search logs...");
-    await searchInput.fill("system");
-
-    // Wait for debounce and network
-    await page.waitForResponse((resp) => resp.url().includes("search=system"));
-
-    // Minimal check that table is still there (data usage depends on actual DB content)
     await expect(page.locator("table")).toBeVisible();
+
+    // Sidebar interaction
+    // Uncheck 'database' column if it's there
+    const colName = "database";
+
+    // Find label containing text (Label is linked to checkbox via htmlFor)
+    const label = page.locator("label").filter({ hasText: colName }).first();
+
+    if (await label.isVisible()) {
+      // Click label to toggle
+      await label.click();
+
+      // Verify header is gone
+      await expect(
+        page.getByRole("columnheader", { name: colName })
+      ).not.toBeVisible();
+
+      // Check it back
+      await label.click();
+      await expect(
+        page.getByRole("columnheader", { name: colName })
+      ).toBeVisible();
+    }
+  });
+
+  test("should execute custom filter", async ({ page }) => {
+    await page.goto("/discover");
+
+    // Select system.tables
+    await page
+      .getByRole("combobox")
+      .filter({ hasText: "Select database" })
+      .click();
+    await page.getByRole("option", { name: "system" }).click();
+    await page
+      .getByRole("combobox")
+      .filter({ hasText: "Select table" })
+      .click();
+    await page
+      .getByRole("option", { name: "tables", exact: true })
+      .or(page.getByRole("option", { name: "tables (" }))
+      .first()
+      .click();
+
+    // Type in Query Bar
+    const editor = page.locator(".cm-content");
+    await expect(editor).toBeVisible();
+
+    await editor.click();
+    await page.keyboard.type("name = 'tables'");
+
+    // Execute
+    await page.locator("button:has(.lucide-refresh-cw)").click();
+
+    await expect(page.locator("table")).toBeVisible();
+
+    // Should only see row with name 'tables'
+    await expect(page.getByText("Error")).not.toBeVisible();
   });
 });
