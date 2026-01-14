@@ -35,7 +35,12 @@ import { getMinTimeFromRange } from "@/lib/types/discover";
  * - Log volume histogram
  * - Results grid with sorting and detail view
  */
+import { AccessDenied } from "@/components/ui/access-denied";
+import { useAuth } from "@/components/auth";
+
 export default function DiscoverPage() {
+  const { permissions, isLoading: authLoading } = useAuth();
+
   // Source selection state
   const [databases, setDatabases] = useState<string[]>([]);
   const [tables, setTables] = useState<{ name: string; engine: string }[]>([]);
@@ -373,6 +378,25 @@ export default function DiscoverPage() {
   const handleHistogramBarClick = (time: string) => {
     setCustomMinTime(time);
   };
+
+  if (authLoading) {
+    return null; // Or skeleton
+  }
+
+  if (!permissions?.canDiscover) {
+    return (
+      <div className="h-full flex flex-col p-4">
+        <h1 className="text-xl font-bold tracking-tight mb-4">Discover</h1>
+        <div className="flex-1 flex items-center justify-center">
+          <AccessDenied
+            title="Access Denied"
+            message="You do not have permission to access the Discover feature."
+            description="Please contact your administrator if you believe this is an error."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col space-y-4 p-4">

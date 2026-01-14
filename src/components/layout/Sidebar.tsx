@@ -210,7 +210,7 @@ const navigation = [
     href: "/discover",
     icon: Search,
     description: "Explore logs and events",
-    requiresPermission: "canViewSystemLogs" as const,
+    requiresPermission: "canDiscover" as const,
   },
   {
     name: "Logging",
