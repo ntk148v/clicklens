@@ -176,6 +176,13 @@ const loggingItems = [
 // Main navigation items with permission requirements
 const navigation = [
   {
+    name: "Discover",
+    href: "/discover",
+    icon: Search,
+    description: "Explore logs and events",
+    requiresPermission: "canDiscover" as const,
+  },
+  {
     name: "SQL Console",
     href: "/sql",
     icon: Terminal,
@@ -204,13 +211,6 @@ const navigation = [
     description: "Cluster health and metrics",
     requiresPermission: "canViewCluster" as const,
     subItems: monitoringItems,
-  },
-  {
-    name: "Discover",
-    href: "/discover",
-    icon: Search,
-    description: "Explore logs and events",
-    requiresPermission: "canDiscover" as const,
   },
   {
     name: "Logging",
