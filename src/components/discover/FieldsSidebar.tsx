@@ -197,7 +197,7 @@ export function FieldsSidebar({
                 />
                 <Label
                   htmlFor={`field-${col.name}`}
-                  className="flex-1 flex items-center gap-1.5 text-xs font-normal cursor-pointer truncate"
+                  className="flex items-center gap-1.5 text-xs font-normal cursor-pointer truncate min-w-0"
                 >
                   {getTypeIcon(col.type)}
                   <span className="truncate">{col.name}</span>
