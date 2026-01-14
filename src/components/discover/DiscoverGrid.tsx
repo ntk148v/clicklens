@@ -6,9 +6,9 @@ import {
   getCoreRowModel,
   flexRender,
   createColumnHelper,
-  VisibilityState,
   getSortedRowModel,
   SortingState,
+  ColumnDef,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -17,294 +17,325 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableWrapper,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { JsonViewer } from "@/components/ui/json-viewer";
+import { RecordDetailSheet } from "@/components/ui/record-detail-sheet";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Maximize2 } from "lucide-react";
-import type { LogEntry } from "@/lib/hooks/use-logs";
+import { Badge } from "@/components/ui/badge";
+import { ArrowUpDown, Expand } from "lucide-react";
+import type { DiscoverRow } from "@/lib/types/discover";
+import type { ColumnMetadata } from "@/lib/types/discover";
+import { cn, formatDateTime } from "@/lib/utils";
 
 interface DiscoverGridProps {
-  logs: LogEntry[];
+  rows: DiscoverRow[];
+  columns: ColumnMetadata[];
+  selectedColumns: string[];
   isLoading: boolean;
-  visibleColumns: VisibilityState;
-  onVisibleColumnsChange: (
-    updaterOrValue:
-      | VisibilityState
-      | ((old: VisibilityState) => VisibilityState)
-  ) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
-const columnHelper = createColumnHelper<LogEntry>();
+const columnHelper = createColumnHelper<DiscoverRow>();
 
-// Stylish badge colors for levels (reused logic)
-function getLevelBadge(level: string) {
-  const l = (level || "").toLowerCase();
-  switch (l) {
-    case "fatal":
-      return <Badge className="bg-red-900 text-red-100 border-0">Fatal</Badge>;
-    case "error":
-      return <Badge className="bg-red-600 text-white border-0">Error</Badge>;
-    case "warning":
-      return (
-        <Badge className="bg-yellow-500 text-yellow-950 border-0">Warn</Badge>
-      );
-    case "information":
-    case "info":
-      return <Badge className="bg-blue-500 text-white border-0">Info</Badge>;
-    case "debug":
-      return <Badge className="bg-gray-500 text-white border-0">Debug</Badge>;
-    case "trace":
-      return (
-        <Badge className="bg-gray-400 text-gray-900 border-0">Trace</Badge>
-      );
-    default:
-      return <Badge variant="outline">{level}</Badge>;
+// Determine if a type is a datetime type (includes time)
+function isDateTimeType(type: string): boolean {
+  const base = type.replace(/^Nullable\(/, "").replace(/\)$/, "");
+  return base.startsWith("DateTime");
+}
+
+// Determine if a type is a date-only type (no time)
+function isDateOnlyType(type: string): boolean {
+  const base = type.replace(/^Nullable\(/, "").replace(/\)$/, "");
+  return base === "Date" || base === "Date32";
+}
+
+// Format cell value based on type
+function formatCellValue(value: unknown, type: string): React.ReactNode {
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground italic">null</span>;
   }
+
+  // Date-only formatting (no time component)
+  if (isDateOnlyType(type) && typeof value === "string") {
+    // Date strings from ClickHouse come as "2026-01-14"
+    // Just return as-is or format nicely without time
+    return value; // Keep as YYYY-MM-DD format
+  }
+
+  // DateTime formatting (with time)
+  if (isDateTimeType(type) && typeof value === "string") {
+    return formatDateTime(value);
+  }
+
+  // Object/Array - show as JSON
+  if (typeof value === "object") {
+    return (
+      <code className="text-xs bg-muted px-1 py-0.5 rounded">
+        {JSON.stringify(value).slice(0, 100)}
+        {JSON.stringify(value).length > 100 && "..."}
+      </code>
+    );
+  }
+
+  // Boolean
+  if (typeof value === "boolean") {
+    return (
+      <Badge variant={value ? "default" : "secondary"}>
+        {value ? "true" : "false"}
+      </Badge>
+    );
+  }
+
+  // Number
+  if (typeof value === "number") {
+    return <span className="font-mono">{value.toLocaleString()}</span>;
+  }
+
+  // String - truncate long values
+  const strValue = String(value);
+  if (strValue.length > 200) {
+    return (
+      <span className="truncate max-w-[300px] inline-block" title={strValue}>
+        {strValue.slice(0, 200)}...
+      </span>
+    );
+  }
+
+  return strValue;
 }
 
+// Log level badge
+function getLevelBadge(level: string) {
+  const levelLower = level?.toLowerCase() || "";
+  if (levelLower.includes("fatal") || levelLower.includes("critical")) {
+    return (
+      <Badge className="bg-red-500/20 text-red-600 border-red-500/30">
+        {level}
+      </Badge>
+    );
+  }
+  if (levelLower.includes("error")) {
+    return (
+      <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30">
+        {level}
+      </Badge>
+    );
+  }
+  if (levelLower.includes("warn")) {
+    return (
+      <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
+        {level}
+      </Badge>
+    );
+  }
+  if (levelLower.includes("info") || levelLower.includes("notice")) {
+    return (
+      <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">
+        {level}
+      </Badge>
+    );
+  }
+  if (levelLower.includes("debug") || levelLower.includes("trace")) {
+    return (
+      <Badge className="bg-gray-500/20 text-gray-500 border-gray-500/30">
+        {level}
+      </Badge>
+    );
+  }
+  return <Badge variant="outline">{level}</Badge>;
+}
+
+/**
+ * Data grid for Discover results with dynamic columns
+ *
+ * Features:
+ * - Dynamic column generation based on selected fields
+ * - Smart cell formatting based on data type
+ * - Sortable columns
+ * - Row detail sheet for viewing full record (matches ClickableTableRow style)
+ * - Load more button for pagination
+ */
 export function DiscoverGrid({
-  logs,
+  rows,
+  columns: columnMetadata,
+  selectedColumns,
   isLoading,
-  visibleColumns,
-  onVisibleColumnsChange,
+  onLoadMore,
+  hasMore = false,
 }: DiscoverGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor("timestamp", {
-        header: ({ column }) => {
-          return (
+  // Create column type lookup
+  const columnTypes = useMemo(() => {
+    const types: Record<string, string> = {};
+    columnMetadata.forEach((col) => {
+      types[col.name] = col.type;
+    });
+    return types;
+  }, [columnMetadata]);
+
+  // Convert columns to meta format for RecordDetailSheet
+  const sheetColumns = useMemo(() => {
+    return columnMetadata.map((col) => ({
+      name: col.name,
+      type: col.type,
+    }));
+  }, [columnMetadata]);
+
+  // Generate table columns dynamically
+  const tableColumns = useMemo(() => {
+    // Determine which columns to show
+    const columnsToShow =
+      selectedColumns.length > 0 ? selectedColumns : Object.keys(rows[0] || {});
+
+    const cols: ColumnDef<DiscoverRow, unknown>[] = columnsToShow.map(
+      (colName) => {
+        const colType = columnTypes[colName] || "String";
+        const isLevel =
+          colName === "level" || colName === "type" || colName === "severity";
+
+        return columnHelper.accessor((row) => row[colName], {
+          id: colName,
+          header: ({ column }) => (
             <Button
               variant="ghost"
               size="sm"
-              className="-ml-3 h-8 data-[state=open]:bg-accent"
+              className="h-8 -ml-3 font-medium"
               onClick={() =>
                 column.toggleSorting(column.getIsSorted() === "asc")
               }
             >
-              <span>Time</span>
-              <ArrowUpDown className="ml-2 h-4 w-4" />
+              {colName}
+              <ArrowUpDown className="ml-1 h-3 w-3" />
             </Button>
-          );
-        },
-        cell: (info) => {
-          try {
-            return new Date(info.getValue()).toLocaleTimeString();
-          } catch {
-            return info.getValue();
-          }
-        },
-        enableHiding: false, // Always show time
-      }),
-      columnHelper.accessor("type", {
-        header: "Level",
-        cell: (info) => getLevelBadge(info.getValue()),
-      }),
-      columnHelper.accessor("component", {
-        header: "Component",
-        cell: (info) => (
-          <TruncatedCell value={info.getValue()} maxWidth={120} />
-        ),
-      }),
-      columnHelper.accessor("message", {
-        header: "Message",
-        cell: (info) => (
-          <div className="max-w-[600px]">
-            <TruncatedCell
-              value={info.getValue()}
-              maxWidth={600}
-              className="font-mono text-xs"
-            />
-          </div>
-        ),
-        enableHiding: false,
-      }),
-      columnHelper.accessor("thread_name", {
-        header: "Thread",
-        cell: (info) => (
-          <span className="text-xs text-muted-foreground">
-            {info.getValue()}
-          </span>
-        ),
-      }),
-      columnHelper.accessor("query_id", {
-        header: "Query ID",
-        cell: (info) => (
-          <span className="text-xs font-mono text-muted-foreground">
-            {info.getValue()}
-          </span>
-        ),
-      }),
-      columnHelper.accessor("source_file", {
-        header: "Source",
-        cell: (info) => (
-          <span className="text-xs text-muted-foreground">
-            {info.getValue()}
-          </span>
-        ),
-      }),
-    ],
-    []
-  );
+          ),
+          cell: (info) => {
+            const value = info.getValue();
+
+            // Special handling for log level columns
+            if (isLevel && typeof value === "string") {
+              return getLevelBadge(value);
+            }
+
+            return formatCellValue(value, colType);
+          },
+        });
+      }
+    );
+
+    return cols;
+  }, [selectedColumns, columnTypes, rows]);
 
   const table = useReactTable({
-    data: logs,
-    columns,
-    state: {
-      sorting,
-      columnVisibility: visibleColumns,
-    },
+    data: rows,
+    columns: tableColumns,
+    state: { sorting },
     onSortingChange: setSorting,
-    onColumnVisibilityChange: onVisibleColumnsChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
+  const handleRowClick = (row: DiscoverRow, index: number) => {
+    setSelectedRow(row);
+    setSelectedRowIndex(index);
+    setSheetOpen(true);
+  };
+
+  if (isLoading && rows.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoading && rows.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        No data found. Try adjusting your filters or time range.
+      </div>
+    );
+  }
+
   return (
     <>
-      <TableWrapper className="border-t-0 rounded-t-none">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="whitespace-nowrap">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
-                {/* Actions column placeholder */}
-                <TableHead className="w-[40px]"></TableHead>
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody isLoading={isLoading}>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="whitespace-nowrap">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                  <TableHead className="w-8" />
+                  {/* Expand icon column */}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody isLoading={isLoading}>
+              {table.getRowModel().rows.map((row, index) => (
+                <tr
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="cursor-pointer group"
-                  onClick={() => setSelectedLog(row.original)}
+                  data-slot="table-row"
+                  className={cn(
+                    "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
+                    selectedRow === row.original && sheetOpen && "bg-muted"
+                  )}
+                  onClick={() => handleRowClick(row.original, index)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className="py-2 text-sm max-w-[400px] truncate"
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
                       )}
                     </TableCell>
                   ))}
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Maximize2 className="h-3 w-3 text-muted-foreground" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length + 1}
-                  className="h-24 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableWrapper>
+                  <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
+                    <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </td>
+                </tr>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
 
-      {/* Details Sheet */}
-      <Sheet
-        open={!!selectedLog}
-        onOpenChange={(open) => !open && setSelectedLog(null)}
-      >
-        <SheetContent className="min-w-[50vw] sm:max-w-xl overflow-y-auto">
-          <SheetHeader className="mb-4">
-            <SheetTitle>Log Details</SheetTitle>
-          </SheetHeader>
+        {/* Load More */}
+        {hasMore && onLoadMore && (
+          <div className="p-4 border-t flex justify-center">
+            <Button variant="outline" onClick={onLoadMore} disabled={isLoading}>
+              {isLoading ? "Loading..." : "Load More"}
+            </Button>
+          </div>
+        )}
+      </div>
 
-          {selectedLog && (
-            <div className="space-y-6">
-              {/* Quick Info */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground text-xs mb-1">
-                    Timestamp
-                  </div>
-                  <div className="font-mono">
-                    {new Date(selectedLog.timestamp).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-xs mb-1">
-                    Level
-                  </div>
-                  <div>{getLevelBadge(selectedLog.type)}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-xs mb-1">
-                    Component
-                  </div>
-                  <div className="font-mono">{selectedLog.component}</div>
-                </div>
-                {selectedLog.query_id && (
-                  <div>
-                    <div className="text-muted-foreground text-xs mb-1">
-                      Query ID
-                    </div>
-                    <div className="font-mono text-xs">
-                      {selectedLog.query_id}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Message */}
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Message
-                </div>
-                <div className="p-3 bg-muted/30 rounded-md border text-sm font-mono whitespace-pre-wrap break-words">
-                  {selectedLog.message}
-                </div>
-              </div>
-
-              {/* Full JSON */}
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">
-                  All Fields
-                </div>
-                <div className="p-3 bg-muted/30 rounded-md border overflow-x-auto">
-                  <JsonViewer data={selectedLog} />
-                </div>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* Row Detail Sheet - using RecordDetailSheet for consistency */}
+      <RecordDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        record={selectedRow}
+        columns={sheetColumns}
+        title="Record Details"
+        rowIndex={selectedRowIndex ?? undefined}
+      />
     </>
   );
 }
