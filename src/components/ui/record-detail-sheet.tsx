@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Copy, Check, FileJson } from "lucide-react";
 import { useState } from "react";
 import { cn, copyToClipboard } from "@/lib/utils";
+import { TruncatedCell } from "./truncated-cell";
 
 interface ColumnMeta {
   name: string;
@@ -178,11 +179,15 @@ export function RecordDetailSheet({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-[10px] px-1.5 py-1 h-auto whitespace-normal break-all text-left",
+                            "text-[10px] px-1.5 py-0.5 h-auto text-left",
                             getTypeColor(col.type)
                           )}
                         >
-                          {col.type}
+                          <TruncatedCell
+                            value={col.type}
+                            maxWidth={250}
+                            className="text-[10px] font-medium"
+                          />
                         </Badge>
                       </div>
                       <CopyButton
