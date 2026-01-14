@@ -404,55 +404,6 @@ export default function DiscoverPage() {
       {/* Header / Source Selection */}
       <Header
         title="Discover"
-        children={
-          <div className="flex items-center gap-3">
-            {/* Database selector */}
-            <div className="flex items-center gap-1.5">
-              <Database className="h-4 w-4 text-muted-foreground" />
-              <Select
-                value={selectedDatabase}
-                onValueChange={setSelectedDatabase}
-              >
-                <SelectTrigger className="w-[180px] h-9">
-                  <SelectValue placeholder="Select database" />
-                </SelectTrigger>
-                <SelectContent>
-                  {databases.map((db) => (
-                    <SelectItem key={db} value={db}>
-                      {db}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Table selector */}
-            <div className="flex items-center gap-1.5">
-              <Table2 className="h-4 w-4 text-muted-foreground" />
-              <Select
-                value={selectedTable}
-                onValueChange={setSelectedTable}
-                disabled={!selectedDatabase || tables.length === 0}
-              >
-                <SelectTrigger className="w-[200px] h-9">
-                  <SelectValue placeholder="Select table" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tables.map((t) => (
-                    <SelectItem key={t.name} value={t.name}>
-                      <span className="flex items-center gap-2">
-                        {t.name}
-                        <span className="text-xs text-muted-foreground">
-                          ({t.engine})
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        }
         actions={
           <div className="flex items-center gap-2">
             <Select
@@ -492,7 +443,55 @@ export default function DiscoverPage() {
             </Button>
           </div>
         }
-      />
+      >
+        <div className="flex items-center gap-3">
+          {/* Database selector */}
+          <div className="flex items-center gap-1.5">
+            <Database className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedDatabase}
+              onValueChange={setSelectedDatabase}
+            >
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Select database" />
+              </SelectTrigger>
+              <SelectContent>
+                {databases.map((db) => (
+                  <SelectItem key={db} value={db}>
+                    {db}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table selector */}
+          <div className="flex items-center gap-1.5">
+            <Table2 className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedTable}
+              onValueChange={setSelectedTable}
+              disabled={!selectedDatabase || tables.length === 0}
+            >
+              <SelectTrigger className="w-[200px] h-9">
+                <SelectValue placeholder="Select table" />
+              </SelectTrigger>
+              <SelectContent>
+                {tables.map((t) => (
+                  <SelectItem key={t.name} value={t.name}>
+                    <span className="flex items-center gap-2">
+                      {t.name}
+                      <span className="text-xs text-muted-foreground">
+                        ({t.engine})
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </Header>
 
       <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Query Bar */}

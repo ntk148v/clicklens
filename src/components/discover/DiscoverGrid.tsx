@@ -219,6 +219,7 @@ export function DiscoverGrid({
     return cols;
   }, [selectedColumns, columnTypes, rows]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: rows,
     columns: tableColumns,
