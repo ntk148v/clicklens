@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
-import { Input } from "@/components/ui/input";
+import { QueryBar } from "@/components/discover/QueryBar";
+import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
 import {
   Select,
   SelectContent,
@@ -12,197 +13,443 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, SlidersHorizontal, FilterX } from "lucide-react";
-import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
-import type { LogEntry } from "@/lib/hooks/use-logs";
-import { VisibilityState } from "@tanstack/react-table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { RefreshCw, FilterX, Database, Table2 } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import type {
+  TableSchema,
+  DiscoverRow,
+  TimeRange,
+  ColumnMetadata,
+  TimeColumnCandidate,
+} from "@/lib/types/discover";
+import { getMinTimeFromRange } from "@/lib/types/discover";
 
-type TimeRange = "5m" | "15m" | "1h" | "6h" | "12h" | "24h" | "7d";
-
-// Logic for calculating minTime
-function getMinTime(range: TimeRange): string {
-  const now = new Date();
-  switch (range) {
-    case "5m":
-      now.setMinutes(now.getMinutes() - 5);
-      break;
-    case "15m":
-      now.setMinutes(now.getMinutes() - 15);
-      break;
-    case "1h":
-      now.setHours(now.getHours() - 1);
-      break;
-    case "6h":
-      now.setHours(now.getHours() - 6);
-      break;
-    case "12h":
-      now.setHours(now.getHours() - 12);
-      break;
-    case "24h":
-      now.setHours(now.getHours() - 24);
-      break;
-    case "7d":
-      now.setDate(now.getDate() - 7);
-      break;
-  }
-  return now.toISOString();
-}
-
+/**
+ * Discover Page - Flexible data exploration for any ClickHouse table
+ *
+ * Features:
+ * - Database/table selection
+ * - Dynamic field sidebar (controls SELECT clause)
+ * - Custom query bar (controls WHERE clause)
+ * - Time range filtering
+ * - Log volume histogram
+ * - Results grid with sorting and detail view
+ */
 export default function DiscoverPage() {
-  // State
-  const [source, setSource] = useState("text_log");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Source selection state
+  const [databases, setDatabases] = useState<string[]>([]);
+  const [tables, setTables] = useState<{ name: string; engine: string }[]>([]);
+  const [selectedDatabase, setSelectedDatabase] = useState<string>("");
+  const [selectedTable, setSelectedTable] = useState<string>("");
+
+  // Schema state
+  const [schema, setSchema] = useState<TableSchema | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+
+  // Query state
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  const [selectedTimeColumn, setSelectedTimeColumn] = useState<string>("");
+  const [customFilter, setCustomFilter] = useState("");
   const [timeRange, setTimeRange] = useState<TimeRange>("1h");
-  // Explicit minTime overrides timeRange if set (e.g. via brush/click)
   const [customMinTime, setCustomMinTime] = useState<string | null>(null);
 
-  const [visibleColumns, setVisibleColumns] = useState<VisibilityState>({
-    source_file: false,
-    thread_name: false,
-    query_id: false,
-  });
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Derived fetch params
-  const activeMinTime = useMemo(
-    () => customMinTime || getMinTime(timeRange),
-    [timeRange, customMinTime]
-  );
-
-  const fetchParams = useMemo(
-    () => ({
-      source,
-      search: debouncedSearch,
-      minTime: activeMinTime,
-    }),
-    [source, debouncedSearch, activeMinTime]
-  );
-
-  // 1. Fetch Logs (Incremental)
-  const {
-    data: logs,
-    isLoading: logsLoading,
-    reload: reloadLogs,
-    fetchNew: fetchMoreLogs,
-  } = useIncrementalData<LogEntry>(
-    {
-      fetchFn: async (params) => {
-        const query = new URLSearchParams({
-          source: params.source as string,
-          search: (params.search as string) || "",
-          minTime: params.minTime as string,
-          limit: "1000",
-          mode: "logs",
-        });
-        if (params.sinceTimestamp) query.set("minTime", params.sinceTimestamp);
-
-        const res = await fetch(`/api/clickhouse/discover?${query}`);
-        const json = await res.json();
-        return (json.data?.data || []) as LogEntry[];
-      },
-      getTimestamp: (l) => l.timestamp,
-      getKey: (l) => `${l.timestamp}_${l.message.slice(0, 20)}`,
-    },
-    fetchParams
-  );
-
-  // 2. Fetch Histogram (Full reload on filter change)
+  // Results state
+  const [rows, setRows] = useState<DiscoverRow[]>([]);
+  const [totalHits, setTotalHits] = useState(0);
   const [histogramData, setHistogramData] = useState<
     { time: string; count: number }[]
   >([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [histLoading, setHistLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pageSize] = useState(100);
 
+  // Derived values
+  const activeMinTime = useMemo(() => {
+    if (customMinTime) return customMinTime;
+    const minDate = getMinTimeFromRange(timeRange);
+    return minDate ? minDate.toISOString() : undefined;
+  }, [timeRange, customMinTime]);
+
+  // Load databases on mount
   useEffect(() => {
-    let mounted = true;
-    const loadHistogram = async () => {
-      setHistLoading(true);
+    const loadDatabases = async () => {
       try {
-        const query = new URLSearchParams({
-          source: fetchParams.source,
-          search: fetchParams.search,
-          minTime: fetchParams.minTime,
-          mode: "histogram",
-        });
-        const res = await fetch(`/api/clickhouse/discover?${query}`);
-        const json = await res.json();
-        if (mounted && json.success) {
-          setHistogramData(json.data);
+        const res = await fetch("/api/clickhouse/databases");
+        const data = await res.json();
+        if (data.success && data.data) {
+          const dbNames = data.data.map((d: { name: string }) => d.name);
+          setDatabases(dbNames);
+          // Default to first database or 'default' if available
+          if (dbNames.includes("default")) {
+            setSelectedDatabase("default");
+          } else if (dbNames.length > 0) {
+            setSelectedDatabase(dbNames[0]);
+          }
         }
-      } finally {
-        if (mounted) setHistLoading(false);
+      } catch (err) {
+        console.error("Failed to load databases:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load databases",
+        });
       }
     };
-    loadHistogram();
-    return () => {
-      mounted = false;
-    };
-  }, [fetchParams.source, fetchParams.search, fetchParams.minTime]);
+    loadDatabases();
+  }, []);
 
-  // Effects
+  // Load tables when database changes
   useEffect(() => {
-    reloadLogs(); // Reload logs when base filters change
-  }, [fetchParams, reloadLogs]);
+    if (!selectedDatabase) {
+      setTables([]);
+      return;
+    }
+
+    const loadTables = async () => {
+      try {
+        const res = await fetch(
+          `/api/clickhouse/tables?database=${encodeURIComponent(
+            selectedDatabase
+          )}`
+        );
+        const data = await res.json();
+        if (data.success && data.data) {
+          setTables(
+            data.data.map((t: { name: string; engine: string }) => ({
+              name: t.name,
+              engine: t.engine,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load tables:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load tables",
+        });
+      }
+    };
+    loadTables();
+
+    // Reset table selection when database changes
+    setSelectedTable("");
+    setSchema(null);
+    setRows([]);
+    setHistogramData([]);
+  }, [selectedDatabase]);
+
+  // Load schema when table changes
+  useEffect(() => {
+    if (!selectedDatabase || !selectedTable) {
+      setSchema(null);
+      return;
+    }
+
+    const loadSchema = async () => {
+      setSchemaLoading(true);
+      try {
+        const res = await fetch(
+          `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(
+            selectedDatabase
+          )}&table=${encodeURIComponent(selectedTable)}`
+        );
+        const data = await res.json();
+        if (data.success && data.data) {
+          setSchema(data.data);
+
+          // Auto-select first 10 columns by default
+          const defaultCols = data.data.columns
+            .slice(0, 10)
+            .map((c: ColumnMetadata) => c.name);
+          setSelectedColumns(defaultCols);
+
+          // Auto-select primary time column if available
+          const primaryTime = data.data.timeColumns.find(
+            (tc: TimeColumnCandidate) => tc.isPrimary
+          );
+          if (primaryTime) {
+            setSelectedTimeColumn(primaryTime.name);
+          } else if (data.data.timeColumns.length > 0) {
+            setSelectedTimeColumn(data.data.timeColumns[0].name);
+          } else {
+            setSelectedTimeColumn("");
+          }
+        } else if (data.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: data.error.userMessage || data.error,
+          });
+          setSchema(null);
+        }
+      } catch (err) {
+        console.error("Failed to load schema:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load table schema",
+        });
+      } finally {
+        setSchemaLoading(false);
+      }
+    };
+    loadSchema();
+
+    // Clear results when table changes
+    setRows([]);
+    setHistogramData([]);
+    setCustomFilter("");
+  }, [selectedDatabase, selectedTable]);
+
+  // Fetch data
+  const fetchData = useCallback(async () => {
+    if (!selectedDatabase || !selectedTable) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        database: selectedDatabase,
+        table: selectedTable,
+        mode: "data",
+        limit: String(pageSize),
+      });
+
+      if (selectedColumns.length > 0) {
+        params.set("columns", selectedColumns.join(","));
+      }
+
+      if (selectedTimeColumn) {
+        params.set("timeColumn", selectedTimeColumn);
+      }
+
+      if (activeMinTime) {
+        params.set("minTime", activeMinTime);
+      }
+
+      if (customFilter.trim()) {
+        params.set("filter", customFilter.trim());
+      }
+
+      const res = await fetch(`/api/clickhouse/discover?${params}`);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        setRows(data.data.rows || []);
+        setTotalHits(data.data.totalHits || 0);
+      } else {
+        setError(data.error || "Failed to fetch data");
+        setRows([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    selectedDatabase,
+    selectedTable,
+    selectedColumns,
+    selectedTimeColumn,
+    activeMinTime,
+    customFilter,
+    pageSize,
+  ]);
+
+  // Fetch more data (Load More)
+  const fetchMore = useCallback(async () => {
+    if (!selectedDatabase || !selectedTable) return;
+    if (rows.length >= totalHits) return; // No more data
+
+    setIsLoadingMore(true);
+
+    try {
+      const params = new URLSearchParams({
+        database: selectedDatabase,
+        table: selectedTable,
+        mode: "data",
+        limit: String(pageSize),
+        offset: String(rows.length), // Offset by current rows
+      });
+
+      if (selectedColumns.length > 0) {
+        params.set("columns", selectedColumns.join(","));
+      }
+
+      if (selectedTimeColumn) {
+        params.set("timeColumn", selectedTimeColumn);
+      }
+
+      if (activeMinTime) {
+        params.set("minTime", activeMinTime);
+      }
+
+      if (customFilter.trim()) {
+        params.set("filter", customFilter.trim());
+      }
+
+      const res = await fetch(`/api/clickhouse/discover?${params}`);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        // Append new rows to existing
+        setRows((prev) => [...prev, ...(data.data.rows || [])]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch more data:", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [
+    selectedDatabase,
+    selectedTable,
+    selectedColumns,
+    selectedTimeColumn,
+    activeMinTime,
+    customFilter,
+    rows.length,
+    totalHits,
+    pageSize,
+  ]);
+
+  // Fetch histogram
+  const fetchHistogram = useCallback(async () => {
+    if (!selectedDatabase || !selectedTable || !selectedTimeColumn) {
+      setHistogramData([]);
+      return;
+    }
+
+    setHistLoading(true);
+
+    try {
+      const params = new URLSearchParams({
+        database: selectedDatabase,
+        table: selectedTable,
+        mode: "histogram",
+        timeColumn: selectedTimeColumn,
+      });
+
+      if (activeMinTime) {
+        params.set("minTime", activeMinTime);
+      }
+
+      if (customFilter.trim()) {
+        params.set("filter", customFilter.trim());
+      }
+
+      const res = await fetch(`/api/clickhouse/discover?${params}`);
+      const data = await res.json();
+
+      if (data.success && data.histogram) {
+        setHistogramData(data.histogram);
+      }
+    } catch (err) {
+      console.error("Failed to fetch histogram:", err);
+    } finally {
+      setHistLoading(false);
+    }
+  }, [
+    selectedDatabase,
+    selectedTable,
+    selectedTimeColumn,
+    activeMinTime,
+    customFilter,
+  ]);
+
+  // Execute search
+  const handleSearch = useCallback(() => {
+    fetchData();
+    fetchHistogram();
+  }, [fetchData, fetchHistogram]);
+
+  // Handle histogram bar click
+  const handleHistogramBarClick = (time: string) => {
+    setCustomMinTime(time);
+  };
 
   return (
     <div className="h-full flex flex-col space-y-4 p-4">
-      {/* Header / Top Controls */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      {/* Header / Source Selection */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold tracking-tight">Discover</h1>
-          <Select value={source} onValueChange={setSource}>
-            <SelectTrigger className="w-[180px] h-9">
-              <SelectValue placeholder="Source" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="text_log">System Logs</SelectItem>
-              <SelectItem value="query_log">Query Log (Future)</SelectItem>
-              <SelectItem value="error_log">Error Log (Future)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative w-[300px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search logs..."
-              className="pl-9 h-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          {/* Database selector */}
+          <div className="flex items-center gap-1.5">
+            <Database className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedDatabase}
+              onValueChange={setSelectedDatabase}
+            >
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Select database" />
+              </SelectTrigger>
+              <SelectContent>
+                {databases.map((db) => (
+                  <SelectItem key={db} value={db}>
+                    {db}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
+          {/* Table selector */}
+          <div className="flex items-center gap-1.5">
+            <Table2 className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedTable}
+              onValueChange={setSelectedTable}
+              disabled={!selectedDatabase || tables.length === 0}
+            >
+              <SelectTrigger className="w-[200px] h-9">
+                <SelectValue placeholder="Select table" />
+              </SelectTrigger>
+              <SelectContent>
+                {tables.map((t) => (
+                  <SelectItem key={t.name} value={t.name}>
+                    <span className="flex items-center gap-2">
+                      {t.name}
+                      <span className="text-xs text-muted-foreground">
+                        ({t.engine})
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Time Range & Refresh */}
+        <div className="flex items-center gap-2">
           <Select
             value={timeRange}
-            onValueChange={(v: string) => {
+            onValueChange={(v) => {
               setTimeRange(v as TimeRange);
-              setCustomMinTime(null); // Reset manual zoom
+              setCustomMinTime(null);
             }}
           >
-            <SelectTrigger className="w-[120px] h-9">
+            <SelectTrigger className="w-[130px] h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="5m">Last 5 min</SelectItem>
               <SelectItem value="15m">Last 15 min</SelectItem>
+              <SelectItem value="30m">Last 30 min</SelectItem>
               <SelectItem value="1h">Last 1 hour</SelectItem>
+              <SelectItem value="3h">Last 3 hours</SelectItem>
               <SelectItem value="6h">Last 6 hours</SelectItem>
               <SelectItem value="12h">Last 12 hours</SelectItem>
               <SelectItem value="24h">Last 24 hours</SelectItem>
+              <SelectItem value="3d">Last 3 days</SelectItem>
               <SelectItem value="7d">Last 7 days</SelectItem>
             </SelectContent>
           </Select>
@@ -211,96 +458,117 @@ export default function DiscoverPage() {
             variant="outline"
             size="icon"
             className="h-9 w-9"
-            onClick={reloadLogs}
+            onClick={handleSearch}
+            disabled={isLoading || !selectedTable}
           >
             <RefreshCw
-              className={`h-4 w-4 ${logsLoading ? "animate-spin" : ""}`}
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
             />
           </Button>
         </div>
       </div>
 
-      {/* Histogram */}
-      <div className="border rounded-md p-4 bg-card shadow-sm relative">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Log Volume
-          </h3>
-          {customMinTime && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCustomMinTime(null)}
-              className="h-6 text-xs"
-            >
-              <FilterX className="mr-1 h-3 w-3" />
-              Reset Zoom
-            </Button>
-          )}
-        </div>
-        <DiscoverHistogram
-          data={histogramData}
-          isLoading={histLoading}
-          onBarClick={(time) => setCustomMinTime(time)} // Simple "zoom to start of this bucket"
+      {/* Query Bar */}
+      {schema && (
+        <QueryBar
+          value={customFilter}
+          onChange={setCustomFilter}
+          onExecute={handleSearch}
+          isLoading={isLoading}
+          error={error}
+          placeholder={`Filter with ClickHouse SQL, e.g. ${
+            schema.columns[0]?.name || "column"
+          } = 'value'`}
         />
-      </div>
+      )}
 
-      {/* Grid Controls (Fields) */}
-      <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
-        {/* Left Sidebar: Fields */}
-        <div className="hidden md:flex flex-col w-56 border rounded-md bg-card p-3 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Available Fields</h3>
-            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+      {/* Main Content */}
+      {!selectedTable ? (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          <div className="text-center space-y-2">
+            <Database className="h-12 w-12 mx-auto opacity-50" />
+            <p>Select a database and table to start exploring</p>
           </div>
-          <div className="space-y-2 overflow-y-auto max-h-[500px]">
-            {/* Hardcoded field list for now, could be dynamic */}
-            {[
-              { id: "type", label: "Level" },
-              { id: "component", label: "Component" },
-              { id: "message", label: "Message" },
-              { id: "thread_name", label: "Thread" },
-              { id: "query_id", label: "Query ID" },
-              { id: "source_file", label: "Source File" },
-            ].map((field) => (
-              <div key={field.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`field-${field.id}`}
-                  checked={visibleColumns[field.id] !== false}
-                  onCheckedChange={(checked: boolean | "indeterminate") => {
-                    setVisibleColumns((prev) => ({
-                      ...prev,
-                      [field.id]: !!checked,
-                    }));
-                  }}
-                />
-                <Label
-                  htmlFor={`field-${field.id}`}
-                  className="text-sm font-normal truncate cursor-pointer"
-                >
-                  {field.label}
-                </Label>
+        </div>
+      ) : schemaLoading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            Loading schema...
+          </div>
+        </div>
+      ) : schema ? (
+        <>
+          {/* Histogram */}
+          {selectedTimeColumn && (
+            <div className="border rounded-md p-4 bg-card shadow-sm relative">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Document Count Over Time
+                </h3>
+                {customMinTime && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCustomMinTime(null)}
+                    className="h-6 text-xs"
+                  >
+                    <FilterX className="mr-1 h-3 w-3" />
+                    Reset Zoom
+                  </Button>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+              <DiscoverHistogram
+                data={histogramData}
+                isLoading={histLoading}
+                onBarClick={handleHistogramBarClick}
+              />
+            </div>
+          )}
 
-        {/* Main Grid */}
-        <div className="flex-1 flex flex-col min-h-0 bg-card border rounded-md shadow-sm overflow-hidden">
-          <div className="p-2 border-b text-xs text-muted-foreground flex justify-between">
-            <span>{logs.length} events loaded</span>
-            {/* Mobile Field Toggle could go here */}
-          </div>
-          <div className="flex-1 overflow-auto">
-            <DiscoverGrid
-              logs={logs}
-              isLoading={logsLoading && logs.length === 0}
-              visibleColumns={visibleColumns}
-              onVisibleColumnsChange={setVisibleColumns}
+          {/* Grid + Sidebar */}
+          <div className="flex-1 flex gap-4 min-h-0">
+            {/* Left Sidebar: Fields */}
+            <FieldsSidebar
+              columns={schema.columns}
+              timeColumns={schema.timeColumns}
+              selectedColumns={selectedColumns}
+              onSelectedColumnsChange={setSelectedColumns}
+              selectedTimeColumn={selectedTimeColumn}
+              onTimeColumnChange={setSelectedTimeColumn}
+              className="hidden md:flex w-64 max-h-[calc(100vh-280px)]"
             />
+
+            {/* Main Grid */}
+            <div className="flex-1 flex flex-col min-h-0 bg-card border rounded-md shadow-sm overflow-hidden">
+              <div className="p-2 border-b text-xs text-muted-foreground flex justify-between items-center">
+                <span>
+                  {rows.length.toLocaleString()} of {totalHits.toLocaleString()}{" "}
+                  hits
+                </span>
+                <span className="font-mono">
+                  {selectedDatabase}.{selectedTable}
+                </span>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <DiscoverGrid
+                  rows={rows}
+                  columns={schema.columns}
+                  selectedColumns={selectedColumns}
+                  isLoading={isLoading && rows.length === 0}
+                  hasMore={rows.length < totalHits}
+                  onLoadMore={fetchMore}
+                />
+                {isLoadingMore && (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    Loading more...
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      ) : null}
     </div>
   );
 }
