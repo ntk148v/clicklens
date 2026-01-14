@@ -157,7 +157,8 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                 <TableHead>Type</TableHead>
                 <TableHead>Default</TableHead>
                 <TableHead>Comment</TableHead>
-                <TableHead className="w-8" /> {/* Expand icon column */}
+                <TableHead className="w-8" />
+                {/* Expand icon column */}
               </TableRow>
             </TableHeader>
             <TableBody isLoading={loading}>
@@ -201,7 +202,8 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                     {col.name}
                   </TableHead>
                 ))}
-                <TableHead className="w-8" /> {/* Expand icon column */}
+                <TableHead className="w-8" />
+                {/* Expand icon column */}
               </TableRow>
             </TableHeader>
             <TableBody isLoading={loading}>

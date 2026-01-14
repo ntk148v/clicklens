@@ -36,15 +36,21 @@ export function JsonViewer({ data, className }: JsonViewerProps) {
   }
 
   // Attempt to parse if it's a JSON string
+  // Pre-parse outside JSX to avoid try/catch with JSX
+  let parsedData = null;
   if (typeof data === "string") {
     try {
       const parsed = JSON.parse(data);
       if (typeof parsed === "object") {
-        return <JsonTree data={parsed} root />;
+        parsedData = parsed;
       }
     } catch {
       // Not JSON, just string
     }
+  }
+
+  if (parsedData !== null) {
+    return <JsonTree data={parsedData} root />;
   }
 
   return <JsonTree data={data} root />;
@@ -85,7 +91,7 @@ function JsonTree({ data, root = false }: { data: any; root?: boolean }) {
           {keys.map((key) => (
             <div key={key} className="flex items-start my-0.5">
               <span className="text-sky-600 dark:text-sky-400 mr-1 select-none">
-                "{key}":
+                &quot;{key}&quot;:
               </span>
               <JsonViewer data={data[key]} />
             </div>
