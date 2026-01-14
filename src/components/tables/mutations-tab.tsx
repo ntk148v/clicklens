@@ -226,7 +226,7 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
                     {mutation.parts_to_do}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(mutation.create_time).toLocaleString()}
+                    {mutation.create_time}
                   </TableCell>
                   <TableCell className="text-xs">
                     <TruncatedCell

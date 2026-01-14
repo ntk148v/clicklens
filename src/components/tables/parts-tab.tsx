@@ -241,7 +241,7 @@ export function PartsTab({ database, table }: PartsTabProps) {
                     : "—"}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(part.modification_time).toLocaleString()}
+                  {part.modification_time}
                 </TableCell>
               </TableRow>
             ))}

@@ -42,10 +42,17 @@ export function DiscoverHistogram({
   }, [data]);
 
   const formatDate = (time: string) => {
-    return new Date(time).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    try {
+      // Try to extract HH:mm from ISO string (2026-01-14T14:26:00Z or 2026-01-14 14:26:00)
+      const datePart = time.split("T")[1] || time.split(" ")[1];
+      if (datePart) {
+        return datePart.substring(0, 5); // HH:mm
+      }
+      // Fallback if parsing fails
+      return time.substring(11, 16);
+    } catch {
+      return time;
+    }
   };
 
   if (isLoading && data.length === 0) {
@@ -117,7 +124,7 @@ export function DiscoverHistogram({
               fontSize: "12px",
               borderRadius: "6px",
             }}
-            labelFormatter={(label) => new Date(label).toLocaleString()}
+            labelFormatter={(label) => String(label)}
             cursor={{ fill: "transparent" }}
           />
           <Bar
