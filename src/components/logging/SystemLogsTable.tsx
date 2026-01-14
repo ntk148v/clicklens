@@ -88,12 +88,16 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
     []
   );
 
-  // Format timestamp for display using local time
+  // Format timestamp for display (ISO format)
   const formatTime = (ts: string) => {
     try {
-      const date = new Date(ts);
-      if (isNaN(date.getTime())) return ts;
-      return date.toLocaleTimeString();
+      // 2026-01-14 14:32:54 or 2026-01-14T14:32:54...
+      const timePart = ts.split(" ")[1] || ts.split("T")[1];
+      if (timePart) {
+        // Return HH:mm:ss.ms or just HH:mm:ss
+        return timePart.split("Z")[0];
+      }
+      return ts;
     } catch {
       return ts;
     }
@@ -101,9 +105,8 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
 
   const formatDate = (ts: string) => {
     try {
-      const date = new Date(ts);
-      if (isNaN(date.getTime())) return "";
-      return date.toLocaleDateString();
+      const datePart = ts.split(" ")[0] || ts.split("T")[0];
+      return datePart;
     } catch {
       return "";
     }
