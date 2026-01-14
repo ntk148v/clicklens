@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Header } from "@/components/layout";
 import { useAuth } from "@/components/auth";
-import { useRouter } from "next/navigation";
+
+// import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { AccessDenied } from "@/components/ui/access-denied";
 
 import {
   Card,
@@ -76,7 +78,6 @@ interface UserWithRoles extends SystemUser {
 
 export default function UsersPage() {
   const { permissions, isLoading: authLoading } = useAuth();
-  const router = useRouter();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [roles, setRoles] = useState<SystemRole[]>([]);
@@ -136,11 +137,12 @@ export default function UsersPage() {
   // Delete user
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!authLoading && !permissions?.canManageUsers) {
-      router.push("/");
-    }
-  }, [authLoading, permissions, router]);
+  // Removed useEffect router redirect for AccessDenied rendering
+  // useEffect(() => {
+  //   if (!authLoading && !permissions?.canManageUsers) {
+  //     router.push("/");
+  //   }
+  // }, [authLoading, permissions, router]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -301,10 +303,24 @@ export default function UsersPage() {
     }));
   };
 
-  if (authLoading || (!permissions?.canManageUsers && !authLoading)) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!permissions?.canManageUsers) {
+    return (
+      <div className="h-full flex flex-col p-4">
+        <Header title="Users" />
+        <div className="flex-1 flex items-center justify-center">
+          <AccessDenied
+            title="Access Denied"
+            message="You need ACCESS MANAGEMENT privileges to view users."
+          />
+        </div>
       </div>
     );
   }
