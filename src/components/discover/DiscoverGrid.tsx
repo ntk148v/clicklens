@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, Expand } from "lucide-react";
 import type { DiscoverRow } from "@/lib/types/discover";
 import type { ColumnMetadata } from "@/lib/types/discover";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 interface DiscoverGridProps {
   rows: DiscoverRow[];
@@ -55,16 +55,15 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
     return <span className="text-muted-foreground italic">null</span>;
   }
 
-  // Date-only formatting (no time component)
-  if (isDateOnlyType(type) && typeof value === "string") {
-    // Date strings from ClickHouse come as "2026-01-14"
-    // Just return as-is or format nicely without time
-    return value; // Keep as YYYY-MM-DD format
-  }
-
-  // DateTime formatting (with time)
-  if (isDateTimeType(type) && typeof value === "string") {
-    return formatDateTime(value);
+  // Date/DateTime - keep original ISO format for consistency
+  // Date: 2026-01-14
+  // DateTime: 2026-01-14T03:41:49Z
+  // DateTime64: 2026-01-14T03:41:49.487495Z
+  if (
+    (isDateOnlyType(type) || isDateTimeType(type)) &&
+    typeof value === "string"
+  ) {
+    return value; // Keep as-is from ClickHouse
   }
 
   // Object/Array - show as JSON
