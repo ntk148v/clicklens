@@ -178,7 +178,7 @@ export function RecordDetailSheet({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-[10px] px-1.5 py-0 shrink-0",
+                            "text-[10px] px-1.5 py-1 h-auto whitespace-normal break-all text-left",
                             getTypeColor(col.type)
                           )}
                         >

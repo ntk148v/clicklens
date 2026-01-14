@@ -51,12 +51,16 @@ function getTypeIcon(type: string) {
 // Shorten ClickHouse type for display
 function shortenType(type: string): string {
   return type
-    .replace("Nullable(", "")
-    .replace(")", "")
-    .replace("DateTime64(3)", "DateTime64")
-    .replace("DateTime64(6)", "DateTime64")
-    .replace("LowCardinality(", "")
-    .replace("String)", "String");
+    .replace(/^Nullable\(/, "")
+    .replace(/\)$/, "")
+    .replace(/^LowCardinality\(/, "")
+    .replace(/DateTime64\(\d*\)/, "DateTime64")
+    .replace(/Enum(8|16)\(.+\)/, "Enum$1")
+    .replace(/FixedString\(\d+\)/, "FixedString")
+    .replace(/Array\(.+\)/, "Array")
+    .replace(/Map\(.+\)/, "Map")
+    .replace(/Tuple\(.+\)/, "Tuple")
+    .replace(/Nested\(.+\)/, "Nested");
 }
 
 /**
