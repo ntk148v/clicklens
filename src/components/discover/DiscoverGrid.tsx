@@ -290,7 +290,7 @@ export function DiscoverGrid({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="py-1.5 px-4 font-mono text-sm border-r last:border-r-0"
+                      className="py-1.5 px-4 font-mono text-sm last:border-r-0"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
