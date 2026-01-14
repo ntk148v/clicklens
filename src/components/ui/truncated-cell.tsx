@@ -13,6 +13,7 @@ export interface TruncatedCellProps {
   className?: string;
   maxWidth?: number;
   showTooltip?: boolean;
+  tooltipContent?: string;
 }
 
 export function TruncatedCell({
@@ -20,6 +21,7 @@ export function TruncatedCell({
   className,
   maxWidth = 200,
   showTooltip = true,
+  tooltipContent,
 }: TruncatedCellProps) {
   if (!value) return <span className="text-primary-foreground">-</span>;
 
@@ -36,7 +38,9 @@ export function TruncatedCell({
         </TooltipTrigger>
         {showTooltip && (
           <TooltipContent className="max-w-[400px] break-all fg-popover text-primary-foreground border-border">
-            <p className="font-mono text-xs whitespace-pre-wrap">{value}</p>
+            <p className="font-mono text-xs whitespace-pre-wrap">
+              {tooltipContent || value}
+            </p>
           </TooltipContent>
         )}
       </Tooltip>

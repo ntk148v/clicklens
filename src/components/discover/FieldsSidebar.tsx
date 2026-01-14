@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Search, Clock, Hash, Type, Calendar, Binary } from "lucide-react";
 import type { ColumnMetadata, TimeColumnCandidate } from "@/lib/types/discover";
 import { cn } from "@/lib/utils";
+import { TruncatedCell } from "@/components/monitoring";
 
 interface FieldsSidebarProps {
   columns: ColumnMetadata[];
@@ -206,9 +207,14 @@ export function FieldsSidebar({
                 </Label>
                 <Badge
                   variant="outline"
-                  className="text-[10px] px-1 py-0 h-4 shrink-0 font-mono"
+                  className="text-[10px] px-1 py-0 h-4 shrink-0 font-mono max-w-[80px]"
                 >
-                  {shortenType(col.type)}
+                  <TruncatedCell
+                    value={shortenType(col.type)}
+                    // Show full type in tooltip
+                    tooltipContent={col.type}
+                    className="truncate"
+                  />
                 </Badge>
               </div>
             ))
