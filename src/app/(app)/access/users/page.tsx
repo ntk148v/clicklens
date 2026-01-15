@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
   TableWrapper,
+  ClickableTableRow,
 } from "@/components/ui/table";
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -406,7 +407,7 @@ export default function UsersPage() {
                     </SortableTableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody isLoading={loading}>
                   {paginatedUsers.length === 0 ? (
                     <TableRow>
                       <TableCell
@@ -417,94 +418,114 @@ export default function UsersPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-muted-foreground" />
-                            {user.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className="font-mono text-xs"
-                          >
-                            {user.auth_type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {user.assigned_roles &&
-                          user.assigned_roles.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {user.assigned_roles.map((role) => (
-                                <Badge
-                                  key={role}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  <Shield className="w-3 h-3 mr-1" />
-                                  {role}
-                                </Badge>
-                              ))}
+                    paginatedUsers.map((user, index) => {
+                      const userMeta = [
+                        { name: "name", type: "String" },
+                        { name: "auth_type", type: "String" },
+                        { name: "assigned_roles", type: "Array(String)" },
+                      ];
+                      return (
+                        <ClickableTableRow
+                          key={user.id}
+                          record={user}
+                          columns={userMeta}
+                          rowIndex={(page - 1) * pageSize + index}
+                          sheetTitle={`User: ${user.name}`}
+                          expandable={true}
+                        >
+                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-muted-foreground" />
+                              {user.name}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">
-                              No roles assigned
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openEditDialog(user)}
+                          </TableCell>
+                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-xs"
                             >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  disabled={deleting === user.name}
-                                >
-                                  {deleting === user.name ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Delete User
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete user{" "}
-                                    <strong>{user.name}</strong>? This action
-                                    cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    onClick={() => handleDelete(user.name)}
+                              {user.auth_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            {user.assigned_roles &&
+                            user.assigned_roles.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {user.assigned_roles.map((role) => (
+                                  <Badge
+                                    key={role}
+                                    variant="secondary"
+                                    className="text-xs"
                                   >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                                    <Shield className="w-3 h-3 mr-1" />
+                                    {role}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground font-mono text-xs">
+                                No roles assigned
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditDialog(user);
+                                }}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    disabled={deleting === user.name}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {deleting === user.name ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-4 h-4" />
+                                    )}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Delete User
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete user{" "}
+                                      <strong>{user.name}</strong>? This action
+                                      cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={() => handleDelete(user.name)}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </ClickableTableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

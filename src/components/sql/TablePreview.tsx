@@ -161,10 +161,10 @@ export function TablePreview({ database, table }: TablePreviewProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Column</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Default</TableHead>
-                <TableHead>Comment</TableHead>
+                <TableHead className="text-sm font-semibold">Column</TableHead>
+                <TableHead className="text-sm font-semibold">Type</TableHead>
+                <TableHead className="text-sm font-semibold">Default</TableHead>
+                <TableHead className="text-sm font-semibold">Comment</TableHead>
                 <TableHead className="w-8" />
                 {/* Expand icon column */}
               </TableRow>
@@ -179,13 +179,15 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                   sheetTitle={`Column: ${col.name}`}
                   expandable={true}
                 >
-                  <TableCell className="font-medium">{col.name}</TableCell>
-                  <TableCell>
+                  <TableCell className="py-1.5 px-4 font-mono text-sm">
+                    {col.name}
+                  </TableCell>
+                  <TableCell className="py-1.5 px-4 font-mono text-sm">
                     <Badge variant="outline" className="font-mono text-xs">
                       {col.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="py-1.5 px-4 font-mono text-sm text-muted-foreground">
                     {col.default_kind ? (
                       <code className="text-xs bg-muted px-1 py-0.5 rounded">
                         {col.default_kind}: {col.default_expression}
@@ -194,7 +196,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="py-1.5 px-4 font-mono text-sm text-muted-foreground">
                     {col.comment || "—"}
                   </TableCell>
                 </ClickableTableRow>
@@ -206,7 +208,10 @@ export function TablePreview({ database, table }: TablePreviewProps) {
             <TableHeader>
               <TableRow>
                 {meta.map((col) => (
-                  <TableHead key={col.name} className="whitespace-nowrap">
+                  <TableHead
+                    key={col.name}
+                    className="whitespace-nowrap text-sm font-semibold"
+                  >
                     {col.name}
                   </TableHead>
                 ))}

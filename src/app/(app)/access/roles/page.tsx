@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
   TableWrapper,
+  ClickableTableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
@@ -614,7 +615,7 @@ export default function RolesPage() {
                       </SortableTableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody isLoading={loading}>
                     {paginatedUserRoles.length === 0 ? (
                       <TableRow>
                         <TableCell
@@ -625,169 +626,190 @@ export default function RolesPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginatedUserRoles.map((role) => (
-                        <TableRow key={role.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <Shield className="w-4 h-4 text-muted-foreground" />
-                              {role.name}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {role.inheritedRoles &&
-                            role.inheritedRoles.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {role.inheritedRoles.map((ir) => {
-                                  const frInfo = getFeatureRole(ir);
-                                  return (
+                      paginatedUserRoles.map((role, index) => {
+                        const roleMeta = [
+                          { name: "name", type: "String" },
+                          { name: "inheritedRoles", type: "Array(String)" },
+                          { name: "dataPrivileges", type: "Array(Object)" },
+                        ];
+                        return (
+                          <ClickableTableRow
+                            key={role.id}
+                            record={role}
+                            columns={roleMeta}
+                            rowIndex={(page - 1) * pageSize + index}
+                            sheetTitle={`Role: ${role.name}`}
+                            expandable={true}
+                          >
+                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-muted-foreground" />
+                                {role.name}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                              {role.inheritedRoles &&
+                              role.inheritedRoles.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {role.inheritedRoles.map((ir) => {
+                                    const frInfo = getFeatureRole(ir);
+                                    return (
+                                      <Badge
+                                        key={ir}
+                                        variant={
+                                          isFeatureRole(ir)
+                                            ? "default"
+                                            : "outline"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {frInfo?.name || ir}
+                                      </Badge>
+                                    );
+                                  })}
+                                  {role.effectiveFeatureRoles?.map((efr) => {
+                                    const frInfo = getFeatureRole(efr);
+                                    if (role.inheritedRoles?.includes(efr))
+                                      return null; // Don't show duplicate
+                                    return (
+                                      <Tooltip key={efr}>
+                                        <TooltipTrigger asChild>
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs border-dashed border-primary/50 opacity-80"
+                                          >
+                                            {frInfo?.name || efr}*
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>
+                                            Implicitly grants this feature via
+                                            privileges
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </div>
+                              ) : role.effectiveFeatureRoles &&
+                                role.effectiveFeatureRoles.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {role.effectiveFeatureRoles.map((efr) => {
+                                    const frInfo = getFeatureRole(efr);
+                                    return (
+                                      <Tooltip key={efr}>
+                                        <TooltipTrigger asChild>
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs border-dashed border-primary/50 opacity-80"
+                                          >
+                                            {frInfo?.name || efr}*
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>
+                                            Implicitly grants this feature via
+                                            privileges
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">
+                                  None
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                              {role.dataPrivileges &&
+                              role.dataPrivileges.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {role.dataPrivileges
+                                    .slice(0, 2)
+                                    .map((dp, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="secondary"
+                                        className="text-xs font-mono"
+                                      >
+                                        {dp.privileges.join(",")} on{" "}
+                                        {dp.database}.{dp.table}
+                                      </Badge>
+                                    ))}
+                                  {role.dataPrivileges.length > 2 && (
                                     <Badge
-                                      key={ir}
-                                      variant={
-                                        isFeatureRole(ir)
-                                          ? "default"
-                                          : "outline"
-                                      }
+                                      variant="outline"
                                       className="text-xs"
                                     >
-                                      {frInfo?.name || ir}
+                                      +{role.dataPrivileges.length - 2} more
                                     </Badge>
-                                  );
-                                })}
-                                {role.effectiveFeatureRoles?.map((efr) => {
-                                  const frInfo = getFeatureRole(efr);
-                                  if (role.inheritedRoles?.includes(efr))
-                                    return null; // Don't show duplicate
-                                  return (
-                                    <Tooltip key={efr}>
-                                      <TooltipTrigger asChild>
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs border-dashed border-primary/50 opacity-80"
-                                        >
-                                          {frInfo?.name || efr}*
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>
-                                          Implicitly grants this feature via
-                                          privileges
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                })}
-                              </div>
-                            ) : role.effectiveFeatureRoles &&
-                              role.effectiveFeatureRoles.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {role.effectiveFeatureRoles.map((efr) => {
-                                  const frInfo = getFeatureRole(efr);
-                                  return (
-                                    <Tooltip key={efr}>
-                                      <TooltipTrigger asChild>
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs border-dashed border-primary/50 opacity-80"
-                                        >
-                                          {frInfo?.name || efr}*
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>
-                                          Implicitly grants this feature via
-                                          privileges
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                None
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {role.dataPrivileges &&
-                            role.dataPrivileges.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {role.dataPrivileges
-                                  .slice(0, 2)
-                                  .map((dp, i) => (
-                                    <Badge
-                                      key={i}
-                                      variant="secondary"
-                                      className="text-xs font-mono"
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">
+                                  None
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditDialog(role);
+                                  }}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      disabled={deleting === role.name}
+                                      onClick={(e) => e.stopPropagation()}
                                     >
-                                      {dp.privileges.join(",")} on {dp.database}
-                                      .{dp.table}
-                                    </Badge>
-                                  ))}
-                                {role.dataPrivileges.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{role.dataPrivileges.length - 2} more
-                                  </Badge>
-                                )}
+                                      {deleting === role.name ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Delete Role
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete role{" "}
+                                        <strong>{role.name}</strong>?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        onClick={() => handleDelete(role.name)}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                None
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditDialog(role)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    disabled={deleting === role.name}
-                                  >
-                                    {deleting === role.name ? (
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="w-4 h-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete Role
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete role{" "}
-                                      <strong>{role.name}</strong>?
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      onClick={() => handleDelete(role.name)}
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                            </TableCell>
+                          </ClickableTableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -884,7 +906,7 @@ export default function RolesPage() {
                       <div
                         key={role.id}
                         className={cn(
-                          "flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm",
+                          "flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-xs",
                           formData.inheritedRoles.includes(role.id)
                             ? "border-primary bg-primary/5"
                             : "border-border hover:border-muted-foreground/50"
