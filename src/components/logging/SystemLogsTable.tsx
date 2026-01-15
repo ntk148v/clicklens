@@ -88,21 +88,6 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
     []
   );
 
-  // Format timestamp for display (ISO format)
-  const formatTime = (ts: string) => {
-    try {
-      // 2026-01-14 14:32:54 or 2026-01-14T14:32:54...
-      const timePart = ts.split(" ")[1] || ts.split("T")[1];
-      if (timePart) {
-        // Return HH:mm:ss.ms or just HH:mm:ss
-        return timePart.split("Z")[0];
-      }
-      return ts;
-    } catch {
-      return ts;
-    }
-  };
-
   const formatDate = (ts: string) => {
     try {
       const datePart = ts.split(" ")[0] || ts.split("T")[0];
@@ -135,10 +120,7 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
               >
                 <TableCell className="font-mono text-xs whitespace-nowrap">
                   <div className="flex flex-col">
-                    <span>{formatTime(log.timestamp)}</span>
-                    <span className="text-muted-foreground text-[10px]">
-                      {formatDate(log.timestamp)}
-                    </span>
+                    <span>{log.timestamp}</span>
                   </div>
                 </TableCell>
                 <TableCell>{getLevelBadge(log.type)}</TableCell>
