@@ -24,14 +24,14 @@ We use `Geist Sans` for UI text and `Geist Mono` for data/code.
 
 Theme variables are defined in `src/app/globals.css`. Do not hardcode hex values.
 
-| Category | Usage | Variable |
-|Str|Str|Str|
-| Background | Page background | `bg-background` |
-| Foreground | Primary text | `text-foreground` |
-| Muted | Secondary text/backgrounds | `text-muted-foreground`, `bg-muted` |
-| Primary | Main actions/highlights | `bg-primary`, `text-primary-foreground` |
-| Borders | Component borders | `border-border` |
-| Input | Input borders | `border-input` |
+| Category   | Usage                      | Variable                                |
+| ---------- | -------------------------- | --------------------------------------- |
+| Background | Page background            | `bg-background`                         |
+| Foreground | Primary text               | `text-foreground`                       |
+| Muted      | Secondary text/backgrounds | `text-muted-foreground`, `bg-muted`     |
+| Primary    | Main actions/highlights    | `bg-primary`, `text-primary-foreground` |
+| Borders    | Component borders          | `border-border`                         |
+| Input      | Input borders              | `border-input`                          |
 
 ## 4. Components
 
@@ -72,7 +72,7 @@ Theme variables are defined in `src/app/globals.css`. Do not hardcode hex values
 ## 7. Example: Data Grid
 
 ```tsx
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 
 export function DataGrid({ data }) {
   return (
@@ -86,6 +86,6 @@ export function DataGrid({ data }) {
         ))}
       </TableBody>
     </Table>
-  );
+  )
 }
 ```
