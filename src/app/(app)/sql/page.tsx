@@ -675,11 +675,14 @@ export default function SqlConsolePage() {
         )} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       };
 
+      // Get user's timezone for proper UTC conversion in ClickHouse
+      // toDateTime() with timezone converts local input to UTC for accurate filtering
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const startStr = formatSqlDate(start);
       const endStr = formatSqlDate(end);
 
       const safeColumn = columnName.trim() || "event_time";
+      // Time filter uses user's timezone - ClickHouse will convert to UTC internally
       const timeClause = `${safeColumn} BETWEEN toDateTime('${startStr}', '${timezone}') AND toDateTime('${endStr}', '${timezone}')`;
 
       const currentSql = tab.sql;

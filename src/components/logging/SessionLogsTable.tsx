@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import type { LogEntry } from "@/lib/hooks/use-logs";
+import { formatDateTime } from "@/lib/utils";
 
 interface SessionLogsTableProps {
   logs: LogEntry[];
@@ -71,14 +72,7 @@ export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
     []
   );
 
-  const formatDate = (ts: string) => {
-    try {
-      const datePart = ts.split(" ")[0] || ts.split("T")[0];
-      return datePart;
-    } catch {
-      return "";
-    }
-  };
+  // Timestamps are displayed with timezone conversion via formatDateTime
 
   return (
     <TableWrapper>
@@ -103,7 +97,7 @@ export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
               >
                 <TableCell className="font-mono text-xs whitespace-nowrap">
                   <div className="flex flex-col">
-                    <span>{log.timestamp}</span>
+                    <span>{formatDateTime(log.timestamp)}</span>
                   </div>
                 </TableCell>
                 <TableCell>{getEventTypeBadge(log.type)}</TableCell>

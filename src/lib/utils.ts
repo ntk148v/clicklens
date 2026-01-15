@@ -167,33 +167,108 @@ export async function copyToClipboard(
 }
 
 /**
- * Format a DateTime value - keeps original ISO format for consistency.
- * ClickHouse returns ISO strings like "2024-01-01T10:00:00Z" which are kept as-is.
- * This preserves timezone information and provides consistent display.
+ * Format a DateTime value - converts UTC to user's local timezone for display.
+ * ClickHouse stores all timestamps in UTC; this function handles the conversion
+ * to the user's local timezone while preserving ISO-like format and precision.
+ *
+ * Preserves fractional seconds (microseconds for DateTime64) from the original input.
+ *
+ * @param value - The datetime value (ISO string, timestamp, or Date object)
+ * @returns Formatted datetime string in ISO format with local timezone
+ *          Example: 2026-01-15T16:36:29.345421+07:00 (preserves microseconds)
  */
 export function formatDateTime(
   value: string | number | Date | null | undefined
 ): string {
   if (value === null || value === undefined) return "—";
 
-  // If it's already a string (common case from ClickHouse), return as-is
+  // Extract fractional seconds from original string if present (for DateTime64)
+  let fractionalSeconds = "";
   if (typeof value === "string") {
-    return value;
-  }
-
-  // For Date objects, convert to ISO string
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-
-  // For numbers (timestamps), convert to ISO string
-  if (typeof value === "number") {
-    try {
-      return new Date(value).toISOString();
-    } catch {
-      return String(value);
+    // Match fractional seconds: .123, .123456, etc.
+    const match = value.match(/\.(\d+)/);
+    if (match) {
+      fractionalSeconds = "." + match[1];
     }
   }
 
-  return String(value);
+  // Parse to Date object
+  let date: Date;
+
+  if (typeof value === "string") {
+    // Parse ISO string from ClickHouse (stored in UTC)
+    date = new Date(value);
+  } else if (typeof value === "number") {
+    date = new Date(value);
+  } else if (value instanceof Date) {
+    date = value;
+  } else {
+    return String(value);
+  }
+
+  // Check for invalid date
+  if (isNaN(date.getTime())) {
+    return typeof value === "string" ? value : String(value);
+  }
+
+  // Format in ISO-like format with local timezone
+  // Preserves original fractional seconds precision
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+
+  // Get timezone offset in ±HH:MM format
+  const tzOffset = -date.getTimezoneOffset();
+  const tzSign = tzOffset >= 0 ? "+" : "-";
+  const tzHours = pad(Math.floor(Math.abs(tzOffset) / 60));
+  const tzMinutes = pad(Math.abs(tzOffset) % 60);
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${fractionalSeconds}${tzSign}${tzHours}:${tzMinutes}`;
+}
+
+/**
+ * Format a Date-only value (no time component).
+ * For ClickHouse Date/Date32 columns, returns YYYY-MM-DD format.
+ *
+ * @param value - The date value (ISO string, timestamp, or Date object)
+ * @returns Formatted date string: YYYY-MM-DD
+ */
+export function formatDate(
+  value: string | number | Date | null | undefined
+): string {
+  if (value === null || value === undefined) return "—";
+
+  // Parse to Date object
+  let date: Date;
+
+  if (typeof value === "string") {
+    // Handle date-only strings (YYYY-MM-DD) which don't have timezone info
+    // These should be displayed as-is without conversion
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+    date = new Date(value);
+  } else if (typeof value === "number") {
+    date = new Date(value);
+  } else if (value instanceof Date) {
+    date = value;
+  } else {
+    return String(value);
+  }
+
+  // Check for invalid date
+  if (isNaN(date.getTime())) {
+    return typeof value === "string" ? value : String(value);
+  }
+
+  // Format as YYYY-MM-DD
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}`;
 }

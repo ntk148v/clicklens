@@ -2,6 +2,12 @@
  * ClickHouse Monitoring SQL Queries
  * Pre-built queries for fetching monitoring data from system tables
  *
+ * TIMEZONE CONVENTION:
+ * All datetime columns (event_time, event_time_microseconds, etc.) are stored in UTC.
+ * Timezone conversion to user's local time is handled client-side via formatDateTime()
+ * in src/lib/utils.ts. When filtering by time, use UTC timestamps or parseDateTimeBestEffort()
+ * which handles ISO 8601 strings with timezone info.
+ *
  * Cluster-aware queries use clusterAllReplicas() to aggregate data from all nodes.
  * Single-node queries are also available as fallback.
  */

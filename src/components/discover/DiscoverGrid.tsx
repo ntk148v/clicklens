@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, Expand } from "lucide-react";
 import type { DiscoverRow } from "@/lib/types/discover";
 import type { ColumnMetadata } from "@/lib/types/discover";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime, formatDate } from "@/lib/utils";
 import { TruncatedCell } from "@/components/monitoring";
 
 interface DiscoverGridProps {
@@ -51,7 +51,7 @@ function isDateOnlyType(type: string): boolean {
 }
 
 // Format cell value based on type
-// Format cell value based on type
+// Uses formatDateTime/formatDate from utils for proper timezone conversion
 function formatCellValue(value: unknown, type: string): React.ReactNode {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground italic">null</span>;
@@ -81,12 +81,13 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
     displayValue = value.toLocaleString();
   }
 
-  // Date/DateTime - keep original ISO format
-  if (
-    (isDateOnlyType(type) || isDateTimeType(type)) &&
-    typeof value === "string"
-  ) {
-    // Keep as-is
+  // Date/DateTime - convert timezone using standard utilities
+  if (isDateTimeType(type) && typeof value === "string") {
+    // DateTime columns: convert UTC to user's local timezone
+    displayValue = formatDateTime(value);
+  } else if (isDateOnlyType(type) && typeof value === "string") {
+    // Date-only columns: format consistently
+    displayValue = formatDate(value);
   }
 
   return (
