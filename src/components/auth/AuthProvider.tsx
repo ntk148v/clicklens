@@ -25,6 +25,7 @@ interface Permissions {
   canViewCluster: boolean;
   canBrowseTables: boolean;
   canExecuteQueries: boolean;
+  canDiscover: boolean;
   canViewSettings: boolean;
   canViewSystemLogs: boolean;
   canViewServerLogs: boolean;
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           canViewCluster: data.permissions.canViewCluster,
           canBrowseTables: data.permissions.canBrowseTables,
           canExecuteQueries: data.permissions.canExecuteQueries,
+          canDiscover: data.permissions.canDiscover,
           canViewSettings: data.permissions.canViewSettings,
           canViewSystemLogs: data.permissions.canViewSystemLogs,
           canViewServerLogs: data.permissions.canViewServerLogs,

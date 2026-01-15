@@ -17,7 +17,15 @@ import {
 } from "@/components/ui/table";
 import { Database, Columns } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
-import { PaginationControls } from "../monitoring";
+import { PaginationControls, TruncatedCell } from "../monitoring";
+
+function getCellClassName(value: unknown): string {
+  if (value === null || value === undefined)
+    return "text-muted-foreground italic";
+  if (typeof value === "number") return "text-right font-mono text-blue-600";
+  if (typeof value === "boolean") return "text-purple-600";
+  return "";
+}
 
 interface ColumnInfo {
   name: string;
@@ -157,7 +165,8 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                 <TableHead>Type</TableHead>
                 <TableHead>Default</TableHead>
                 <TableHead>Comment</TableHead>
-                <TableHead className="w-8" /> {/* Expand icon column */}
+                <TableHead className="w-8" />
+                {/* Expand icon column */}
               </TableRow>
             </TableHeader>
             <TableBody isLoading={loading}>
@@ -201,7 +210,8 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                     {col.name}
                   </TableHead>
                 ))}
-                <TableHead className="w-8" /> {/* Expand icon column */}
+                <TableHead className="w-8" />
+                {/* Expand icon column */}
               </TableRow>
             </TableHeader>
             <TableBody isLoading={loading}>
@@ -214,14 +224,20 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                   sheetTitle={`Row ${currentPage * pageSize + i + 1}`}
                   expandable={true}
                 >
-                  {meta.map((col) => (
-                    <TableCell
-                      key={col.name}
-                      className="max-w-[200px] truncate"
-                    >
-                      {formatCellValue(row[col.name])}
-                    </TableCell>
-                  ))}
+                  {meta.map((col) => {
+                    const value = row[col.name];
+                    return (
+                      <TableCell
+                        key={col.name}
+                        className="py-1.5 px-4 font-mono text-sm"
+                      >
+                        <TruncatedCell
+                          value={formatCellValue(value)}
+                          className={getCellClassName(value)}
+                        />
+                      </TableCell>
+                    );
+                  })}
                 </ClickableTableRow>
               ))}
             </TableBody>

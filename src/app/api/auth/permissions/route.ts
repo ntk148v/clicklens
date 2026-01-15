@@ -29,6 +29,7 @@ interface PermissionsResponse {
     canViewServerLogs: boolean;
     canViewCrashLogs: boolean;
     canViewSessionLogs: boolean;
+    canDiscover: boolean;
     accessibleDatabases: string[];
     username: string;
   };
@@ -350,6 +351,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     // SQL Console: open to anyone who can query at least ONE database (user or system)
     // accessInfo.databases has user DBs. If they have global access, they have databases.
     const canExecuteQueries = accessibleDatabases.length > 0 || hasGlobalAccess;
+    const canDiscover = accessibleDatabases.length > 0 || hasGlobalAccess;
 
     // Table Explorer: STRICTER.
     // Requires explicitly finding roles OR Global Access.
@@ -366,6 +368,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         canViewCluster,
         canBrowseTables,
         canExecuteQueries,
+        canDiscover,
         canViewSettings,
         canViewSystemLogs,
         canViewServerLogs,

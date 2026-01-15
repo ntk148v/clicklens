@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Header } from "@/components/layout";
 import { useAuth } from "@/components/auth";
-import { useRouter } from "next/navigation";
+
+// import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -97,7 +98,9 @@ import {
 import type { SystemRole } from "@/lib/clickhouse";
 import { cn } from "@/lib/utils";
 import { PaginationControls } from "@/components/monitoring";
+
 import { useToast } from "@/components/ui/use-toast";
+import { AccessDenied } from "@/components/ui/access-denied";
 
 interface RoleWithPrivileges extends SystemRole {
   isFeatureRole: boolean;
@@ -122,7 +125,6 @@ interface TableInfo {
 
 export default function RolesPage() {
   const { permissions, isLoading: authLoading } = useAuth();
-  const router = useRouter();
   const { toast } = useToast();
   const [roles, setRoles] = useState<RoleWithPrivileges[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,12 +145,11 @@ export default function RolesPage() {
     setSortDirection(direction);
   };
 
-  // Protect route
-  useEffect(() => {
-    if (!authLoading && !permissions?.canManageUsers) {
-      router.push("/");
-    }
-  }, [authLoading, permissions, router]);
+  // useEffect(() => {
+  //   if (!authLoading && !permissions?.canManageUsers) {
+  //     router.push("/");
+  //   }
+  // }, [authLoading, permissions, router]);
 
   // Database/table cache
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
@@ -475,10 +476,24 @@ export default function RolesPage() {
   );
   const totalPages = Math.ceil(userRoles.length / pageSize);
 
-  if (authLoading || (!permissions?.canManageUsers && !authLoading)) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!permissions?.canManageUsers) {
+    return (
+      <div className="h-full flex flex-col p-4">
+        <Header title="Roles" />
+        <div className="flex-1 flex items-center justify-center">
+          <AccessDenied
+            title="Access Denied"
+            message="You need ACCESS MANAGEMENT privileges to view roles."
+          />
+        </div>
       </div>
     );
   }

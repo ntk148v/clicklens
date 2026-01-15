@@ -280,8 +280,7 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
       {/* Stats */}
       <div className="text-xs text-muted-foreground">
         Showing {logs.length} logs
-        {newestTimestamp &&
-          ` • Latest: ${new Date(newestTimestamp).toLocaleTimeString()}`}
+        {newestTimestamp && ` • Latest: ${newestTimestamp}`}
       </div>
 
       <DataSourceBadge

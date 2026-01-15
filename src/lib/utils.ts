@@ -167,22 +167,32 @@ export async function copyToClipboard(
 }
 
 /**
- * Format a DateTime value (including ISO strings from ClickHouse) to local time.
- * Handles both ISO strings "2024-01-01T10:00:00+00:00" and regular strings if they look like dates.
+ * Format a DateTime value - keeps original ISO format for consistency.
+ * ClickHouse returns ISO strings like "2024-01-01T10:00:00Z" which are kept as-is.
+ * This preserves timezone information and provides consistent display.
  */
 export function formatDateTime(
   value: string | number | Date | null | undefined
 ): string {
   if (value === null || value === undefined) return "—";
 
-  try {
-    const date = new Date(value);
-    // valid date?
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleString();
+  // If it's already a string (common case from ClickHouse), return as-is
+  if (typeof value === "string") {
+    return value;
+  }
+
+  // For Date objects, convert to ISO string
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  // For numbers (timestamps), convert to ISO string
+  if (typeof value === "number") {
+    try {
+      return new Date(value).toISOString();
+    } catch {
+      return String(value);
     }
-  } catch {
-    // ignore
   }
 
   return String(value);

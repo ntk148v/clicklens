@@ -25,6 +25,7 @@ import {
   Shield,
   ScrollText,
   Settings,
+  Search,
   AlertTriangle,
   Github,
   BookOpen,
@@ -175,6 +176,13 @@ const loggingItems = [
 // Main navigation items with permission requirements
 const navigation = [
   {
+    name: "Discover",
+    href: "/discover",
+    icon: Search,
+    description: "Explore logs and events",
+    requiresPermission: "canDiscover" as const,
+  },
+  {
     name: "SQL Console",
     href: "/sql",
     icon: Terminal,
@@ -204,7 +212,6 @@ const navigation = [
     requiresPermission: "canViewCluster" as const,
     subItems: monitoringItems,
   },
-
   {
     name: "Logging",
     href: "/logging",
