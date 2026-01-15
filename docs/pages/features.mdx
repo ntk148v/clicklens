@@ -1,69 +1,278 @@
 # Features
 
-ClickLens provides a comprehensive suite of tools designed to make ClickHouse management efficient, secure, and insightful.
+ClickLens provides a comprehensive suite of tools for managing and monitoring ClickHouse databases. This guide covers all major features and how to use them.
 
-## Comparison
+import { Callout } from "nextra/components";
 
-| Feature           | ClickLens                   | caioricciuti/ch-ui       | HouseOps                |
-| :---------------- | :-------------------------- | :----------------------- | :---------------------- |
-| **Tech Stack**    | Next.js 15, Bun             | Vue.js, Node.js          | Electron, React         |
-| **Type**          | Web Application             | Web Application          | Desktop App             |
-| **Primary Focus** | Modern Dev Experience       | Admin & General Querying | Ops & Health Monitoring |
-| **Auth Model**    | Session-based (Server-side) | Browser Local Storage    | Direct Connection       |
-| **Query History** | Yes (Server Persisted)      | Yes (Local Storage)      | Yes (Local)             |
-| **Deployment**    | Docker / Vercel             | Docker / NPM             | Desktop Install         |
+## Discover (Kibana-like Data Exploration)
+
+The **Discover** feature provides a flexible, Kibana-style interface for exploring data in any ClickHouse table—not just logs.
+
+<Callout type="info">
+  **Requires `canDiscover` permission.** This permission is derived from having
+  `SHOW TABLES` and `SELECT` access on at least one table.
+</Callout>
+
+### Components
+
+#### Database & Table Selection
+
+Use the dropdowns in the header to select your data source:
+
+- **Database Selector**: Choose from available databases
+- **Table Selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
+
+#### Fields Sidebar
+
+The left sidebar controls which columns appear in your query:
+
+- **Search**: Filter columns by name
+- **Select All / None**: Quick selection toggles
+- **Time Column Picker**: Choose which DateTime column to use for time filtering
+- **Type Icons**: Visual indicators for column types (DateTime, String, Number, Boolean)
+
+<Callout type="warning">
+  Only selected columns are included in the `SELECT` clause. This affects both
+  the data grid and query performance.
+</Callout>
+
+#### Query Bar
+
+Enter custom ClickHouse `WHERE` clause expressions:
+
+```sql
+level = 'Error'
+status >= 400
+host LIKE '%api%'
+message ILIKE '%timeout%'
+level IN ('Error', 'Fatal')
+```
+
+Features:
+
+- **Query History**: Persisted in localStorage (up to 20 entries)
+- **Syntax Help**: Hover over the help icon for examples
+- **Execute**: Press Enter or click Search
+
+#### Time Range Selector
+
+Filter data by time using presets:
+
+- 5m, 15m, 30m (minutes)
+- 1h, 3h, 6h, 12h, 24h (hours)
+- 3d, 7d (days)
+
+#### Histogram
+
+When a time column is selected, a bar chart shows document distribution over time:
+
+- **Click a bar** to zoom into that time range
+- **Reset Zoom** button to return to the selected preset
+
+#### Results Grid
+
+- **Row Count**: Shows "X of Y hits"
+- **Row Detail**: Click any row to see all fields in a slide-out panel
+- **Load More**: Offset-based pagination for large result sets
+
+---
 
 ## SQL Console
 
-The SQL Console is the heart of ClickLens, built for both power users and newcomers.
+A full-featured SQL editor for writing and executing ClickHouse queries.
 
-- **Smart Autocompletion**: Context-aware suggestions for databases, tables, and columns. It understands your current query context to provide relevant completions.
-- **Formatted Visualization**: Results are displayed in a rich, interactive grid with support for sorting, filtering, and data type formatting.
-- **Multiple Tabs**: Work on multiple queries simultaneously.
-- **Query History**: Automatically saves your execution history for quick access to past queries.
-- **Export**: easy export of results to CSV or JSON.
+<Callout type="info">
+  **Requires `canExecuteQueries` permission.** This is derived from having
+  `SELECT` access on at least one database.
+</Callout>
 
-## Role-Based Access Control (RBAC)
+### Key Features
 
-ClickLens implements a **Strict RBAC** model that seamlessly integrates with ClickHouse's native permission system. We follow the [ChistaData Best Practices for RBAC](https://chistadata.com/best-practices-for-clickhouses-role-based-access-control/) to ensure security and compliance.
+#### Multi-Tab Support
 
-### Permission Proxy Model
+- Open multiple query tabs simultaneously
+- Tabs are persisted locally (SQL content survives browser refresh)
+- Each tab maintains its own result set and history
 
-Unlike many UIs that run as a "superuser" and hide features via obscurity, ClickLens acts as a **transparent proxy** for the logged-in user.
+#### SQL Editor
 
-1.  **User Identity**: Every query executed in the console or by background monitoring tools runs with the **exact credentials and permissions** of the logged-in user.
-2.  **No Privilege Escalation**: If a user cannot run `SELECT * FROM system.settings` in the CLI, they cannot see the Settings page in ClickLens.
-3.  **Strict UI Adaptation**: The interface dynamically adapts based on granular capabilities:
-    - **Table Explorer**: Visible only if the user has the `clicklens_table_explorer` role or global access. Mere `SELECT` permission on a single database does not grant browsing rights for the entire cluster.
-    - **Settings**: Visible only to users with the `clicklens_settings_admin` role.
-    - **Monitoring**: Metrics and logs are secured behind specific roles (`clicklens_cluster_monitor`, `clicklens_query_monitor`).
+Built on CodeMirror 6 with ClickHouse-specific enhancements:
 
-### Introspection Logic
+- **Syntax Highlighting**: Keywords, functions, strings, numbers
+- **Autocomplete**: Tables, columns, ClickHouse functions, keywords
+- **Code Actions**: Execute, Explain, Format
 
-To provide a smooth user experience without requiring every user to have introspection permissions (like reading `system.grants`), ClickLens uses a specialized service account (if configured) to safely query metadata _about_ the user, while ensuring the user can only _act_ within their own boundaries.
+#### Execution Modes
 
-## Monitoring & Observability
+| Shortcut           | Action                                        |
+| ------------------ | --------------------------------------------- |
+| `Ctrl+Enter`       | Execute all statements in the editor          |
+| `Ctrl+Shift+Enter` | Execute only the statement at cursor position |
 
-Gain deep insights into your cluster's performance with real-time dashboards.
+#### Query Streaming
 
-- **Cluster Overview**: Real-time metrics on CPU, Memory, and active connections.
-- **Query Monitoring**: View currently running queries, kill runaway processes, and analyze query performance history.
-- **Server Logs**: A searchable viewer for `system.text_log`, allowing you to debug issues without SSH access.
-- **Crash Logs**: Dedicated viewer for `system.crash_log` to diagnose server stability issues.
-- **Disc Usage**: Visualize storage distribution across databases and tables.
+Large result sets are streamed to the UI using NDJSON:
 
-## Database Explorer
+- Progress indicator shows rows being fetched
+- Results appear incrementally
+- Cancel running queries with the Stop button
 
-Navigate your data hierarchy with ease while respecting strict permission boundaries.
+#### Explain Queries
 
-- **Schema Viewer**: Inspect table structures, column types, and engine configs.
-- **Data Preview**: Quickly sample data without writing queries.
-- **Smart Search**: Filter tables and databases instantly.
+Use the Explain dropdown to analyze query plans:
 
-## User Management
+- **AST**: Abstract Syntax Tree
+- **SYNTAX**: Normalized query syntax
+- **PLAN**: Query execution plan
+- **PIPELINE**: Processing pipeline visualization
 
-A GUI for ClickHouse's native user and role management.
+#### Saved Queries
 
-- **User Administration**: Create, update, and remove users.
-- **Role Assignment**: Graphically assign roles and privileges.
-- **Profile Management**: Configure settings profiles and quotas.
+Save frequently-used queries for quick access:
+
+- Click the Save icon to store a query
+- Access saved queries from the Bookmarks panel
+- Queries are stored server-side
+
+#### Query History
+
+The History panel shows recent executions with:
+
+- SQL text
+- Duration
+- Rows returned / read
+- Bytes read
+- Memory usage
+- User who ran it
+- Errors (if any)
+
+#### Time Range Insertion
+
+Use the Time Range Selector to quickly insert time filter clauses into your SQL, properly handling the `WHERE` vs `AND` syntax.
+
+---
+
+## Table Explorer
+
+Browse and inspect your ClickHouse schema in detail.
+
+<Callout type="info">
+  **Requires `canBrowseTables` permission.** This is derived from having `SHOW
+  TABLES` grant.
+</Callout>
+
+### Navigation
+
+1. Select a database from the left sidebar
+2. Click a table to view its details
+3. Use the tabs to explore different aspects
+
+### Table Detail Tabs
+
+| Tab           | Description                                |
+| ------------- | ------------------------------------------ |
+| **Overview**  | Summary statistics (rows, size, engine)    |
+| **Columns**   | Column definitions with types and defaults |
+| **Parts**     | Data parts with sizes and row counts       |
+| **Merges**    | Active merge operations                    |
+| **Mutations** | Pending ALTER mutations                    |
+| **Replicas**  | Replication status (for replicated tables) |
+| **DDL**       | `CREATE TABLE` statement                   |
+
+---
+
+## Monitoring
+
+Real-time cluster health and performance monitoring.
+
+<Callout type="info">
+  **Requires `canViewCluster` permission.** This is derived from having `SELECT`
+  on system cluster tables.
+</Callout>
+
+### Available Tabs
+
+| Tab             | Route                     | Description                 |
+| --------------- | ------------------------- | --------------------------- |
+| **Overview**    | `/monitoring/overview`    | Dashboard with key metrics  |
+| **Metrics**     | `/monitoring/metrics`     | Browse `system.metrics`     |
+| **Cluster**     | `/monitoring/cluster`     | Cluster topology and nodes  |
+| **Health**      | `/monitoring/health`      | Health check status         |
+| **Disks**       | `/monitoring/disks`       | Disk usage and capacity     |
+| **Keeper**      | `/monitoring/keeper`      | ClickHouse Keeper status    |
+| **Operations**  | `/monitoring/operations`  | Active merges and mutations |
+| **Replication** | `/monitoring/replication` | Replication queue status    |
+
+---
+
+## Query Analytics
+
+Analyze query performance and identify slow queries.
+
+<Callout type="info">
+  **Requires `canViewProcesses` permission.** This is derived from having
+  `SELECT` on `system.processes`.
+</Callout>
+
+### Available Views
+
+| View          | Route                | Description                                  |
+| ------------- | -------------------- | -------------------------------------------- |
+| **Running**   | `/queries/running`   | Currently executing queries                  |
+| **History**   | `/queries/history`   | Historical query log from `system.query_log` |
+| **Analytics** | `/queries/analytics` | Top resource-consuming queries               |
+| **Cache**     | `/queries/cache`     | Query cache statistics                       |
+
+### Query Cancellation
+
+From the Running Queries view, you can kill queries using the KILL QUERY command. This requires the `canKillQueries` permission.
+
+---
+
+## Logging
+
+View and search through ClickHouse logs.
+
+<Callout type="info">
+  Different log types require different permissions.
+</Callout>
+
+| Log Type         | Route              | Required Permission  |
+| ---------------- | ------------------ | -------------------- |
+| **Server Logs**  | `/logging/server`  | `canViewServerLogs`  |
+| **Session Logs** | `/logging/session` | `canViewSessionLogs` |
+| **Crash Logs**   | `/logging/crash`   | `canViewCrashLogs`   |
+
+---
+
+## Access Control
+
+Manage ClickHouse users and roles.
+
+<Callout type="info">
+  **Requires `canManageUsers` permission.** This is derived from having `ACCESS
+  MANAGEMENT` grant.
+</Callout>
+
+### Available Views
+
+| View      | Route           | Description                    |
+| --------- | --------------- | ------------------------------ |
+| **Users** | `/access/users` | List and manage database users |
+| **Roles** | `/access/roles` | Manage roles and their grants  |
+
+---
+
+## Settings
+
+View ClickHouse server and session settings.
+
+<Callout type="info">
+  **Requires `canViewSettings` permission.** This is derived from having
+  `SELECT` on `system.settings`.
+</Callout>
+
+| View                 | Route               | Description                        |
+| -------------------- | ------------------- | ---------------------------------- |
+| **Server Settings**  | `/settings/server`  | Read from `system.server_settings` |
+| **Session Settings** | `/settings/session` | Read from `system.settings`        |

@@ -1,86 +1,311 @@
-# Contributing to ClickLens
+# Contributing
 
-We love your input! We want to make contributing to ClickLens as easy and transparent as possible, whether it's:
+Welcome to ClickLens! This guide will help you set up your development environment and contribute to the project.
 
-- Reporting a bug
-- Discussing the current state of the code
-- Submitting a fix
-- Proposing new features
+import { Callout } from "nextra/components";
 
-## Tech Stack
+## Prerequisites
 
-ClickLens is built with a modern stack:
+- **Bun** (latest version) - Package manager and runtime
+- **Node.js** (20.x) - For production builds
+- **Git** - Version control
+- **A ClickHouse server** - For testing
 
-- **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
-- **Runtime & Package Manager**: [Bun](https://bun.sh/)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Components**: [Radix UI](https://www.radix-ui.com/)
-- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
-- **Validation**: [Zod](https://zod.dev/)
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/ntk148v/clicklens.git
+cd clicklens
+
+# Install dependencies
+bun install
+
+# Copy environment configuration
+cp env.sample .env.local
+
+# Start the development server
+bun dev
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+## Project Structure
+
+```
+clicklens/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   ├── components/             # React components
+│   └── lib/                    # Core libraries
+├── docs/                       # Nextra documentation
+├── e2e/                        # Playwright E2E tests
+├── public/                     # Static assets
+└── scripts/                    # Build/utility scripts
+```
+
+### Key Directories
+
+#### `src/app/` - Next.js Routes
+
+The App Router structure with route groups:
+
+| Directory | Purpose                                               |
+| --------- | ----------------------------------------------------- |
+| `(app)/`  | Authenticated routes (wrapped in layout with sidebar) |
+| `api/`    | API route handlers                                    |
+| `login/`  | Public authentication page                            |
+
+#### `src/components/` - UI Components
+
+| Directory     | Purpose                                                                            |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `auth/`       | `AuthProvider` and `useAuth` hook                                                  |
+| `discover/`   | Discover feature: `QueryBar`, `FieldsSidebar`, `DiscoverGrid`, `DiscoverHistogram` |
+| `layout/`     | `Sidebar`, `Header`, `ConnectionStatus`                                            |
+| `logging/`    | Log viewer components                                                              |
+| `monitoring/` | Monitoring tabs (14 components)                                                    |
+| `queries/`    | Query analytics components                                                         |
+| `sql/`        | SQL Console: `SqlEditor`, `ResultGrid`, `QueryTabs`, etc. (13 components)          |
+| `tables/`     | Table explorer tabs (8 components)                                                 |
+| `ui/`         | shadcn/ui base components (30 components)                                          |
+
+#### `src/lib/` - Core Libraries
+
+| Directory/File            | Purpose                                                   |
+| ------------------------- | --------------------------------------------------------- |
+| `auth/`                   | Session management (`iron-session` configuration)         |
+| `clickhouse/`             | ClickHouse client, config, types                          |
+| `hooks/`                  | Custom React hooks (6 hooks)                              |
+| `rbac/`                   | Feature role definitions                                  |
+| `store/`                  | Zustand stores (`tabs.ts`, `sql-browser.ts`, `access.ts`) |
+| `types/`                  | TypeScript type definitions                               |
+| `sql/`                    | SQL parsing utilities                                     |
+| `utils.ts`                | General utility functions                                 |
+| `clickhouse-functions.ts` | ClickHouse function definitions for autocomplete          |
 
 ## Development Workflow
 
-### 1. Prerequisites
-
-Ensure you have [Bun](https://bun.sh/) installed effectively.
-
-```bash
-curl -fsSL https://bun.sh/install | bash
-```
-
-### 2. Setup
-
-Clone the repo and install dependencies:
-
-```bash
-git clone https://github.com/ntk148v/clicklens.git
-cd clicklens
-bun install
-```
-
-### 3. Environment
-
-Copy the sample environment file:
-
-```bash
-cp env.sample .env.local
-```
-
-You will need a running ClickHouse instance. Update `.env.local` with your connection details.
-
-### 4. Running Locally
-
-Start the development server:
+### Running the Dev Server
 
 ```bash
 bun dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000).
+This starts:
 
-### 5. Code Quality
+- Next.js dev server with hot reload
+- TypeScript type checking
+- Tailwind CSS JIT compilation
 
-We use `eslint` for linting. Please ensure your code passes linting before submitting a PR.
+### Linting
 
 ```bash
 bun lint
 ```
 
-### 6. Building
+We use ESLint with the Next.js configuration. All code must pass linting before merge.
 
-To verify that your changes build correctly for production:
+### Building
 
 ```bash
 bun run build
 ```
 
-## Pull Request Process
+This creates a production-optimized build in `.next/standalone/`.
 
-1.  Update the `README.md` with details of changes to the interface, this includes new environment variables, exposed ports, useful file locations and container parameters.
-2.  Increase the version numbers in any examples files and the README.md to the new version that this Pull Request would represent.
-3.  You may merge the Pull Request in once you have the sign-off of two other developers, or if you do not have permission to do that, you may request the second reviewer to merge it for you.
+### Testing
 
-## License
+#### E2E Tests (Playwright)
 
-By contributing, you agree that your contributions will be licensed under its MIT License.
+```bash
+# Run all E2E tests
+bun run test:e2e
+
+# Run with UI mode
+bun run test:e2e:ui
+```
+
+E2E tests are located in the `e2e/` directory.
+
+## Code Style Guidelines
+
+### TypeScript
+
+- **Strict mode** is enabled
+- Prefer `type` over `interface` unless extension is needed
+- No `any` without justification (use `unknown` with narrowing)
+- Validate external inputs with Zod
+
+### React Components
+
+- Default to **Server Components** where possible
+- Add `"use client"` only when required (state, effects, browser APIs)
+- Colocate route-specific components under their route segment
+- Shared components go in `src/components/`
+
+### State Management
+
+- Use Zustand for global client state
+- Keep stores focused and minimal
+- Persist only essential data (not results, not large objects)
+
+### Styling
+
+- Use Tailwind CSS exclusively
+- Follow shadcn/ui patterns for new components
+- Use `cn()` helper for conditional classes
+
+## Adding a New Feature
+
+### 1. Plan the Routes
+
+Decide where your feature lives in `src/app/(app)/`:
+
+```
+src/app/(app)/my-feature/
+├── page.tsx           # Main page component
+└── layout.tsx         # Optional layout wrapper
+```
+
+### 2. Create Components
+
+Add feature-specific components:
+
+```
+src/components/my-feature/
+├── MyComponent.tsx
+├── AnotherComponent.tsx
+└── index.ts           # Barrel export
+```
+
+### 3. Add API Routes (if needed)
+
+```
+src/app/api/clickhouse/my-feature/
+└── route.ts           # Next.js route handler
+```
+
+### 4. Add to Navigation
+
+Update `src/components/layout/Sidebar.tsx` to add your feature to the navigation.
+
+### 5. Add Permissions (if needed)
+
+If your feature requires specific permissions:
+
+1. Add the permission to `src/components/auth/AuthProvider.tsx`
+2. Add permission check in your page component
+3. Add the permission derivation in `/api/auth/permissions/route.ts`
+
+## API Development
+
+### Creating an API Route
+
+```typescript
+// src/app/api/clickhouse/my-endpoint/route.ts
+import { NextResponse } from "next/server";
+import { getSessionClickHouseConfig } from "@/lib/auth";
+import { createClient } from "@/lib/clickhouse";
+
+export async function GET(request: Request) {
+  const config = await getSessionClickHouseConfig();
+
+  if (!config) {
+    return NextResponse.json(
+      { success: false, error: "Not authenticated" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const client = createClient(config);
+    const result = await client.query({ query: "SELECT 1" });
+
+    return NextResponse.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### Using the Two Client Types
+
+**Lens Client** (for metadata, no user context needed):
+
+```typescript
+import { createLensClient } from "@/lib/clickhouse";
+
+const client = createLensClient();
+const databases = await client.query({ query: "SHOW DATABASES" });
+```
+
+**User Client** (for user queries):
+
+```typescript
+import { getSessionClickHouseConfig } from "@/lib/auth";
+import { createClient } from "@/lib/clickhouse";
+
+const config = await getSessionClickHouseConfig();
+const client = createClient(config);
+const result = await client.query({ query: userSql });
+```
+
+## Adding UI Components
+
+### Using shadcn/ui
+
+We use shadcn/ui patterns. To add a new base component:
+
+```bash
+bunx shadcn-ui@latest add button
+```
+
+Components are added to `src/components/ui/`.
+
+### Creating Custom Components
+
+Follow the existing patterns in `src/components/ui/`:
+
+```tsx
+// src/components/ui/my-component.tsx
+import { cn } from "@/lib/utils";
+
+interface MyComponentProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+export function MyComponent({ className, children }: MyComponentProps) {
+  return <div className={cn("base-classes", className)}>{children}</div>;
+}
+```
+
+## Contributing Checklist
+
+Before submitting a PR:
+
+- [ ] Code passes `bun lint`
+- [ ] Code passes `bun run build`
+- [ ] New features have appropriate permissions checks
+- [ ] API routes handle errors gracefully
+- [ ] Components are properly typed
+- [ ] No `console.log` statements (use proper error handling)
+- [ ] PR description explains the change
+
+## Getting Help
+
+- **Issues:** Open a GitHub issue for bugs or feature requests
+- **Discussions:** Use GitHub Discussions for questions
+- **Documentation:** Check `docs/internal/PROJECT_AUDIT.md` for detailed architecture info
+
+<Callout type="info">
+  For detailed architecture information, refer to the internal audit document at
+  `docs/internal/PROJECT_AUDIT.md`.
+</Callout>
