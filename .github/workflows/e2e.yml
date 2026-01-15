@@ -18,8 +18,6 @@ jobs:
           - 8123:8123
           - 9000:9000
         env:
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_DB: default
         options: >-
@@ -49,9 +47,8 @@ jobs:
         run: bun run test:e2e
         env:
           CLICKHOUSE_HOST: http://localhost:8123
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
           CLICKHOUSE_DB: default
+          LENS_USER: default
           CI: true
 
       - uses: actions/upload-artifact@v4

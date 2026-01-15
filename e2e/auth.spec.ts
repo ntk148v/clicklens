@@ -8,9 +8,7 @@ test.describe("Authentication", () => {
     // For CI we will use a fresh CH which has default user with no password usually
     // But the form might require inputs.
 
-    await page.getByPlaceholder("Host").fill("127.0.0.1"); // Use localhost/service
-    await page.getByPlaceholder("Port").fill("8123");
-    await page.getByPlaceholder("Username").fill("default");
+    await page.getByLabel("Username").fill("default");
     // Password empty
 
     await page.click("button[type=submit]");
