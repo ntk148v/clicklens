@@ -263,14 +263,14 @@ export function SettingsTable({
                     rowIndex={0} // Index not critical for display but required by type? Checked: optional
                     sheetTitle="Setting Details"
                   >
-                    <TableCell className="font-medium font-mono text-sm">
+                    <TableCell className="data-table-cell font-medium">
                       <TruncatedCell value={setting.name} maxWidth={250} />
                     </TableCell>
-                    <TableCell className="font-mono text-sm max-w-[200px]">
+                    <TableCell className="data-table-cell max-w-[200px]">
                       <TruncatedCell value={setting.value} maxWidth={200} />
                     </TableCell>
                     {scope === "server" && (
-                      <TableCell className="font-mono text-sm max-w-[200px] text-muted-foreground">
+                      <TableCell className="data-table-cell max-w-[200px] text-muted-foreground">
                         {setting.default ? (
                           <TruncatedCell
                             value={setting.default}
@@ -281,10 +281,10 @@ export function SettingsTable({
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="data-table-cell text-muted-foreground">
                       {setting.type}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="data-table-cell">
                       {setting.changed === 1 && (
                         <Badge variant="secondary" className="text-xs">
                           Modified
@@ -292,7 +292,7 @@ export function SettingsTable({
                       )}
                     </TableCell>
                     {scope === "server" && (
-                      <TableCell>
+                      <TableCell className="data-table-cell">
                         {setting.is_hot_reloadable === 1 ? (
                           <Badge
                             variant="outline"
@@ -307,14 +307,14 @@ export function SettingsTable({
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="text-sm text-muted-foreground max-w-[400px]">
+                    <TableCell className="data-table-cell text-muted-foreground max-w-[400px]">
                       <TruncatedCell
                         value={setting.description}
                         maxWidth={400}
                       />
                     </TableCell>
                     {!readOnly && scope === "session" && (
-                      <TableCell>
+                      <TableCell className="data-table-cell">
                         {setting.readonly === 0 && (
                           <Button
                             variant="ghost"

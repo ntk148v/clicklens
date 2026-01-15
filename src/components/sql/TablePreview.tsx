@@ -179,15 +179,13 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                   sheetTitle={`Column: ${col.name}`}
                   expandable={true}
                 >
-                  <TableCell className="py-1.5 px-4 font-mono text-sm">
-                    {col.name}
-                  </TableCell>
-                  <TableCell className="py-1.5 px-4 font-mono text-sm">
+                  <TableCell className="data-table-cell">{col.name}</TableCell>
+                  <TableCell className="data-table-cell">
                     <Badge variant="outline" className="font-mono text-xs">
                       {col.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="py-1.5 px-4 font-mono text-sm text-muted-foreground">
+                  <TableCell className="data-table-cell text-muted-foreground">
                     {col.default_kind ? (
                       <code className="text-xs bg-muted px-1 py-0.5 rounded">
                         {col.default_kind}: {col.default_expression}
@@ -196,7 +194,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="py-1.5 px-4 font-mono text-sm text-muted-foreground">
+                  <TableCell className="data-table-cell text-muted-foreground">
                     {col.comment || "—"}
                   </TableCell>
                 </ClickableTableRow>
@@ -232,10 +230,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
                   {meta.map((col) => {
                     const value = row[col.name];
                     return (
-                      <TableCell
-                        key={col.name}
-                        className="py-1.5 px-4 font-mono text-sm"
-                      >
+                      <TableCell key={col.name} className="data-table-cell">
                         <TruncatedCell
                           value={formatCellValue(value)}
                           className={getCellClassName(value)}

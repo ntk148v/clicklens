@@ -316,10 +316,7 @@ export function ResultGrid({
                 sheetTitle="Query Result"
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    key={cell.id}
-                    className="py-1.5 px-4 font-mono text-sm"
-                  >
+                  <TableCell key={cell.id} className="data-table-cell">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

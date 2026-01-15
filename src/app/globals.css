@@ -210,4 +210,9 @@
   .monitor-card {
     @apply p-4 rounded-lg bg-card border shadow-sm;
   }
+
+  /* Shared Data Table Styles */
+  .data-table-cell {
+    @apply py-1.5 px-4 font-mono text-xs;
+  }
 }

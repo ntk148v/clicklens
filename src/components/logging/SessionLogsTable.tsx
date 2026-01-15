@@ -95,16 +95,18 @@ export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
                 rowIndex={index}
                 sheetTitle="Session Detail"
               >
-                <TableCell className="font-mono text-xs whitespace-nowrap">
+                <TableCell className="data-table-cell whitespace-nowrap">
                   <div className="flex flex-col">
                     <span>{formatDateTime(log.timestamp)}</span>
                   </div>
                 </TableCell>
-                <TableCell>{getEventTypeBadge(log.type)}</TableCell>
-                <TableCell className="font-mono text-xs text-secondary-foreground font-medium">
+                <TableCell className="data-table-cell">
+                  {getEventTypeBadge(log.type)}
+                </TableCell>
+                <TableCell className="data-table-cell text-secondary-foreground font-medium">
                   {log.component}
                 </TableCell>
-                <TableCell>
+                <TableCell className="data-table-cell">
                   <div className="max-w-[600px]">
                     <TruncatedCell
                       value={log.message}

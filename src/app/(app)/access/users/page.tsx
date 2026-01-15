@@ -433,13 +433,13 @@ export default function UsersPage() {
                           sheetTitle={`User: ${user.name}`}
                           expandable={true}
                         >
-                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                          <TableCell className="data-table-cell">
                             <div className="flex items-center gap-2">
                               <User className="w-4 h-4 text-muted-foreground" />
                               {user.name}
                             </div>
                           </TableCell>
-                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                          <TableCell className="data-table-cell">
                             <Badge
                               variant="outline"
                               className="font-mono text-xs"
@@ -447,7 +447,7 @@ export default function UsersPage() {
                               {user.auth_type}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                          <TableCell className="data-table-cell">
                             {user.assigned_roles &&
                             user.assigned_roles.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
@@ -468,7 +468,7 @@ export default function UsersPage() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="py-1.5 px-4 font-mono text-xs">
+                          <TableCell className="data-table-cell">
                             <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"

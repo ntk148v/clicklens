@@ -338,11 +338,11 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
               paginatedDisks.map((disk, idx) => (
                 <TableRow key={`${disk.node}-${disk.name}-${idx}`}>
                   {isMultiNode && (
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell text-xs">
                       <TruncatedCell value={disk.node} maxWidth={100} />
                     </TableCell>
                   )}
-                  <TableCell className="font-mono font-medium text-xs">
+                  <TableCell className="data-table-cell font-medium">
                     {disk.name}
                   </TableCell>
                   <TableCell>
@@ -350,7 +350,7 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
                       {disk.type}
                     </span>
                   </TableCell>
-                  <TableCell className="text-xs">
+                  <TableCell className="data-table-cell text-xs text-muted-foreground">
                     <TruncatedCell
                       value={disk.path}
                       maxWidth={150}
@@ -376,24 +376,24 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {formatBytes(disk.totalSpace)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {formatBytes(disk.usedSpace)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {formatBytes(disk.freeSpace)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {disk.compressedBytes
                       ? formatBytes(disk.compressedBytes)
                       : "-"}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {formatCompressionRatio(disk.compressionRatio)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {disk.partsCount?.toLocaleString() || "-"}
                   </TableCell>
                 </TableRow>

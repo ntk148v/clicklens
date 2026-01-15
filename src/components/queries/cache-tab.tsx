@@ -180,17 +180,17 @@ export function CacheTab() {
           <TableBody isLoading={isLoading}>
             {sortedEntries.map((entry, idx) => (
               <TableRow key={entry.key_hash || idx}>
-                <TableCell className="text-xs">
+                <TableCell className="data-table-cell">
                   <TruncatedCell
                     value={entry.query}
                     maxWidth={400}
                     className="bg-muted px-2 py-1 rounded"
                   />
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatBytes(entry.result_size)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="data-table-cell">
                   <div className="flex gap-1">
                     {entry.stale === 1 && (
                       <Badge variant="secondary" className="text-xs">
@@ -209,7 +209,7 @@ export function CacheTab() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="data-table-cell text-muted-foreground">
                   {formatDateTime(entry.expires_at)}
                 </TableCell>
               </TableRow>

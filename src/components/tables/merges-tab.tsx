@@ -186,7 +186,7 @@ export function MergesTab({ database, table }: MergesTabProps) {
           <TableBody isLoading={isLoading}>
             {sortedMerges.map((merge, idx) => (
               <TableRow key={idx}>
-                <TableCell className="font-mono text-xs">
+                <TableCell className="data-table-cell">
                   {merge.result_part_name}
                 </TableCell>
                 <TableCell>
@@ -205,17 +205,17 @@ export function MergesTab({ database, table }: MergesTabProps) {
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {merge.num_parts}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatNumber(merge.rows_written)} /{" "}
                   {formatNumber(merge.rows_read)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatBytes(merge.memory_usage)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {merge.elapsed.toFixed(1)}s
                 </TableCell>
               </TableRow>

@@ -379,7 +379,7 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 ) : (
                   paginatedMetrics.map((m) => (
                     <TableRow key={m.metric}>
-                      <TableCell className="font-mono text-xs font-medium">
+                      <TableCell className="data-table-cell font-medium">
                         {m.metric}
                       </TableCell>
                       <TableCell>
@@ -392,10 +392,10 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                           {categoryLabels[m.category]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="data-table-cell text-right">
                         {formatMetricValue(m.metric, m.value)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
+                      <TableCell className="data-table-cell text-muted-foreground">
                         {m.description}
                       </TableCell>
                     </TableRow>
@@ -478,13 +478,13 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 ) : (
                   paginatedAsyncMetrics.map((m) => (
                     <TableRow key={m.metric}>
-                      <TableCell className="font-mono text-xs font-medium">
+                      <TableCell className="data-table-cell font-medium">
                         {m.metric}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="data-table-cell text-right">
                         {formatMetricValue(m.metric, m.value)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
+                      <TableCell className="data-table-cell text-muted-foreground">
                         {m.description}
                       </TableCell>
                     </TableRow>
@@ -567,13 +567,13 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
                 ) : (
                   paginatedEvents.map((e) => (
                     <TableRow key={e.event}>
-                      <TableCell className="font-mono text-xs font-medium">
+                      <TableCell className="data-table-cell font-medium">
                         {e.event}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="data-table-cell text-right">
                         {formatMetricValue(e.event, e.value)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
+                      <TableCell className="data-table-cell text-muted-foreground">
                         {e.description}
                       </TableCell>
                     </TableRow>

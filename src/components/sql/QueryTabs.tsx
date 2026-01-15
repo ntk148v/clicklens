@@ -38,15 +38,17 @@ export function QueryTabs() {
                 {tab.name}
               </span>
               {tabs.length > 1 && (
-                <button
-                  className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity p-0.5 -mr-1"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 hover:bg-transparent hover:text-red-600 transition-opacity -mr-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeTab(tab.id);
                   }}
                 >
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </Button>
               )}
             </div>
           ))}

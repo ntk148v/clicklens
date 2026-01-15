@@ -326,10 +326,10 @@ export function HistoryTab({
                     rowIndex={index}
                     sheetTitle="Query Details"
                   >
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="data-table-cell">
                       <TruncatedCell value={query.query_id} maxWidth={150} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="data-table-cell">
                       <div className="max-w-[500px]">
                         <TruncatedCell
                           value={query.query}
@@ -338,23 +338,25 @@ export function HistoryTab({
                         />
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs">{query.user}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap text-right">
+                    <TableCell className="data-table-cell">
+                      {query.user}
+                    </TableCell>
+                    <TableCell className="data-table-cell text-muted-foreground whitespace-nowrap text-right">
                       {formatDateTime(query.event_time)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatDuration(query.query_duration_ms)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {query.read_rows.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatBytes(query.read_bytes)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatBytes(query.memory_usage)}
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell">
                       {query.exception ? (
                         <Badge
                           variant="destructive"

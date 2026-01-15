@@ -256,13 +256,13 @@ export function ReplicationTab({
                       <TableCell>
                         <StatusDot status={replicaStatus} />
                       </TableCell>
-                      <TableCell className="font-mono text-xs font-medium">
+                      <TableCell className="data-table-cell font-medium">
                         <TruncatedCell value={r.database} maxWidth={150} />
                       </TableCell>
-                      <TableCell className="font-mono text-xs font-medium">
+                      <TableCell className="data-table-cell font-medium">
                         <TruncatedCell value={r.table} maxWidth={200} />
                       </TableCell>
-                      <TableCell className="text-center text-xs">
+                      <TableCell className="data-table-cell text-center">
                         {r.isLeader ? (
                           <span className="text-green-600 dark:text-green-400">
                             ✓
@@ -271,7 +271,7 @@ export function ReplicationTab({
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center text-xs">
+                      <TableCell className="data-table-cell text-center">
                         {r.isReadonly ? (
                           <StatusBadge
                             status="critical"
@@ -282,10 +282,10 @@ export function ReplicationTab({
                           <span className="text-muted-foreground">No</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="data-table-cell text-right">
                         {formatNumber(r.queueSize)}
                       </TableCell>
-                      <TableCell className="text-right text-xs">
+                      <TableCell className="data-table-cell text-right">
                         <span
                           className={
                             r.absoluteDelay >= 60
@@ -298,7 +298,7 @@ export function ReplicationTab({
                           {formatDelay(r.absoluteDelay)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="data-table-cell text-right">
                         {r.activeReplicas}/{r.totalReplicas}
                       </TableCell>
                     </TableRow>

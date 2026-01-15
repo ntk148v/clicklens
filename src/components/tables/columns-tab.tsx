@@ -198,7 +198,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
                 maxBytes > 0 ? (Number(col.bytes_on_disk) / maxBytes) * 100 : 0;
               return (
                 <TableRow key={col.column}>
-                  <TableCell className="font-mono font-medium text-xs">
+                  <TableCell className="data-table-cell font-medium">
                     {col.column}
                   </TableCell>
                   <TableCell>
@@ -206,7 +206,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
                       {col.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {formatBytes(col.bytes_on_disk)}
                   </TableCell>
                   <TableCell>
@@ -217,7 +217,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {(col.compression_ratio * 100).toFixed(1)}%
                   </TableCell>
                 </TableRow>

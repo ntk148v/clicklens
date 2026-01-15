@@ -112,16 +112,18 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
                 rowIndex={index}
                 sheetTitle="Log Details"
               >
-                <TableCell className="font-mono text-xs whitespace-nowrap">
+                <TableCell className="data-table-cell whitespace-nowrap">
                   <div className="flex flex-col">
                     <span>{formatDateTime(log.timestamp)}</span>
                   </div>
                 </TableCell>
-                <TableCell>{getLevelBadge(log.type)}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
+                <TableCell className="data-table-cell">
+                  {getLevelBadge(log.type)}
+                </TableCell>
+                <TableCell className="data-table-cell text-muted-foreground">
                   <TruncatedCell value={log.component} maxWidth={150} />
                 </TableCell>
-                <TableCell>
+                <TableCell className="data-table-cell">
                   <div className="max-w-[600px]">
                     <TruncatedCell
                       value={log.message}

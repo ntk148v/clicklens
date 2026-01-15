@@ -218,7 +218,9 @@ export function PartsTab({ database, table }: PartsTabProps) {
                     {part.partition}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{part.name}</TableCell>
+                <TableCell className="data-table-cell m-0 p-0 pl-1">
+                  {part.name}
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant={
@@ -229,18 +231,18 @@ export function PartsTab({ database, table }: PartsTabProps) {
                     {part.part_type}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatNumber(part.rows)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatBytes(part.bytes_on_disk)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {part.compression_ratio
                     ? `${(part.compression_ratio * 100).toFixed(1)}%`
                     : "—"}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="data-table-cell text-muted-foreground">
                   {part.modification_time}
                 </TableCell>
               </TableRow>

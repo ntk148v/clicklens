@@ -185,7 +185,7 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
           <TableBody isLoading={isLoading}>
             {sortedQueries.map((query) => (
               <TableRow key={query.query_id}>
-                <TableCell className="text-xs">
+                <TableCell className="data-table-cell">
                   <TruncatedCell
                     value={query.query}
                     maxWidth={400}
@@ -195,21 +195,21 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
                     ID: {query.query_id.slice(0, 8)}...
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="data-table-cell">
                   <Badge variant="secondary" className="text-xs">
                     {query.user}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {query.elapsed.toFixed(2)}s
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatBytes(query.read_bytes)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="data-table-cell text-right">
                   {formatBytes(query.memory_usage)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="data-table-cell">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button

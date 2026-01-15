@@ -641,13 +641,13 @@ export default function RolesPage() {
                             sheetTitle={`Role: ${role.name}`}
                             expandable={true}
                           >
-                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <TableCell className="data-table-cell">
                               <div className="flex items-center gap-2">
                                 <Shield className="w-4 h-4 text-muted-foreground" />
                                 {role.name}
                               </div>
                             </TableCell>
-                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <TableCell className="data-table-cell">
                               {role.inheritedRoles &&
                               role.inheritedRoles.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
@@ -722,7 +722,7 @@ export default function RolesPage() {
                                 </span>
                               )}
                             </TableCell>
-                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <TableCell className="data-table-cell">
                               {role.dataPrivileges &&
                               role.dataPrivileges.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
@@ -753,7 +753,7 @@ export default function RolesPage() {
                                 </span>
                               )}
                             </TableCell>
-                            <TableCell className="py-1.5 px-4 font-mono text-xs">
+                            <TableCell className="data-table-cell">
                               <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"

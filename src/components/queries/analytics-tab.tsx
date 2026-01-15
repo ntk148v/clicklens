@@ -262,7 +262,7 @@ export function AnalyticsTab() {
               <TableBody isLoading={isLoading}>
                 {paginatedQueries.map((query, idx) => (
                   <TableRow key={query.normalized_query_hash || idx}>
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell">
                       <button
                         className="text-left w-full hover:bg-muted/50 rounded p-1 transition-colors group"
                         onClick={() =>
@@ -284,21 +284,21 @@ export function AnalyticsTab() {
                         Last run: {formatDateTime(query.last_event_time)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell">
                       <Badge variant="secondary" className="text-xs">
                         {query.user}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatNumber(query.count)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatDuration(query.avg_duration_ms)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatBytes(query.avg_read_bytes)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatBytes(query.avg_memory)}
                     </TableCell>
                   </TableRow>

@@ -248,20 +248,20 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
               <TableBody isLoading={isLoading}>
                 {sortedMerges.map((m, i) => (
                   <TableRow key={i}>
-                    <TableCell className="font-mono text-xs font-medium">
+                    <TableCell className="data-table-cell font-medium">
                       <TruncatedCell
                         value={`${m.database}.${m.table}`}
                         maxWidth={200}
                       />
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell">
                       <TruncatedCell
                         value={m.resultPartName}
                         maxWidth={150}
                         className="text-muted-foreground"
                       />
                     </TableCell>
-                    <TableCell className="text-center text-xs">
+                    <TableCell className="data-table-cell text-center">
                       {m.numParts}
                     </TableCell>
                     <TableCell>
@@ -275,13 +275,13 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatDuration(m.elapsed * 1000)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatBytes(m.totalSizeBytesCompressed)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="data-table-cell text-right">
                       {formatBytes(m.memoryUsage)}
                     </TableCell>
                   </TableRow>
@@ -356,23 +356,23 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
               <TableBody>
                 {sortedMutations.map((m, i) => (
                   <TableRow key={i}>
-                    <TableCell className="font-mono text-xs font-medium">
+                    <TableCell className="data-table-cell font-medium">
                       <TruncatedCell
                         value={`${m.database}.${m.table}`}
                         maxWidth={200}
                       />
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell">
                       <TruncatedCell value={m.mutationId} maxWidth={120} />
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="data-table-cell">
                       <TruncatedCell
                         value={m.command}
                         maxWidth={200}
                         className="text-muted-foreground"
                       />
                     </TableCell>
-                    <TableCell className="text-center font-mono text-xs">
+                    <TableCell className="data-table-cell text-center">
                       {m.partsToDo}
                     </TableCell>
                     <TableCell className="text-center">
@@ -386,7 +386,7 @@ export function OperationsTab({ refreshInterval = 10000 }: OperationsTabProps) {
                         <StatusBadge status="ok" label="Running" size="sm" />
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="data-table-cell text-muted-foreground">
                       {m.createTime}
                     </TableCell>
                   </TableRow>

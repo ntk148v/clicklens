@@ -201,7 +201,7 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
               const isDone = mutation.is_done === 1;
               return (
                 <TableRow key={mutation.mutation_id}>
-                  <TableCell className="font-mono text-xs">
+                  <TableCell className="data-table-cell">
                     {mutation.mutation_id}
                   </TableCell>
                   <TableCell>
@@ -222,13 +222,13 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
+                  <TableCell className="data-table-cell text-right">
                     {mutation.parts_to_do}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="data-table-cell text-muted-foreground">
                     {mutation.create_time}
                   </TableCell>
-                  <TableCell className="text-xs">
+                  <TableCell className="data-table-cell">
                     <TruncatedCell
                       value={mutation.command}
                       maxWidth={400}
