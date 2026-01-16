@@ -332,11 +332,10 @@ export async function POST(
           try {
             await client.command(`GRANT ${priv} ON ${target} TO ${quotedRole}`);
             // Auto-grant REMOTE when SELECT is granted (needed for clusterAllReplicas in Discover)
+            // REMOTE is a SOURCES privilege - must be granted globally
             if (priv === "SELECT") {
               try {
-                await client.command(
-                  `GRANT REMOTE ON ${target} TO ${quotedRole}`
-                );
+                await client.command(`GRANT REMOTE ON *.* TO ${quotedRole}`);
               } catch {
                 // REMOTE grant may fail on non-cluster setups, ignore silently
               }
@@ -494,11 +493,10 @@ export async function PUT(
           try {
             await client.command(`GRANT ${priv} ON ${target} TO ${quotedRole}`);
             // Auto-grant REMOTE when SELECT is granted (needed for clusterAllReplicas in Discover)
+            // REMOTE is a SOURCES privilege - must be granted globally
             if (priv === "SELECT") {
               try {
-                await client.command(
-                  `GRANT REMOTE ON ${target} TO ${quotedRole}`
-                );
+                await client.command(`GRANT REMOTE ON *.* TO ${quotedRole}`);
               } catch {
                 // REMOTE grant may fail on non-cluster setups, ignore silently
               }

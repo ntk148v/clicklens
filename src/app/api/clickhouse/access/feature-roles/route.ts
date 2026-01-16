@@ -84,65 +84,11 @@ export async function POST(): Promise<
     const client = createClient(config);
     const created: string[] = [];
 
-    // Create each feature role with its privileges
-    const roleDefinitions = [
-      {
-        name: "clicklens_table_explorer",
-        grants: [
-          "GRANT SHOW DATABASES ON *.* TO `clicklens_table_explorer`",
-          "GRANT SHOW TABLES ON *.* TO `clicklens_table_explorer`",
-          "GRANT SHOW COLUMNS ON *.* TO `clicklens_table_explorer`",
-          "GRANT SHOW DICTIONARIES ON *.* TO `clicklens_table_explorer`",
-          "GRANT SELECT ON system.tables TO `clicklens_table_explorer`",
-          "GRANT SELECT ON system.columns TO `clicklens_table_explorer`",
-          "GRANT SELECT ON system.databases TO `clicklens_table_explorer`",
-        ],
-      },
-      {
-        name: "clicklens_query_monitor",
-        grants: [
-          "GRANT KILL QUERY ON *.* TO `clicklens_query_monitor`",
-          "GRANT SELECT ON system.processes TO `clicklens_query_monitor`",
-          "GRANT SELECT ON system.query_log TO `clicklens_query_monitor`",
-        ],
-      },
-      {
-        name: "clicklens_cluster_monitor",
-        grants: [
-          "GRANT SELECT ON system.clusters TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.replicas TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.replication_queue TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.metrics TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.events TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.asynchronous_metrics TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.settings TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.parts TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.text_log TO `clicklens_cluster_monitor`",
-          "GRANT SELECT ON system.crash_log TO `clicklens_cluster_monitor`",
-        ],
-      },
-      {
-        name: "clicklens_user_admin",
-        grants: ["GRANT ACCESS MANAGEMENT ON *.* TO `clicklens_user_admin`"],
-      },
-      {
-        name: "clicklens_table_admin",
-        grants: [
-          "GRANT CREATE TABLE ON *.* TO `clicklens_table_admin`",
-          "GRANT DROP TABLE ON *.* TO `clicklens_table_admin`",
-          "GRANT ALTER TABLE ON *.* TO `clicklens_table_admin`",
-          "GRANT TRUNCATE ON *.* TO `clicklens_table_admin`",
-          "GRANT OPTIMIZE ON *.* TO `clicklens_table_admin`",
-        ],
-      },
-    ];
-
-    for (const role of roleDefinitions) {
+    // Create each feature role with its privileges (using FEATURE_ROLES as source of truth)
+    for (const role of FEATURE_ROLES) {
       try {
         // Create the role
-        await client.command(`CREATE ROLE IF NOT EXISTS \`${role.name}\``);
+        await client.command(`CREATE ROLE IF NOT EXISTS \`${role.id}\``);
 
         // Grant privileges
         for (const grant of role.grants) {
@@ -154,9 +100,9 @@ export async function POST(): Promise<
           }
         }
 
-        created.push(role.name);
+        created.push(role.id);
       } catch (e) {
-        console.error(`Failed to create role ${role.name}:`, e);
+        console.error(`Failed to create role ${role.id}:`, e);
       }
     }
 

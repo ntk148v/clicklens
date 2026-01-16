@@ -32,7 +32,7 @@ export const FEATURE_ROLES: FeatureRole[] = [
     description: "Browse databases, tables, parts, and replication status",
     details:
       "Grants SHOW DATABASES, SHOW TABLES, SHOW COLUMNS, SHOW DICTIONARIES globally. " +
-      "Also grants SELECT on system tables for schema browsing, parts, columns, replicas, mutations, and merges.",
+      "Also grants SELECT on system tables and REMOTE globally for cluster queries.",
     grants: [
       "GRANT SHOW DATABASES ON *.* TO `clicklens_table_explorer`",
       "GRANT SHOW TABLES ON *.* TO `clicklens_table_explorer`",
@@ -46,6 +46,8 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "GRANT SELECT ON system.replicas TO `clicklens_table_explorer`",
       "GRANT SELECT ON system.mutations TO `clicklens_table_explorer`",
       "GRANT SELECT ON system.merges TO `clicklens_table_explorer`",
+      // REMOTE is a SOURCES privilege - must be granted globally
+      "GRANT REMOTE ON *.* TO `clicklens_table_explorer`",
     ],
   },
   {
@@ -54,12 +56,14 @@ export const FEATURE_ROLES: FeatureRole[] = [
     description: "View and kill running queries, analyze query performance",
     details:
       "Grants KILL QUERY globally to terminate running queries. " +
-      "Also grants SELECT on system.processes, system.query_log, and system.query_cache for monitoring.",
+      "Also grants SELECT on system.processes, system.query_log, system.query_cache and REMOTE globally for cluster queries.",
     grants: [
       "GRANT KILL QUERY ON *.* TO `clicklens_query_monitor`",
       "GRANT SELECT ON system.processes TO `clicklens_query_monitor`",
       "GRANT SELECT ON system.query_log TO `clicklens_query_monitor`",
       "GRANT SELECT ON system.query_cache TO `clicklens_query_monitor`",
+      // REMOTE is a SOURCES privilege - must be granted globally
+      "GRANT REMOTE ON *.* TO `clicklens_query_monitor`",
     ],
   },
   {
@@ -67,8 +71,7 @@ export const FEATURE_ROLES: FeatureRole[] = [
     name: "Cluster Monitor",
     description: "View cluster health, metrics, and settings",
     details:
-      "Grants SELECT on system tables for cluster monitoring: clusters, replicas, " +
-      "replication_queue, metrics, events, asynchronous_metrics, settings, disks, parts.",
+      "Grants SELECT on system tables for cluster monitoring and REMOTE globally for cluster queries.",
     grants: [
       "GRANT SELECT ON system.clusters TO `clicklens_cluster_monitor`",
       "GRANT SELECT ON system.replicas TO `clicklens_cluster_monitor`",
@@ -79,6 +82,21 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "GRANT SELECT ON system.settings TO `clicklens_cluster_monitor`",
       "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor`",
       "GRANT SELECT ON system.parts TO `clicklens_cluster_monitor`",
+      // Operations tables (processes, merges, mutations)
+      "GRANT SELECT ON system.processes TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.merges TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.mutations TO `clicklens_cluster_monitor`",
+      // Query log for time-series charts on overview
+      "GRANT SELECT ON system.query_log TO `clicklens_cluster_monitor`",
+      // Log tables for logging features
+      "GRANT SELECT ON system.text_log TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.crash_log TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.session_log TO `clicklens_cluster_monitor`",
+      // Metric log tables for monitoring time series
+      "GRANT SELECT ON system.metric_log TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.asynchronous_metric_log TO `clicklens_cluster_monitor`",
+      // REMOTE is a SOURCES privilege - must be granted globally
+      "GRANT REMOTE ON *.* TO `clicklens_cluster_monitor`",
     ],
   },
   {
@@ -86,9 +104,16 @@ export const FEATURE_ROLES: FeatureRole[] = [
     name: "User Administration",
     description: "Manage users, roles, and access control",
     details:
-      "Grants ACCESS MANAGEMENT globally. This includes creating, altering, and dropping " +
-      "users, roles, row policies, quotas, and settings profiles.",
-    grants: ["GRANT ACCESS MANAGEMENT ON *.* TO `clicklens_user_admin`"],
+      "Grants ACCESS MANAGEMENT globally. Also grants SELECT on system access tables " +
+      "(users, roles, grants, role_grants) for viewing access information.",
+    grants: [
+      "GRANT ACCESS MANAGEMENT ON *.* TO `clicklens_user_admin`",
+      // SELECT on access management tables for viewing
+      "GRANT SELECT ON system.users TO `clicklens_user_admin`",
+      "GRANT SELECT ON system.roles TO `clicklens_user_admin`",
+      "GRANT SELECT ON system.grants TO `clicklens_user_admin`",
+      "GRANT SELECT ON system.role_grants TO `clicklens_user_admin`",
+    ],
   },
   {
     id: "clicklens_table_admin",
@@ -107,11 +132,12 @@ export const FEATURE_ROLES: FeatureRole[] = [
     name: "Settings Viewer",
     description: "View system and server settings",
     details:
-      "Grants SELECT on system.settings and system.server_settings globally. " +
-      "Allows varying settings for current user scope.",
+      "Grants SELECT on system.settings and system.server_settings, with REMOTE globally for cluster queries.",
     grants: [
       "GRANT SELECT ON system.settings TO `clicklens_settings_admin`",
       "GRANT SELECT ON system.server_settings TO `clicklens_settings_admin`",
+      // REMOTE is a SOURCES privilege - must be granted globally
+      "GRANT REMOTE ON *.* TO `clicklens_settings_admin`",
     ],
   },
 ];
