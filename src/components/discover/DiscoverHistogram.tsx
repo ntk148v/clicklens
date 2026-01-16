@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import {
   BarChart,
   Bar,
@@ -22,11 +22,11 @@ interface HistogramData {
 interface DiscoverHistogramProps {
   data: HistogramData[];
   isLoading?: boolean;
-  onBarClick?: (time: string) => void;
+  onBarClick?: (startTime: string, endTime?: string) => void;
   activeTime?: string | null;
 }
 
-export function DiscoverHistogram({
+export const DiscoverHistogram = memo(function DiscoverHistogram({
   data,
   isLoading,
   onBarClick,
@@ -41,17 +41,60 @@ export function DiscoverHistogram({
     }));
   }, [data]);
 
+  // Calculate interval between bars to determine range
+  const intervalMs = useMemo(() => {
+    if (data.length < 2) return 0;
+    const t1 = new Date(data[0].time).getTime();
+    const t2 = new Date(data[1].time).getTime();
+    return Math.abs(t2 - t1);
+  }, [data]);
+
   const formatDate = (time: string) => {
     try {
-      // Try to extract HH:mm from ISO string (2026-01-14T14:26:00Z or 2026-01-14 14:26:00)
-      const datePart = time.split("T")[1] || time.split(" ")[1];
-      if (datePart) {
-        return datePart.substring(0, 5); // HH:mm
+      const date = new Date(time);
+      // If invalid date, return original string
+      if (isNaN(date.getTime())) return time;
+
+      // For X-axis, we want to be concise but informative
+      // If data spans more than 24h, show date + time
+      // Otherwise just time
+      const timeStr = date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      if (data.length > 0) {
+        const start = new Date(data[0].time);
+        const end = new Date(data[data.length - 1].time);
+        const diffHours =
+          Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+        if (diffHours > 24) {
+          return `${date.getMonth() + 1}/${date.getDate()} ${timeStr}`;
+        }
       }
-      // Fallback if parsing fails
-      return time.substring(11, 16);
+
+      return timeStr;
     } catch {
       return time;
+    }
+  };
+
+  const handleBarClick = (time: string) => {
+    if (!onBarClick) return;
+
+    // If we have an interval, calculate the end time
+    if (intervalMs > 0) {
+      const startTime = new Date(time);
+      const endTime = new Date(startTime.getTime() + intervalMs);
+      onBarClick(startTime.toISOString(), endTime.toISOString());
+    } else {
+      // Fallback for single bar or unknown interval - try to guess based on common bucketing
+      // Default to 1 hour if we can't determine
+      const startTime = new Date(time);
+      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+      onBarClick(startTime.toISOString(), endTime.toISOString());
     }
   };
 
@@ -81,15 +124,15 @@ export function DiscoverHistogram({
             bottom: 0,
           }}
           onClick={(data) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const payload = data as any;
-            if (
-              payload &&
-              payload.activePayload &&
-              payload.activePayload.length > 0
+            if (data && data.activeLabel) {
+              handleBarClick(String(data.activeLabel));
+            } else if (
+              data &&
+              data.activePayload &&
+              data.activePayload.length > 0
             ) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onBarClick?.((payload.activePayload[0].payload as any).time);
+              handleBarClick((data.activePayload[0].payload as any).time);
             }
           }}
         >
@@ -124,7 +167,7 @@ export function DiscoverHistogram({
               fontSize: "12px",
               borderRadius: "6px",
             }}
-            labelFormatter={(label) => String(label)}
+            labelFormatter={(label) => formatDate(String(label))}
             cursor={{ fill: "transparent" }}
           />
           <Bar
@@ -145,4 +188,4 @@ export function DiscoverHistogram({
       </ResponsiveContainer>
     </div>
   );
-}
+});

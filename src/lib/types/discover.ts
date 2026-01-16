@@ -95,17 +95,45 @@ export type TimeRange =
   | "12h"
   | "24h"
   | "3d"
-  | "7d"
-  | "custom";
+  | "7d";
+
+export interface FlexibleTimeRange {
+  type: "relative" | "absolute";
+  // For relative: "15m", "1h", etc.
+  // For absolute: ISO strings
+  from: string;
+  to: string | "now";
+  label: string; // Display label like "Last 15 minutes" or "Jan 1, 10:00 - Jan 2, 10:00"
+}
+
+export function getFlexibleRangeFromEnum(range: TimeRange): FlexibleTimeRange {
+  const labels: Record<TimeRange, string> = {
+    "5m": "Last 5 minutes",
+    "15m": "Last 15 minutes",
+    "30m": "Last 30 minutes",
+    "1h": "Last 1 hour",
+    "3h": "Last 3 hours",
+    "6h": "Last 6 hours",
+    "12h": "Last 12 hours",
+    "24h": "Last 24 hours",
+    "3d": "Last 3 days",
+    "7d": "Last 7 days",
+  };
+
+  return {
+    type: "relative",
+    from: `now-${range}`,
+    to: "now",
+    label: labels[range],
+  };
+}
 
 /**
  * Calculate minTime from a TimeRange
  */
 export function getMinTimeFromRange(range: TimeRange): Date | null {
-  if (range === "custom") return null;
-
   const now = new Date();
-  const mapping: Record<Exclude<TimeRange, "custom">, number> = {
+  const mapping: Record<TimeRange, number> = {
     "5m": 5 * 60 * 1000,
     "15m": 15 * 60 * 1000,
     "30m": 30 * 60 * 1000,

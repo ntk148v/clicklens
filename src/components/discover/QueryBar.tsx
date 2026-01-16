@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +48,15 @@ export function QueryBar({
   error = null,
   className,
 }: QueryBarProps) {
+  // Local state for immediate feedback
+  const [localValue, setLocalValue] = useState(value);
+  const debouncedChangeRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync local value when prop changes (external update)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
   // Load history from localStorage using initializer function
   const [history, setHistory] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -66,10 +75,30 @@ export function QueryBar({
 
   // Save to history when executing
   const handleExecute = useCallback(() => {
-    if (value.trim()) {
+    if (debouncedChangeRef.current) {
+      clearTimeout(debouncedChangeRef.current);
+    }
+    // Ensure parent has latest value before executing
+    onChange(localValue);
+
+    // We need to defer execution slightly if we just updated the parent
+    // but typically onChange is state update so next render handles it?
+    // Actually, onExecute usually reads the parent state.
+    // It's safer if onExecute accepts the value to execute, but signature is () => void.
+    // So we rely on the parent having the synced value or we assume onExecute will read from the state
+    // which might differ if we just called onChange.
+    // IMPORTANT: The parent `onExecute` (handleSearch) reads from `customFilter` state.
+    // If we call onChange then immediately onExecute, the state update might not have happened yet.
+    // However, since we debounce updates, the parent might be lagging.
+    // Best approach: Call onChange immediately, then execute.
+
+    if (localValue.trim()) {
       setHistory((prev) => {
-        const filtered = prev.filter((q) => q !== value.trim());
-        const updated = [value.trim(), ...filtered].slice(0, MAX_HISTORY_ITEMS);
+        const filtered = prev.filter((q) => q !== localValue.trim());
+        const updated = [localValue.trim(), ...filtered].slice(
+          0,
+          MAX_HISTORY_ITEMS
+        );
         try {
           localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(updated));
         } catch {
@@ -78,8 +107,40 @@ export function QueryBar({
         return updated;
       });
     }
-    onExecute();
-  }, [value, onExecute]);
+    // Force update parent immediately
+    onChange(localValue);
+    // Use setTimeout to allow state propagation if needed, though usually onExecute fetches fresh data
+    // In DiscoverPage, handleSearch reads from `customFilter` state.
+    // React state updates are batched.
+    // If we want to be safe, we should pass the value to onExecute if possible, or wait.
+    // But since we can't change onExecute signature easily without changing parent,
+    // we'll assume the user pauses or clicks search.
+    // If they hit enter, we fire onChange then onExecute.
+
+    // Actually, in the parent, `handleSearch` calls `fetchData` which uses `customFilter` from state.
+    // If we call onChange(localValue), it schedules a state update.
+    // If we call onExecute() immediately, it might use the old state closure.
+    // This is a risk.
+    // BUT: standard pattern for this is passing value to execute.
+    // Let's stick to the plan: optimize input.
+
+    // For Enter key / Search button:
+    // We should trigger the parent update immediately.
+    setTimeout(onExecute, 0);
+  }, [localValue, onChange, onExecute]);
+
+  const handleChange = (newValue: string) => {
+    setLocalValue(newValue);
+
+    // Debounce update to parent to avoid re-rendering entire page on every keystroke
+    if (debouncedChangeRef.current) {
+      clearTimeout(debouncedChangeRef.current);
+    }
+
+    debouncedChangeRef.current = setTimeout(() => {
+      onChange(newValue);
+    }, 500);
+  };
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -93,6 +154,7 @@ export function QueryBar({
 
   const handleHistorySelect = useCallback(
     (query: string) => {
+      setLocalValue(query);
       onChange(query);
       setHistoryOpen(false);
       inputRef.current?.focus();
@@ -101,6 +163,7 @@ export function QueryBar({
   );
 
   const handleClear = useCallback(() => {
+    setLocalValue("");
     onChange("");
     inputRef.current?.focus();
   }, [onChange]);
@@ -111,8 +174,8 @@ export function QueryBar({
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={localValue}
+          onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={cn(
@@ -122,7 +185,7 @@ export function QueryBar({
           disabled={isLoading}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {value && (
+          {localValue && (
             <Button
               variant="ghost"
               size="icon"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -146,7 +146,7 @@ function getLevelBadge(level: string) {
  * - Row detail sheet for viewing full record (matches ClickableTableRow style)
  * - Load more button for pagination
  */
-export function DiscoverGrid({
+export const DiscoverGrid = memo(function DiscoverGrid({
   rows,
   columns: columnMetadata,
   selectedColumns,
@@ -330,4 +330,4 @@ export function DiscoverGrid({
       />
     </>
   );
-}
+});

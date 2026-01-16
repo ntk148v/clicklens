@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { format } from "date-fns";
 import { Header } from "@/components/layout";
 import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
+import { TimeRangePicker } from "@/components/discover/TimeRangePicker";
 import {
   Select,
   SelectContent,
@@ -22,8 +24,9 @@ import type {
   TimeRange,
   ColumnMetadata,
   TimeColumnCandidate,
+  FlexibleTimeRange,
 } from "@/lib/types/discover";
-import { getMinTimeFromRange } from "@/lib/types/discover";
+import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
 
 /**
  * Discover Page - Flexible data exploration for any ClickHouse table
@@ -56,8 +59,10 @@ export default function DiscoverPage() {
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [selectedTimeColumn, setSelectedTimeColumn] = useState<string>("");
   const [customFilter, setCustomFilter] = useState("");
-  const [timeRange, setTimeRange] = useState<TimeRange>("1h");
-  const [customMinTime, setCustomMinTime] = useState<string | null>(null);
+  // Time range state (Unified)
+  const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
+    getFlexibleRangeFromEnum("1h")
+  );
 
   // Results state
   const [rows, setRows] = useState<DiscoverRow[]>([]);
@@ -71,12 +76,55 @@ export default function DiscoverPage() {
   const [error, setError] = useState<string | null>(null);
   const [pageSize] = useState(100);
 
-  // Derived values
-  const activeMinTime = useMemo(() => {
-    if (customMinTime) return customMinTime;
-    const minDate = getMinTimeFromRange(timeRange);
-    return minDate ? minDate.toISOString() : undefined;
-  }, [timeRange, customMinTime]);
+  // Derived values for API calls
+  const { activeMinTime, activeMaxTime } = useMemo(() => {
+    if (flexibleRange.type === "absolute") {
+      return {
+        activeMinTime: flexibleRange.from,
+        activeMaxTime:
+          flexibleRange.to === "now" ? undefined : flexibleRange.to, // API handles missing maxTime as "now" usually, but for absolute we might want explicit
+      };
+    } else {
+      // Relative: "now-1h" -> parse "1h"
+      const rangeKey = flexibleRange.from.replace("now-", "") as TimeRange;
+      // This function is now internal to getFlexibleRangeFromEnum or similar,
+      // but for direct use, we'd need a helper. For now, let's assume the API
+      // can handle "now-1h" directly or we need to calculate it here.
+      // Given the original `getMinTimeFromRange` was used, we'll re-introduce a similar logic.
+      const getMinTimeFromRangeLocal = (range: TimeRange): Date | null => {
+        const now = new Date();
+        switch (range) {
+          case "5m":
+            return new Date(now.getTime() - 5 * 60 * 1000);
+          case "15m":
+            return new Date(now.getTime() - 15 * 60 * 1000);
+          case "30m":
+            return new Date(now.getTime() - 30 * 60 * 1000);
+          case "1h":
+            return new Date(now.getTime() - 60 * 60 * 1000);
+          case "3h":
+            return new Date(now.getTime() - 3 * 60 * 60 * 1000);
+          case "6h":
+            return new Date(now.getTime() - 6 * 60 * 60 * 1000);
+          case "12h":
+            return new Date(now.getTime() - 12 * 60 * 60 * 1000);
+          case "24h":
+            return new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          case "3d":
+            return new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+          case "7d":
+            return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          default:
+            return null;
+        }
+      };
+      const minDate = getMinTimeFromRangeLocal(rangeKey);
+      return {
+        activeMinTime: minDate ? minDate.toISOString() : undefined,
+        activeMaxTime: undefined,
+      };
+    }
+  }, [flexibleRange]);
 
   // Load databases on mount
   useEffect(() => {
@@ -239,6 +287,10 @@ export default function DiscoverPage() {
         params.set("minTime", activeMinTime);
       }
 
+      if (activeMaxTime) {
+        params.set("maxTime", activeMaxTime);
+      }
+
       if (customFilter.trim()) {
         params.set("filter", customFilter.trim());
       }
@@ -250,12 +302,25 @@ export default function DiscoverPage() {
         setRows(data.data.rows || []);
         setTotalHits(data.data.totalHits || 0);
       } else {
-        setError(data.error || "Failed to fetch data");
+        const errorMessage = data.error || "Failed to fetch data";
+        setError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Query Error",
+          description: errorMessage,
+        });
         setRows([]);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch data");
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch data";
+      setError(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Query Error",
+        description: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -265,6 +330,7 @@ export default function DiscoverPage() {
     selectedColumns,
     selectedTimeColumn,
     activeMinTime,
+    activeMaxTime,
     customFilter,
     pageSize,
   ]);
@@ -297,6 +363,10 @@ export default function DiscoverPage() {
         params.set("minTime", activeMinTime);
       }
 
+      if (activeMaxTime) {
+        params.set("maxTime", activeMaxTime);
+      }
+
       if (customFilter.trim()) {
         params.set("filter", customFilter.trim());
       }
@@ -310,6 +380,11 @@ export default function DiscoverPage() {
       }
     } catch (err) {
       console.error("Failed to fetch more data:", err);
+      toast({
+        variant: "destructive",
+        title: "Load More Error",
+        description: "Failed to load more data. Please try again.",
+      });
     } finally {
       setIsLoadingMore(false);
     }
@@ -319,6 +394,7 @@ export default function DiscoverPage() {
     selectedColumns,
     selectedTimeColumn,
     activeMinTime,
+    activeMaxTime,
     customFilter,
     rows.length,
     totalHits,
@@ -346,6 +422,10 @@ export default function DiscoverPage() {
         params.set("minTime", activeMinTime);
       }
 
+      if (activeMaxTime) {
+        params.set("maxTime", activeMaxTime);
+      }
+
       if (customFilter.trim()) {
         params.set("filter", customFilter.trim());
       }
@@ -358,6 +438,12 @@ export default function DiscoverPage() {
       }
     } catch (err) {
       console.error("Failed to fetch histogram:", err);
+      // Histogram failure shouldn't blocking, but maybe we show a warning if it persists
+      // toast({
+      //   variant: "destructive",
+      //   title: "Histogram Error",
+      //   description: "Failed to load histogram data.",
+      // });
     } finally {
       setHistLoading(false);
     }
@@ -366,6 +452,7 @@ export default function DiscoverPage() {
     selectedTable,
     selectedTimeColumn,
     activeMinTime,
+    activeMaxTime,
     customFilter,
   ]);
 
@@ -375,9 +462,29 @@ export default function DiscoverPage() {
     fetchHistogram();
   }, [fetchData, fetchHistogram]);
 
-  // Handle histogram bar click
-  const handleHistogramBarClick = (time: string) => {
-    setCustomMinTime(time);
+  // Initial fetch when deps change (but after schema loaded)
+  useEffect(() => {
+    if (schema) {
+      handleSearch();
+    }
+  }, [schema, selectedTimeColumn, activeMinTime, activeMaxTime]); // Re-fetch when time range changes
+
+  // Handle histogram bar click (Zoom in)
+  const handleHistogramBarClick = (startTime: string, endTime?: string) => {
+    if (endTime) {
+      const fromDate = new Date(startTime);
+      const toDate = new Date(endTime);
+
+      setFlexibleRange({
+        type: "absolute",
+        from: startTime,
+        to: endTime,
+        label: `${format(fromDate, "MMM d, HH:mm")} to ${format(
+          toDate,
+          "MMM d, HH:mm"
+        )}`,
+      });
+    }
   };
 
   if (authLoading) {
@@ -406,29 +513,10 @@ export default function DiscoverPage() {
         title="Discover"
         actions={
           <div className="flex items-center gap-2">
-            <Select
-              value={timeRange}
-              onValueChange={(v) => {
-                setTimeRange(v as TimeRange);
-                setCustomMinTime(null);
-              }}
-            >
-              <SelectTrigger className="w-[130px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5m">Last 5 min</SelectItem>
-                <SelectItem value="15m">Last 15 min</SelectItem>
-                <SelectItem value="30m">Last 30 min</SelectItem>
-                <SelectItem value="1h">Last 1 hour</SelectItem>
-                <SelectItem value="3h">Last 3 hours</SelectItem>
-                <SelectItem value="6h">Last 6 hours</SelectItem>
-                <SelectItem value="12h">Last 12 hours</SelectItem>
-                <SelectItem value="24h">Last 24 hours</SelectItem>
-                <SelectItem value="3d">Last 3 days</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-              </SelectContent>
-            </Select>
+            <TimeRangePicker
+              value={flexibleRange}
+              onChange={setFlexibleRange}
+            />
 
             <Button
               variant="outline"
@@ -532,11 +620,13 @@ export default function DiscoverPage() {
                   <h3 className="text-sm font-medium text-muted-foreground">
                     Document Count Over Time
                   </h3>
-                  {customMinTime && (
+                  {flexibleRange.type === "absolute" && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setCustomMinTime(null)}
+                      onClick={() =>
+                        setFlexibleRange(getFlexibleRangeFromEnum("1h"))
+                      }
                       className="h-6 text-xs"
                     >
                       <FilterX className="mr-1 h-3 w-3" />
