@@ -1,0 +1,278 @@
+# Features
+
+ClickLens provides a comprehensive suite of tools for managing and monitoring ClickHouse databases. This guide covers all major features and how to use them.
+
+import { Callout } from "nextra/components";
+
+## 1. Discover (Kibana-like Data Exploration)
+
+The **Discover** feature provides a flexible, Kibana-style interface for exploring data in any ClickHouse table—not just logs.
+
+<Callout type="info">
+  **Requires `canDiscover` permission.** This permission is derived from having
+  `SHOW TABLES` and `SELECT` access on at least one table.
+</Callout>
+
+### 1.1. Components
+
+#### 1.1.1. Database & Table Selection
+
+Use the dropdowns in the header to select your data source:
+
+- **Database Selector**: Choose from available databases
+- **Table Selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
+
+#### 1.1.2. Fields Sidebar
+
+The left sidebar controls which columns appear in your query:
+
+- **Search**: Filter columns by name
+- **Select All / None**: Quick selection toggles
+- **Time Column Picker**: Choose which DateTime column to use for time filtering
+- **Type Icons**: Visual indicators for column types (DateTime, String, Number, Boolean)
+
+<Callout type="warning">
+  Only selected columns are included in the `SELECT` clause. This affects both
+  the data grid and query performance.
+</Callout>
+
+#### 1.1.3. Query Bar
+
+Enter custom ClickHouse `WHERE` clause expressions:
+
+```sql
+level = 'Error'
+status >= 400
+host LIKE '%api%'
+message ILIKE '%timeout%'
+level IN ('Error', 'Fatal')
+```
+
+Features:
+
+- **Query History**: Persisted in localStorage (up to 20 entries)
+- **Syntax Help**: Hover over the help icon for examples
+- **Execute**: Press Enter or click Search
+
+#### 1.1.4. Time Range Selector
+
+Filter data by time using presets:
+
+- 5m, 15m, 30m (minutes)
+- 1h, 3h, 6h, 12h, 24h (hours)
+- 3d, 7d (days)
+
+#### 1.1.5. Histogram
+
+When a time column is selected, a bar chart shows document distribution over time:
+
+- **Click a bar** to zoom into that time range
+- **Reset Zoom** button to return to the selected preset
+
+#### 1.1.6. Results Grid
+
+- **Row Count**: Shows "X of Y hits"
+- **Row Detail**: Click any row to see all fields in a slide-out panel
+- **Load More**: Offset-based pagination for large result sets
+
+---
+
+## 2. SQL Console
+
+A full-featured SQL editor for writing and executing ClickHouse queries.
+
+<Callout type="info">
+  **Requires `canExecuteQueries` permission.** This is derived from having
+  `SELECT` access on at least one database.
+</Callout>
+
+### 2.1. Key Features
+
+#### 2.1.1. Multi-Tab Support
+
+- Open multiple query tabs simultaneously
+- Tabs are persisted locally (SQL content survives browser refresh)
+- Each tab maintains its own result set and history
+
+#### 2.1.2. SQL Editor
+
+Built on CodeMirror 6 with ClickHouse-specific enhancements:
+
+- **Syntax Highlighting**: Keywords, functions, strings, numbers
+- **Autocomplete**: Tables, columns, ClickHouse functions, keywords
+- **Code Actions**: Execute, Explain, Format
+
+#### 2.1.3. Execution Modes
+
+| Shortcut           | Action                                        |
+| ------------------ | --------------------------------------------- |
+| `Ctrl+Enter`       | Execute all statements in the editor          |
+| `Ctrl+Shift+Enter` | Execute only the statement at cursor position |
+
+#### 2.1.4. Query Streaming
+
+Large result sets are streamed to the UI using NDJSON:
+
+- Progress indicator shows rows being fetched
+- Results appear incrementally
+- Cancel running queries with the Stop button
+
+#### 2.1.5. Explain Queries
+
+Use the Explain dropdown to analyze query plans:
+
+- **AST**: Abstract Syntax Tree
+- **SYNTAX**: Normalized query syntax
+- **PLAN**: Query execution plan
+- **PIPELINE**: Processing pipeline visualization
+
+#### 2.1.6. Saved Queries
+
+Save frequently-used queries for quick access:
+
+- Click the Save icon to store a query
+- Access saved queries from the Bookmarks panel
+- Queries are stored server-side
+
+#### 2.1.7. Query History
+
+The History panel shows recent executions with:
+
+- SQL text
+- Duration
+- Rows returned / read
+- Bytes read
+- Memory usage
+- User who ran it
+- Errors (if any)
+
+#### 2.1.8. Time Range Insertion
+
+Use the Time Range Selector to quickly insert time filter clauses into your SQL, properly handling the `WHERE` vs `AND` syntax.
+
+---
+
+## 3. Table Explorer
+
+Browse and inspect your ClickHouse schema in detail.
+
+<Callout type="info">
+  **Requires `canBrowseTables` permission.** This is derived from having `SHOW
+  TABLES` grant.
+</Callout>
+
+### 3.1. Navigation
+
+1. Select a database from the left sidebar
+2. Click a table to view its details
+3. Use the tabs to explore different aspects
+
+### 3.2. Table Detail Tabs
+
+| Tab           | Description                                |
+| ------------- | ------------------------------------------ |
+| **Overview**  | Summary statistics (rows, size, engine)    |
+| **Columns**   | Column definitions with types and defaults |
+| **Parts**     | Data parts with sizes and row counts       |
+| **Merges**    | Active merge operations                    |
+| **Mutations** | Pending ALTER mutations                    |
+| **Replicas**  | Replication status (for replicated tables) |
+| **DDL**       | `CREATE TABLE` statement                   |
+
+---
+
+## 4. Monitoring
+
+Real-time cluster health and performance monitoring.
+
+<Callout type="info">
+  **Requires `canViewCluster` permission.** This is derived from having `SELECT`
+  on system cluster tables.
+</Callout>
+
+### 4.1. Available Tabs
+
+| Tab             | Route                     | Description                 |
+| --------------- | ------------------------- | --------------------------- |
+| **Overview**    | `/monitoring/overview`    | Dashboard with key metrics  |
+| **Metrics**     | `/monitoring/metrics`     | Browse `system.metrics`     |
+| **Cluster**     | `/monitoring/cluster`     | Cluster topology and nodes  |
+| **Health**      | `/monitoring/health`      | Health check status         |
+| **Disks**       | `/monitoring/disks`       | Disk usage and capacity     |
+| **Keeper**      | `/monitoring/keeper`      | ClickHouse Keeper status    |
+| **Operations**  | `/monitoring/operations`  | Active merges and mutations |
+| **Replication** | `/monitoring/replication` | Replication queue status    |
+
+---
+
+## 5. Query Analytics
+
+Analyze query performance and identify slow queries.
+
+<Callout type="info">
+  **Requires `canViewProcesses` permission.** This is derived from having
+  `SELECT` on `system.processes`.
+</Callout>
+
+### 5.1. Available Views
+
+| View          | Route                | Description                                  |
+| ------------- | -------------------- | -------------------------------------------- |
+| **Running**   | `/queries/running`   | Currently executing queries                  |
+| **History**   | `/queries/history`   | Historical query log from `system.query_log` |
+| **Analytics** | `/queries/analytics` | Top resource-consuming queries               |
+| **Cache**     | `/queries/cache`     | Query cache statistics                       |
+
+### 5.2. Query Cancellation
+
+From the Running Queries view, you can kill queries using the KILL QUERY command. This requires the `canKillQueries` permission.
+
+---
+
+## 6. Logging
+
+View and search through ClickHouse logs.
+
+<Callout type="info">
+  Different log types require different permissions.
+</Callout>
+
+| Log Type         | Route              | Required Permission  |
+| ---------------- | ------------------ | -------------------- |
+| **Server Logs**  | `/logging/server`  | `canViewServerLogs`  |
+| **Session Logs** | `/logging/session` | `canViewSessionLogs` |
+| **Crash Logs**   | `/logging/crash`   | `canViewCrashLogs`   |
+
+---
+
+## 7. Access Control
+
+Manage ClickHouse users and roles.
+
+<Callout type="info">
+  **Requires `canManageUsers` permission.** This is derived from having `ACCESS
+  MANAGEMENT` grant.
+</Callout>
+
+### 7.1. Available Views
+
+| View      | Route           | Description                    |
+| --------- | --------------- | ------------------------------ |
+| **Users** | `/access/users` | List and manage database users |
+| **Roles** | `/access/roles` | Manage roles and their grants  |
+
+---
+
+## 8. Settings
+
+View ClickHouse server and session settings.
+
+<Callout type="info">
+  **Requires `canViewSettings` permission.** This is derived from having
+  `SELECT` on `system.settings`.
+</Callout>
+
+| View                 | Route               | Description                        |
+| -------------------- | ------------------- | ---------------------------------- |
+| **Server Settings**  | `/settings/server`  | Read from `system.server_settings` |
+| **Session Settings** | `/settings/session` | Read from `system.settings`        |

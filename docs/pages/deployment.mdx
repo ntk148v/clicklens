@@ -1,0 +1,301 @@
+# Deployment
+
+This guide covers production deployment of ClickLens for operators and DevOps teams.
+
+import { Callout } from "nextra/components";
+
+## 1. Environment Variables
+
+ClickLens is configured entirely through environment variables. Here's the complete reference:
+
+### 1.1. Required Variables
+
+| Variable          | Description                                    | Example                           |
+| ----------------- | ---------------------------------------------- | --------------------------------- |
+| `CLICKHOUSE_HOST` | ClickHouse server hostname                     | `clickhouse.example.com`          |
+| `LENS_USER`       | Service account username for metadata queries  | `lensuser`                        |
+| `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...` |
+
+### 1.2. Optional Variables
+
+| Variable                  | Default                         | Description                                                                 |
+| ------------------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| `CLICKHOUSE_PORT`         | `8123` (HTTP) or `8443` (HTTPS) | ClickHouse HTTP interface port                                              |
+| `CLICKHOUSE_SECURE`       | `false`                         | Set to `true` to use HTTPS                                                  |
+| `CLICKHOUSE_VERIFY`       | `true`                          | Set to `false` to skip SSL certificate verification (for self-signed certs) |
+| `LENS_PASSWORD`           | `""`                            | Password for the Lens service account                                       |
+| `NODE_ENV`                | `development`                   | Set to `production` for production deployments                              |
+| `DISABLE_SECURE_COOKIES`  | `false`                         | Set to `true` if running behind a non-HTTPS proxy                           |
+| `NEXT_PUBLIC_APP_VERSION` | From `package.json`             | Override the displayed app version                                          |
+
+<Callout type="warning">
+  **Security:** The `SESSION_SECRET` must be at least 32 characters. In
+  production, generate a strong secret with: ```bash openssl rand -base64 32 ```
+</Callout>
+
+### 1.3. Sample `.env.local` File
+
+```bash
+# ClickHouse Server Connection (required)
+CLICKHOUSE_HOST=localhost
+CLICKHOUSE_PORT=8123
+CLICKHOUSE_SECURE=false
+CLICKHOUSE_VERIFY=true
+
+# Lens Service User (for metadata queries)
+LENS_USER=lensuser
+LENS_PASSWORD=your-password
+
+# Session Secret (required for production)
+SESSION_SECRET=complex_password_at_least_32_characters_long_for_security
+```
+
+## 2. Docker Deployment
+
+### 2.1. Quick Start
+
+```bash
+docker run -d \
+  --name clicklens \
+  -p 3000:3000 \
+  -e CLICKHOUSE_HOST=your-clickhouse-host \
+  -e CLICKHOUSE_PORT=8123 \
+  -e LENS_USER=lensuser \
+  -e LENS_PASSWORD=your-password \
+  -e SESSION_SECRET=your-32-character-secret-key-here \
+  -e NODE_ENV=production \
+  ghcr.io/ntk148v/clicklens:latest
+```
+
+### 2.2. Docker Compose
+
+```yaml
+version: "3.8"
+
+services:
+  clicklens:
+    image: ghcr.io/ntk148v/clicklens:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - LENS_USER=lensuser
+      - LENS_PASSWORD=your-password
+      - SESSION_SECRET=your-32-character-secret-key-here
+      - NODE_ENV=production
+      - DISABLE_SECURE_COOKIES=true
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+
+volumes:
+  clickhouse-data:
+```
+
+### 2.3. Docker Image Details
+
+- **Base Image:** `node:20-alpine` (runtime)
+- **Build Image:** `oven/bun:latest` (build stage)
+- **Exposed Port:** `3000`
+- **Output:** Next.js standalone build (optimized for containers)
+
+### 2.4. Building Custom Image
+
+```bash
+docker build \
+  --build-arg APP_VERSION=1.0.0 \
+  -t clicklens:custom \
+  .
+```
+
+## 3. RBAC Configuration
+
+ClickLens uses ClickHouse's native RBAC. To enable all features for a user, you can use the predefined **Feature Roles**.
+
+### 3.1. Feature Roles
+
+These are ClickHouse roles that ClickLens expects. Create them to simplify user permission management:
+
+| Role                        | Purpose                                | Required Grants                                                                                     |
+| --------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `clicklens_table_explorer`  | Browse databases, tables, parts        | `SHOW DATABASES`, `SHOW TABLES`, `SHOW COLUMNS`, `SELECT ON system.{tables,columns,parts,replicas}` |
+| `clicklens_query_monitor`   | View/kill queries, analyze performance | `KILL QUERY`, `SELECT ON system.{processes,query_log,query_cache}`                                  |
+| `clicklens_cluster_monitor` | View cluster health and metrics        | `SELECT ON system.{clusters,replicas,metrics,events,disks,settings}`                                |
+| `clicklens_user_admin`      | Full user and role management          | `ACCESS MANAGEMENT ON *.*`                                                                          |
+| `clicklens_table_admin`     | DDL operations (TRUNCATE, OPTIMIZE)    | `TRUNCATE`, `OPTIMIZE ON *.*`                                                                       |
+| `clicklens_settings_admin`  | View system settings                   | `SELECT ON system.{settings,server_settings}`                                                       |
+
+### 3.2. Creating Feature Roles
+
+```sql
+-- Table Explorer Role
+CREATE ROLE IF NOT EXISTS clicklens_table_explorer;
+GRANT SHOW DATABASES ON *.* TO clicklens_table_explorer;
+GRANT SHOW TABLES ON *.* TO clicklens_table_explorer;
+GRANT SHOW COLUMNS ON *.* TO clicklens_table_explorer;
+GRANT SELECT ON system.tables TO clicklens_table_explorer;
+GRANT SELECT ON system.columns TO clicklens_table_explorer;
+GRANT SELECT ON system.databases TO clicklens_table_explorer;
+GRANT SELECT ON system.parts TO clicklens_table_explorer;
+GRANT SELECT ON system.replicas TO clicklens_table_explorer;
+GRANT SELECT ON system.mutations TO clicklens_table_explorer;
+GRANT SELECT ON system.merges TO clicklens_table_explorer;
+
+-- Query Monitor Role
+CREATE ROLE IF NOT EXISTS clicklens_query_monitor;
+GRANT KILL QUERY ON *.* TO clicklens_query_monitor;
+GRANT SELECT ON system.processes TO clicklens_query_monitor;
+GRANT SELECT ON system.query_log TO clicklens_query_monitor;
+GRANT SELECT ON system.query_cache TO clicklens_query_monitor;
+
+-- Cluster Monitor Role
+CREATE ROLE IF NOT EXISTS clicklens_cluster_monitor;
+GRANT SELECT ON system.clusters TO clicklens_cluster_monitor;
+GRANT SELECT ON system.replicas TO clicklens_cluster_monitor;
+GRANT SELECT ON system.replication_queue TO clicklens_cluster_monitor;
+GRANT SELECT ON system.metrics TO clicklens_cluster_monitor;
+GRANT SELECT ON system.events TO clicklens_cluster_monitor;
+GRANT SELECT ON system.asynchronous_metrics TO clicklens_cluster_monitor;
+GRANT SELECT ON system.settings TO clicklens_cluster_monitor;
+GRANT SELECT ON system.disks TO clicklens_cluster_monitor;
+GRANT SELECT ON system.parts TO clicklens_cluster_monitor;
+
+-- User Admin Role
+CREATE ROLE IF NOT EXISTS clicklens_user_admin;
+GRANT ACCESS MANAGEMENT ON *.* TO clicklens_user_admin;
+
+-- Settings Viewer Role
+CREATE ROLE IF NOT EXISTS clicklens_settings_admin;
+GRANT SELECT ON system.settings TO clicklens_settings_admin;
+GRANT SELECT ON system.server_settings TO clicklens_settings_admin;
+```
+
+### 3.3. Creating the Lens Service User
+
+The Lens user needs minimal read access for metadata queries:
+
+```sql
+CREATE USER IF NOT EXISTS lensuser IDENTIFIED BY 'your-password';
+
+-- Grant read access to system tables
+GRANT SELECT ON system.* TO lensuser;
+
+-- Grant schema introspection
+GRANT SHOW DATABASES ON *.* TO lensuser;
+GRANT SHOW TABLES ON *.* TO lensuser;
+GRANT SHOW COLUMNS ON *.* TO lensuser;
+GRANT SHOW DICTIONARIES ON *.* TO lensuser;
+```
+
+### 3.4. Creating Application Users
+
+Example: Create a developer user with full ClickLens access:
+
+```sql
+CREATE USER IF NOT EXISTS developer IDENTIFIED BY 'password';
+
+-- Grant all feature roles
+GRANT clicklens_table_explorer TO developer;
+GRANT clicklens_query_monitor TO developer;
+GRANT clicklens_cluster_monitor TO developer;
+GRANT clicklens_settings_admin TO developer;
+
+-- Grant data access
+GRANT SELECT ON mydb.* TO developer;
+GRANT INSERT ON mydb.* TO developer;
+```
+
+Example: Create a read-only analyst user:
+
+```sql
+CREATE USER IF NOT EXISTS analyst IDENTIFIED BY 'password';
+
+-- Limited feature access
+GRANT clicklens_table_explorer TO analyst;
+GRANT clicklens_cluster_monitor TO analyst;
+
+-- Read-only data access
+GRANT SELECT ON analytics.* TO analyst;
+```
+
+## 4. Reverse Proxy Configuration
+
+### 4.1. Nginx
+
+```nginx
+server {
+    listen 80;
+    server_name clicklens.example.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+<Callout type="info">
+  If your proxy terminates SSL (HTTPS), set `DISABLE_SECURE_COOKIES=true` so
+  session cookies work over the HTTP connection between proxy and app.
+</Callout>
+
+## 5. Health Checks
+
+ClickLens provides a health check endpoint:
+
+```bash
+curl http://localhost:3000/api/clickhouse/ping
+```
+
+Response (healthy):
+
+```json
+{ "success": true }
+```
+
+Use this endpoint for:
+
+- Kubernetes liveness/readiness probes
+- Load balancer health checks
+- Monitoring systems
+
+## 6. Troubleshooting
+
+### 6.1. Common Issues
+
+**"Session expired" errors:**
+
+- Ensure `SESSION_SECRET` is consistent across restarts
+- Check cookie settings if behind a proxy (`DISABLE_SECURE_COOKIES`)
+
+**"Permission denied" for features:**
+
+- Check the user's ClickHouse grants with `SHOW GRANTS FOR user`
+- Ensure the required system tables are accessible
+
+**Connection refused to ClickHouse:**
+
+- Verify `CLICKHOUSE_HOST` and `CLICKHOUSE_PORT` are correct
+- Ensure the HTTP interface is enabled (not just native protocol)
+- Check firewall rules
+
+**SSL certificate errors:**
+
+- Set `CLICKHOUSE_VERIFY=false` for self-signed certificates
+- Or install the CA certificate in the container

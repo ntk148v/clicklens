@@ -1,0 +1,401 @@
+# Contributing
+
+Welcome to ClickLens! This guide will help you set up your development environment and contribute to the project.
+
+import { Callout } from "nextra/components";
+
+## 1. Prerequisites
+
+- **Bun** (latest version) - Package manager and runtime
+- **Node.js** (20.x) - For production builds
+- **Git** - Version control
+- **A ClickHouse server** - For testing
+
+## 2. Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/ntk148v/clicklens.git
+cd clicklens
+
+# Install dependencies
+bun install
+
+# Copy environment configuration
+cp env.sample .env.local
+
+# Start the development server
+bun dev
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+## 3. Project Structure
+
+```
+clicklens/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   ├── components/             # React components
+│   └── lib/                    # Core libraries
+├── docs/                       # Nextra documentation
+├── e2e/                        # Playwright E2E tests
+├── public/                     # Static assets
+└── scripts/                    # Build/utility scripts
+```
+
+### 3.1. Key Directories
+
+#### 3.1.1. `src/app/` - Next.js Routes
+
+The App Router structure with route groups:
+
+| Directory | Purpose                                               |
+| --------- | ----------------------------------------------------- |
+| `(app)/`  | Authenticated routes (wrapped in layout with sidebar) |
+| `api/`    | API route handlers                                    |
+| `login/`  | Public authentication page                            |
+
+#### 3.1.2. `src/components/` - UI Components
+
+| Directory     | Purpose                                                                            |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `auth/`       | `AuthProvider` and `useAuth` hook                                                  |
+| `discover/`   | Discover feature: `QueryBar`, `FieldsSidebar`, `DiscoverGrid`, `DiscoverHistogram` |
+| `layout/`     | `Sidebar`, `Header`, `ConnectionStatus`                                            |
+| `logging/`    | Log viewer components                                                              |
+| `monitoring/` | Monitoring tabs (14 components)                                                    |
+| `queries/`    | Query analytics components                                                         |
+| `sql/`        | SQL Console: `SqlEditor`, `ResultGrid`, `QueryTabs`, etc. (13 components)          |
+| `tables/`     | Table explorer tabs (8 components)                                                 |
+| `ui/`         | shadcn/ui base components (30 components)                                          |
+
+#### 3.1.3. `src/lib/` - Core Libraries
+
+| Directory/File            | Purpose                                                   |
+| ------------------------- | --------------------------------------------------------- |
+| `auth/`                   | Session management (`iron-session` configuration)         |
+| `clickhouse/`             | ClickHouse client, config, types                          |
+| `hooks/`                  | Custom React hooks (6 hooks)                              |
+| `rbac/`                   | Feature role definitions                                  |
+| `store/`                  | Zustand stores (`tabs.ts`, `sql-browser.ts`, `access.ts`) |
+| `types/`                  | TypeScript type definitions                               |
+| `sql/`                    | SQL parsing utilities                                     |
+| `utils.ts`                | General utility functions                                 |
+| `clickhouse-functions.ts` | ClickHouse function definitions for autocomplete          |
+
+## 4. Development Workflow
+
+### 4.1. Running the Dev Server
+
+```bash
+bun dev
+```
+
+This starts:
+
+- Next.js dev server with hot reload
+- TypeScript type checking
+- Tailwind CSS JIT compilation
+
+### 4.2. Linting
+
+```bash
+bun lint
+```
+
+We use ESLint with the Next.js configuration. All code must pass linting before merge.
+
+### 4.3. Building
+
+```bash
+bun run build
+```
+
+This creates a production-optimized build in `.next/standalone/`.
+
+### 4.4. Testing
+
+#### 4.4.1. E2E Tests (Playwright)
+
+```bash
+# Run all E2E tests
+bun run test:e2e
+
+# Run with UI mode
+bun run test:e2e:ui
+```
+
+E2E tests are located in the `e2e/` directory.
+
+## 5. Code Style Guidelines
+
+### 5.1. TypeScript
+
+- **Strict mode** is enabled
+- Prefer `type` over `interface` unless extension is needed
+- No `any` without justification (use `unknown` with narrowing)
+- Validate external inputs with Zod
+
+### 5.2. React Components
+
+- Default to **Server Components** where possible
+- Add `"use client"` only when required (state, effects, browser APIs)
+- Colocate route-specific components under their route segment
+- Shared components go in `src/components/`
+
+### 5.3. State Management
+
+- Use Zustand for global client state
+- Keep stores focused and minimal
+- Persist only essential data (not results, not large objects)
+
+### 5.4. Styling
+
+Refer to the [UI Style Guide](#6-ui-style-guide) section below for detailed styling standards.
+
+## 6. UI Style Guide
+
+This section outlines the styling standards and best practices for the ClickLens codebase. Following these rules ensures consistency, maintainability, and a premium user experience.
+
+### 6.1. Core Principles
+
+- **Utility-First**: Use Tailwind CSS for all styling. Avoid custom CSS files unless creating shared utility classes in `globals.css`.
+- **Component-Driven**: Build UIs using shared components from `src/components/ui` (shadcn/ui).
+- **Dark Mode First**: Designs should look great in dark mode (default for ClickHouse-related tools), while supporting light mode.
+
+### 6.2. Typography
+
+We use `Geist Sans` for UI text and `Geist Mono` for data/code.
+
+- **UI Text**: Use `font-sans` (default).
+- **Data/Code**: Use `font-mono` for all database content, SQL queries, and technical values (IDs, hashes).
+
+#### 6.2.1. Utility Classes
+
+- `.data-table-cell`: Applied to table cells displaying database content.
+  - Definition: `@apply py-1.5 px-4 font-mono text-sm;`
+
+### 6.3. Colors & Theming
+
+Theme variables are defined in `src/app/globals.css`. Do not hardcode hex values.
+
+| Category   | Usage                      | Variable                                |
+| ---------- | -------------------------- | --------------------------------------- |
+| Background | Page background            | `bg-background`                         |
+| Foreground | Primary text               | `text-foreground`                       |
+| Muted      | Secondary text/backgrounds | `text-muted-foreground`, `bg-muted`     |
+| Primary    | Main actions/highlights    | `bg-primary`, `text-primary-foreground` |
+| Borders    | Component borders          | `border-border`                         |
+| Input      | Input borders              | `border-input`                          |
+
+### 6.4. Components
+
+#### 6.4.1. Buttons
+
+- **Do not use raw HTML `<button>` tags.**
+- Use `import { Button } from "@/components/ui/button"`.
+- Variants:
+  - `default`: Primary actions.
+  - `secondary`: Secondary actions.
+  - `ghost`: Icon buttons or subtle actions.
+  - `outline`: Bordered actions.
+  - `destructive`: Delete/Remove actions.
+
+#### 6.4.2. Tables
+
+- Use `import { Table, ... } from "@/components/ui/table"`.
+- Use `TableCell` with `.data-table-cell` for data rows to ensure consistent padding and font.
+- For interactive rows, use `ClickableTableRow`.
+
+#### 6.4.3. Icons
+
+- Use `lucide-react` for all icons.
+- Standard size: `w-4 h-4` (16px) for buttons, `w-3.5 h-3.5` (14px) for subtle indicators.
+
+### 6.5. Spacing & Layout
+
+- **Padding/Margin**: Use standard Tailwind spacing header (e.g., `p-4`, `m-2`).
+- **Flexbox**: Prefer `flex` and `gap-*` over margins for component layouts.
+- **Containers**: Use `container mx-auto` for page content wrappers.
+
+### 6.6. Best Practices
+
+- **Colocation**: Keep styles close to usage (Tailwind classes).
+- **Avoid Inline Styles**: Do not use `style={{ ... }}` unless dynamic values are required (e.g., resizable widths).
+- **Accessibility**: ensure interactive elements have `aria-label` if they contain only icons.
+
+### 6.7. Example: Data Grid
+
+```tsx
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+
+export function DataGrid({ data }) {
+  return (
+    <Table>
+      <TableBody>
+        {data.map((row) => (
+          <TableRow key={row.id}>
+            {/* Use global utility for consistent data cells */}
+            <TableCell className="data-table-cell">{row.value}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+```
+
+## 7. Adding a New Feature
+
+### 7.1. Plan the Routes
+
+Decide where your feature lives in `src/app/(app)/`:
+
+```
+src/app/(app)/my-feature/
+├── page.tsx           # Main page component
+└── layout.tsx         # Optional layout wrapper
+```
+
+### 7.2. Create Components
+
+Add feature-specific components:
+
+```
+src/components/my-feature/
+├── MyComponent.tsx
+├── AnotherComponent.tsx
+└── index.ts           # Barrel export
+```
+
+### 7.3. Add API Routes (if needed)
+
+```
+src/app/api/clickhouse/my-feature/
+└── route.ts           # Next.js route handler
+```
+
+### 7.4. Add to Navigation
+
+Update `src/components/layout/Sidebar.tsx` to add your feature to the navigation.
+
+### 7.5. Add Permissions (if needed)
+
+If your feature requires specific permissions:
+
+1. Add the permission to `src/components/auth/AuthProvider.tsx`
+2. Add permission check in your page component
+3. Add the permission derivation in `/api/auth/permissions/route.ts`
+
+## 8. API Development
+
+### 8.1. Creating an API Route
+
+```typescript
+// src/app/api/clickhouse/my-endpoint/route.ts
+import { NextResponse } from "next/server";
+import { getSessionClickHouseConfig } from "@/lib/auth";
+import { createClient } from "@/lib/clickhouse";
+
+export async function GET(request: Request) {
+  const config = await getSessionClickHouseConfig();
+
+  if (!config) {
+    return NextResponse.json(
+      { success: false, error: "Not authenticated" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const client = createClient(config);
+    const result = await client.query({ query: "SELECT 1" });
+
+    return NextResponse.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 8.2. Using the Two Client Types
+
+**Lens Client** (for metadata, no user context needed):
+
+```typescript
+import { createLensClient } from "@/lib/clickhouse";
+
+const client = createLensClient();
+const databases = await client.query({ query: "SHOW DATABASES" });
+```
+
+**User Client** (for user queries):
+
+```typescript
+import { getSessionClickHouseConfig } from "@/lib/auth";
+import { createClient } from "@/lib/clickhouse";
+
+const config = await getSessionClickHouseConfig();
+const client = createClient(config);
+const result = await client.query({ query: userSql });
+```
+
+## 9. Adding UI Components
+
+### 9.1. Using shadcn/ui
+
+We use shadcn/ui patterns. To add a new base component:
+
+```bash
+bunx shadcn-ui@latest add button
+```
+
+Components are added to `src/components/ui/`.
+
+### 9.2. Creating Custom Components
+
+Follow the existing patterns in `src/components/ui/`:
+
+```tsx
+// src/components/ui/my-component.tsx
+import { cn } from "@/lib/utils";
+
+interface MyComponentProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+export function MyComponent({ className, children }: MyComponentProps) {
+  return <div className={cn("base-classes", className)}>{children}</div>;
+}
+```
+
+## 10. Contributing Checklist
+
+Before submitting a PR:
+
+- [ ] Code passes `bun lint`
+- [ ] Code passes `bun run build`
+- [ ] New features have appropriate permissions checks
+- [ ] API routes handle errors gracefully
+- [ ] Components are properly typed
+- [ ] No `console.log` statements (use proper error handling)
+- [ ] PR description explains the change
+
+## 11. Getting Help
+
+- **Issues:** Open a GitHub issue for bugs or feature requests
+- **Discussions:** Use GitHub Discussions for questions
+- **Documentation:** Check `docs/internal/PROJECT_AUDIT.md` for detailed architecture info
+
+<Callout type="info">
+  For detailed architecture information, refer to the internal audit document at
+  `docs/internal/PROJECT_AUDIT.md`.
+</Callout>

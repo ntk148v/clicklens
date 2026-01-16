@@ -1,0 +1,158 @@
+# Getting Started
+
+This guide will help you get ClickLens up and running with your ClickHouse database.
+
+import { Callout } from "nextra/components";
+
+## 1. Prerequisites
+
+Before installing ClickLens, ensure you have:
+
+- A running **ClickHouse server** (version 21.8 or later recommended)
+- ClickHouse HTTP interface enabled (ports 8123 for HTTP, 8443 for HTTPS)
+- A ClickHouse user account with appropriate permissions
+
+<Callout type="info">
+  ClickLens uses the ClickHouse **HTTP interface** (ports 8123/8443). The native
+  TCP protocol (ports 9000/9440) is NOT supported.
+</Callout>
+
+## 2. Installation
+
+### 2.1. Option 1: Docker (Recommended)
+
+The fastest way to run ClickLens is with Docker:
+
+```bash
+docker run -d \
+  --name clicklens \
+  -p 3000:3000 \
+  -e CLICKHOUSE_HOST=your-clickhouse-host \
+  -e CLICKHOUSE_PORT=8123 \
+  -e LENS_USER=lensuser \
+  -e LENS_PASSWORD=your-password \
+  -e SESSION_SECRET=your-32-character-secret-key-here \
+  ghcr.io/ntk148v/clicklens:latest
+```
+
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### 2.2. Option 2: Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/ntk148v/clicklens:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - CLICKHOUSE_HOST=your-clickhouse-host
+      - CLICKHOUSE_PORT=8123
+      - LENS_USER=lensuser
+      - LENS_PASSWORD=your-password
+      - SESSION_SECRET=your-32-character-secret-key-here
+      - NODE_ENV=production
+      - DISABLE_SECURE_COOKIES=true
+    restart: unless-stopped
+```
+
+Then run:
+
+```bash
+docker-compose up -d
+```
+
+### 2.3. Option 3: Local Development
+
+For local development with Bun:
+
+```bash
+# Clone the repository
+git clone https://github.com/ntk148v/clicklens.git
+cd clicklens
+
+# Install dependencies
+bun install
+
+# Copy environment file
+cp env.sample .env.local
+
+# Edit .env.local with your ClickHouse connection details
+# Then start the development server
+bun dev
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+## 3. Understanding the Service User
+
+ClickLens uses **two types of ClickHouse connections**:
+
+### 3.1. Lens Service User (Environment Credentials)
+
+Configured via `LENS_USER` and `LENS_PASSWORD` environment variables. This service account is used for:
+
+- Schema introspection and metadata queries
+- System table access for monitoring features
+- Background operations that don't require user context
+
+**Recommended minimal grants:**
+
+```sql
+CREATE USER lensuser IDENTIFIED BY 'your-password';
+GRANT SELECT ON system.* TO lensuser;
+GRANT SHOW DATABASES ON *.* TO lensuser;
+GRANT SHOW TABLES ON *.* TO lensuser;
+GRANT SHOW COLUMNS ON *.* TO lensuser;
+```
+
+### 3.2. User Client (Session Credentials)
+
+When you log in to ClickLens, your ClickHouse username and password are used directly for:
+
+- Executing your SQL queries
+- Determining your UI permissions
+- All data access operations
+
+<Callout type="warning">
+  Your permissions in ClickLens are determined by your ClickHouse user's grants
+  and roles. ClickLens does not add or remove permissions—it simply reflects
+  what your ClickHouse account can do.
+</Callout>
+
+## 4. First Login
+
+1. Navigate to [http://localhost:3000](http://localhost:3000)
+2. Enter your ClickHouse credentials:
+   - **Username**: Your ClickHouse user
+   - **Password**: Your ClickHouse password
+3. Click **Login**
+
+Upon successful login, you'll be taken to the **Dashboard**.
+
+## 5. The Dashboard
+
+The Dashboard is your starting point in ClickLens. It displays feature cards based on your permissions:
+
+| Feature              | Description                                                  | Required Permission |
+| -------------------- | ------------------------------------------------------------ | ------------------- |
+| **SQL Console**      | Execute queries with syntax highlighting and auto-completion | `canExecuteQueries` |
+| **Table Explorer**   | Browse databases, tables, and parts                          | `canBrowseTables`   |
+| **Query Monitoring** | Monitor running queries and view history                     | `canViewProcesses`  |
+| **Cluster Health**   | CPU, memory, merges, and Keeper status                       | `canViewCluster`    |
+| **Access Control**   | Manage users and roles                                       | `canManageUsers`    |
+| **Logging**          | View system and query logs                                   | `canViewCluster`    |
+
+<Callout type="info">
+  Feature cards are dynamically shown or hidden based on your ClickHouse user's
+  permissions. If you're missing expected features, check your ClickHouse
+  grants.
+</Callout>
+
+## 6. Next Steps
+
+- Explore the [Features](/features) guide to learn about each module
+- Read about [Deployment](/deployment) for production configuration
+- Check the [Architecture](/architecture) documentation for technical details
