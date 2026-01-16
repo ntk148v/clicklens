@@ -7,7 +7,7 @@ import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
-import { TimeRangePicker } from "@/components/discover/TimeRangePicker";
+import { DiscoverTimeSelector } from "@/components/discover/DiscoverTimeSelector";
 import {
   Select,
   SelectContent,
@@ -71,10 +71,10 @@ export default function DiscoverPage() {
     { time: string; count: number }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [histLoading, setHistLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pageSize] = useState(100);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
 
   // Derived values for API calls
   const { activeMinTime, activeMaxTime } = useMemo(() => {
@@ -268,11 +268,13 @@ export default function DiscoverPage() {
     setError(null);
 
     try {
+      const offset = (page - 1) * pageSize;
       const params = new URLSearchParams({
         database: selectedDatabase,
         table: selectedTable,
         mode: "data",
         limit: String(pageSize),
+        offset: String(offset),
       });
 
       if (selectedColumns.length > 0) {
@@ -332,77 +334,15 @@ export default function DiscoverPage() {
     activeMinTime,
     activeMaxTime,
     customFilter,
+    page,
     pageSize,
   ]);
 
-  // Fetch more data (Load More)
-  const fetchMore = useCallback(async () => {
-    if (!selectedDatabase || !selectedTable) return;
-    if (rows.length >= totalHits) return; // No more data
-
-    setIsLoadingMore(true);
-
-    try {
-      const params = new URLSearchParams({
-        database: selectedDatabase,
-        table: selectedTable,
-        mode: "data",
-        limit: String(pageSize),
-        offset: String(rows.length), // Offset by current rows
-      });
-
-      if (selectedColumns.length > 0) {
-        params.set("columns", selectedColumns.join(","));
-      }
-
-      if (selectedTimeColumn) {
-        params.set("timeColumn", selectedTimeColumn);
-      }
-
-      if (activeMinTime) {
-        params.set("minTime", activeMinTime);
-      }
-
-      if (activeMaxTime) {
-        params.set("maxTime", activeMaxTime);
-      }
-
-      if (customFilter.trim()) {
-        params.set("filter", customFilter.trim());
-      }
-
-      const res = await fetch(`/api/clickhouse/discover?${params}`);
-      const data = await res.json();
-
-      if (data.success && data.data) {
-        // Append new rows to existing
-        setRows((prev) => [...prev, ...(data.data.rows || [])]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch more data:", err);
-      toast({
-        variant: "destructive",
-        title: "Load More Error",
-        description: "Failed to load more data. Please try again.",
-      });
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [
-    selectedDatabase,
-    selectedTable,
-    selectedColumns,
-    selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    customFilter,
-    rows.length,
-    totalHits,
-    pageSize,
-  ]);
+  // Removed fetchMore
 
   // Fetch histogram
   const fetchHistogram = useCallback(async () => {
+    // ... (same as before) ...
     if (!selectedDatabase || !selectedTable || !selectedTimeColumn) {
       setHistogramData([]);
       return;
@@ -438,12 +378,6 @@ export default function DiscoverPage() {
       }
     } catch (err) {
       console.error("Failed to fetch histogram:", err);
-      // Histogram failure shouldn't blocking, but maybe we show a warning if it persists
-      // toast({
-      //   variant: "destructive",
-      //   title: "Histogram Error",
-      //   description: "Failed to load histogram data.",
-      // });
     } finally {
       setHistLoading(false);
     }
@@ -458,16 +392,34 @@ export default function DiscoverPage() {
 
   // Execute search
   const handleSearch = useCallback(() => {
-    fetchData();
-    fetchHistogram();
-  }, [fetchData, fetchHistogram]);
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      fetchData();
+      fetchHistogram();
+    }
+  }, [page, fetchData, fetchHistogram]);
 
-  // Initial fetch when deps change (but after schema loaded)
+  // Effect to fetch active data when deps change
   useEffect(() => {
     if (schema) {
-      handleSearch();
+      fetchData();
     }
-  }, [schema, selectedTimeColumn, activeMinTime, activeMaxTime]); // Re-fetch when time range changes
+  }, [schema, fetchData]); // fetchData depends on page, pageSize, filters.
+
+  // Effect to fetch histogram when deps change (excluding pagination)
+  useEffect(() => {
+    if (schema) {
+      fetchHistogram();
+    }
+  }, [
+    schema,
+    fetchHistogram,
+    selectedTimeColumn,
+    activeMinTime,
+    activeMaxTime,
+    customFilter,
+  ]); // Explicit deps for histogram
 
   // Handle histogram bar click (Zoom in)
   const handleHistogramBarClick = (startTime: string, endTime?: string) => {
@@ -513,7 +465,7 @@ export default function DiscoverPage() {
         title="Discover"
         actions={
           <div className="flex items-center gap-2">
-            <TimeRangePicker
+            <DiscoverTimeSelector
               value={flexibleRange}
               onChange={setFlexibleRange}
             />
@@ -672,12 +624,16 @@ export default function DiscoverPage() {
                     columns={schema.columns}
                     selectedColumns={selectedColumns}
                     isLoading={isLoading && rows.length === 0}
-                    hasMore={rows.length < totalHits}
-                    onLoadMore={fetchMore}
+                    // Pagination
+                    page={page}
+                    pageSize={pageSize}
+                    totalHits={totalHits}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
                   />
-                  {isLoadingMore && (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                      Loading more...
+                  {isLoading && rows.length > 0 && (
+                    <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     </div>
                   )}
                 </div>

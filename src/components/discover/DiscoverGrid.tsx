@@ -32,8 +32,12 @@ interface DiscoverGridProps {
   columns: ColumnMetadata[];
   selectedColumns: string[];
   isLoading: boolean;
-  onLoadMore?: () => void;
-  hasMore?: boolean;
+  // Pagination props
+  page: number; // 1-indexed for display
+  pageSize: number;
+  totalHits: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 }
 
 const columnHelper = createColumnHelper<DiscoverRow>();
@@ -136,6 +140,9 @@ function getLevelBadge(level: string) {
   return <Badge variant="outline">{level}</Badge>;
 }
 
+// Import PaginationControls
+import { PaginationControls } from "@/components/monitoring";
+
 /**
  * Data grid for Discover results with dynamic columns
  *
@@ -143,16 +150,19 @@ function getLevelBadge(level: string) {
  * - Dynamic column generation based on selected fields
  * - Smart cell formatting based on data type
  * - Sortable columns
- * - Row detail sheet for viewing full record (matches ClickableTableRow style)
- * - Load more button for pagination
+ * - Row detail sheet for viewing full record
+ * - Pagination controls
  */
 export const DiscoverGrid = memo(function DiscoverGrid({
   rows,
   columns: columnMetadata,
   selectedColumns,
   isLoading,
-  onLoadMore,
-  hasMore = false,
+  page,
+  pageSize,
+  totalHits,
+  onPageChange,
+  onPageSizeChange,
 }: DiscoverGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
@@ -224,7 +234,15 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   const table = useReactTable({
     data: rows,
     columns: tableColumns,
-    state: { sorting },
+    state: {
+      sorting,
+      pagination: {
+        pageIndex: page - 1,
+        pageSize: pageSize,
+      },
+    },
+    manualPagination: true,
+    pageCount: Math.ceil(totalHits / pageSize),
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -309,14 +327,15 @@ export const DiscoverGrid = memo(function DiscoverGrid({
           </Table>
         </div>
 
-        {/* Load More */}
-        {hasMore && onLoadMore && (
-          <div className="p-4 border-t flex justify-center">
-            <Button variant="outline" onClick={onLoadMore} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Load More"}
-            </Button>
-          </div>
-        )}
+        {/* Pagination Controls */}
+        <PaginationControls
+          page={page}
+          totalPages={Math.ceil(totalHits / pageSize)}
+          totalItems={totalHits}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
       </div>
 
       {/* Row Detail Sheet - using RecordDetailSheet for consistency */}
