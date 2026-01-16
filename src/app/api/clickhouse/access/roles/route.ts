@@ -331,6 +331,16 @@ export async function POST(
         for (const priv of dp.privileges) {
           try {
             await client.command(`GRANT ${priv} ON ${target} TO ${quotedRole}`);
+            // Auto-grant REMOTE when SELECT is granted (needed for clusterAllReplicas in Discover)
+            if (priv === "SELECT") {
+              try {
+                await client.command(
+                  `GRANT REMOTE ON ${target} TO ${quotedRole}`
+                );
+              } catch {
+                // REMOTE grant may fail on non-cluster setups, ignore silently
+              }
+            }
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             console.warn(`Failed to grant ${priv} on ${target}:`, msg);
@@ -483,6 +493,16 @@ export async function PUT(
         for (const priv of dp.privileges) {
           try {
             await client.command(`GRANT ${priv} ON ${target} TO ${quotedRole}`);
+            // Auto-grant REMOTE when SELECT is granted (needed for clusterAllReplicas in Discover)
+            if (priv === "SELECT") {
+              try {
+                await client.command(
+                  `GRANT REMOTE ON ${target} TO ${quotedRole}`
+                );
+              } catch {
+                // REMOTE grant may fail on non-cluster setups, ignore silently
+              }
+            }
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             console.warn(`Failed to grant ${priv} on ${target}:`, msg);
