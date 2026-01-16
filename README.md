@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClickLens
 
-## Getting Started
+[![GitHub](https://img.shields.io/github/license/ntk148v/clicklens)](https://github.com/ntk148v/clicklens/blob/master/LICENSE)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fntk148v%2Fclicklens-blue)](https://ghcr.io/ntk148v/clicklens)
 
-First, run the development server:
+A modern, powerful web interface for managing and monitoring [ClickHouse](https://clickhouse.com/) databases.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 1. Introduction
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ClickLens provides a comprehensive suite of tools for developers, analysts, and administrators to interact with their ClickHouse clusters efficiently.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1.1. Why ClickLens?
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+ClickHouse is an incredible analytical database, but managing it via CLI or basic tools can be challenging. ClickLens bridges the gap by offering:
 
-## Learn More
+- **Discover** - Flexible, Kibana-like data exploration for any table
+- **SQL Console** - Write, execute, and analyze queries with syntax highlighting and streaming results
+- **Real-time Monitoring** - Keep an eye on your cluster's health, query performance, and resource usage
+- **Schema Explorer** - Navigate databases, tables, columns, parts, and more
+- **Access Control** - Manage users and roles directly from the UI
+- **Native RBAC** - Your UI permissions are derived directly from your ClickHouse grants
 
-To learn more about Next.js, take a look at the following resources:
+## 2. Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Feature             | Description                                                                   |
+| ------------------- | ----------------------------------------------------------------------------- |
+| **Discover**        | Kibana-style exploration with time filtering, field selection, and histograms |
+| **SQL Console**     | Multi-tab editor with autocomplete, EXPLAIN, saved queries, and streaming     |
+| **Table Explorer**  | Browse schemas with parts, merges, mutations, and DDL views                   |
+| **Monitoring**      | 8 dashboards for metrics, cluster, disks, Keeper, and replication             |
+| **Query Analytics** | Running queries, history, performance analysis, and cache stats               |
+| **Logging**         | Server logs, session logs, and crash logs                                     |
+| **Access Control**  | User and role management with feature roles                                   |
+| **Settings**        | View server and session settings                                              |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 3. Documentation
 
-## Deploy on Vercel
+Full documentation is available at **[https://ntk148v.github.io/clicklens](https://ntk148v.github.io/clicklens)**.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Section                                                                | Description                          |
+| ---------------------------------------------------------------------- | ------------------------------------ |
+| [Getting Started](https://ntk148v.github.io/clicklens/getting-started) | Installation and first login         |
+| [Features](https://ntk148v.github.io/clicklens/features)               | All features with usage instructions |
+| [Architecture](https://ntk148v.github.io/clicklens/architecture)       | Tech stack, data flow, internals     |
+| [Deployment](https://ntk148v.github.io/clicklens/deployment)           | Configuration, Docker, RBAC setup    |
+| [Contributing](https://ntk148v.github.io/clicklens/contributing)       | Development setup, code guidelines   |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 4. Screenshots
+
+<!-- TODO: Add screenshots here -->
+
+## 5. License
+
+[MIT](LICENSE)

@@ -4,11 +4,11 @@ This guide covers production deployment of ClickLens for operators and DevOps te
 
 import { Callout } from "nextra/components";
 
-## Environment Variables
+## 1. Environment Variables
 
 ClickLens is configured entirely through environment variables. Here's the complete reference:
 
-### Required Variables
+### 1.1. Required Variables
 
 | Variable          | Description                                    | Example                           |
 | ----------------- | ---------------------------------------------- | --------------------------------- |
@@ -16,7 +16,7 @@ ClickLens is configured entirely through environment variables. Here's the compl
 | `LENS_USER`       | Service account username for metadata queries  | `lensuser`                        |
 | `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...` |
 
-### Optional Variables
+### 1.2. Optional Variables
 
 | Variable                  | Default                         | Description                                                                 |
 | ------------------------- | ------------------------------- | --------------------------------------------------------------------------- |
@@ -33,7 +33,7 @@ ClickLens is configured entirely through environment variables. Here's the compl
   production, generate a strong secret with: ```bash openssl rand -base64 32 ```
 </Callout>
 
-### Sample `.env.local` File
+### 1.3. Sample `.env.local` File
 
 ```bash
 # ClickHouse Server Connection (required)
@@ -50,9 +50,9 @@ LENS_PASSWORD=your-password
 SESSION_SECRET=complex_password_at_least_32_characters_long_for_security
 ```
 
-## Docker Deployment
+## 2. Docker Deployment
 
-### Quick Start
+### 2.1. Quick Start
 
 ```bash
 docker run -d \
@@ -67,7 +67,7 @@ docker run -d \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
-### Docker Compose
+### 2.2. Docker Compose
 
 ```yaml
 version: "3.8"
@@ -101,14 +101,14 @@ volumes:
   clickhouse-data:
 ```
 
-### Docker Image Details
+### 2.3. Docker Image Details
 
 - **Base Image:** `node:20-alpine` (runtime)
 - **Build Image:** `oven/bun:latest` (build stage)
 - **Exposed Port:** `3000`
 - **Output:** Next.js standalone build (optimized for containers)
 
-### Building Custom Image
+### 2.4. Building Custom Image
 
 ```bash
 docker build \
@@ -117,11 +117,11 @@ docker build \
   .
 ```
 
-## RBAC Configuration
+## 3. RBAC Configuration
 
 ClickLens uses ClickHouse's native RBAC. To enable all features for a user, you can use the predefined **Feature Roles**.
 
-### Feature Roles
+### 3.1. Feature Roles
 
 These are ClickHouse roles that ClickLens expects. Create them to simplify user permission management:
 
@@ -134,7 +134,7 @@ These are ClickHouse roles that ClickLens expects. Create them to simplify user 
 | `clicklens_table_admin`     | DDL operations (TRUNCATE, OPTIMIZE)    | `TRUNCATE`, `OPTIMIZE ON *.*`                                                                       |
 | `clicklens_settings_admin`  | View system settings                   | `SELECT ON system.{settings,server_settings}`                                                       |
 
-### Creating Feature Roles
+### 3.2. Creating Feature Roles
 
 ```sql
 -- Table Explorer Role
@@ -179,7 +179,7 @@ GRANT SELECT ON system.settings TO clicklens_settings_admin;
 GRANT SELECT ON system.server_settings TO clicklens_settings_admin;
 ```
 
-### Creating the Lens Service User
+### 3.3. Creating the Lens Service User
 
 The Lens user needs minimal read access for metadata queries:
 
@@ -196,7 +196,7 @@ GRANT SHOW COLUMNS ON *.* TO lensuser;
 GRANT SHOW DICTIONARIES ON *.* TO lensuser;
 ```
 
-### Creating Application Users
+### 3.4. Creating Application Users
 
 Example: Create a developer user with full ClickLens access:
 
@@ -227,9 +227,9 @@ GRANT clicklens_cluster_monitor TO analyst;
 GRANT SELECT ON analytics.* TO analyst;
 ```
 
-## Reverse Proxy Configuration
+## 4. Reverse Proxy Configuration
 
-### Nginx
+### 4.1. Nginx
 
 ```nginx
 server {
@@ -255,7 +255,7 @@ server {
   session cookies work over the HTTP connection between proxy and app.
 </Callout>
 
-## Health Checks
+## 5. Health Checks
 
 ClickLens provides a health check endpoint:
 
@@ -275,9 +275,9 @@ Use this endpoint for:
 - Load balancer health checks
 - Monitoring systems
 
-## Troubleshooting
+## 6. Troubleshooting
 
-### Common Issues
+### 6.1. Common Issues
 
 **"Session expired" errors:**
 

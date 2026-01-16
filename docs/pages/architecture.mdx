@@ -4,7 +4,9 @@ This document describes the technical architecture of ClickLens for developers a
 
 import { Callout } from "nextra/components";
 
-## Tech Stack
+![ClickLens Architecture](/architecture-diagram.png)
+
+## 1. Tech Stack
 
 | Layer                 | Technology                | Version   |
 | --------------------- | ------------------------- | --------- |
@@ -20,7 +22,7 @@ import { Callout } from "nextra/components";
 | **Charts**            | Recharts                  | 3.6.0     |
 | **Editor**            | CodeMirror 6              | 6.x       |
 
-## Project Structure
+## 2. Project Structure
 
 ```
 src/
@@ -60,34 +62,27 @@ src/
     └── sql/                # SQL parsing utilities
 ```
 
-## Data Flow
+## 3. Data Flow
 
-### Query Execution (NDJSON Streaming)
+### 3.1. Query Execution (NDJSON Streaming)
 
 ClickLens uses a streaming architecture for query execution to handle large result sets efficiently:
 
-```
-┌─────────────────┐     POST /api/clickhouse/query
-│   SQL Editor    │ ───────────────────────────────────►
-│   (Browser)     │
-└─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │   Next.js API Route │
-                    │   (Server)          │
-                    └─────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │   @clickhouse/client│
-                    │   (HTTP Interface)  │
-                    └─────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │   ClickHouse Server │
-                    └─────────────────────┘
+```mermaid
+sequenceDiagram
+    participant Browser as SQL Editor (Browser)
+    participant API as Next.js API Route
+    participant Client as @clickhouse/client
+    participant CH as ClickHouse Server
+
+    Browser->>API: POST /api/clickhouse/query
+    API->>Client: Execute query
+    Client->>CH: SQL via HTTP interface
+    CH-->>Client: NDJSON stream
+    Client-->>API: Stream events
+    API-->>Browser: Streaming response
+
+    Note over Browser,CH: Stream Events: meta, data, progress, done, error
 ```
 
 **Stream Events (NDJSON):**
@@ -107,23 +102,27 @@ ClickLens uses a streaming architecture for query execution to handle large resu
 3. Accumulate rows in component state
 4. Display progress while streaming
 
-### Query Cancellation
+### 3.2. Query Cancellation
 
-```
-┌─────────────────┐     POST /api/clickhouse/kill
-│   Cancel Button │ ───────────────────────────────────►
-└─────────────────┘                    │
-                                       ▼
-                              KILL QUERY WHERE query_id = '...'
+```mermaid
+sequenceDiagram
+    participant Browser as Cancel Button
+    participant API as Next.js API Route
+    participant CH as ClickHouse Server
+
+    Browser->>API: POST /api/clickhouse/kill
+    API->>CH: KILL QUERY WHERE query_id = '...'
+    CH-->>API: Query terminated
+    API-->>Browser: Success response
 ```
 
 Each query is assigned a UUID (`query_id`) which enables cancellation via ClickHouse's `KILL QUERY` command.
 
-## State Management
+## 4. State Management
 
 ClickLens uses Zustand for client-side state, split into three stores:
 
-### `useTabsStore` (Persisted)
+### 4.1. `useTabsStore` (Persisted)
 
 **File:** `src/lib/store/tabs.ts`
 
@@ -143,7 +142,7 @@ interface TabsState {
 - History entries include: SQL, duration, rows, bytes, memory, user, error
 - Maximum 100 history entries retained
 
-### `useSqlBrowserStore` (Transient)
+### 4.2. `useSqlBrowserStore` (Transient)
 
 **File:** `src/lib/store/sql-browser.ts`
 
@@ -166,15 +165,15 @@ interface SqlBrowserState {
 - Columns have a 5-minute TTL cache
 - Cache keys use `database.table` format
 
-### `useAccessStore` (Transient)
+### 4.3. `useAccessStore` (Transient)
 
 **File:** `src/lib/store/access.ts`
 
 Manages access control UI state. Not persisted.
 
-## Authentication & Session
+## 5. Authentication & Session
 
-### Session Management
+### 5.1. Session Management
 
 ClickLens uses `iron-session` for secure, encrypted cookie-based sessions.
 
@@ -204,7 +203,7 @@ interface SessionData {
   security.
 </Callout>
 
-### Permission Derivation
+### 5.2. Permission Derivation
 
 Permissions are **not stored**—they're derived from ClickHouse grants at login time.
 
@@ -231,7 +230,7 @@ Permissions are **not stored**—they're derived from ClickHouse grants at login
 4. Permissions are cached in client-side AuthContext
 5. UI components use `useAuth()` hook to check permissions
 
-### AuthProvider
+### 5.3. AuthProvider
 
 **File:** `src/components/auth/AuthProvider.tsx`
 
@@ -242,9 +241,9 @@ The `AuthProvider` component wraps the entire app and:
 - Provides `login()`, `logout()`, `refresh()` functions
 - Redirects to `/login` if unauthenticated
 
-## ClickHouse Client
+## 6. ClickHouse Client
 
-### Dual Client Model
+### 6.1. Dual Client Model
 
 ClickLens uses two types of ClickHouse connections:
 
@@ -260,7 +259,7 @@ ClickLens uses two types of ClickHouse connections:
 - Used for all user-initiated queries
 - Permissions reflect the user's ClickHouse grants
 
-### Configuration
+### 6.2. Configuration
 
 **File:** `src/lib/clickhouse/config.ts`
 
@@ -276,7 +275,7 @@ interface ClickHouseConfig {
 }
 ```
 
-### HTTP Interface
+### 6.3. HTTP Interface
 
 ClickLens uses the ClickHouse HTTP interface exclusively:
 
@@ -284,7 +283,7 @@ ClickLens uses the ClickHouse HTTP interface exclusively:
 - Custom headers: `X-ClickHouse-User`, `X-ClickHouse-Key`, `X-ClickHouse-Database`
 - Native TCP protocol (9000/9440) is NOT supported
 
-## Custom Hooks
+## 7. Custom Hooks
 
 | Hook                 | File                      | Purpose                         |
 | -------------------- | ------------------------- | ------------------------------- |
@@ -295,7 +294,7 @@ ClickLens uses the ClickHouse HTTP interface exclusively:
 | `useSettings`        | `use-settings.ts`         | Settings management             |
 | `useTableExplorer`   | `use-table-explorer.ts`   | Table browsing state            |
 
-## UI Component Library
+## 8. UI Component Library
 
 ClickLens uses shadcn/ui patterns with Radix UI primitives:
 

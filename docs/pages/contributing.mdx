@@ -4,14 +4,14 @@ Welcome to ClickLens! This guide will help you set up your development environme
 
 import { Callout } from "nextra/components";
 
-## Prerequisites
+## 1. Prerequisites
 
 - **Bun** (latest version) - Package manager and runtime
 - **Node.js** (20.x) - For production builds
 - **Git** - Version control
 - **A ClickHouse server** - For testing
 
-## Quick Start
+## 2. Quick Start
 
 ```bash
 # Clone the repository
@@ -30,7 +30,7 @@ bun dev
 
 The app will be available at [http://localhost:3000](http://localhost:3000).
 
-## Project Structure
+## 3. Project Structure
 
 ```
 clicklens/
@@ -44,9 +44,9 @@ clicklens/
 └── scripts/                    # Build/utility scripts
 ```
 
-### Key Directories
+### 3.1. Key Directories
 
-#### `src/app/` - Next.js Routes
+#### 3.1.1. `src/app/` - Next.js Routes
 
 The App Router structure with route groups:
 
@@ -56,7 +56,7 @@ The App Router structure with route groups:
 | `api/`    | API route handlers                                    |
 | `login/`  | Public authentication page                            |
 
-#### `src/components/` - UI Components
+#### 3.1.2. `src/components/` - UI Components
 
 | Directory     | Purpose                                                                            |
 | ------------- | ---------------------------------------------------------------------------------- |
@@ -70,7 +70,7 @@ The App Router structure with route groups:
 | `tables/`     | Table explorer tabs (8 components)                                                 |
 | `ui/`         | shadcn/ui base components (30 components)                                          |
 
-#### `src/lib/` - Core Libraries
+#### 3.1.3. `src/lib/` - Core Libraries
 
 | Directory/File            | Purpose                                                   |
 | ------------------------- | --------------------------------------------------------- |
@@ -84,9 +84,9 @@ The App Router structure with route groups:
 | `utils.ts`                | General utility functions                                 |
 | `clickhouse-functions.ts` | ClickHouse function definitions for autocomplete          |
 
-## Development Workflow
+## 4. Development Workflow
 
-### Running the Dev Server
+### 4.1. Running the Dev Server
 
 ```bash
 bun dev
@@ -98,7 +98,7 @@ This starts:
 - TypeScript type checking
 - Tailwind CSS JIT compilation
 
-### Linting
+### 4.2. Linting
 
 ```bash
 bun lint
@@ -106,7 +106,7 @@ bun lint
 
 We use ESLint with the Next.js configuration. All code must pass linting before merge.
 
-### Building
+### 4.3. Building
 
 ```bash
 bun run build
@@ -114,9 +114,9 @@ bun run build
 
 This creates a production-optimized build in `.next/standalone/`.
 
-### Testing
+### 4.4. Testing
 
-#### E2E Tests (Playwright)
+#### 4.4.1. E2E Tests (Playwright)
 
 ```bash
 # Run all E2E tests
@@ -128,37 +128,127 @@ bun run test:e2e:ui
 
 E2E tests are located in the `e2e/` directory.
 
-## Code Style Guidelines
+## 5. Code Style Guidelines
 
-### TypeScript
+### 5.1. TypeScript
 
 - **Strict mode** is enabled
 - Prefer `type` over `interface` unless extension is needed
 - No `any` without justification (use `unknown` with narrowing)
 - Validate external inputs with Zod
 
-### React Components
+### 5.2. React Components
 
 - Default to **Server Components** where possible
 - Add `"use client"` only when required (state, effects, browser APIs)
 - Colocate route-specific components under their route segment
 - Shared components go in `src/components/`
 
-### State Management
+### 5.3. State Management
 
 - Use Zustand for global client state
 - Keep stores focused and minimal
 - Persist only essential data (not results, not large objects)
 
-### Styling
+### 5.4. Styling
 
-- Use Tailwind CSS exclusively
-- Follow shadcn/ui patterns for new components
-- Use `cn()` helper for conditional classes
+Refer to the [UI Style Guide](#6-ui-style-guide) section below for detailed styling standards.
 
-## Adding a New Feature
+## 6. UI Style Guide
 
-### 1. Plan the Routes
+This section outlines the styling standards and best practices for the ClickLens codebase. Following these rules ensures consistency, maintainability, and a premium user experience.
+
+### 6.1. Core Principles
+
+- **Utility-First**: Use Tailwind CSS for all styling. Avoid custom CSS files unless creating shared utility classes in `globals.css`.
+- **Component-Driven**: Build UIs using shared components from `src/components/ui` (shadcn/ui).
+- **Dark Mode First**: Designs should look great in dark mode (default for ClickHouse-related tools), while supporting light mode.
+
+### 6.2. Typography
+
+We use `Geist Sans` for UI text and `Geist Mono` for data/code.
+
+- **UI Text**: Use `font-sans` (default).
+- **Data/Code**: Use `font-mono` for all database content, SQL queries, and technical values (IDs, hashes).
+
+#### 6.2.1. Utility Classes
+
+- `.data-table-cell`: Applied to table cells displaying database content.
+  - Definition: `@apply py-1.5 px-4 font-mono text-sm;`
+
+### 6.3. Colors & Theming
+
+Theme variables are defined in `src/app/globals.css`. Do not hardcode hex values.
+
+| Category   | Usage                      | Variable                                |
+| ---------- | -------------------------- | --------------------------------------- |
+| Background | Page background            | `bg-background`                         |
+| Foreground | Primary text               | `text-foreground`                       |
+| Muted      | Secondary text/backgrounds | `text-muted-foreground`, `bg-muted`     |
+| Primary    | Main actions/highlights    | `bg-primary`, `text-primary-foreground` |
+| Borders    | Component borders          | `border-border`                         |
+| Input      | Input borders              | `border-input`                          |
+
+### 6.4. Components
+
+#### 6.4.1. Buttons
+
+- **Do not use raw HTML `<button>` tags.**
+- Use `import { Button } from "@/components/ui/button"`.
+- Variants:
+  - `default`: Primary actions.
+  - `secondary`: Secondary actions.
+  - `ghost`: Icon buttons or subtle actions.
+  - `outline`: Bordered actions.
+  - `destructive`: Delete/Remove actions.
+
+#### 6.4.2. Tables
+
+- Use `import { Table, ... } from "@/components/ui/table"`.
+- Use `TableCell` with `.data-table-cell` for data rows to ensure consistent padding and font.
+- For interactive rows, use `ClickableTableRow`.
+
+#### 6.4.3. Icons
+
+- Use `lucide-react` for all icons.
+- Standard size: `w-4 h-4` (16px) for buttons, `w-3.5 h-3.5` (14px) for subtle indicators.
+
+### 6.5. Spacing & Layout
+
+- **Padding/Margin**: Use standard Tailwind spacing header (e.g., `p-4`, `m-2`).
+- **Flexbox**: Prefer `flex` and `gap-*` over margins for component layouts.
+- **Containers**: Use `container mx-auto` for page content wrappers.
+
+### 6.6. Best Practices
+
+- **Colocation**: Keep styles close to usage (Tailwind classes).
+- **Avoid Inline Styles**: Do not use `style={{ ... }}` unless dynamic values are required (e.g., resizable widths).
+- **Accessibility**: ensure interactive elements have `aria-label` if they contain only icons.
+
+### 6.7. Example: Data Grid
+
+```tsx
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+
+export function DataGrid({ data }) {
+  return (
+    <Table>
+      <TableBody>
+        {data.map((row) => (
+          <TableRow key={row.id}>
+            {/* Use global utility for consistent data cells */}
+            <TableCell className="data-table-cell">{row.value}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+```
+
+## 7. Adding a New Feature
+
+### 7.1. Plan the Routes
 
 Decide where your feature lives in `src/app/(app)/`:
 
@@ -168,7 +258,7 @@ src/app/(app)/my-feature/
 └── layout.tsx         # Optional layout wrapper
 ```
 
-### 2. Create Components
+### 7.2. Create Components
 
 Add feature-specific components:
 
@@ -179,18 +269,18 @@ src/components/my-feature/
 └── index.ts           # Barrel export
 ```
 
-### 3. Add API Routes (if needed)
+### 7.3. Add API Routes (if needed)
 
 ```
 src/app/api/clickhouse/my-feature/
 └── route.ts           # Next.js route handler
 ```
 
-### 4. Add to Navigation
+### 7.4. Add to Navigation
 
 Update `src/components/layout/Sidebar.tsx` to add your feature to the navigation.
 
-### 5. Add Permissions (if needed)
+### 7.5. Add Permissions (if needed)
 
 If your feature requires specific permissions:
 
@@ -198,9 +288,9 @@ If your feature requires specific permissions:
 2. Add permission check in your page component
 3. Add the permission derivation in `/api/auth/permissions/route.ts`
 
-## API Development
+## 8. API Development
 
-### Creating an API Route
+### 8.1. Creating an API Route
 
 ```typescript
 // src/app/api/clickhouse/my-endpoint/route.ts
@@ -235,7 +325,7 @@ export async function GET(request: Request) {
 }
 ```
 
-### Using the Two Client Types
+### 8.2. Using the Two Client Types
 
 **Lens Client** (for metadata, no user context needed):
 
@@ -257,9 +347,9 @@ const client = createClient(config);
 const result = await client.query({ query: userSql });
 ```
 
-## Adding UI Components
+## 9. Adding UI Components
 
-### Using shadcn/ui
+### 9.1. Using shadcn/ui
 
 We use shadcn/ui patterns. To add a new base component:
 
@@ -269,7 +359,7 @@ bunx shadcn-ui@latest add button
 
 Components are added to `src/components/ui/`.
 
-### Creating Custom Components
+### 9.2. Creating Custom Components
 
 Follow the existing patterns in `src/components/ui/`:
 
@@ -287,7 +377,7 @@ export function MyComponent({ className, children }: MyComponentProps) {
 }
 ```
 
-## Contributing Checklist
+## 10. Contributing Checklist
 
 Before submitting a PR:
 
@@ -299,7 +389,7 @@ Before submitting a PR:
 - [ ] No `console.log` statements (use proper error handling)
 - [ ] PR description explains the change
 
-## Getting Help
+## 11. Getting Help
 
 - **Issues:** Open a GitHub issue for bugs or feature requests
 - **Discussions:** Use GitHub Discussions for questions

@@ -4,7 +4,7 @@ This guide will help you get ClickLens up and running with your ClickHouse datab
 
 import { Callout } from "nextra/components";
 
-## Prerequisites
+## 1. Prerequisites
 
 Before installing ClickLens, ensure you have:
 
@@ -17,9 +17,9 @@ Before installing ClickLens, ensure you have:
   TCP protocol (ports 9000/9440) is NOT supported.
 </Callout>
 
-## Installation
+## 2. Installation
 
-### Option 1: Docker (Recommended)
+### 2.1. Option 1: Docker (Recommended)
 
 The fastest way to run ClickLens is with Docker:
 
@@ -37,7 +37,7 @@ docker run -d \
 
 Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Option 2: Docker Compose
+### 2.2. Option 2: Docker Compose
 
 Create a `docker-compose.yml` file:
 
@@ -64,7 +64,7 @@ Then run:
 docker-compose up -d
 ```
 
-### Option 3: Local Development
+### 2.3. Option 3: Local Development
 
 For local development with Bun:
 
@@ -86,11 +86,11 @@ bun dev
 
 The app will be available at [http://localhost:3000](http://localhost:3000).
 
-## Understanding the Service User
+## 3. Understanding the Service User
 
 ClickLens uses **two types of ClickHouse connections**:
 
-### 1. Lens Service User (Environment Credentials)
+### 3.1. Lens Service User (Environment Credentials)
 
 Configured via `LENS_USER` and `LENS_PASSWORD` environment variables. This service account is used for:
 
@@ -108,7 +108,7 @@ GRANT SHOW TABLES ON *.* TO lensuser;
 GRANT SHOW COLUMNS ON *.* TO lensuser;
 ```
 
-### 2. User Client (Session Credentials)
+### 3.2. User Client (Session Credentials)
 
 When you log in to ClickLens, your ClickHouse username and password are used directly for:
 
@@ -122,7 +122,7 @@ When you log in to ClickLens, your ClickHouse username and password are used dir
   what your ClickHouse account can do.
 </Callout>
 
-## First Login
+## 4. First Login
 
 1. Navigate to [http://localhost:3000](http://localhost:3000)
 2. Enter your ClickHouse credentials:
@@ -132,7 +132,7 @@ When you log in to ClickLens, your ClickHouse username and password are used dir
 
 Upon successful login, you'll be taken to the **Dashboard**.
 
-## The Dashboard
+## 5. The Dashboard
 
 The Dashboard is your starting point in ClickLens. It displays feature cards based on your permissions:
 
@@ -151,7 +151,7 @@ The Dashboard is your starting point in ClickLens. It displays feature cards bas
   grants.
 </Callout>
 
-## Next Steps
+## 6. Next Steps
 
 - Explore the [Features](/features) guide to learn about each module
 - Read about [Deployment](/deployment) for production configuration
