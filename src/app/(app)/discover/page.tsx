@@ -71,10 +71,12 @@ export default function DiscoverPage() {
     { time: string; count: number }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [histLoading, setHistLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [pageSize] = useState(100);
 
   // Derived values for API calls
   const { activeMinTime, activeMaxTime } = useMemo(() => {
@@ -192,6 +194,8 @@ export default function DiscoverPage() {
     setSelectedTable("");
     setSchema(null);
     setRows([]);
+    setNextCursor(null);
+    setHasMore(false);
     setHistogramData([]);
   }, [selectedDatabase]);
 
@@ -254,95 +258,115 @@ export default function DiscoverPage() {
 
     // Clear results when table changes
     setRows([]);
+    setNextCursor(null);
+    setHasMore(false);
     setHistogramData([]);
     setCustomFilter("");
   }, [selectedDatabase, selectedTable]);
 
   // Fetch data
-  const fetchData = useCallback(async () => {
-    if (!selectedDatabase || !selectedTable) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const offset = (page - 1) * pageSize;
-      const params = new URLSearchParams({
-        database: selectedDatabase,
-        table: selectedTable,
-        mode: "data",
-        limit: String(pageSize),
-        offset: String(offset),
-      });
-
-      if (selectedColumns.length > 0) {
-        params.set("columns", selectedColumns.join(","));
+  const fetchData = useCallback(
+    async (cursorToLoad?: string | null) => {
+      if (!selectedDatabase || !selectedTable) {
+        return;
       }
 
-      if (selectedTimeColumn) {
-        params.set("timeColumn", selectedTimeColumn);
-      }
-
-      if (activeMinTime) {
-        params.set("minTime", activeMinTime);
-      }
-
-      if (activeMaxTime) {
-        params.set("maxTime", activeMaxTime);
-      }
-
-      if (customFilter.trim()) {
-        params.set("filter", customFilter.trim());
-      }
-
-      const res = await fetch(`/api/clickhouse/discover?${params}`);
-      const data = await res.json();
-
-      if (data.success && data.data) {
-        setRows(data.data.rows || []);
-        setTotalHits(data.data.totalHits || 0);
+      const isLoadMore = !!cursorToLoad;
+      if (isLoadMore) {
+        setIsLoadingMore(true);
       } else {
-        const errorMessage = data.error || "Failed to fetch data";
+        setIsLoading(true);
+      }
+      setError(null);
+
+      try {
+        const params = new URLSearchParams({
+          database: selectedDatabase,
+          table: selectedTable,
+          mode: "data",
+          limit: String(pageSize),
+        });
+
+        if (cursorToLoad) {
+          params.set("cursor", cursorToLoad);
+        }
+
+        if (selectedColumns.length > 0) {
+          params.set("columns", selectedColumns.join(","));
+        }
+
+        if (selectedTimeColumn) {
+          params.set("timeColumn", selectedTimeColumn);
+        }
+
+        if (activeMinTime) {
+          params.set("minTime", activeMinTime);
+        }
+
+        if (activeMaxTime) {
+          params.set("maxTime", activeMaxTime);
+        }
+
+        if (customFilter.trim()) {
+          params.set("filter", customFilter.trim());
+        }
+
+        const res = await fetch(`/api/clickhouse/discover?${params}`);
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          setRows((prev) =>
+            isLoadMore ? [...prev, ...data.data.rows] : data.data.rows || []
+          );
+          setTotalHits(data.data.totalHits || 0);
+          setNextCursor(data.data.nextCursor);
+          setHasMore(data.data.hasMore);
+        } else {
+          const errorMessage = data.error || "Failed to fetch data";
+          setError(errorMessage);
+          toast({
+            variant: "destructive",
+            title: "Query Error",
+            description: errorMessage,
+          });
+          if (!isLoadMore) setRows([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch data:", err);
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch data";
         setError(errorMessage);
         toast({
           variant: "destructive",
           title: "Query Error",
           description: errorMessage,
         });
-        setRows([]);
+      } finally {
+        setIsLoading(false);
+        setIsLoadingMore(false);
       }
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch data";
-      setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Query Error",
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    selectedDatabase,
-    selectedTable,
-    selectedColumns,
-    selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    customFilter,
-    page,
-    pageSize,
-  ]);
+    },
+    [
+      selectedDatabase,
+      selectedTable,
+      selectedColumns,
+      selectedTimeColumn,
+      activeMinTime,
+      activeMaxTime,
+      customFilter,
+      pageSize,
+    ]
+  );
 
-  // Removed fetchMore
+  // Handle Load More
+  const handleLoadMore = useCallback(() => {
+    if (nextCursor && !isLoadingMore) {
+      fetchData(nextCursor);
+    }
+  }, [fetchData, nextCursor, isLoadingMore]);
 
   // Fetch histogram
   const fetchHistogram = useCallback(async () => {
-    // ... (same as before) ...
     if (!selectedDatabase || !selectedTable || !selectedTimeColumn) {
       setHistogramData([]);
       return;
@@ -392,34 +416,23 @@ export default function DiscoverPage() {
 
   // Execute search
   const handleSearch = useCallback(() => {
-    if (page !== 1) {
-      setPage(1);
-    } else {
-      fetchData();
-      fetchHistogram();
-    }
-  }, [page, fetchData, fetchHistogram]);
+    fetchData(null); // Reset cursor
+    fetchHistogram();
+  }, [fetchData, fetchHistogram]);
 
-  // Effect to fetch active data when deps change
+  // Effect to fetch active data when deps change (initial load or filter change)
   useEffect(() => {
     if (schema) {
-      fetchData();
+      fetchData(null);
     }
-  }, [schema, fetchData]); // fetchData depends on page, pageSize, filters.
+  }, [schema, fetchData]); // fetchData includes filters in dependencies
 
   // Effect to fetch histogram when deps change (excluding pagination)
   useEffect(() => {
     if (schema) {
       fetchHistogram();
     }
-  }, [
-    schema,
-    fetchHistogram,
-    selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    customFilter,
-  ]); // Explicit deps for histogram
+  }, [schema, fetchHistogram]); // fetchHistogram depends on filters, so we only need to depend on it
 
   // Handle histogram bar click (Zoom in)
   const handleHistogramBarClick = (startTime: string, endTime?: string) => {
@@ -624,12 +637,10 @@ export default function DiscoverPage() {
                     columns={schema.columns}
                     selectedColumns={selectedColumns}
                     isLoading={isLoading && rows.length === 0}
-                    // Pagination
-                    page={page}
-                    pageSize={pageSize}
-                    totalHits={totalHits}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
+                    // Pagination / Infinite Scroll
+                    hasMore={hasMore}
+                    onLoadMore={handleLoadMore}
+                    isLoadingMore={isLoadingMore}
                   />
                   {isLoading && rows.length > 0 && (
                     <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">

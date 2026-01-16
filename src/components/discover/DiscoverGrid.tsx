@@ -21,7 +21,7 @@ import {
 import { RecordDetailSheet } from "@/components/ui/record-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, Expand } from "lucide-react";
+import { ArrowUpDown, Expand, Loader2 } from "lucide-react";
 import type { DiscoverRow } from "@/lib/types/discover";
 import type { ColumnMetadata } from "@/lib/types/discover";
 import { cn, formatDateTime, formatDate } from "@/lib/utils";
@@ -32,12 +32,10 @@ interface DiscoverGridProps {
   columns: ColumnMetadata[];
   selectedColumns: string[];
   isLoading: boolean;
-  // Pagination props
-  page: number; // 1-indexed for display
-  pageSize: number;
-  totalHits: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
+  // Cursor props
+  hasMore: boolean;
+  onLoadMore: () => void;
+  isLoadingMore: boolean;
 }
 
 const columnHelper = createColumnHelper<DiscoverRow>();
@@ -140,8 +138,7 @@ function getLevelBadge(level: string) {
   return <Badge variant="outline">{level}</Badge>;
 }
 
-// Import PaginationControls
-import { PaginationControls } from "@/components/monitoring";
+// PaginationControls removed
 
 /**
  * Data grid for Discover results with dynamic columns
@@ -158,11 +155,9 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   columns: columnMetadata,
   selectedColumns,
   isLoading,
-  page,
-  pageSize,
-  totalHits,
-  onPageChange,
-  onPageSizeChange,
+  hasMore,
+  onLoadMore,
+  isLoadingMore,
 }: DiscoverGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
@@ -237,12 +232,12 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     state: {
       sorting,
       pagination: {
-        pageIndex: page - 1,
-        pageSize: pageSize,
+        pageIndex: 0,
+        pageSize: rows.length, // Show all loaded rows
       },
     },
     manualPagination: true,
-    pageCount: Math.ceil(totalHits / pageSize),
+    pageCount: -1,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -327,15 +322,26 @@ export const DiscoverGrid = memo(function DiscoverGrid({
           </Table>
         </div>
 
-        {/* Pagination Controls */}
-        <PaginationControls
-          page={page}
-          totalPages={Math.ceil(totalHits / pageSize)}
-          totalItems={totalHits}
-          pageSize={pageSize}
-          onPageChange={onPageChange}
-          onPageSizeChange={onPageSizeChange}
-        />
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="p-4 border-t flex justify-center bg-card">
+            <Button
+              variant="outline"
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="w-full max-w-sm"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading more...
+                </>
+              ) : (
+                "Load More"
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Row Detail Sheet - using RecordDetailSheet for consistency */}

@@ -124,15 +124,17 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
             bottom: 0,
           }}
           onClick={(data) => {
-            if (data && data.activeLabel) {
-              handleBarClick(String(data.activeLabel));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const chartData = data as any;
+            if (chartData && chartData.activeLabel) {
+              handleBarClick(String(chartData.activeLabel));
             } else if (
-              data &&
-              data.activePayload &&
-              data.activePayload.length > 0
+              chartData &&
+              chartData.activePayload &&
+              chartData.activePayload.length > 0
             ) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              handleBarClick((data.activePayload[0].payload as any).time);
+              handleBarClick((chartData.activePayload[0].payload as any).time);
             }
           }}
         >

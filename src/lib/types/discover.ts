@@ -75,7 +75,8 @@ export interface DiscoverResponse {
   data?: {
     rows: DiscoverRow[];
     totalHits: number;
-    cursor: string | null; // Cursor for next page, null if no more data
+    nextCursor: string | null; // Cursor for next page
+    hasMore: boolean;
     executedQuery?: string; // For debugging
   };
   histogram?: { time: string; count: number }[];
@@ -153,19 +154,29 @@ export function getMinTimeFromRange(range: TimeRange): Date | null {
  * Helper to parse cursor string
  */
 export function parseCursor(cursor: string): {
-  timestamp: string;
-  id: string;
+  timestamp: string; // ISO string
+  id: string; // secondary sort key
 } | null {
-  const parts = cursor.split("_");
-  if (parts.length < 2) return null;
-  const id = parts.pop()!;
-  const timestamp = parts.join("_"); // Handle ISO timestamps with underscores
-  return { timestamp, id };
+  try {
+    const decoded = atob(cursor);
+    const parts = decoded.split("::");
+    if (parts.length < 2) return null;
+    // Format: timestamp::id
+    // If ID contains ::, we only split on the first one? No, ID might be last.
+    // Let's assume timestamp is always first.
+    // Actually safe split:
+    const timestamp = parts[0];
+    const id = parts.slice(1).join("::");
+    return { timestamp, id };
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Helper to create cursor string
  */
 export function createCursor(timestamp: string, id: string): string {
-  return `${timestamp}_${id}`;
+  // Simple delimiter that is unlikely to be in ISO timestamp
+  return btoa(`${timestamp}::${id}`);
 }
