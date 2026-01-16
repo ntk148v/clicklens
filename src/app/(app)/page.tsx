@@ -18,9 +18,17 @@ import {
   Users,
   ArrowRight,
   ScrollText,
+  Search,
 } from "lucide-react";
 
 const features = [
+  {
+    title: "Discover",
+    description:
+      "Explore any ClickHouse table with Kibana-like filtering, histograms, and field selection.",
+    href: "/discover",
+    icon: Search,
+  },
   {
     title: "SQL Console",
     description:
@@ -67,6 +75,9 @@ export default function HomePage() {
   const { permissions } = useAuth();
 
   const displayedFeatures = features.filter((feature) => {
+    if (feature.title === "Discover") {
+      return permissions?.canDiscover;
+    }
     if (feature.title === "Access Control") {
       return permissions?.canManageUsers;
     }
