@@ -38,7 +38,7 @@ jobs:
       job-type: docker
       clickhouse-versions: '["25.12"]'
       platforms: linux/amd64,linux/arm64
-      push-image: true
+      push-image: ${{ github.event_name != 'pull_request' }}
 
   validate-docker:
     name: validate-docker
