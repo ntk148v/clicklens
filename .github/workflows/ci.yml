@@ -1,0 +1,51 @@
+name: Image build and Push
+
+on:
+  push:
+    branches:
+      - master
+  release:
+  pull_request:
+  workflow_dispatch:
+
+# Cancel in-progress runs for same workflow and branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+jobs:
+  build:
+    name: build
+    uses: ./.github/workflows/base.yml
+    with:
+      job-type: build
+
+  lint:
+    name: lint
+    uses: ./.github/workflows/base.yml
+    with:
+      job-type: lint
+
+  build-docker:
+    name: build-docker
+    uses: ./.github/workflows/base.yml
+    with:
+      job-type: docker
+      clickhouse-versions: '["25.12"]'
+      platforms: linux/amd64,linux/arm64
+      push-image: true
+
+  validate-docker:
+    name: validate-docker
+    uses: ./.github/workflows/base.yml
+    with:
+      job-type: docker
+      clickhouse-versions: '["25.12"]'
+      platforms: linux/amd64
+      load-image: true
+      test-container: true
