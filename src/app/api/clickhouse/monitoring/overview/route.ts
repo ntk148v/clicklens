@@ -157,7 +157,7 @@ interface DashboardOverview {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<MonitoringApiResponse<DashboardOverview>>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -173,7 +173,7 @@ export async function GET(
             userMessage: "Please log in to ClickHouse first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -194,7 +194,7 @@ export async function GET(
     if (clusterName) {
       try {
         const summaryResult = await client.query<ClusterSummaryRow>(
-          CLUSTER_SUMMARY_QUERY
+          CLUSTER_SUMMARY_QUERY,
         );
         clusterSummary = summaryResult.data[0] || null;
       } catch {
@@ -222,16 +222,16 @@ export async function GET(
       client.query<ThroughputMetricsRow>(THROUGHPUT_METRICS_QUERY),
       // Time series queries with cluster awareness
       client.query<TimeSeriesPoint>(
-        getQueriesPerMinuteQuery(timeRange, clusterName)
+        getQueriesPerMinuteQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getInsertedRowsPerMinuteQuery(timeRange, clusterName)
+        getInsertedRowsPerMinuteQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getSelectedBytesPerMinuteQuery(timeRange, clusterName)
+        getSelectedBytesPerMinuteQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getMemoryUsageHistoryQuery(timeRange, clusterName)
+        getMemoryUsageHistoryQuery(timeRange, clusterName),
       ),
     ]);
 
@@ -244,7 +244,7 @@ export async function GET(
     const memoryPercentage =
       memoryMetrics?.memory_total > 0
         ? Math.round(
-            (memoryMetrics.memory_used / memoryMetrics.memory_total) * 100
+            (memoryMetrics.memory_used / memoryMetrics.memory_total) * 100,
           )
         : 0;
 
@@ -311,16 +311,16 @@ export async function GET(
           perNodeSelectedResult,
         ] = await Promise.all([
           client.query<PerNodeTimeSeriesPoint>(
-            getPerNodeQueriesQuery(timeRange, clusterName)
+            getPerNodeQueriesQuery(timeRange, clusterName),
           ),
           client.query<PerNodeTimeSeriesPoint>(
-            getPerNodeMemoryQuery(timeRange, clusterName)
+            getPerNodeMemoryQuery(timeRange, clusterName),
           ),
           client.query<PerNodeTimeSeriesPoint>(
-            getPerNodeInsertedRowsQuery(timeRange, clusterName)
+            getPerNodeInsertedRowsQuery(timeRange, clusterName),
           ),
           client.query<PerNodeTimeSeriesPoint>(
-            getPerNodeSelectedBytesQuery(timeRange, clusterName)
+            getPerNodeSelectedBytesQuery(timeRange, clusterName),
           ),
         ]);
 
@@ -349,25 +349,31 @@ export async function GET(
     console.error("Monitoring overview error:", error);
 
     if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            type: error.type,
+            userMessage: error.userMessage || error.message,
+          },
         },
-      }), { status: 500 };
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "An unexpected error occurred",
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 500,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "INTERNAL_ERROR",
+          userMessage: "An unexpected error occurred",
+        },
       },
-    }), { status: 500 };
+      { status: 500 },
+    );
   }
 }

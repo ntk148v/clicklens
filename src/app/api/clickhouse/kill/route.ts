@@ -19,7 +19,7 @@ interface KillResponse {
 }
 
 export async function POST(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<KillResponse>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -27,7 +27,7 @@ export async function POST(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(
     if (!body.queryId) {
       return NextResponse.json(
         { success: false, error: "Query ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,10 +53,10 @@ export async function POST(
         error: isClickHouseError(error)
           ? error.userMessage || error.message
           : error instanceof Error
-          ? error.message
-          : "Unknown error",
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }

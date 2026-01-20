@@ -54,7 +54,9 @@ interface KeeperData {
   };
 }
 
-export async function GET(): Promise<NextResponse<MonitoringApiResponse<KeeperData>>> {
+export async function GET(): Promise<
+  NextResponse<MonitoringApiResponse<KeeperData>>
+> {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -69,7 +71,7 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<KeeperDa
             userMessage: "Please log in to ClickHouse first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -140,25 +142,31 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<KeeperDa
     console.error("Monitoring keeper error:", error);
 
     if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            type: error.type,
+            userMessage: error.userMessage || error.message,
+          },
         },
-      }), { status: 500 };
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "An unexpected error occurred",
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 500,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "INTERNAL_ERROR",
+          userMessage: "An unexpected error occurred",
+        },
       },
-    }), { status: 500 };
+      { status: 500 },
+    );
   }
 }

@@ -29,7 +29,7 @@ export async function GET(): Promise<NextResponse<RoleGrantsResponse>> {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -61,10 +61,10 @@ export async function GET(): Promise<NextResponse<RoleGrantsResponse>> {
         error: isClickHouseError(error)
           ? error.userMessage || error.message
           : error instanceof Error
-          ? error.message
-          : "Unknown error",
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -78,7 +78,7 @@ export interface GrantRoleRequest {
 }
 
 export async function POST(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -86,7 +86,7 @@ export async function POST(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -95,7 +95,7 @@ export async function POST(
     if (!body.roleName || !body.granteeName) {
       return NextResponse.json(
         { success: false, error: "Role name and grantee name are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -124,10 +124,10 @@ export async function POST(
         error: isClickHouseError(error)
           ? error.userMessage || error.message
           : error instanceof Error
-          ? error.message
-          : "Unknown error",
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -140,7 +140,7 @@ export interface RevokeRoleRequest {
 }
 
 export async function DELETE(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -148,7 +148,7 @@ export async function DELETE(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -157,7 +157,7 @@ export async function DELETE(
     if (!body.roleName || !body.granteeName) {
       return NextResponse.json(
         { success: false, error: "Role name and grantee name are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -182,10 +182,10 @@ export async function DELETE(
         error: isClickHouseError(error)
           ? error.userMessage || error.message
           : error instanceof Error
-          ? error.message
-          : "Unknown error",
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }
