@@ -19,6 +19,13 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    name: test
+    uses: ./.github/workflows/base.yml
+    with:
+      job-type: test
+      clickhouse-versions: '["24.8", "25.12"]'
+
   build:
     name: build
     uses: ./.github/workflows/base.yml

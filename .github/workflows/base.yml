@@ -95,6 +95,11 @@ jobs:
         if: ${{ inputs.job-type == 'lint' }}
         run: bun run lint
 
+      # === Tests ===
+      - name: Run Tests
+        if: ${{ inputs.job-type == 'test' }}
+        run: bun run test:coverage
+
       # === App Build ===
       - name: Build App
         if: ${{ inputs.job-type == 'build' }}

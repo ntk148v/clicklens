@@ -1,14 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { login } from "./utils";
 
 test.describe("Discover Feature", () => {
   test.beforeEach(async ({ page }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByPlaceholder("Host").fill("localhost");
-    await page.getByPlaceholder("Port").fill("8123");
-    await page.getByPlaceholder("Username").fill("default");
-    await page.click("button[type=submit]");
-    await expect(page).toHaveURL(/\/sql/);
+    await login(page);
   });
 
   test("should navigate to discover page", async ({ page }) => {
@@ -47,7 +43,7 @@ test.describe("Discover Feature", () => {
 
     // Verify some data
     await expect(
-      page.locator("td").filter({ hasText: "system" }).first()
+      page.locator("td").filter({ hasText: "system" }).first(),
     ).toBeVisible();
   });
 
@@ -85,13 +81,13 @@ test.describe("Discover Feature", () => {
 
       // Verify header is gone
       await expect(
-        page.getByRole("columnheader", { name: colName })
+        page.getByRole("columnheader", { name: colName }),
       ).not.toBeVisible();
 
       // Check it back
       await label.click();
       await expect(
-        page.getByRole("columnheader", { name: colName })
+        page.getByRole("columnheader", { name: colName }),
       ).toBeVisible();
     }
   });

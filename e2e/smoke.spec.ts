@@ -1,13 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { login } from "./utils";
 
 test.describe("Smoke Test", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/login");
-    await page.getByPlaceholder("Host").fill("localhost");
-    await page.getByPlaceholder("Port").fill("8123");
-    await page.getByPlaceholder("Username").fill("default");
-    await page.click("button[type=submit]");
-    await expect(page).toHaveURL(/\/sql/);
+    await login(page);
   });
 
   test("should load SQL console", async ({ page }) => {
@@ -15,7 +11,7 @@ test.describe("Smoke Test", () => {
     await expect(
       page
         .getByRole("textbox", { name: "SQL Query" })
-        .or(page.locator(".cm-content"))
+        .or(page.locator(".cm-content")),
     ).toBeVisible();
   });
 

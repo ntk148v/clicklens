@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [master]
 
+# Cancel in-progress runs for same workflow and branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   test:
     timeout-minutes: 60
@@ -20,6 +29,8 @@ jobs:
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: admin
+          CLICKHOUSE_PASSWORD: password
         options: >-
           --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
           --health-interval 10s
@@ -60,7 +71,8 @@ jobs:
         env:
           CLICKHOUSE_HOST: http://localhost:8123
           CLICKHOUSE_DB: default
-          LENS_USER: default
+          CLICKHOUSE_USER: admin
+          CLICKHOUSE_PASSWORD: password
           CI: true
 
       - uses: actions/upload-artifact@v4
