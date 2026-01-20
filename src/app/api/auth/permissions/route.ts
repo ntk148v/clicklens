@@ -381,13 +381,16 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
   } catch (error) {
     console.error("Error checking permissions:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+          ? error.message
+          : "Unknown error",
+      },
+      { status: 500 }, { status: 500 }
+    );
   }
 }

@@ -23,7 +23,10 @@ interface HealthCheckRow {
 }
 
 // Health check thresholds
-const THRESHOLDS: Record<string, { warning: number; critical: number; operator: "gt" | "lt" | "eq" }> = {
+const THRESHOLDS: Record<
+  string,
+  { warning: number; critical: number; operator: "gt" | "lt" | "eq" }
+> = {
   readonly_replicas: { warning: 0, critical: 1, operator: "gt" },
   max_parts_per_partition: { warning: 300, critical: 500, operator: "gt" },
   delayed_inserts: { warning: 0, critical: 5, operator: "gt" },
@@ -52,7 +55,11 @@ function getHealthStatus(id: string, value: number): HealthStatus {
   return "ok";
 }
 
-function getHealthMessage(id: string, value: number, status: HealthStatus): string {
+function getHealthMessage(
+  id: string,
+  value: number,
+  status: HealthStatus,
+): string {
   const messages: Record<string, Record<HealthStatus, string>> = {
     server_responsive: {
       ok: "Server is responding normally",
@@ -107,7 +114,9 @@ function getHealthMessage(id: string, value: number, status: HealthStatus): stri
   return messages[id]?.[status] || `Value: ${value}`;
 }
 
-export async function GET(): Promise<NextResponse<MonitoringApiResponse<HealthSummary>>> {
+export async function GET(): Promise<
+  NextResponse<MonitoringApiResponse<HealthSummary>>
+> {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -122,7 +131,7 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<HealthSu
             userMessage: "Please log in to ClickHouse first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -172,25 +181,31 @@ export async function GET(): Promise<NextResponse<MonitoringApiResponse<HealthSu
     console.error("Health check error:", error);
 
     if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            type: error.type,
+            userMessage: error.userMessage || error.message,
+          },
         },
-      });
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "An unexpected error occurred",
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 500,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "INTERNAL_ERROR",
+          userMessage: "An unexpected error occurred",
+        },
       },
-    });
+      { status: 500 },
+    );
   }
 }

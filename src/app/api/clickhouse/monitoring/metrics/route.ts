@@ -19,7 +19,7 @@ import {
 } from "@/lib/clickhouse/monitoring";
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<MonitoringApiResponse<MetricsResponse>>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -35,7 +35,7 @@ export async function GET(
             userMessage: "Please log in to ClickHouse first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -52,7 +52,9 @@ export async function GET(
 
     const [metricsResult, asyncResult, eventsResult] = await Promise.all([
       shouldFetchMetrics ? client.query<SystemMetric>(METRICS_QUERY) : null,
-      shouldFetchAsync ? client.query<SystemAsyncMetric>(ASYNC_METRICS_QUERY) : null,
+      shouldFetchAsync
+        ? client.query<SystemAsyncMetric>(ASYNC_METRICS_QUERY)
+        : null,
       shouldFetchEvents ? client.query<SystemEvent>(EVENTS_QUERY) : null,
     ]);
 
@@ -77,25 +79,31 @@ export async function GET(
     console.error("Monitoring metrics error:", error);
 
     if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            type: error.type,
+            userMessage: error.userMessage || error.message,
+          },
         },
-      });
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "An unexpected error occurred",
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 500,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "INTERNAL_ERROR",
+          userMessage: "An unexpected error occurred",
+        },
       },
-    });
+      { status: 500 },
+    );
   }
 }

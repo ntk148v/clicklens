@@ -26,7 +26,7 @@ export async function GET(): Promise<NextResponse<GrantsResponse>> {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -56,14 +56,17 @@ export async function GET(): Promise<NextResponse<GrantsResponse>> {
   } catch (error) {
     console.error("Error fetching grants:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -78,7 +81,7 @@ export interface GrantRequest {
 }
 
 export async function POST(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -86,7 +89,7 @@ export async function POST(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -95,7 +98,7 @@ export async function POST(
     if (!body.accessType || !body.granteeName) {
       return NextResponse.json(
         { success: false, error: "Access type and grantee name are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -103,7 +106,7 @@ export async function POST(
     let target = "";
     if (body.database && body.table) {
       target = `ON ${quoteIdentifier(body.database)}.${quoteIdentifier(
-        body.table
+        body.table,
       )}`;
     } else if (body.database) {
       target = `ON ${quoteIdentifier(body.database)}.*`;
@@ -125,18 +128,21 @@ export async function POST(
     const client = createClient(config);
     await client.command(sql);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { status: 500 });
   } catch (error) {
     console.error("Error granting permission:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -150,7 +156,7 @@ export interface RevokeRequest {
 }
 
 export async function DELETE(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -158,7 +164,7 @@ export async function DELETE(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -167,7 +173,7 @@ export async function DELETE(
     if (!body.accessType || !body.granteeName) {
       return NextResponse.json(
         { success: false, error: "Access type and grantee name are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -175,7 +181,7 @@ export async function DELETE(
     let target = "";
     if (body.database && body.table) {
       target = `ON ${quoteIdentifier(body.database)}.${quoteIdentifier(
-        body.table
+        body.table,
       )}`;
     } else if (body.database) {
       target = `ON ${quoteIdentifier(body.database)}.*`;
@@ -193,18 +199,21 @@ export async function DELETE(
     const client = createClient(config);
     await client.command(sql);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { status: 500 });
   } catch (error) {
     console.error("Error revoking permission:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 

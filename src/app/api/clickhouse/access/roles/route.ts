@@ -48,7 +48,7 @@ import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 // Ensure feature roles exist (auto-create on first access)
 async function ensureFeatureRoles(
-  client: ReturnType<typeof createClient>
+  client: ReturnType<typeof createClient>,
 ): Promise<void> {
   try {
     // Check which feature roles exist
@@ -121,7 +121,7 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -209,12 +209,12 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
                     access_type: g.access_type,
                     database: g.database || undefined,
                     table: g.table || undefined,
-                  }))
-                )
+                  })),
+                ),
               ).map((fr) => fr.id)
             : undefined,
         };
-      }
+      },
     );
 
     // Sort: feature roles first, then user roles
@@ -231,14 +231,17 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
   } catch (error) {
     console.error("Error fetching roles:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -250,7 +253,7 @@ export interface CreateRoleRequest {
 }
 
 export async function POST(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -258,7 +261,7 @@ export async function POST(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -267,7 +270,7 @@ export async function POST(
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: "Role name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -278,7 +281,7 @@ export async function POST(
           success: false,
           error: "Cannot create roles with 'clicklens_' prefix",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -291,7 +294,7 @@ export async function POST(
               success: false,
               error: `Cannot grant privileges on '${dp.database}' database. Use feature roles for system access.`,
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -325,8 +328,8 @@ export async function POST(
           dp.database === "*" && dp.table === "*"
             ? "*.*"
             : dp.table === "*"
-            ? `${quoteIdentifier(dp.database)}.*`
-            : `${quoteIdentifier(dp.database)}.${quoteIdentifier(dp.table)}`;
+              ? `${quoteIdentifier(dp.database)}.*`
+              : `${quoteIdentifier(dp.database)}.${quoteIdentifier(dp.table)}`;
 
         for (const priv of dp.privileges) {
           try {
@@ -353,21 +356,24 @@ export async function POST(
       return NextResponse.json({
         success: false,
         error: `Role created but with errors: ${errors.join("; ")}`,
-      });
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error creating role:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -379,7 +385,7 @@ export interface UpdateRoleRequest {
 }
 
 export async function PUT(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -387,7 +393,7 @@ export async function PUT(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -396,7 +402,7 @@ export async function PUT(
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: "Role name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -404,7 +410,7 @@ export async function PUT(
     if (isFeatureRole(body.name)) {
       return NextResponse.json(
         { success: false, error: "Cannot edit feature roles" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -417,7 +423,7 @@ export async function PUT(
               success: false,
               error: `Cannot grant privileges on '${dp.database}' database`,
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -436,7 +442,7 @@ export async function PUT(
     `);
 
     const currentInherited = currentRoleGrants.data.map(
-      (r) => r.granted_role_name
+      (r) => r.granted_role_name,
     );
     const newInherited = body.inheritedRoles || [];
 
@@ -447,7 +453,7 @@ export async function PUT(
       if (!newInherited.includes(ir)) {
         try {
           await client.command(
-            `REVOKE ${quoteIdentifier(ir)} FROM ${quotedRole}`
+            `REVOKE ${quoteIdentifier(ir)} FROM ${quotedRole}`,
           );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -486,8 +492,8 @@ export async function PUT(
           dp.database === "*" && dp.table === "*"
             ? "*.*"
             : dp.table === "*"
-            ? `${quoteIdentifier(dp.database)}.*`
-            : `${quoteIdentifier(dp.database)}.${quoteIdentifier(dp.table)}`;
+              ? `${quoteIdentifier(dp.database)}.*`
+              : `${quoteIdentifier(dp.database)}.${quoteIdentifier(dp.table)}`;
 
         for (const priv of dp.privileges) {
           try {
@@ -514,21 +520,24 @@ export async function PUT(
       return NextResponse.json({
         success: false,
         error: `Role updated but with errors: ${errors.join("; ")}`,
-      });
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating role:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -538,7 +547,7 @@ export interface DeleteRoleRequest {
 }
 
 export async function DELETE(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -546,7 +555,7 @@ export async function DELETE(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -555,7 +564,7 @@ export async function DELETE(
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: "Role name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -563,24 +572,27 @@ export async function DELETE(
     if (isFeatureRole(body.name)) {
       return NextResponse.json(
         { success: false, error: "Cannot delete feature roles" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const client = createClient(config);
     await client.command(`DROP ROLE IF EXISTS ${quoteIdentifier(body.name)}`);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { status: 500 });
   } catch (error) {
     console.error("Error deleting role:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }

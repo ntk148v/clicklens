@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -128,7 +128,7 @@ export async function GET(request: Request) {
           ? "event_time"
           : "event_time_microseconds";
       whereConditions.push(
-        `${timeCol} > parseDateTimeBestEffort('${safeMin}')`
+        `${timeCol} > parseDateTimeBestEffort('${safeMin}')`,
       );
     }
 
@@ -142,12 +142,25 @@ export async function GET(request: Request) {
         : "event_time_microseconds";
     query += ` ORDER BY ${orderCol} DESC LIMIT ${limit}`;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const resultSet = await client.query<any>(query);
+    // Define the expected row structure
+    interface LogRow {
+      timestamp: string | number;
+      type?: string;
+      event_type?: string;
+      component: string;
+      message: string;
+      details: string;
+      event_time: string;
+      thread_name: string;
+      query_id: string;
+      source_file: string;
+      source_line: number;
+    }
+
+    const resultSet = await client.query<LogRow>(query);
 
     // Map result rows to standard LogEntry format
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = resultSet.data.map((row: any) => ({
+    const data = resultSet.data.map((row) => ({
       ...row,
       // For session_log, we aliased `type` as `event_type` to avoid ambiguity
       type: row.event_type || row.type,
@@ -168,22 +181,31 @@ export async function GET(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const code = (error as any).code;
       if ((code === 60 || code === "60") && source === "session_log") {
-        return NextResponse.json({
-          success: false,
-          error:
-            "Session logging is not enabled on this server. Please configure 'session_log' in config.xml.",
-        });
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Session logging is not enabled on this server. Please configure 'session_log' in config.xml.",
+          },
+          { status: 400 },
+        );
       }
 
-      return NextResponse.json({
-        success: false,
-        error: error.userMessage || "Failed to fetch logs",
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.userMessage || "Failed to fetch logs",
+        },
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: "Failed to fetch logs",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch logs",
+      },
+      { status: 500 },
+    );
   }
 }

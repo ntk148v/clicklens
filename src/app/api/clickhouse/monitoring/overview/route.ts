@@ -357,7 +357,7 @@ export async function GET(
           type: error.type,
           userMessage: error.userMessage || error.message,
         },
-      });
+      }), { status: 500 };
     }
 
     return NextResponse.json({
@@ -368,6 +368,6 @@ export async function GET(
         type: "INTERNAL_ERROR",
         userMessage: "An unexpected error occurred",
       },
-    });
+    }), { status: 500 };
   }
 }

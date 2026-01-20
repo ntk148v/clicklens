@@ -47,13 +47,16 @@ export async function POST(
   } catch (error) {
     console.error("Kill query error:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+          ? error.message
+          : "Unknown error",
+      },
+      { status: 500 }, { status: 500 }
+    );
   }
 }

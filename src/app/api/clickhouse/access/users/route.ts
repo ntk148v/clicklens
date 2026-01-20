@@ -30,7 +30,7 @@ export async function GET(): Promise<NextResponse<UsersResponse>> {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -90,14 +90,17 @@ export async function GET(): Promise<NextResponse<UsersResponse>> {
   } catch (error) {
     console.error("Error fetching users:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -110,7 +113,7 @@ export interface CreateUserRequest {
 }
 
 export async function POST(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -118,7 +121,7 @@ export async function POST(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -127,7 +130,7 @@ export async function POST(
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: "User name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -139,7 +142,7 @@ export async function POST(
 
     if (body.password) {
       sql += ` IDENTIFIED WITH sha256_password BY '${escapeString(
-        body.password
+        body.password,
       )}'`;
     } else {
       sql += " NOT IDENTIFIED";
@@ -158,13 +161,13 @@ export async function POST(
       for (const role of body.roles) {
         try {
           await client.command(
-            `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`
+            `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`,
           );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error(
             `Failed to grant role ${role} to user ${body.name}:`,
-            msg
+            msg,
           );
           errors.push(`Failed to grant role ${role}: ${msg}`);
         }
@@ -178,7 +181,7 @@ export async function POST(
         const msg = e instanceof Error ? e.message : String(e);
         console.error(
           `Failed to set default roles for user ${body.name}:`,
-          msg
+          msg,
         );
         errors.push(`Failed to set default roles: ${msg}`);
       }
@@ -188,21 +191,24 @@ export async function POST(
       return NextResponse.json({
         success: false,
         error: `User created but with errors: ${errors.join("; ")}`,
-      });
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error creating user:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -215,7 +221,7 @@ export interface UpdateUserRequest {
 }
 
 export async function PUT(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -223,7 +229,7 @@ export async function PUT(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -232,7 +238,7 @@ export async function PUT(
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: "User name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -243,8 +249,8 @@ export async function PUT(
     if (body.newPassword) {
       await client.command(
         `ALTER USER ${quotedUser} IDENTIFIED WITH sha256_password BY '${escapeString(
-          body.newPassword
-        )}'`
+          body.newPassword,
+        )}'`,
       );
     }
 
@@ -253,8 +259,8 @@ export async function PUT(
       if (body.defaultDatabase) {
         await client.command(
           `ALTER USER ${quotedUser} DEFAULT DATABASE ${quoteIdentifier(
-            body.defaultDatabase
-          )}`
+            body.defaultDatabase,
+          )}`,
         );
       }
     }
@@ -272,26 +278,26 @@ export async function PUT(
         WHERE user_name = '${escapeString(body.name)}'
       `);
       const currentRoles = currentRolesResult.data.map(
-        (r) => r.granted_role_name
+        (r) => r.granted_role_name,
       );
 
       const newRoles = body.roles;
 
       // Revoke removed roles
       const rolesToRevoke = currentRoles.filter(
-        (role) => !newRoles.includes(role)
+        (role) => !newRoles.includes(role),
       );
 
       for (const role of rolesToRevoke) {
         try {
           await client.command(
-            `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`
+            `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`,
           );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error(
             `Failed to revoke role ${role} from user ${body.name}:`,
-            msg
+            msg,
           );
           errors.push(`Failed to revoke role ${role}: ${msg}`);
         }
@@ -302,13 +308,13 @@ export async function PUT(
         if (!currentRoles.includes(role)) {
           try {
             await client.command(
-              `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`
+              `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`,
             );
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             console.error(
               `Failed to grant role ${role} to user ${body.name}:`,
-              msg
+              msg,
             );
             errors.push(`Failed to grant role ${role}: ${msg}`);
           }
@@ -324,7 +330,7 @@ export async function PUT(
           const msg = e instanceof Error ? e.message : String(e);
           console.error(
             `Failed to set default roles for user ${body.name}:`,
-            msg
+            msg,
           );
           errors.push(`Failed to set default roles: ${msg}`);
         }
@@ -335,7 +341,7 @@ export async function PUT(
           const msg = e instanceof Error ? e.message : String(e);
           console.error(
             `Failed to clear default roles for user ${body.name}:`,
-            msg
+            msg,
           );
           errors.push(`Failed to clear default roles: ${msg}`);
         }
@@ -346,21 +352,24 @@ export async function PUT(
       return NextResponse.json({
         success: false, // Mark as failed so UI shows the error
         error: `Update completed with errors: ${errors.join("; ")}`,
-      });
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating user:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+          ? error.message
+          : "Unknown error",
+      },
+      { status: 500 }, { status: 500 }
+    );
   }
 }
 
@@ -370,7 +379,7 @@ export interface DeleteUserRequest {
 }
 
 export async function DELETE(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -378,7 +387,7 @@ export async function DELETE(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -387,7 +396,7 @@ export async function DELETE(
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: "User name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -398,13 +407,16 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting user:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }

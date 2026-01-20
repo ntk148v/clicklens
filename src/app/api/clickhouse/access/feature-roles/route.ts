@@ -31,7 +31,7 @@ export async function GET(): Promise<NextResponse<FeatureRolesResponse>> {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -56,14 +56,17 @@ export async function GET(): Promise<NextResponse<FeatureRolesResponse>> {
   } catch (error) {
     console.error("Error fetching feature roles:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -77,7 +80,7 @@ export async function POST(): Promise<
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -109,17 +112,20 @@ export async function POST(): Promise<
     return NextResponse.json({
       success: true,
       created,
-    });
+    }, { status: 500 });
   } catch (error) {
     console.error("Error setting up feature roles:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }

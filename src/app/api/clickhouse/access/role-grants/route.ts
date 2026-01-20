@@ -55,14 +55,17 @@ export async function GET(): Promise<NextResponse<RoleGrantsResponse>> {
   } catch (error) {
     console.error("Error fetching role grants:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+          ? error.message
+          : "Unknown error",
+      },
+      { status: 500 }, { status: 500 }
+    );
   }
 }
 
@@ -115,14 +118,17 @@ export async function POST(
   } catch (error) {
     console.error("Error granting role:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+          ? error.message
+          : "Unknown error",
+      },
+      { status: 500 }, { status: 500 }
+    );
   }
 }
 
@@ -170,14 +176,17 @@ export async function DELETE(
   } catch (error) {
     console.error("Error revoking role:", error);
 
-    return NextResponse.json({
-      success: false,
-      error: isClickHouseError(error)
-        ? error.userMessage || error.message
-        : error instanceof Error
-        ? error.message
-        : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: isClickHouseError(error)
+          ? error.userMessage || error.message
+          : error instanceof Error
+          ? error.message
+          : "Unknown error",
+      },
+      { status: 500 }, { status: 500 }
+    );
   }
 }
 

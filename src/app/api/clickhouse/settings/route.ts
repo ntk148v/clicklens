@@ -80,7 +80,7 @@ export async function GET(request: Request) {
           ? error.userMessage || error.message
           : "Failed to fetch settings",
       },
-      { status: 500 }
+      { status: 500 }, { status: 500 }
     );
   }
 }
@@ -163,7 +163,7 @@ export async function PUT(request: Request) {
           ? error.userMessage || error.message
           : "Failed to update setting",
       },
-      { status: 500 }
+      { status: 500 }, { status: 500 }
     );
   }
 }
