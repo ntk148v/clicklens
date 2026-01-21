@@ -1,3 +1,4 @@
+import { test } from "@playwright/test";
 import { login } from "./utils";
 
 test.describe("Authentication", () => {
