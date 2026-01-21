@@ -205,6 +205,8 @@ export default function DiscoverPage() {
       return;
     }
 
+    // Reset schema immediately to prevent stale queries while loading
+    // Handled in handleTableChange now, but useEffect dependencies still manage loading logic
     const loadSchema = async () => {
       setSchemaLoading(true);
       try {
@@ -254,13 +256,17 @@ export default function DiscoverPage() {
       }
     };
     loadSchema();
+  }, [selectedDatabase, selectedTable]);
 
-    // Clear results when table changes
+  const handleTableChange = (table: string) => {
+    setSelectedTable(table);
+    setSchema(null);
+    setSelectedColumns([]);
     setRows([]);
     setHistogramData([]);
     setCustomFilter("");
     setAppliedFilter("");
-  }, [selectedDatabase, selectedTable]);
+  };
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -394,15 +400,29 @@ export default function DiscoverPage() {
   ]);
 
   // Execute search
-  const handleSearch = useCallback(() => {
-    setAppliedFilter(customFilter);
-    if (page !== 1) {
-      setPage(1);
-    } else if (customFilter === appliedFilter) {
-      fetchData();
-      fetchHistogram();
-    }
-  }, [page, customFilter, appliedFilter, fetchData, fetchHistogram]);
+  const handleSearch = useCallback(
+    (filterOverride?: string | unknown) => {
+      const filterToApply =
+        typeof filterOverride === "string" ? filterOverride : customFilter;
+
+      // Ensure custom filter is synced (useful if driven by external triggers)
+      if (
+        typeof filterOverride === "string" &&
+        filterOverride !== customFilter
+      ) {
+        setCustomFilter(filterOverride);
+      }
+
+      setAppliedFilter(filterToApply);
+      if (page !== 1) {
+        setPage(1);
+      } else if (filterToApply === appliedFilter) {
+        fetchData();
+        fetchHistogram();
+      }
+    },
+    [page, customFilter, appliedFilter, fetchData, fetchHistogram],
+  );
 
   // Effect to fetch active data when deps change (initial load or filter change)
   useEffect(() => {
@@ -504,7 +524,7 @@ export default function DiscoverPage() {
             <Table2 className="h-4 w-4 text-muted-foreground" />
             <Select
               value={selectedTable}
-              onValueChange={setSelectedTable}
+              onValueChange={handleTableChange}
               disabled={!selectedDatabase || tables.length === 0}
             >
               <SelectTrigger
