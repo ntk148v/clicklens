@@ -18,6 +18,6 @@ test.describe("Smoke Test", () => {
   test("should load Tables", async ({ page }) => {
     await page.click("a[href='/tables']");
     await expect(page).toHaveURL("/tables");
-    await expect(page.locator("text=Databases")).toBeVisible();
+    await expect(page.locator("text=Database:")).toBeVisible();
   });
 });

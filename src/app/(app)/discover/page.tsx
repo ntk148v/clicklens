@@ -63,7 +63,7 @@ export default function DiscoverPage() {
 
   // Time range state (Unified)
   const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
-    getFlexibleRangeFromEnum("1h")
+    getFlexibleRangeFromEnum("1h"),
   );
 
   // Results state
@@ -168,8 +168,8 @@ export default function DiscoverPage() {
       try {
         const res = await fetch(
           `/api/clickhouse/tables?database=${encodeURIComponent(
-            selectedDatabase
-          )}`
+            selectedDatabase,
+          )}`,
         );
         const data = await res.json();
         if (data.success && data.data) {
@@ -177,7 +177,7 @@ export default function DiscoverPage() {
             data.data.map((t: { name: string; engine: string }) => ({
               name: t.name,
               engine: t.engine,
-            }))
+            })),
           );
         }
       } catch (err) {
@@ -210,8 +210,8 @@ export default function DiscoverPage() {
       try {
         const res = await fetch(
           `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(
-            selectedDatabase
-          )}&table=${encodeURIComponent(selectedTable)}`
+            selectedDatabase,
+          )}&table=${encodeURIComponent(selectedTable)}`,
         );
         const data = await res.json();
         if (data.success && data.data) {
@@ -225,7 +225,7 @@ export default function DiscoverPage() {
 
           // Auto-select primary time column if available
           const primaryTime = data.data.timeColumns.find(
-            (tc: TimeColumnCandidate) => tc.isPrimary
+            (tc: TimeColumnCandidate) => tc.isPrimary,
           );
           if (primaryTime) {
             setSelectedTimeColumn(primaryTime.name);
@@ -430,7 +430,7 @@ export default function DiscoverPage() {
         to: endTime,
         label: `${format(fromDate, "MMM d, HH:mm")} to ${format(
           toDate,
-          "MMM d, HH:mm"
+          "MMM d, HH:mm",
         )}`,
       });
     }
@@ -489,16 +489,13 @@ export default function DiscoverPage() {
               value={selectedDatabase}
               onValueChange={setSelectedDatabase}
             >
-              <SelectTrigger className="w-[180px] h-9">
+              <SelectTrigger
+                className="w-[180px] h-9"
+                aria-label="Select database"
+              >
                 <SelectValue placeholder="Select database" />
               </SelectTrigger>
-              <SelectContent>
-                {databases.map((db) => (
-                  <SelectItem key={db} value={db}>
-                    {db}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              {/* ... */}
             </Select>
           </div>
 
@@ -510,7 +507,10 @@ export default function DiscoverPage() {
               onValueChange={setSelectedTable}
               disabled={!selectedDatabase || tables.length === 0}
             >
-              <SelectTrigger className="w-[200px] h-9">
+              <SelectTrigger
+                className="w-[200px] h-9"
+                aria-label="Select table"
+              >
                 <SelectValue placeholder="Select table" />
               </SelectTrigger>
               <SelectContent>
