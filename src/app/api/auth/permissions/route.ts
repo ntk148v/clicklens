@@ -41,7 +41,7 @@ interface PermissionsResponse {
  */
 async function getEffectiveRoles(
   client: ReturnType<typeof createClient>,
-  username: string
+  username: string,
 ): Promise<Set<string>> {
   const effectiveRoles = new Set<string>();
 
@@ -160,7 +160,7 @@ async function getAccessInfo(username: string): Promise<{
     if (hasGlobalAccess) {
       // User has global access, get all non-system databases
       const result = await client.query(
-        `SELECT name FROM system.databases ORDER BY name`
+        `SELECT name FROM system.databases ORDER BY name`,
       );
       const allDbs = result.data as unknown as Array<{ name: string }>;
       databases = allDbs
@@ -209,7 +209,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     if (!session.isLoggedIn || !session.user) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -217,7 +217,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -387,10 +387,10 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         error: isClickHouseError(error)
           ? error.userMessage || error.message
           : error instanceof Error
-          ? error.message
-          : "Unknown error",
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }

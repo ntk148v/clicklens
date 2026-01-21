@@ -188,10 +188,13 @@ export async function POST(
     }
 
     if (errors.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: `User created but with errors: ${errors.join("; ")}`,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `User created but with errors: ${errors.join("; ")}`,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });
@@ -349,10 +352,13 @@ export async function PUT(
     }
 
     if (errors.length > 0) {
-      return NextResponse.json({
-        success: false, // Mark as failed so UI shows the error
-        error: `Update completed with errors: ${errors.join("; ")}`,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false, // Mark as failed so UI shows the error
+          error: `Update completed with errors: ${errors.join("; ")}`,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });
@@ -365,10 +371,10 @@ export async function PUT(
         error: isClickHouseError(error)
           ? error.userMessage || error.message
           : error instanceof Error
-          ? error.message
-          : "Unknown error",
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }

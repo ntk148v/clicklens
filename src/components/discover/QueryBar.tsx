@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 interface QueryBarProps {
   value: string;
   onChange: (query: string) => void;
-  onExecute: () => void;
+  onExecute: (query: string) => void;
   isLoading?: boolean;
   placeholder?: string;
   error?: string | null;
@@ -78,27 +78,16 @@ export function QueryBar({
     if (debouncedChangeRef.current) {
       clearTimeout(debouncedChangeRef.current);
     }
+
+    const query = localValue;
+
     // Ensure parent has latest value before executing
-    onChange(localValue);
+    onChange(query);
 
-    // We need to defer execution slightly if we just updated the parent
-    // but typically onChange is state update so next render handles it?
-    // Actually, onExecute usually reads the parent state.
-    // It's safer if onExecute accepts the value to execute, but signature is () => void.
-    // So we rely on the parent having the synced value or we assume onExecute will read from the state
-    // which might differ if we just called onChange.
-    // IMPORTANT: The parent `onExecute` (handleSearch) reads from `customFilter` state.
-    // If we call onChange then immediately onExecute, the state update might not have happened yet.
-    // However, since we debounce updates, the parent might be lagging.
-    // Best approach: Call onChange immediately, then execute.
-
-    if (localValue.trim()) {
+    if (query.trim()) {
       setHistory((prev) => {
-        const filtered = prev.filter((q) => q !== localValue.trim());
-        const updated = [localValue.trim(), ...filtered].slice(
-          0,
-          MAX_HISTORY_ITEMS
-        );
+        const filtered = prev.filter((q) => q !== query.trim());
+        const updated = [query.trim(), ...filtered].slice(0, MAX_HISTORY_ITEMS);
         try {
           localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(updated));
         } catch {
@@ -107,26 +96,9 @@ export function QueryBar({
         return updated;
       });
     }
-    // Force update parent immediately
-    onChange(localValue);
-    // Use setTimeout to allow state propagation if needed, though usually onExecute fetches fresh data
-    // In DiscoverPage, handleSearch reads from `customFilter` state.
-    // React state updates are batched.
-    // If we want to be safe, we should pass the value to onExecute if possible, or wait.
-    // But since we can't change onExecute signature easily without changing parent,
-    // we'll assume the user pauses or clicks search.
-    // If they hit enter, we fire onChange then onExecute.
 
-    // Actually, in the parent, `handleSearch` calls `fetchData` which uses `customFilter` from state.
-    // If we call onChange(localValue), it schedules a state update.
-    // If we call onExecute() immediately, it might use the old state closure.
-    // This is a risk.
-    // BUT: standard pattern for this is passing value to execute.
-    // Let's stick to the plan: optimize input.
-
-    // For Enter key / Search button:
-    // We should trigger the parent update immediately.
-    setTimeout(onExecute, 0);
+    // Execute with the current value immediately
+    onExecute(query);
   }, [localValue, onChange, onExecute]);
 
   const handleChange = (newValue: string) => {
@@ -149,7 +121,7 @@ export function QueryBar({
         handleExecute();
       }
     },
-    [handleExecute]
+    [handleExecute],
   );
 
   const handleHistorySelect = useCallback(
@@ -159,7 +131,7 @@ export function QueryBar({
       setHistoryOpen(false);
       inputRef.current?.focus();
     },
-    [onChange]
+    [onChange],
   );
 
   const handleClear = useCallback(() => {
@@ -180,7 +152,7 @@ export function QueryBar({
           placeholder={placeholder}
           className={cn(
             "pl-10 pr-20 font-mono text-sm",
-            error && "border-destructive focus-visible:ring-destructive"
+            error && "border-destructive focus-visible:ring-destructive",
           )}
           disabled={isLoading}
         />

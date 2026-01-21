@@ -63,7 +63,7 @@ export default function DiscoverPage() {
 
   // Time range state (Unified)
   const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
-    getFlexibleRangeFromEnum("1h")
+    getFlexibleRangeFromEnum("1h"),
   );
 
   // Results state
@@ -168,8 +168,8 @@ export default function DiscoverPage() {
       try {
         const res = await fetch(
           `/api/clickhouse/tables?database=${encodeURIComponent(
-            selectedDatabase
-          )}`
+            selectedDatabase,
+          )}`,
         );
         const data = await res.json();
         if (data.success && data.data) {
@@ -177,7 +177,7 @@ export default function DiscoverPage() {
             data.data.map((t: { name: string; engine: string }) => ({
               name: t.name,
               engine: t.engine,
-            }))
+            })),
           );
         }
       } catch (err) {
@@ -205,13 +205,15 @@ export default function DiscoverPage() {
       return;
     }
 
+    // Reset schema immediately to prevent stale queries while loading
+    // Handled in handleTableChange now, but useEffect dependencies still manage loading logic
     const loadSchema = async () => {
       setSchemaLoading(true);
       try {
         const res = await fetch(
           `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(
-            selectedDatabase
-          )}&table=${encodeURIComponent(selectedTable)}`
+            selectedDatabase,
+          )}&table=${encodeURIComponent(selectedTable)}`,
         );
         const data = await res.json();
         if (data.success && data.data) {
@@ -225,7 +227,7 @@ export default function DiscoverPage() {
 
           // Auto-select primary time column if available
           const primaryTime = data.data.timeColumns.find(
-            (tc: TimeColumnCandidate) => tc.isPrimary
+            (tc: TimeColumnCandidate) => tc.isPrimary,
           );
           if (primaryTime) {
             setSelectedTimeColumn(primaryTime.name);
@@ -254,13 +256,17 @@ export default function DiscoverPage() {
       }
     };
     loadSchema();
+  }, [selectedDatabase, selectedTable]);
 
-    // Clear results when table changes
+  const handleTableChange = (table: string) => {
+    setSelectedTable(table);
+    setSchema(null);
+    setSelectedColumns([]);
     setRows([]);
     setHistogramData([]);
     setCustomFilter("");
     setAppliedFilter("");
-  }, [selectedDatabase, selectedTable]);
+  };
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -394,15 +400,29 @@ export default function DiscoverPage() {
   ]);
 
   // Execute search
-  const handleSearch = useCallback(() => {
-    setAppliedFilter(customFilter);
-    if (page !== 1) {
-      setPage(1);
-    } else if (customFilter === appliedFilter) {
-      fetchData();
-      fetchHistogram();
-    }
-  }, [page, customFilter, appliedFilter, fetchData, fetchHistogram]);
+  const handleSearch = useCallback(
+    (filterOverride?: string | unknown) => {
+      const filterToApply =
+        typeof filterOverride === "string" ? filterOverride : customFilter;
+
+      // Ensure custom filter is synced (useful if driven by external triggers)
+      if (
+        typeof filterOverride === "string" &&
+        filterOverride !== customFilter
+      ) {
+        setCustomFilter(filterOverride);
+      }
+
+      setAppliedFilter(filterToApply);
+      if (page !== 1) {
+        setPage(1);
+      } else if (filterToApply === appliedFilter) {
+        fetchData();
+        fetchHistogram();
+      }
+    },
+    [page, customFilter, appliedFilter, fetchData, fetchHistogram],
+  );
 
   // Effect to fetch active data when deps change (initial load or filter change)
   useEffect(() => {
@@ -430,7 +450,7 @@ export default function DiscoverPage() {
         to: endTime,
         label: `${format(fromDate, "MMM d, HH:mm")} to ${format(
           toDate,
-          "MMM d, HH:mm"
+          "MMM d, HH:mm",
         )}`,
       });
     }
@@ -507,7 +527,7 @@ export default function DiscoverPage() {
             <Table2 className="h-4 w-4 text-muted-foreground" />
             <Select
               value={selectedTable}
-              onValueChange={setSelectedTable}
+              onValueChange={handleTableChange}
               disabled={!selectedDatabase || tables.length === 0}
             >
               <SelectTrigger className="w-[200px] h-9">

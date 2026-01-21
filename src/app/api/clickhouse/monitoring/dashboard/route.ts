@@ -119,7 +119,7 @@ interface DashboardResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<MonitoringApiResponse<DashboardResponse>>> {
   try {
     const config = await getSessionClickHouseConfig();
@@ -135,7 +135,7 @@ export async function GET(
             userMessage: "Please log in to ClickHouse first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -148,9 +148,8 @@ export async function GET(
     let clusterNodes: NodeRow[] = [];
 
     try {
-      const clustersResult = await client.query<ClusterRow>(
-        CLUSTERS_LIST_QUERY
-      );
+      const clustersResult =
+        await client.query<ClusterRow>(CLUSTERS_LIST_QUERY);
       const clusters = clustersResult.data
         .map((r) => r.cluster)
         .filter((c) => !c.startsWith("_") && !c.startsWith("all_groups."));
@@ -165,7 +164,7 @@ export async function GET(
         ]);
 
         clusterNodes = nodesResult.data.filter(
-          (n) => n.cluster === clusterName
+          (n) => n.cluster === clusterName,
         );
       }
     } catch {
@@ -191,44 +190,44 @@ export async function GET(
       networkResult,
     ] = await Promise.all([
       client.query<TimeSeriesPoint>(
-        getDashboardQueriesPerSecQuery(timeRange, clusterName)
+        getDashboardQueriesPerSecQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardQueriesRunningQuery(timeRange, clusterName)
+        getDashboardQueriesRunningQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardMergesRunningQuery(timeRange, clusterName)
+        getDashboardMergesRunningQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardSelectedRowsQuery(timeRange, clusterName)
+        getDashboardSelectedRowsQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardInsertedRowsQuery(timeRange, clusterName)
+        getDashboardInsertedRowsQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardMaxPartsQuery(timeRange, clusterName)
+        getDashboardMaxPartsQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardMemoryQuery(timeRange, clusterName)
+        getDashboardMemoryQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardCPUQuery(timeRange, clusterName)
+        getDashboardCPUQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardIOWaitQuery(timeRange, clusterName)
+        getDashboardIOWaitQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardFilesystemQuery(timeRange, clusterName)
+        getDashboardFilesystemQuery(timeRange, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardNetworkQuery(timeRange, clusterName)
+        getDashboardNetworkQuery(timeRange, clusterName),
       ),
     ]);
 
     // Extract unique node names
     const nodeSet = new Set<string>();
     [...queriesPerSecResult.data, ...memoryResult.data].forEach((p) =>
-      nodeSet.add(p.node)
+      nodeSet.add(p.node),
     );
     const nodes = Array.from(nodeSet).sort();
 
@@ -290,25 +289,31 @@ export async function GET(
     console.error("Dashboard API error:", error);
 
     if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            type: error.type,
+            userMessage: error.userMessage || error.message,
+          },
         },
-      }), { status: 500 };
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "An unexpected error occurred",
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 500,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "INTERNAL_ERROR",
+          userMessage: "An unexpected error occurred",
+        },
       },
-    }), { status: 500 };
+      { status: 500 },
+    );
   }
 }

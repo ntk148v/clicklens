@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
           ? error.userMessage || error.message
           : "Failed to fetch settings",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -91,7 +91,7 @@ export async function PUT(request: Request) {
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -104,7 +104,7 @@ export async function PUT(request: Request) {
           success: false,
           error: "Setting name and value are required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -117,7 +117,7 @@ export async function PUT(request: Request) {
     if (!currentUsername) {
       return NextResponse.json(
         { success: false, error: "Could not determine current user" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -152,7 +152,7 @@ export async function PUT(request: Request) {
           error:
             "Cannot modify settings for this user. The user is defined in ClickHouse's XML configuration file (users.xml), which is readonly. To change settings for this user, modify the XML configuration file directly.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -163,7 +163,7 @@ export async function PUT(request: Request) {
           ? error.userMessage || error.message
           : "Failed to update setting",
       },
-      { status: 500 }, { status: 500 }
+      { status: 500 },
     );
   }
 }
