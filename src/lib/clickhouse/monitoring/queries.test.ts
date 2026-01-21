@@ -1,5 +1,5 @@
 import { createClient } from "@clickhouse/client";
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { describe, test, afterAll } from "bun:test";
 import * as queries from "./queries";
 
 describe("Monitoring Queries Validation", () => {
@@ -34,8 +34,8 @@ describe("Monitoring Queries Validation", () => {
         query: queryToCheck,
         format: "JSONEachRow",
       });
-    } catch (e: any) {
-      const msg = (e.message || "").toString();
+    } catch (e: unknown) {
+      const msg = (e instanceof Error ? e.message : String(e)).toString();
 
       // Ignore dependencies we can't control in this generic test
       if (

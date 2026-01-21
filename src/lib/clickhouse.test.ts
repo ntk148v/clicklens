@@ -1,5 +1,5 @@
 import { createClient } from "@clickhouse/client";
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { describe, expect, test, afterAll } from "bun:test";
 
 describe("ClickHouse Integration", () => {
   const client = createClient({
