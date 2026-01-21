@@ -20,7 +20,6 @@ import {
   isRestrictedDatabase,
   getFeatureRole,
   checkConfiguredFeature,
-  FEATURE_ROLE_PREFIX,
   type DataPrivilege,
   type DataPrivilegeType,
 } from "@/lib/rbac";
@@ -51,27 +50,19 @@ async function ensureFeatureRoles(
   client: ReturnType<typeof createClient>,
 ): Promise<void> {
   try {
-    // Check which feature roles exist
-    const existingRoles = await client.query<{ name: string }>(`
-      SELECT name FROM system.roles WHERE name LIKE '${FEATURE_ROLE_PREFIX}%'
-    `);
-    const existingSet = new Set(existingRoles.data.map((r) => r.name));
-
-    // Create missing feature roles
+    // Ensure all feature roles and their grants are present
     for (const fr of FEATURE_ROLES) {
-      if (!existingSet.has(fr.id)) {
-        try {
-          await client.command(`CREATE ROLE IF NOT EXISTS \`${fr.id}\``);
-          for (const grant of fr.grants) {
-            try {
-              await client.command(grant);
-            } catch {
-              // Ignore individual grant failures
-            }
+      try {
+        await client.command(`CREATE ROLE IF NOT EXISTS \`${fr.id}\``);
+        for (const grant of fr.grants) {
+          try {
+            await client.command(grant);
+          } catch {
+            // Ignore individual grant failures
           }
-        } catch {
-          // Ignore role creation failures (may lack permissions)
         }
+      } catch {
+        // Ignore role creation failures (may lack permissions)
       }
     }
   } catch {
@@ -353,10 +344,13 @@ export async function POST(
     }
 
     if (errors.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: `Role created but with errors: ${errors.join("; ")}`,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Role created but with errors: ${errors.join("; ")}`,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });
@@ -517,10 +511,13 @@ export async function PUT(
     }
 
     if (errors.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: `Role updated but with errors: ${errors.join("; ")}`,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Role updated but with errors: ${errors.join("; ")}`,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });

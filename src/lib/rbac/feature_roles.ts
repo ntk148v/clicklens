@@ -34,20 +34,20 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "Grants SHOW DATABASES, SHOW TABLES, SHOW COLUMNS, SHOW DICTIONARIES globally. " +
       "Also grants SELECT on system tables and REMOTE globally for cluster queries.",
     grants: [
-      "GRANT SHOW DATABASES ON *.* TO `clicklens_table_explorer`",
-      "GRANT SHOW TABLES ON *.* TO `clicklens_table_explorer`",
-      "GRANT SHOW COLUMNS ON *.* TO `clicklens_table_explorer`",
-      "GRANT SHOW DICTIONARIES ON *.* TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.tables TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.columns TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.databases TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.parts TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.parts_columns TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.replicas TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.mutations TO `clicklens_table_explorer`",
-      "GRANT SELECT ON system.merges TO `clicklens_table_explorer`",
+      "GRANT SHOW DATABASES ON *.* TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SHOW TABLES ON *.* TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SHOW COLUMNS ON *.* TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SHOW DICTIONARIES ON *.* TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.tables TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.columns TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.databases TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.parts TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.parts_columns TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.replicas TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.mutations TO `clicklens_table_explorer` WITH GRANT OPTION",
+      "GRANT SELECT ON system.merges TO `clicklens_table_explorer` WITH GRANT OPTION",
       // REMOTE is a SOURCES privilege - must be granted globally
-      "GRANT REMOTE ON *.* TO `clicklens_table_explorer`",
+      "GRANT REMOTE ON *.* TO `clicklens_table_explorer` WITH GRANT OPTION",
     ],
   },
   {
@@ -58,12 +58,12 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "Grants KILL QUERY globally to terminate running queries. " +
       "Also grants SELECT on system.processes, system.query_log, system.query_cache and REMOTE globally for cluster queries.",
     grants: [
-      "GRANT KILL QUERY ON *.* TO `clicklens_query_monitor`",
-      "GRANT SELECT ON system.processes TO `clicklens_query_monitor`",
-      "GRANT SELECT ON system.query_log TO `clicklens_query_monitor`",
-      "GRANT SELECT ON system.query_cache TO `clicklens_query_monitor`",
+      "GRANT KILL QUERY ON *.* TO `clicklens_query_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.processes TO `clicklens_query_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.query_log TO `clicklens_query_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.query_cache TO `clicklens_query_monitor` WITH GRANT OPTION",
       // REMOTE is a SOURCES privilege - must be granted globally
-      "GRANT REMOTE ON *.* TO `clicklens_query_monitor`",
+      "GRANT REMOTE ON *.* TO `clicklens_query_monitor` WITH GRANT OPTION",
     ],
   },
   {
@@ -73,30 +73,30 @@ export const FEATURE_ROLES: FeatureRole[] = [
     details:
       "Grants SELECT on system tables for cluster monitoring and REMOTE globally for cluster queries.",
     grants: [
-      "GRANT SELECT ON system.clusters TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.replicas TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.replication_queue TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.metrics TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.events TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.asynchronous_metrics TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.settings TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.parts TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.clusters TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.replicas TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.replication_queue TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.metrics TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.events TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.asynchronous_metrics TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.settings TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.disks TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.parts TO `clicklens_cluster_monitor` WITH GRANT OPTION",
       // Operations tables (processes, merges, mutations)
-      "GRANT SELECT ON system.processes TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.merges TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.mutations TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.processes TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.merges TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.mutations TO `clicklens_cluster_monitor` WITH GRANT OPTION",
       // Query log for time-series charts on overview
-      "GRANT SELECT ON system.query_log TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.query_log TO `clicklens_cluster_monitor` WITH GRANT OPTION",
       // Log tables for logging features
-      "GRANT SELECT ON system.text_log TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.crash_log TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.session_log TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.text_log TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.crash_log TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.session_log TO `clicklens_cluster_monitor` WITH GRANT OPTION",
       // Metric log tables for monitoring time series
-      "GRANT SELECT ON system.metric_log TO `clicklens_cluster_monitor`",
-      "GRANT SELECT ON system.asynchronous_metric_log TO `clicklens_cluster_monitor`",
+      "GRANT SELECT ON system.metric_log TO `clicklens_cluster_monitor` WITH GRANT OPTION",
+      "GRANT SELECT ON system.asynchronous_metric_log TO `clicklens_cluster_monitor` WITH GRANT OPTION",
       // REMOTE is a SOURCES privilege - must be granted globally
-      "GRANT REMOTE ON *.* TO `clicklens_cluster_monitor`",
+      "GRANT REMOTE ON *.* TO `clicklens_cluster_monitor` WITH GRANT OPTION",
     ],
   },
   {
@@ -107,12 +107,12 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "Grants ACCESS MANAGEMENT globally. Also grants SELECT on system access tables " +
       "(users, roles, grants, role_grants) for viewing access information.",
     grants: [
-      "GRANT ACCESS MANAGEMENT ON *.* TO `clicklens_user_admin`",
+      "GRANT ACCESS MANAGEMENT ON *.* TO `clicklens_user_admin` WITH GRANT OPTION",
       // SELECT on access management tables for viewing
-      "GRANT SELECT ON system.users TO `clicklens_user_admin`",
-      "GRANT SELECT ON system.roles TO `clicklens_user_admin`",
-      "GRANT SELECT ON system.grants TO `clicklens_user_admin`",
-      "GRANT SELECT ON system.role_grants TO `clicklens_user_admin`",
+      "GRANT SELECT ON system.users TO `clicklens_user_admin` WITH GRANT OPTION",
+      "GRANT SELECT ON system.roles TO `clicklens_user_admin` WITH GRANT OPTION",
+      "GRANT SELECT ON system.grants TO `clicklens_user_admin` WITH GRANT OPTION",
+      "GRANT SELECT ON system.role_grants TO `clicklens_user_admin` WITH GRANT OPTION",
     ],
   },
   {
@@ -123,8 +123,11 @@ export const FEATURE_ROLES: FeatureRole[] = [
       "Grants CREATE TABLE, DROP TABLE, ALTER TABLE, TRUNCATE, and OPTIMIZE globally. " +
       "Use with data privileges to restrict to specific databases.",
     grants: [
-      "GRANT TRUNCATE ON *.* TO `clicklens_table_admin`",
-      "GRANT OPTIMIZE ON *.* TO `clicklens_table_admin`",
+      "GRANT CREATE TABLE ON *.* TO `clicklens_table_admin` WITH GRANT OPTION",
+      "GRANT DROP TABLE ON *.* TO `clicklens_table_admin` WITH GRANT OPTION",
+      "GRANT ALTER TABLE ON *.* TO `clicklens_table_admin` WITH GRANT OPTION",
+      "GRANT TRUNCATE ON *.* TO `clicklens_table_admin` WITH GRANT OPTION",
+      "GRANT OPTIMIZE ON *.* TO `clicklens_table_admin` WITH GRANT OPTION",
     ],
   },
   {
@@ -134,10 +137,10 @@ export const FEATURE_ROLES: FeatureRole[] = [
     details:
       "Grants SELECT on system.settings and system.server_settings, with REMOTE globally for cluster queries.",
     grants: [
-      "GRANT SELECT ON system.settings TO `clicklens_settings_admin`",
-      "GRANT SELECT ON system.server_settings TO `clicklens_settings_admin`",
+      "GRANT SELECT ON system.settings TO `clicklens_settings_admin` WITH GRANT OPTION",
+      "GRANT SELECT ON system.server_settings TO `clicklens_settings_admin` WITH GRANT OPTION",
       // REMOTE is a SOURCES privilege - must be granted globally
-      "GRANT REMOTE ON *.* TO `clicklens_settings_admin`",
+      "GRANT REMOTE ON *.* TO `clicklens_settings_admin` WITH GRANT OPTION",
     ],
   },
 ];
@@ -196,7 +199,7 @@ export function checkConfiguredFeature(
     access_type: string;
     database?: string;
     table?: string;
-  }[]
+  }[],
 ): boolean {
   // Define criteria for each feature role
   const criteria: Record<
