@@ -1,4 +1,4 @@
-name: Image build and Push
+name: CI
 
 on:
   push:
@@ -20,26 +20,27 @@ permissions:
 
 jobs:
   test:
-    name: test
+    name: Unit Tests
     uses: ./.github/workflows/base.yml
     with:
       job-type: test
       clickhouse-versions: '["24.8", "25.12"]'
 
   build:
-    name: build
+    name: Build
     uses: ./.github/workflows/base.yml
     with:
       job-type: build
 
   lint:
-    name: lint
+    name: Lint
     uses: ./.github/workflows/base.yml
     with:
       job-type: lint
 
   build-docker:
-    name: build-docker
+    name: Build Docker Image
+    needs: [test, build, lint]
     uses: ./.github/workflows/base.yml
     with:
       job-type: docker
@@ -48,7 +49,8 @@ jobs:
       push-image: ${{ github.event_name != 'pull_request' }}
 
   validate-docker:
-    name: validate-docker
+    name: Validate Docker Image
+    needs: [test, build, lint]
     uses: ./.github/workflows/base.yml
     with:
       job-type: docker
@@ -56,3 +58,31 @@ jobs:
       platforms: linux/amd64
       load-image: true
       test-container: true
+
+  # Summary job for PR status checks
+  ci-success:
+    name: CI Success
+    needs: [test, build, lint]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.test.result }}" != "success" ]] || \
+             [[ "${{ needs.build.result }}" != "success" ]] || \
+             [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo ""
+            echo "❌ One or more CI checks failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All CI checks passed!"
