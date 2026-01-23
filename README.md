@@ -3,7 +3,7 @@
   <h1>ClickLens</h1>
   <p>
     A modern, powerful web interface for managing and monitoring
-    [ClickHouse](https://clickhouse.com/) databases.
+    <a href="https://clickhouse.com">ClickHouse</a> databases.
   </p>
   <p>
     <a href="https://github.com/ntk148v/clicklens/blob/master/LICENSE">
