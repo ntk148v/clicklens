@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "docs/**"
   pull_request:
     branches:
       - master
+    paths:
       - "docs/**"
   workflow_dispatch:
 
@@ -30,19 +33,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: dorny/paths-filter@v3
-        id: changes
-        with:
-          filters: |
-            docs_changes:
-              - 'docs/**'
-
-      - if: steps.changes.outputs.docs_changes == 'true'
-        name: Setup Bun
+      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - if: steps.changes.outputs.docs_changes == 'true'
-        name: Next Cache
+      - name: Next Cache
         uses: actions/cache@v5
         with:
           path: .next/cache
@@ -52,23 +46,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/bun.lock') }}-
 
-      - if: steps.changes.outputs.docs_changes == 'true'
-        name: Install dependencies
+      - name: Install dependencies
         working-directory: docs
         run: bun install
 
-      - if: steps.changes.outputs.docs_changes == 'true'
-        name: Build
+      - name: Build
         working-directory: docs
         run: bun run build
 
-      - if: steps.changes.outputs.docs_changes == 'true'
-        name: Upload static files as artifact
+      - name: Upload static files as artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: docs/out
 
-      - if: steps.changes.outputs.docs_changes == 'true'
-        name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
