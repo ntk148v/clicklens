@@ -73,10 +73,11 @@ jobs:
       - name: Run Playwright tests (${{ matrix.browser }})
         run: bunx playwright test --project=${{ matrix.browser }}
         env:
-          CLICKHOUSE_HOST: http://localhost:8123
-          CLICKHOUSE_DB: default
-          CLICKHOUSE_USER: admin
-          CLICKHOUSE_PASSWORD: password
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 8123
+          LENS_USER: admin
+          LENS_PASSWORD: password
+          SESSION_SECRET: complex_password_at_least_32_characters_long_for_security
           CI: true
 
       - name: E2E Test Summary
