@@ -5,7 +5,10 @@ on:
     branches:
       - master
   release:
+    types: [published]
   pull_request:
+    branches:
+      - master
   workflow_dispatch:
 
 # Cancel in-progress runs for same workflow and branch/PR
