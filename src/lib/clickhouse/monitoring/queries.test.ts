@@ -2,11 +2,20 @@ import { createClient } from "@clickhouse/client";
 import { describe, test, afterAll } from "bun:test";
 import * as queries from "./queries";
 
+// Build connection URL from environment variables (matching ClickLens config approach)
+const getConnectionUrl = () => {
+  const host = process.env.CLICKHOUSE_HOST || "localhost";
+  const port = process.env.CLICKHOUSE_PORT || "8123";
+  const secure = process.env.CLICKHOUSE_SECURE === "true";
+  const protocol = secure ? "https" : "http";
+  return `${protocol}://${host}:${port}`;
+};
+
 describe("Monitoring Queries Validation", () => {
   const client = createClient({
-    url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
-    username: process.env.CLICKHOUSE_USER || "admin",
-    password: process.env.CLICKHOUSE_PASSWORD || "password",
+    url: getConnectionUrl(),
+    username: process.env.CLICKHOUSE_USER || process.env.LENS_USER || "admin",
+    password: process.env.CLICKHOUSE_PASSWORD || process.env.LENS_PASSWORD || "password",
   });
 
   afterAll(async () => {
