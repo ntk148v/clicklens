@@ -1,9 +1,27 @@
-# ClickLens
+<div align="center">
+  <img src="./public/logo.png" width="20%" height="20%" />
+  <h1>ClickLens</h1>
+  <p>
+    A modern, powerful web interface for managing and monitoring
+    [ClickHouse](https://clickhouse.com/) databases.
+  </p>
+  <p>
+    <a href="https://github.com/ntk148v/clicklens/blob/master/LICENSE">
+      <img
+        alt="License"
+        src="https://img.shields.io/github/license/ntk148v/clicklens"
+      />
+    </a>
+    <a href="https://ghcr.io/ntk148v/clicklens">
+      <img
+        alt="GitHub stars"
+        src="https://img.shields.io/badge/docker-ghcr.io%2Fntk148v%2Fclicklens-blue"
+      />
+    </a>
+  </p>
+</div>
 
-[![GitHub](https://img.shields.io/github/license/ntk148v/clicklens)](https://github.com/ntk148v/clicklens/blob/master/LICENSE)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fntk148v%2Fclicklens-blue)](https://ghcr.io/ntk148v/clicklens)
-
-A modern, powerful web interface for managing and monitoring [ClickHouse](https://clickhouse.com/) databases.
+![](docs/public/screenshots/home-page.png)
 
 ## 1. Introduction
 
@@ -47,7 +65,71 @@ Full documentation is available at **[https://ntk148v.github.io/clicklens](https
 
 ## 4. Screenshots
 
-<!-- TODO: Add screenshots here -->
+### Discovery
+
+|                               Overview                                |                              Filter                               |                                  Expandable Row                                   |
+| :-------------------------------------------------------------------: | :---------------------------------------------------------------: | :-------------------------------------------------------------------------------: |
+| ![discovery-overview](docs/public/screenshots/discovery-overview.png) | ![discovery-filter](docs/public/screenshots/discovery-filter.png) | ![discovery-expandable-row](docs/public/screenshots/discovery-expandable-row.png) |
+
+### SQL Console
+
+|                         Overview                          |                    Run Query                    |                            Results                            |
+| :-------------------------------------------------------: | :---------------------------------------------: | :-----------------------------------------------------------: |
+| ![sql-overview](docs/public/screenshots/sql-overview.png) | ![sql-run](docs/public/screenshots/sql-run.png) | ![sql-run-result](docs/public/screenshots/sql-run-result.png) |
+
+|                         History                         |                                   Time Range                                    |                                 Table Preview                                 |
+| :-----------------------------------------------------: | :-----------------------------------------------------------------------------: | :---------------------------------------------------------------------------: |
+| ![sql-history](docs/public/screenshots/sql-history.png) | ![sql-time-range-selector](docs/public/screenshots/sql-time-range-selector.png) | ![sql-table-preview-data](docs/public/screenshots/sql-table-preview-data.png) |
+
+### Monitoring
+
+|                                Overview                                 |                                Metrics                                |                                   Async Metrics                                   |
+| :---------------------------------------------------------------------: | :-------------------------------------------------------------------: | :-------------------------------------------------------------------------------: |
+| ![monitoring-overview](docs/public/screenshots/monitoring-overview.png) | ![monitoring-metrics](docs/public/screenshots/monitoring-metrics.png) | ![monitoring-async-metrics](docs/public/screenshots/monitoring-async-metrics.png) |
+
+|                              Disks                              |                                 ZooKeeper                                 |
+| :-------------------------------------------------------------: | :-----------------------------------------------------------------------: |
+| ![monitoring-disk](docs/public/screenshots/monitoring-disk.png) | ![monitoring-zookeeper](docs/public/screenshots/monitoring-zookeeper.png) |
+
+### Queries
+
+|                             History                             |                                History Filter                                 |                             Running                             |                              Analytics                              |
+| :-------------------------------------------------------------: | :---------------------------------------------------------------------------: | :-------------------------------------------------------------: | :-----------------------------------------------------------------: |
+| ![queries-history](docs/public/screenshots/queries-history.png) | ![queries-history-filter](docs/public/screenshots/queries-history-filter.png) | ![queries-running](docs/public/screenshots/queries-running.png) | ![queries-analytics](docs/public/screenshots/queries-analytics.png) |
+
+### Access Control
+
+|                                   Users                                   |                              Create User                              |                             Edit User                             |
+| :-----------------------------------------------------------------------: | :-------------------------------------------------------------------: | :---------------------------------------------------------------: |
+| ![access-user-overview](docs/public/screenshots/access-user-overview.png) | ![access-user-create](docs/public/screenshots/access-user-create.png) | ![access-user-edit](docs/public/screenshots/access-user-edit.png) |
+
+|                                   Roles                                   |                              Create Role                              |                                   Feature Role                                    |
+| :-----------------------------------------------------------------------: | :-------------------------------------------------------------------: | :-------------------------------------------------------------------------------: |
+| ![access-role-overview](docs/public/screenshots/access-role-overview.png) | ![access-role-create](docs/public/screenshots/access-role-create.png) | ![access-role-feature-role](docs/public/screenshots/access-role-feature-role.png) |
+
+### Settings
+
+|                         Server Settings                         |                                       Server Expandable                                       |                         Session Settings                          |                                       Session Expandable                                        |
+| :-------------------------------------------------------------: | :-------------------------------------------------------------------------------------------: | :---------------------------------------------------------------: | :---------------------------------------------------------------------------------------------: |
+| ![settings-server](docs/public/screenshots/settings-server.png) | ![settings-server-expandable-row](docs/public/screenshots/settings-server-expandable-row.png) | ![settings-session](docs/public/screenshots/settings-session.png) | ![settings-session-expandable-row](docs/public/screenshots/settings-session-expandable-row.png) |
+
+### Tables
+
+|                            Columns                            |                           Parts                           |
+| :-----------------------------------------------------------: | :-------------------------------------------------------: |
+| ![tables-columns](docs/public/screenshots/tables-columns.png) | ![tables-parts](docs/public/screenshots/tables-parts.png) |
+
+### Logging
+
+|                          Server Logs                          |                         Crash Logs                          |
+| :-----------------------------------------------------------: | :---------------------------------------------------------: |
+| ![logging-server](docs/public/screenshots/logging-server.png) | ![logging-crash](docs/public/screenshots/logging-crash.png) |
+
+### Profile
+
+|                  User Profile                   |
+| :---------------------------------------------: |
+| ![profile](docs/public/screenshots/profile.png) |
 
 ## 5. License
 
