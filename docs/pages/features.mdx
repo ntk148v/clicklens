@@ -240,10 +240,9 @@ Real-time cluster health and performance monitoring.
 
 ![](/screenshots/monitoring-overview.png)
 
-- **① The Cluster status**: shows the umber of shards, replias, as well as the cluster name.
+- **① The Cluster status**: shows the number of shards, replicas, as well as the cluster name.
 - **② The Overall healthcheck**: ClickLens performs multiple checks: uptime, readonly replicas, parts to check, max parts per partition, active queries, memory usage, and replication delay.
-- **③ Multiple Graphs**: basically these graphs are taken from [ClickHouse built-in advanced monitoring dashboards](https://clickhouse.com/docs/operations/system-tables/dashboards). ClickLens chooses these metrics carefully, following the [ClickHouse operation documention](https://clickhouse.com/docs/operations/monitoring).
--
+- **③ Multiple Graphs**: these graphs are based on [ClickHouse built-in advanced monitoring dashboards](https://clickhouse.com/docs/operations/system-tables/dashboards). ClickLens selects metrics following the [ClickHouse operations documentation](https://clickhouse.com/docs/operations/monitoring).
 
 ![](/screenshots/monitoring-metrics.png)
 
@@ -251,7 +250,7 @@ Real-time cluster health and performance monitoring.
 
 ![](/screenshots/monitoring-disk.png)
 
-> Cause the demo cluster doesn't come along with ClickHouse Keeper/Zookeeper, the screenshots shows errors. It's the expected behavior.
+> Because the demo cluster does not include ClickHouse Keeper/ZooKeeper, the screenshots show errors. This is expected behavior.
 
 ![](/screenshots/monitoring-zookeeper.png)
 
@@ -281,10 +280,10 @@ Analyze query performance and identify slow queries.
 
 ![](/screenshots/queries-history-filter.png)
 
-- **① Filter by user**: User can get all queries executed by the specificed user.
-- **② Filter the execute duration**: Enter the minimum duration to get all queries executed longer than this value.
-- **③ Filter by the type of query**: There are multiple types of query (INSERT, CREATE, SELECT, ALTER, DROP).
-- **④ Filter by the status**: 'Success' or 'Error'.
+- **① Filter by user**: Filters queries executed by a specific user.
+- **② Filter by execution duration**: Enter a minimum duration to show only queries that took longer.
+- **③ Filter by query type**: Filter by query type (INSERT, CREATE, SELECT, ALTER, DROP).
+- **④ Filter by status**: Filter by execution status ('Success' or 'Error').
 
 ### 5.2. Query Cancellation
 
@@ -311,10 +310,10 @@ View and search through ClickHouse logs.
 
 ![](/screenshots/logging-server.png)
 
-- **① Time range**: Choose the time range to get logs from.
-- **② Filter by the log levels**: Sometimes, user just want to get only ERROR logs for e.x..
-- **③ Filter by the component**: Enter the component name to filer.
-- **④ Filter by the message**: Enter a part of message (ClickLens performs statement with WHERE LIKE %string%).
+- **① Time range**: Select the time range for logs.
+- **② Filter by log level**: Filter to show only specific log levels (e.g., ERROR).
+- **③ Filter by component**: Enter a component name to filter logs.
+- **④ Filter by message**: Enter part of a message to search (uses `WHERE LIKE '%string%'`).
 
 > The system.crash_log table does not exist in the database by default, it is created only when fatal errors occur.
 
@@ -333,7 +332,7 @@ Manage ClickHouse users and roles.
 
 In ClickHouse, Access control management is supported via RBAC approach. The entities that are part of ClickHouse RBAC are
 
-- **User Account** – Hepls to identify individual end users or the application which connects and accesses the data in ClickHouse
+- **User Account** – Identifies individual end users or applications that connect and access data in ClickHouse
 - **Role** – Roles hold the information about privileges, settings, and constraints for the users
 - **Settings profile** – Group of settings that will be applied to the user or a role
 - **Quotas** – Limit the resource usage for a role or user over a period of time
@@ -360,7 +359,9 @@ The above illustration shows the access entities and the possible assignment of 
 While this approach can help in implementing RBAC, the strict enforcement of the Principle of Least Privilege is entirely in the hands of the database admin. This is because, let’s say, we have two users A and B, with the same role. They can end up having different sets of privileges and settings because it is possible to grant settings profiles and any specific privileges to individual users. We can enforce the upcoming RBAC approach to ensure consistency and strict implementation of the Principle of Least Privilege.
 
 <Callout type="info">
-  The **principle of least privilege** is an information security concept that states that every entity must be able to access only the information and resources that are necessary for completing the required task.
+  The **principle of least privilege** is an information security concept that
+  states that every entity must be able to access only the information and
+  resources that are necessary for completing the required task.
 </Callout>
 
 ClickLens chooses the different approach, simpler and more effective. This will ensure that we have a consistent set of privileges and enforce the Principle of Least Privilege effectively.
@@ -376,7 +377,7 @@ flowchart LR
     USERS[Users]
 
     GRANT --> ROLES
-    ROLES --> USERSc
+    ROLES --> USERS
     SETTINGS --> ROLES
 ```
 
@@ -401,11 +402,11 @@ View roles. There are two types of roles:
 
 ![](/screenshots/access-role-overview.png)
 
-- **① Feature roles**: The system-managed roles that enable UI features. It doesn't editable, just view only by clicking on each role.
+- **① Feature roles**: System-managed roles that enable UI features. These are read-only and can be viewed by clicking on each role.
 
 ![](/screenshots/access-role-feature-role.png)
 
-- **② Custom roles**: These roles created by user, contains two different subsets of roles and priviledges: Inherit from other roles and Data priviledges. It allows to create flexible roles.
+- **② Custom roles**: User-created roles containing two types of permissions: inherited roles and data privileges. This allows for flexible role configuration.
 
 ![](/screenshots/access-role-create.png)
 
@@ -422,10 +423,10 @@ View ClickHouse server and session settings.
 
 **Available views**
 
-| View                 | Route               | Description                        |
-| -------------------- | ------------------- | ---------------------------------- |
+| View                 | Route               | Description                                                                                                                                                                                                                                                         |
+| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Server Settings**  | `/settings/server`  | Read from `system.server_settings`, contains information about global settings for the server, which are specified in `config.xml`. Currently, the table shows only settings from the first layer of `config.xml` and doesn't support nested configs (e.g. logger). |
-| **Session Settings** | `/settings/session` | Read from `system.settings`, contains information about session settings for current user.|
+| **Session Settings** | `/settings/session` | Read from `system.settings`, contains information about session settings for current user.                                                                                                                                                                          |
 
 ![](/screenshots/settings-server.png)
 
@@ -434,7 +435,6 @@ View ClickHouse server and session settings.
 ![](/screenshots/settings-session.png)
 
 ![](/screenshots/settings-session-expandable-row.png)
-
 
 ## 9. Profile
 
