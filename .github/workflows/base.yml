@@ -100,6 +100,27 @@ jobs:
         if: ${{ inputs.job-type == 'test' }}
         run: bun run test:coverage
 
+      - name: Upload coverage report
+        if: ${{ inputs.job-type == 'test' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.clickhouse-version }}
+          path: coverage/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Test Summary
+        if: ${{ inputs.job-type == 'test' && always() }}
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "ClickHouse Version: ${{ matrix.clickhouse-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d "coverage" ]; then
+            echo "📊 Coverage report generated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No coverage report found" >> $GITHUB_STEP_SUMMARY
+          fi
+
       # === App Build ===
       - name: Build App
         if: ${{ inputs.job-type == 'build' }}

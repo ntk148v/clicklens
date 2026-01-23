@@ -75,6 +75,16 @@ jobs:
           CLICKHOUSE_PASSWORD: password
           CI: true
 
+      - name: E2E Test Summary
+        if: always()
+        run: |
+          echo "## E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🧪 Playwright E2E tests completed" >> $GITHUB_STEP_SUMMARY
+          if [ -d "playwright-report" ]; then
+            echo "📊 Report generated successfully" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
