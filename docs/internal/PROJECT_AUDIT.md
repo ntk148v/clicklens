@@ -1,6 +1,6 @@
 # ClickLens Technical Audit
 
-> **Audit Date:** 2026-01-15
+> **Audit Date:** 2026-01-23
 > **Purpose:** Deep-dive technical analysis of the ClickLens project to bridge the gap between source code and documentation.
 
 ---
@@ -44,6 +44,7 @@ clicklens/
 │   └── lib/           # Core libraries (31 files)
 ├── docs/              # Documentation (Nextra)
 ├── e2e/               # Playwright E2E tests
+├── scripts/           # Build and utility scripts
 └── public/            # Static assets
 ```
 
@@ -380,21 +381,68 @@ Feature roles are ClickHouse roles prefixed with `clicklens_`. Defined in `src/l
 
 #### ClickHouse (`/api/clickhouse/`)
 
-| Endpoint                         | Method   | Description               |
-| -------------------------------- | -------- | ------------------------- |
-| `/api/clickhouse/ping`           | GET      | Health check              |
-| `/api/clickhouse/databases`      | GET      | List databases            |
-| `/api/clickhouse/tables`         | GET      | List tables               |
-| `/api/clickhouse/tables/[table]` | GET      | Table details             |
-| `/api/clickhouse/query`          | POST     | Execute query (streaming) |
-| `/api/clickhouse/kill`           | POST     | Kill running query        |
-| `/api/clickhouse/discover`       | GET      | Discover feature queries  |
-| `/api/clickhouse/schema/*`       | GET      | Schema introspection      |
-| `/api/clickhouse/settings`       | GET      | Settings queries          |
-| `/api/clickhouse/logging`        | GET      | Log queries               |
-| `/api/clickhouse/queries/*`      | GET      | Query analytics           |
-| `/api/clickhouse/access/*`       | GET/POST | Access control            |
-| `/api/clickhouse/monitoring/*`   | GET      | Monitoring data           |
+| Endpoint                         | Method | Description               |
+| -------------------------------- | ------ | ------------------------- |
+| `/api/clickhouse/ping`           | GET    | Health check              |
+| `/api/clickhouse/databases`      | GET    | List databases            |
+| `/api/clickhouse/tables`         | GET    | List tables               |
+| `/api/clickhouse/tables/[table]` | GET    | Table details             |
+| `/api/clickhouse/query`          | POST   | Execute query (streaming) |
+| `/api/clickhouse/kill`           | POST   | Kill running query        |
+| `/api/clickhouse/discover`       | GET    | Discover feature queries  |
+| `/api/clickhouse/settings`       | GET    | Settings queries          |
+| `/api/clickhouse/logging`        | GET    | Log queries               |
+
+**Schema Endpoints:**
+
+| Endpoint                               | Method | Description           |
+| -------------------------------------- | ------ | --------------------- |
+| `/api/clickhouse/schema/columns`       | GET    | Column introspection  |
+| `/api/clickhouse/schema/table-columns` | GET    | Table column metadata |
+
+**Table Explorer Endpoints:**
+
+| Endpoint                                    | Method | Description         |
+| ------------------------------------------- | ------ | ------------------- |
+| `/api/clickhouse/tables/explorer`           | GET    | Table explorer data |
+| `/api/clickhouse/tables/explorer/columns`   | GET    | Table columns       |
+| `/api/clickhouse/tables/explorer/parts`     | GET    | Table parts         |
+| `/api/clickhouse/tables/explorer/merges`    | GET    | Active merges       |
+| `/api/clickhouse/tables/explorer/mutations` | GET    | Pending mutations   |
+| `/api/clickhouse/tables/explorer/replicas`  | GET    | Replica status      |
+
+**Monitoring Endpoints:**
+
+| Endpoint                                | Method | Description        |
+| --------------------------------------- | ------ | ------------------ |
+| `/api/clickhouse/monitoring/overview`   | GET    | Overview metrics   |
+| `/api/clickhouse/monitoring/dashboard`  | GET    | Dashboard data     |
+| `/api/clickhouse/monitoring/metrics`    | GET    | System metrics     |
+| `/api/clickhouse/monitoring/cluster`    | GET    | Cluster info       |
+| `/api/clickhouse/monitoring/health`     | GET    | Health checks      |
+| `/api/clickhouse/monitoring/disks`      | GET    | Disk usage         |
+| `/api/clickhouse/monitoring/keeper`     | GET    | Keeper/ZooKeeper   |
+| `/api/clickhouse/monitoring/operations` | GET    | Merges/mutations   |
+| `/api/clickhouse/monitoring/replicas`   | GET    | Replication status |
+
+**Query Analytics Endpoints:**
+
+| Endpoint                            | Method | Description       |
+| ----------------------------------- | ------ | ----------------- |
+| `/api/clickhouse/queries/running`   | GET    | Running queries   |
+| `/api/clickhouse/queries/history`   | GET    | Query history     |
+| `/api/clickhouse/queries/analytics` | GET    | Query analytics   |
+| `/api/clickhouse/queries/cache`     | GET    | Query cache stats |
+
+**Access Control Endpoints:**
+
+| Endpoint                               | Method   | Description      |
+| -------------------------------------- | -------- | ---------------- |
+| `/api/clickhouse/access/users`         | GET/POST | User management  |
+| `/api/clickhouse/access/roles`         | GET/POST | Role management  |
+| `/api/clickhouse/access/grants`        | GET/POST | Grant management |
+| `/api/clickhouse/access/role-grants`   | GET      | Role grants      |
+| `/api/clickhouse/access/feature-roles` | GET      | Feature roles    |
 
 #### Saved Queries (`/api/saved-queries/`)
 
@@ -598,15 +646,15 @@ Built on shadcn/ui patterns with Radix primitives:
 
 | Metric                | Count |
 | --------------------- | ----- |
-| Total Source Files    | ~193  |
-| App Routes            | ~29   |
-| API Endpoints         | ~41   |
-| UI Components         | ~88   |
-| Lib Modules           | ~31   |
+| Total Source Files    | ~180  |
+| App Routes (pages)    | 28    |
+| API Endpoints         | 41    |
+| UI Components         | 80    |
+| Lib Modules           | 31    |
 | Environment Variables | 10    |
 | Feature Roles         | 6     |
 | Permission Types      | 12    |
 
 ---
 
-_This audit was generated by analyzing the ClickLens source code as of 2026-01-15._
+_This audit was generated by analyzing the ClickLens source code as of 2026-01-23._

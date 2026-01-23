@@ -10,11 +10,12 @@ ClickLens is configured entirely through environment variables. Here's the compl
 
 ### 1.1. Required Variables
 
-| Variable          | Description                                    | Example                           |
-| ----------------- | ---------------------------------------------- | --------------------------------- |
-| `CLICKHOUSE_HOST` | ClickHouse server hostname                     | `clickhouse.example.com`          |
-| `LENS_USER`       | Service account username for metadata queries  | `lensuser`                        |
-| `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...` |
+| Variable          | Description                                    | Example                               |
+| ----------------- | ---------------------------------------------- | ------------------------------------- |
+| `CLICKHOUSE_HOST` | ClickHouse server hostname                     | `clickhouse.example.com`              |
+| `LENS_USER`       | Service account username for metadata queries  | `lensuser`                            |
+| `LENS_PASSWORD`   | `""`                                           | Password for the Lens service account |
+| `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...`     |
 
 ### 1.2. Optional Variables
 
@@ -23,7 +24,6 @@ ClickLens is configured entirely through environment variables. Here's the compl
 | `CLICKHOUSE_PORT`         | `8123` (HTTP) or `8443` (HTTPS) | ClickHouse HTTP interface port                                              |
 | `CLICKHOUSE_SECURE`       | `false`                         | Set to `true` to use HTTPS                                                  |
 | `CLICKHOUSE_VERIFY`       | `true`                          | Set to `false` to skip SSL certificate verification (for self-signed certs) |
-| `LENS_PASSWORD`           | `""`                            | Password for the Lens service account                                       |
 | `NODE_ENV`                | `development`                   | Set to `production` for production deployments                              |
 | `DISABLE_SECURE_COOKIES`  | `false`                         | Set to `true` if running behind a non-HTTPS proxy                           |
 | `NEXT_PUBLIC_APP_VERSION` | From `package.json`             | Override the displayed app version                                          |
@@ -33,7 +33,78 @@ ClickLens is configured entirely through environment variables. Here's the compl
   production, generate a strong secret with: ```bash openssl rand -base64 32 ```
 </Callout>
 
-### 1.3. Sample `.env.local` File
+## 2. ClickHouse Server Requirements
+
+### 2.1. Version Compatibility
+
+ClickLens is tested with ClickHouse version **21.8** and later. Some features require newer versions:
+
+| Feature            | Minimum Version | Notes                                |
+| ------------------ | --------------- | ------------------------------------ |
+| Core functionality | 21.8+           | Basic queries, schema browsing       |
+| Query cache stats  | 23.1+           | `system.query_cache` table           |
+| Time-series charts | 21.8+           | Requires `system.metric_log` enabled |
+| Cluster monitoring | 21.8+           | Uses `clusterAllReplicas()` function |
+
+### 2.2. Required Server Configuration
+
+Ensure the ClickHouse HTTP interface is enabled in your `config.xml`:
+
+```xml
+<clickhouse>
+    <!-- Required: Enable HTTP interface -->
+    <http_port>8123</http_port>
+    <!-- Or for HTTPS -->
+    <https_port>8443</https_port>
+
+    <!-- Recommended: Enable access management for RBAC -->
+    <access_control_improvements>
+        <users_without_row_policies_can_read_rows>true</users_without_row_policies_can_read_rows>
+    </access_control_improvements>
+</clickhouse>
+```
+
+For user management features, ensure SQL-driven access control is enabled in `users.xml`:
+
+```xml
+<clickhouse>
+    <users>
+        <default>
+            <access_management>1</access_management>
+        </default>
+    </users>
+</clickhouse>
+```
+
+### 2.3. Cluster Configuration
+
+For cluster monitoring, ClickLens uses the `clusterAllReplicas()` function to aggregate data across nodes. Ensure your cluster is properly configured in `config.xml`:
+
+```xml
+<clickhouse>
+    <remote_servers>
+        <my_cluster>
+            <shard>
+                <replica>
+                    <host>node1.example.com</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>node2.example.com</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </my_cluster>
+    </remote_servers>
+</clickhouse>
+```
+
+<Callout type="info">
+  ClickLens automatically detects clusters from `system.clusters` and displays
+  cluster-aware metrics when available.
+</Callout>
+
+### 2.4. Sample `.env.local` File
 
 ```bash
 # ClickHouse Server Connection (required)
@@ -50,9 +121,9 @@ LENS_PASSWORD=your-password
 SESSION_SECRET=complex_password_at_least_32_characters_long_for_security
 ```
 
-## 2. Docker Deployment
+## 3. Docker Deployment
 
-### 2.1. Quick Start
+### 3.1. Quick Start
 
 ```bash
 docker run -d \
@@ -67,7 +138,7 @@ docker run -d \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
-### 2.2. Docker Compose
+### 3.2. Docker Compose
 
 ```yaml
 version: "3.8"
@@ -101,14 +172,14 @@ volumes:
   clickhouse-data:
 ```
 
-### 2.3. Docker Image Details
+### 3.3. Docker Image Details
 
 - **Base Image:** `node:20-alpine` (runtime)
 - **Build Image:** `oven/bun:latest` (build stage)
 - **Exposed Port:** `3000`
 - **Output:** Next.js standalone build (optimized for containers)
 
-### 2.4. Building Custom Image
+### 3.4. Building Custom Image
 
 ```bash
 docker build \
@@ -117,11 +188,11 @@ docker build \
   .
 ```
 
-## 3. RBAC Configuration
+## 4. RBAC Configuration
 
 ClickLens uses ClickHouse's native RBAC. To enable all features for a user, you can use the predefined **Feature Roles**.
 
-### 3.1. Feature Roles
+### 4.1. Feature Roles
 
 These are ClickHouse roles that ClickLens expects. Create them to simplify user permission management:
 
@@ -134,7 +205,7 @@ These are ClickHouse roles that ClickLens expects. Create them to simplify user 
 | `clicklens_table_admin`     | DDL operations (TRUNCATE, OPTIMIZE)    | `TRUNCATE`, `OPTIMIZE ON *.*`                                                                       |
 | `clicklens_settings_admin`  | View system settings                   | `SELECT ON system.{settings,server_settings}`                                                       |
 
-### 3.2. Creating Feature Roles
+### 4.2. Creating Feature Roles
 
 ```sql
 -- Table Explorer Role
@@ -179,7 +250,7 @@ GRANT SELECT ON system.settings TO clicklens_settings_admin;
 GRANT SELECT ON system.server_settings TO clicklens_settings_admin;
 ```
 
-### 3.3. Creating the Lens Service User
+### 4.3. Creating the Lens Service User
 
 The Lens user needs minimal read access for metadata queries:
 
@@ -196,7 +267,7 @@ GRANT SHOW COLUMNS ON *.* TO lensuser;
 GRANT SHOW DICTIONARIES ON *.* TO lensuser;
 ```
 
-### 3.4. Creating Application Users
+### 4.4. Creating Application Users
 
 Example: Create a developer user with full ClickLens access:
 
@@ -227,9 +298,9 @@ GRANT clicklens_cluster_monitor TO analyst;
 GRANT SELECT ON analytics.* TO analyst;
 ```
 
-## 4. Reverse Proxy Configuration
+## 5. Reverse Proxy Configuration
 
-### 4.1. Nginx
+### 5.1. Nginx
 
 ```nginx
 server {
@@ -255,7 +326,7 @@ server {
   session cookies work over the HTTP connection between proxy and app.
 </Callout>
 
-## 5. Health Checks
+## 6. Health Checks
 
 ClickLens provides a health check endpoint:
 
@@ -275,9 +346,9 @@ Use this endpoint for:
 - Load balancer health checks
 - Monitoring systems
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
-### 6.1. Common Issues
+### 7.1. Common Issues
 
 **"Session expired" errors:**
 

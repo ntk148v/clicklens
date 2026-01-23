@@ -13,18 +13,20 @@ The **Discover** feature provides a flexible, Kibana-style interface for explori
   `SHOW TABLES` and `SELECT` access on at least one table.
 </Callout>
 
+![](/screenshots/discovery-overview.png)
+
 ### 1.1. Components
 
 #### 1.1.1. Database & Table Selection
 
 Use the dropdowns in the header to select your data source:
 
-- **Database Selector**: Choose from available databases
-- **Table Selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
+- **① Database Selector**: Choose from available databases
+- **② Table Selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
 
 #### 1.1.2. Fields Sidebar
 
-The left sidebar controls which columns appear in your query:
+The **④ left sidebar** controls which columns appear in your query:
 
 - **Search**: Filter columns by name
 - **Select All / None**: Quick selection toggles
@@ -38,7 +40,7 @@ The left sidebar controls which columns appear in your query:
 
 #### 1.1.3. Query Bar
 
-Enter custom ClickHouse `WHERE` clause expressions:
+**③ Query Bar** allows user to enter custom ClickHouse `WHERE` clause expressions:
 
 ```sql
 level = 'Error'
@@ -75,6 +77,10 @@ When a time column is selected, a bar chart shows document distribution over tim
 - **Row Detail**: Click any row to see all fields in a slide-out panel
 - **Load More**: Offset-based pagination for large result sets
 
+![](/screenshots/discovery-filter.png)
+
+![](/screenshots/discovery-expandable-row.png)
+
 ---
 
 ## 2. SQL Console
@@ -85,6 +91,13 @@ A full-featured SQL editor for writing and executing ClickHouse queries.
   **Requires `canExecuteQueries` permission.** This is derived from having
   `SELECT` access on at least one database.
 </Callout>
+
+![](/screenshots/sql-overview.png)
+
+- **① Database selector**: Choose from available databases
+- **② Table selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
+- **③ SQL editor**: User can enter the query here, ClickLens could help with autocomplete and syntax highlighting.
+- **④ Execution modes**: Control how ClickLens enter the input queries.
 
 ### 2.1. Key Features
 
@@ -101,6 +114,10 @@ Built on CodeMirror 6 with ClickHouse-specific enhancements:
 - **Syntax Highlighting**: Keywords, functions, strings, numbers
 - **Autocomplete**: Tables, columns, ClickHouse functions, keywords
 - **Code Actions**: Execute, Explain, Format
+
+![](/screenshots/sql-run.png)
+
+![](/screenshots/sql-run-result.png)
 
 #### 2.1.3. Execution Modes
 
@@ -146,9 +163,23 @@ The History panel shows recent executions with:
 - User who ran it
 - Errors (if any)
 
+![](/screenshots/sql-history.png)
+
 #### 2.1.8. Time Range Insertion
 
 Use the Time Range Selector to quickly insert time filter clauses into your SQL, properly handling the `WHERE` vs `AND` syntax.
+
+![](/screenshots/sql-time-range-selector.png)
+
+![](/screenshots/sql-time-range-apply.png)
+
+#### 2.1.9 Table preview
+
+ClickLens also supports easy table preview feature. By clicking the table name in the sidebar, you can navigate this table's structure and data (only the first 100 rows).
+
+![](/screenshots/sql-table-preview-data.png)
+
+![](/screenshots/sql-table-preview-structure.png)
 
 ---
 
@@ -179,6 +210,10 @@ Browse and inspect your ClickHouse schema in detail.
 | **Replicas**  | Replication status (for replicated tables) |
 | **DDL**       | `CREATE TABLE` statement                   |
 
+![](/screenshots/tables-columns.png)
+
+![](/screenshots/tables-parts.png)
+
 ---
 
 ## 4. Monitoring
@@ -190,7 +225,7 @@ Real-time cluster health and performance monitoring.
   on system cluster tables.
 </Callout>
 
-### 4.1. Available Tabs
+**Available Tabs**
 
 | Tab             | Route                     | Description                 |
 | --------------- | ------------------------- | --------------------------- |
@@ -202,6 +237,22 @@ Real-time cluster health and performance monitoring.
 | **Keeper**      | `/monitoring/keeper`      | ClickHouse Keeper status    |
 | **Operations**  | `/monitoring/operations`  | Active merges and mutations |
 | **Replication** | `/monitoring/replication` | Replication queue status    |
+
+![](/screenshots/monitoring-overview.png)
+
+- **① The Cluster status**: shows the number of shards, replicas, as well as the cluster name.
+- **② The Overall healthcheck**: ClickLens performs multiple checks: uptime, readonly replicas, parts to check, max parts per partition, active queries, memory usage, and replication delay.
+- **③ Multiple Graphs**: these graphs are based on [ClickHouse built-in advanced monitoring dashboards](https://clickhouse.com/docs/operations/system-tables/dashboards). ClickLens selects metrics following the [ClickHouse operations documentation](https://clickhouse.com/docs/operations/monitoring).
+
+![](/screenshots/monitoring-metrics.png)
+
+![](/screenshots/monitoring-async-metrics.png)
+
+![](/screenshots/monitoring-disk.png)
+
+> Because the demo cluster does not include ClickHouse Keeper/ZooKeeper, the screenshots show errors. This is expected behavior.
+
+![](/screenshots/monitoring-zookeeper.png)
 
 ---
 
@@ -223,9 +274,23 @@ Analyze query performance and identify slow queries.
 | **Analytics** | `/queries/analytics` | Top resource-consuming queries               |
 | **Cache**     | `/queries/cache`     | Query cache statistics                       |
 
+![](/screenshots/queries-analytics.png)
+
+![](/screenshots/queries-history.png)
+
+![](/screenshots/queries-history-filter.png)
+
+- **① Filter by user**: Filters queries executed by a specific user.
+- **② Filter by execution duration**: Enter a minimum duration to show only queries that took longer.
+- **③ Filter by query type**: Filter by query type (INSERT, CREATE, SELECT, ALTER, DROP).
+- **④ Filter by status**: Filter by execution status ('Success' or 'Error').
+
 ### 5.2. Query Cancellation
 
-From the Running Queries view, you can kill queries using the KILL QUERY command. This requires the `canKillQueries` permission.
+![](/screenshots/queries-running.png)
+
+- **① Refresh Control**: Like other components (logging & monitoring), user can control the refresh behavior by using the Refresh Control. It's very similar to Grafana and Kibana.
+- **② Kill action**: From the Running Queries view, you can kill queries using the KILL QUERY command. This requires the `canKillQueries` permission.
 
 ---
 
@@ -243,6 +308,17 @@ View and search through ClickHouse logs.
 | **Session Logs** | `/logging/session` | `canViewSessionLogs` |
 | **Crash Logs**   | `/logging/crash`   | `canViewCrashLogs`   |
 
+![](/screenshots/logging-server.png)
+
+- **① Time range**: Select the time range for logs.
+- **② Filter by log level**: Filter to show only specific log levels (e.g., ERROR).
+- **③ Filter by component**: Enter a component name to filter logs.
+- **④ Filter by message**: Enter part of a message to search (uses `WHERE LIKE '%string%'`).
+
+> The system.crash_log table does not exist in the database by default, it is created only when fatal errors occur.
+
+![](/screenshots/logging-crash.png)
+
 ---
 
 ## 7. Access Control
@@ -254,12 +330,85 @@ Manage ClickHouse users and roles.
   MANAGEMENT` grant.
 </Callout>
 
-### 7.1. Available Views
+In ClickHouse, Access control management is supported via RBAC approach. The entities that are part of ClickHouse RBAC are
+
+- **User Account** – Identifies individual end users or applications that connect and access data in ClickHouse
+- **Role** – Roles hold the information about privileges, settings, and constraints for the users
+- **Settings profile** – Group of settings that will be applied to the user or a role
+- **Quotas** – Limit the resource usage for a role or user over a period of time
+
+```mermaid
+flowchart LR
+    GRANT[GRANT / REVOKE<br/>Privileges]
+    ROLES[Roles]
+    SETTINGS[Settings Profile]
+    USERS[Users]
+
+    GRANT --> USERS
+    GRANT --> ROLES
+    ROLES --> USERS
+    SETTINGS --> USERS
+    SETTINGS --> ROLES
+```
+
+The above illustration shows the access entities and the possible assignment of access entities among themselves. In ClickHouse, it is possible to
+
+- Grant roles, settings profile, and any specific privilege to users
+- Grant settings profile and any specific privilege to any role
+
+While this approach can help in implementing RBAC, the strict enforcement of the Principle of Least Privilege is entirely in the hands of the database admin. This is because, let’s say, we have two users A and B, with the same role. They can end up having different sets of privileges and settings because it is possible to grant settings profiles and any specific privileges to individual users. We can enforce the upcoming RBAC approach to ensure consistency and strict implementation of the Principle of Least Privilege.
+
+<Callout type="info">
+  The **principle of least privilege** is an information security concept that
+  states that every entity must be able to access only the information and
+  resources that are necessary for completing the required task.
+</Callout>
+
+ClickLens chooses the different approach, simpler and more effective. This will ensure that we have a consistent set of privileges and enforce the Principle of Least Privilege effectively.
+
+- We shall grant only the roles to users
+- We shall grant privileges and settings profile to roles
+
+```mermaid
+flowchart LR
+    GRANT[GRANT / REVOKE<br/>Privileges]
+    ROLES[Roles]
+    SETTINGS[Settings Profile]
+    USERS[Users]
+
+    GRANT --> ROLES
+    ROLES --> USERS
+    SETTINGS --> ROLES
+```
+
+**Available views**
 
 | View      | Route           | Description                    |
 | --------- | --------------- | ------------------------------ |
 | **Users** | `/access/users` | List and manage database users |
 | **Roles** | `/access/roles` | Manage roles and their grants  |
+
+User can view all ClickHouse's users here.
+
+![](/screenshots/access-user-overview.png)
+
+Create/Edit user and grant role(s).
+
+![](/screenshots/access-user-create.png)
+
+![](/screenshots/access-user-edit.png)
+
+View roles. There are two types of roles:
+
+![](/screenshots/access-role-overview.png)
+
+- **① Feature roles**: System-managed roles that enable UI features. These are read-only and can be viewed by clicking on each role.
+
+![](/screenshots/access-role-feature-role.png)
+
+- **② Custom roles**: User-created roles containing two types of permissions: inherited roles and data privileges. This allows for flexible role configuration.
+
+![](/screenshots/access-role-create.png)
 
 ---
 
@@ -272,7 +421,25 @@ View ClickHouse server and session settings.
   `SELECT` on `system.settings`.
 </Callout>
 
-| View                 | Route               | Description                        |
-| -------------------- | ------------------- | ---------------------------------- |
-| **Server Settings**  | `/settings/server`  | Read from `system.server_settings` |
-| **Session Settings** | `/settings/session` | Read from `system.settings`        |
+**Available views**
+
+| View                 | Route               | Description                                                                                                                                                                                                                                                         |
+| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Server Settings**  | `/settings/server`  | Read from `system.server_settings`, contains information about global settings for the server, which are specified in `config.xml`. Currently, the table shows only settings from the first layer of `config.xml` and doesn't support nested configs (e.g. logger). |
+| **Session Settings** | `/settings/session` | Read from `system.settings`, contains information about session settings for current user.                                                                                                                                                                          |
+
+![](/screenshots/settings-server.png)
+
+![](/screenshots/settings-server-expandable-row.png)
+
+![](/screenshots/settings-session.png)
+
+![](/screenshots/settings-session-expandable-row.png)
+
+## 9. Profile
+
+Users can view their information and change the password.
+
+![](../public/screenshots/home-page.png)
+
+![](../public/screenshots/profile.png)

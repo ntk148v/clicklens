@@ -122,7 +122,71 @@ When you log in to ClickLens, your ClickHouse username and password are used dir
   what your ClickHouse account can do.
 </Callout>
 
-## 4. First Login
+## 4. ClickHouse System Tables
+
+ClickLens relies on ClickHouse's built-in system tables to provide its features. Understanding which tables are used helps with permission planning and troubleshooting.
+
+### 4.1. System Tables by Feature
+
+| Feature                 | System Tables Used                                                                     | Purpose                                          |
+| ----------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **Monitoring Overview** | `system.metrics`, `system.asynchronous_metrics`, `system.events`, `system.query_log`   | Server metrics, uptime, query throughput         |
+| **Cluster Health**      | `system.clusters`, `system.replicas`, `system.replication_queue`                       | Cluster topology, node status, replication state |
+| **Disk Usage**          | `system.disks`, `system.parts`                                                         | Storage capacity, compression ratios             |
+| **Query Analytics**     | `system.processes`, `system.query_log`, `system.query_cache`                           | Running queries, history, cache stats            |
+| **Table Explorer**      | `system.tables`, `system.columns`, `system.parts`, `system.merges`, `system.mutations` | Schema browsing, part information                |
+| **Keeper/ZooKeeper**    | `system.metrics` (ZooKeeper*), `system.events` (ZooKeeper*)                            | Coordination service health                      |
+| **Logging**             | `system.text_log`, `system.session_log`, `system.crash_log`                            | Server and session logs                          |
+| **Settings**            | `system.settings`, `system.server_settings`                                            | Configuration values                             |
+| **Time-Series Charts**  | `system.metric_log`, `system.query_log`                                                | Historical metrics for graphs                    |
+
+<Callout type="info">
+  The `system.metric_log` table must be enabled in ClickHouse's config for
+  time-series graphs to work. See the [ClickHouse metric_log
+  documentation](https://clickhouse.com/docs/en/operations/system-tables/metric_log).
+</Callout>
+
+### 4.2. Optional System Tables
+
+Some ClickLens features depend on tables that may not exist by default:
+
+| Table                | When Created               | Feature Impact                |
+| -------------------- | -------------------------- | ----------------------------- |
+| `system.text_log`    | Must be enabled in config  | Server logs viewer            |
+| `system.session_log` | Must be enabled in config  | Session logs viewer           |
+| `system.crash_log`   | Created when crashes occur | Crash logs viewer             |
+| `system.metric_log`  | Must be enabled in config  | Time-series monitoring charts |
+| `system.query_log`   | Enabled by default         | Query history and analytics   |
+
+To enable optional logging tables, add to your ClickHouse `config.xml`:
+
+```xml
+<clickhouse>
+    <!-- Enable text_log for server logs -->
+    <text_log>
+        <database>system</database>
+        <table>text_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </text_log>
+
+    <!-- Enable session_log for login tracking -->
+    <session_log>
+        <database>system</database>
+        <table>session_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </session_log>
+
+    <!-- Enable metric_log for time-series charts -->
+    <metric_log>
+        <database>system</database>
+        <table>metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <collect_interval_milliseconds>1000</collect_interval_milliseconds>
+    </metric_log>
+</clickhouse>
+```
+
+## 5. First Login
 
 1. Navigate to [http://localhost:3000](http://localhost:3000)
 2. Enter your ClickHouse credentials:
@@ -132,7 +196,7 @@ When you log in to ClickLens, your ClickHouse username and password are used dir
 
 Upon successful login, you'll be taken to the **Dashboard**.
 
-## 5. The Dashboard
+## 6. The Dashboard
 
 The Dashboard is your starting point in ClickLens. It displays feature cards based on your permissions:
 
@@ -151,7 +215,7 @@ The Dashboard is your starting point in ClickLens. It displays feature cards bas
   grants.
 </Callout>
 
-## 6. Next Steps
+## 7. Next Steps
 
 - Explore the [Features](/features) guide to learn about each module
 - Read about [Deployment](/deployment) for production configuration
