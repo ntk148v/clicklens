@@ -155,6 +155,13 @@ jobs:
       - name: Build App
         if: ${{ inputs.job-type == 'build' }}
         run: bun run build
+        env:
+          # ClickLens application environment variables
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 8123
+          LENS_USER: admin
+          LENS_PASSWORD: password
+          SESSION_SECRET: complex_password_at_least_32_characters_long_for_security
 
       # === Docker Build ===
       - name: Set up QEMU
