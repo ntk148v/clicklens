@@ -26,6 +26,14 @@ interface DiscoverHistogramProps {
   activeTime?: string | null;
 }
 
+// Type for Recharts click event data
+interface ChartClickData {
+  activeLabel?: string;
+  activePayload?: Array<{
+    payload: HistogramData;
+  }>;
+}
+
 export const DiscoverHistogram = memo(function DiscoverHistogram({
   data,
   isLoading,
@@ -124,17 +132,11 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
             bottom: 0,
           }}
           onClick={(data) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const chartData = data as any;
-            if (chartData && chartData.activeLabel) {
+            const chartData = data as ChartClickData | null;
+            if (chartData?.activeLabel) {
               handleBarClick(String(chartData.activeLabel));
-            } else if (
-              chartData &&
-              chartData.activePayload &&
-              chartData.activePayload.length > 0
-            ) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              handleBarClick((chartData.activePayload[0].payload as any).time);
+            } else if (chartData?.activePayload && chartData.activePayload.length > 0) {
+              handleBarClick(chartData.activePayload[0].payload.time);
             }
           }}
         >

@@ -6,6 +6,20 @@ export { isClickHouseError } from "../types";
 export type { ClickHouseError } from "../types";
 export type { ClickHouseConfig } from "../config";
 
+/**
+ * Common ClickHouse output formats
+ */
+export type ClickHouseFormat =
+  | "JSON"
+  | "JSONEachRow"
+  | "JSONCompact"
+  | "JSONCompactEachRow"
+  | "JSONCompactEachRowWithNamesAndTypes"
+  | "CSV"
+  | "CSVWithNames"
+  | "TabSeparated"
+  | "TabSeparatedWithNames";
+
 export interface ClickHouseStatistics {
   elapsed: number;
   rows_read: number;
@@ -63,7 +77,7 @@ export interface ClickHouseClient {
     options?: {
       timeout?: number;
       query_id?: string;
-      format?: string;
+      format?: ClickHouseFormat;
       clickhouse_settings?: Record<string, unknown>;
     }
   ): Promise<unknown>; // returning unknown to avoid deep type dependencies for now, or use complex type

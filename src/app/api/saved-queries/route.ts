@@ -17,6 +17,7 @@ import {
   METADATA_DB,
   SAVED_QUERIES_TABLE,
 } from "@/lib/clickhouse/metadata";
+import { ApiErrors, apiError } from "@/lib/api";
 
 export interface SavedQuery {
   id: string;
@@ -30,17 +31,11 @@ export interface SavedQuery {
 export async function GET() {
   const session = await getSession();
   if (!session.isLoggedIn || !session.user) {
-    return NextResponse.json(
-      { success: false, error: "Not authenticated" },
-      { status: 401 }
-    );
+    return ApiErrors.unauthorized();
   }
 
   if (!isLensUserConfigured()) {
-    return NextResponse.json(
-      { success: false, error: "Metadata storage not configured" },
-      { status: 503 }
-    );
+    return apiError(503, "INTERNAL_ERROR", "Metadata storage not configured", "Saved queries feature is not configured");
   }
 
   try {
@@ -63,20 +58,14 @@ export async function GET() {
     return NextResponse.json({ success: true, data: result.data });
   } catch (error) {
     console.error("Failed to fetch saved queries:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch saved queries" },
-      { status: 500 }
-    );
+    return ApiErrors.fromError(error, "Failed to fetch saved queries");
   }
 }
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session.isLoggedIn || !session.user) {
-    return NextResponse.json(
-      { success: false, error: "Not authenticated" },
-      { status: 401 }
-    );
+    return ApiErrors.unauthorized();
   }
 
   try {
@@ -84,18 +73,12 @@ export async function POST(request: NextRequest) {
     const { name, sql, description = "" } = body;
 
     if (!name || !sql) {
-      return NextResponse.json(
-        { success: false, error: "Name and SQL are required" },
-        { status: 400 }
-      );
+      return ApiErrors.badRequest("Name and SQL are required");
     }
 
     const config = getLensConfig();
     if (!config) {
-      return NextResponse.json(
-        { success: false, error: "Metadata storage not configured" },
-        { status: 503 }
-      );
+      return apiError(503, "INTERNAL_ERROR", "Metadata storage not configured", "Saved queries feature is not configured");
     }
 
     const client = createClient(config);
@@ -115,9 +98,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("Failed to save query:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to save query" },
-      { status: 500 }
-    );
+    return ApiErrors.fromError(error, "Failed to save query");
   }
 }

@@ -20,6 +20,7 @@ import {
   TableRow,
   ClickableTableRow,
   TableWrapper,
+  type RowData,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,16 @@ function formatDuration(seconds: number): string {
   if (seconds < 0.001) return `${(seconds * 1000000).toFixed(0)}µs`;
   if (seconds < 1) return `${(seconds * 1000).toFixed(2)}ms`;
   return `${seconds.toFixed(3)}s`;
+}
+
+/**
+ * Type-safe accessor for row data that can be either array or object format
+ */
+function getRowValue(row: unknown, columnName: string, columnIndex: number): unknown {
+  if (Array.isArray(row)) {
+    return row[columnIndex];
+  }
+  return (row as Record<string, unknown>)[columnName];
 }
 
 function formatCellValue(value: unknown): string {
@@ -171,16 +182,7 @@ export function ResultGrid({
     const headers = meta.map((c) => c.name).join("\t");
     const rows = data.map((row) =>
       meta
-        .map((c, idx) => {
-          let value: unknown;
-          if (Array.isArray(row)) {
-            value = row[idx];
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            value = (row as any)[c.name];
-          }
-          return formatCellValue(value);
-        })
+        .map((c, idx) => formatCellValue(getRowValue(row, c.name, idx)))
         .join("\t")
     );
     const text = [headers, ...rows].join("\n");
@@ -191,16 +193,7 @@ export function ResultGrid({
     const headers = meta.map((c) => `"${c.name}"`).join(",");
     const rows = data.map((row) =>
       meta
-        .map((c, idx) => {
-          let value: unknown;
-          if (Array.isArray(row)) {
-            value = row[idx];
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            value = (row as any)[c.name];
-          }
-          return formatCellValue(value);
-        })
+        .map((c, idx) => formatCellValue(getRowValue(row, c.name, idx)))
         .map((v) => `"${v.replace(/"/g, '""')}"`)
         .join(",")
     );
@@ -309,8 +302,7 @@ export function ResultGrid({
             {table.getRowModel().rows.map((row, rowIndex) => (
               <ClickableTableRow
                 key={row.id}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                record={data[page * pageSize + rowIndex] as any}
+                record={data[page * pageSize + rowIndex] as RowData}
                 columns={meta}
                 rowIndex={page * pageSize + rowIndex}
                 sheetTitle="Query Result"

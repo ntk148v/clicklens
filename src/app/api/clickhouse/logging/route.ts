@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClient, isClickHouseError } from "@/lib/clickhouse";
+import { createClient, isClickHouseError, type ClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { ApiErrors } from "@/lib/api";
 
 export async function GET(request: Request) {
   let source = "text_log";
@@ -10,10 +11,7 @@ export async function GET(request: Request) {
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
-      return NextResponse.json(
-        { success: false, error: "Not authenticated" },
-        { status: 401 },
-      );
+      return ApiErrors.unauthorized();
     }
 
     const { searchParams } = new URL(request.url);
@@ -177,35 +175,17 @@ export async function GET(request: Request) {
     console.error("Failed to fetch logs:", error);
 
     if (isClickHouseError(error)) {
+      const chError = error as ClickHouseError;
       // Handle UNKNOWN_TABLE (60) specifically for session_log
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const code = (error as any).code;
-      if ((code === 60 || code === "60") && source === "session_log") {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Session logging is not enabled on this server. Please configure 'session_log' in config.xml.",
-          },
-          { status: 400 },
+      if (chError.code === 60 && source === "session_log") {
+        return ApiErrors.badRequest(
+          "Session logging is not enabled on this server. Please configure 'session_log' in config.xml."
         );
       }
 
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.userMessage || "Failed to fetch logs",
-        },
-        { status: 500 },
-      );
+      return ApiErrors.fromError(error, "Failed to fetch logs");
     }
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch logs",
-      },
-      { status: 500 },
-    );
+    return ApiErrors.internal("Failed to fetch logs");
   }
 }
