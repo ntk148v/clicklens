@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 
 interface QueryHistoryEntry {
   id: string;
@@ -256,3 +257,55 @@ export function initializeTabs() {
 }
 
 export type { Tab, QueryTab, TableTab, QueryHistoryEntry };
+
+/**
+ * Optimized selector hooks for better performance.
+ * These use shallow comparison to prevent unnecessary re-renders.
+ */
+
+/** Get tabs and activeTabId only - avoids re-renders from history changes */
+export function useTabsOnly() {
+  return useTabsStore(
+    useShallow((state) => ({
+      tabs: state.tabs,
+      activeTabId: state.activeTabId,
+    }))
+  );
+}
+
+/** Get tab actions only - stable references that never cause re-renders */
+export function useTabActions() {
+  return useTabsStore(
+    useShallow((state) => ({
+      addTab: state.addTab,
+      addTableTab: state.addTableTab,
+      removeTab: state.removeTab,
+      setActiveTab: state.setActiveTab,
+      updateTab: state.updateTab,
+    }))
+  );
+}
+
+/** Get history only - avoids re-renders from tab changes */
+export function useQueryHistory() {
+  return useTabsStore(
+    useShallow((state) => ({
+      history: state.history,
+      addToHistory: state.addToHistory,
+      clearHistory: state.clearHistory,
+    }))
+  );
+}
+
+/** Get the active tab with selector - only re-renders when the active tab changes */
+export function useActiveTab() {
+  const tabs = useTabsStore((state) => state.tabs);
+  const activeTabId = useTabsStore((state) => state.activeTabId);
+  return tabs.find((t) => t.id === activeTabId);
+}
+
+/** Get the active query tab only - returns undefined if active tab is not a query */
+export function useActiveQueryTab() {
+  const activeTab = useActiveTab();
+  return activeTab?.type === "query" ? activeTab : undefined;
+}

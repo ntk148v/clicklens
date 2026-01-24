@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { useTheme } from "next-themes";
 import {
   EditorView,
@@ -765,7 +765,7 @@ function createSchemaCompletionSource(
   };
 }
 
-export function SqlEditor({
+export const SqlEditor = memo(function SqlEditor({
   value,
   onChange,
   onExecute,
@@ -992,4 +992,4 @@ export function SqlEditor({
       className="h-full w-full overflow-hidden rounded-md border border-border"
     />
   );
-}
+});
