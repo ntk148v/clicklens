@@ -3,9 +3,9 @@
 import { useEffect, useCallback, useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/layout";
 import {
-  SqlEditor,
   ResultGrid,
   QueryTabs,
   QueryHistory,
@@ -19,6 +19,19 @@ import {
   TimeRangeSelector,
   type ExplainType,
 } from "@/components/sql";
+
+// Lazy load SqlEditor to reduce initial bundle size (CodeMirror is large)
+const SqlEditor = dynamic(
+  () => import("@/components/sql/SqlEditor").then((mod) => mod.SqlEditor),
+  {
+    loading: () => (
+      <div className="h-full w-full rounded-md border border-border p-4 flex items-center justify-center text-muted-foreground text-sm">
+        Loading editor...
+      </div>
+    ),
+    ssr: false, // CodeMirror requires browser APIs
+  }
+);
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useAuth } from "@/components/auth";

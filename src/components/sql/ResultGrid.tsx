@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -105,7 +105,7 @@ function getCellClassName(value: unknown): string {
   return "";
 }
 
-export function ResultGrid({
+export const ResultGrid = memo(function ResultGrid({
   data,
   meta,
   statistics,
@@ -178,7 +178,7 @@ export function ResultGrid({
     columnResizeMode,
   });
 
-  const handleCopyToClipboard = async () => {
+  const handleCopyToClipboard = useCallback(async () => {
     const headers = meta.map((c) => c.name).join("\t");
     const rows = data.map((row) =>
       meta
@@ -187,9 +187,9 @@ export function ResultGrid({
     );
     const text = [headers, ...rows].join("\n");
     await copyToClipboard(text);
-  };
+  }, [data, meta]);
 
-  const downloadCsv = () => {
+  const downloadCsv = useCallback(() => {
     const headers = meta.map((c) => `"${c.name}"`).join(",");
     const rows = data.map((row) =>
       meta
@@ -205,7 +205,7 @@ export function ResultGrid({
     a.download = `query-result-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [data, meta]);
 
   if (data.length === 0) {
     return (
@@ -341,4 +341,4 @@ export function ResultGrid({
       />
     </div>
   );
-}
+});

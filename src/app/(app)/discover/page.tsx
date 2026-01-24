@@ -258,7 +258,7 @@ export default function DiscoverPage() {
     loadSchema();
   }, [selectedDatabase, selectedTable]);
 
-  const handleTableChange = (table: string) => {
+  const handleTableChange = useCallback((table: string) => {
     setSelectedTable(table);
     setSchema(null);
     setSelectedColumns([]);
@@ -266,7 +266,7 @@ export default function DiscoverPage() {
     setHistogramData([]);
     setCustomFilter("");
     setAppliedFilter("");
-  };
+  }, []);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -439,22 +439,25 @@ export default function DiscoverPage() {
   }, [schema, fetchHistogram]);
 
   // Handle histogram bar click (Zoom in)
-  const handleHistogramBarClick = (startTime: string, endTime?: string) => {
-    if (endTime) {
-      const fromDate = new Date(startTime);
-      const toDate = new Date(endTime);
+  const handleHistogramBarClick = useCallback(
+    (startTime: string, endTime?: string) => {
+      if (endTime) {
+        const fromDate = new Date(startTime);
+        const toDate = new Date(endTime);
 
-      setFlexibleRange({
-        type: "absolute",
-        from: startTime,
-        to: endTime,
-        label: `${format(fromDate, "MMM d, HH:mm")} to ${format(
-          toDate,
-          "MMM d, HH:mm",
-        )}`,
-      });
-    }
-  };
+        setFlexibleRange({
+          type: "absolute",
+          from: startTime,
+          to: endTime,
+          label: `${format(fromDate, "MMM d, HH:mm")} to ${format(
+            toDate,
+            "MMM d, HH:mm",
+          )}`,
+        });
+      }
+    },
+    []
+  );
 
   if (authLoading) {
     return null; // Or skeleton

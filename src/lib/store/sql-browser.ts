@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 
 interface TableInfo {
   database?: string;
@@ -309,3 +310,46 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
     set({ columnsCache: newCache });
   },
 }));
+
+/**
+ * Optimized selector hooks for better performance.
+ * These use shallow comparison to prevent unnecessary re-renders.
+ */
+
+/** Get databases list only */
+export function useDatabases() {
+  return useSqlBrowserStore(
+    useShallow((state) => ({
+      databases: state.databases,
+      selectedDatabase: state.selectedDatabase,
+      loadingDatabases: state.loadingDatabases,
+      selectDatabase: state.selectDatabase,
+      fetchDatabases: state.fetchDatabases,
+    }))
+  );
+}
+
+/** Get tables list only */
+export function useTables() {
+  return useSqlBrowserStore(
+    useShallow((state) => ({
+      tables: state.tables,
+      loadingTables: state.loadingTables,
+    }))
+  );
+}
+
+/** Get sidebar state only */
+export function useSidebarState() {
+  return useSqlBrowserStore(
+    useShallow((state) => ({
+      sidebarCollapsed: state.sidebarCollapsed,
+      toggleSidebar: state.toggleSidebar,
+    }))
+  );
+}
+
+/** Get columns for autocomplete */
+export function useColumnsForAutocomplete() {
+  return useSqlBrowserStore((state) => state.getColumnsForTable);
+}
