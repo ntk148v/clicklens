@@ -34,33 +34,28 @@ jobs:
     uses: ./.github/workflows/base.yml
     with:
       job-type: build
+      clickhouse-versions: '["none"]'
 
   lint:
     name: Lint
     uses: ./.github/workflows/base.yml
     with:
       job-type: lint
+      clickhouse-versions: '["none"]'
 
+  # For PRs: Quick validation with single platform + container test
+  # For main branch: Multi-platform build + push to registry
   build-docker:
-    name: Build Docker Image
+    name: ${{ github.event_name == 'pull_request' && 'Validate Docker Image' || 'Build Docker Image' }}
     needs: [test, build, lint]
     uses: ./.github/workflows/base.yml
     with:
       job-type: docker
       clickhouse-versions: '["25.12"]'
-      platforms: linux/amd64,linux/arm64
+      platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
       push-image: ${{ github.event_name != 'pull_request' }}
-
-  validate-docker:
-    name: Validate Docker Image
-    needs: [test, build, lint]
-    uses: ./.github/workflows/base.yml
-    with:
-      job-type: docker
-      clickhouse-versions: '["25.12"]'
-      platforms: linux/amd64
-      load-image: true
-      test-container: true
+      load-image: ${{ github.event_name == 'pull_request' }}
+      test-container: ${{ github.event_name == 'pull_request' }}
 
   # Summary job for PR status checks
   ci-success:

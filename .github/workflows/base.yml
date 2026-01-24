@@ -8,8 +8,8 @@ on:
         type: string
       clickhouse-versions:
         type: string
-        description: 'ClickHouse version as JSON array string (e.g. ''["24.5", "24.6"]'')'
-        default: '["24.5","24.6"]'
+        description: 'ClickHouse version as JSON array string (e.g. ''["24.5", "24.6"]''). Use ''["none"]'' for jobs that don''t need ClickHouse.'
+        default: '["none"]'
       platforms:
         type: string
         description: 'Platform(s) for Docker build (e.g., "linux/amd64,linux/arm64")'
@@ -67,9 +67,11 @@ jobs:
       matrix:
         clickhouse-version: ${{ fromJSON(inputs.clickhouse-versions) }}
 
+    # ClickHouse service - only used by test and docker jobs
+    # For lint/build jobs with matrix.clickhouse-version='none', this service starts but is not used
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:${{ matrix.clickhouse-version }}
+        image: ${{ matrix.clickhouse-version != 'none' && format('clickhouse/clickhouse-server:{0}', matrix.clickhouse-version) || 'clickhouse/clickhouse-server:latest' }}
         ports:
           - 8123:8123
           - 9000:9000
@@ -85,6 +87,14 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Next.js Cache
         uses: actions/cache@v5
