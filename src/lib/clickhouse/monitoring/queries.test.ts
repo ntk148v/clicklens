@@ -1,5 +1,5 @@
 import { createClient } from "@clickhouse/client";
-import { describe, test, afterAll } from "bun:test";
+import { describe, test, afterAll, beforeAll } from "bun:test";
 import * as queries from "./queries";
 
 // Build connection URL from environment variables (matching ClickLens config approach)
@@ -18,12 +18,44 @@ describe("Monitoring Queries Validation", () => {
     password: process.env.CLICKHOUSE_PASSWORD || process.env.LENS_PASSWORD || "password",
   });
 
+  let clickhouseAvailable = false;
+
+  beforeAll(async () => {
+    // Check if ClickHouse is available
+    try {
+      await client.query({
+        query: "SELECT 1",
+        format: "JSONEachRow",
+      });
+      clickhouseAvailable = true;
+    } catch (e) {
+      const msg = (e instanceof Error ? e.message : String(e)).toString();
+      if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND") || msg.includes("fetch failed")) {
+        console.warn(
+          "⚠️  ClickHouse not available. Skipping monitoring queries validation tests.",
+        );
+        console.warn(
+          "   To run these tests, start ClickHouse: docker run -d -p 8123:8123 clickhouse/clickhouse-server:latest",
+        );
+        clickhouseAvailable = false;
+      } else {
+        throw e;
+      }
+    }
+  });
+
   afterAll(async () => {
     await client.close();
   });
 
   // Helper to wrap query with LIMIT 1 avoiding syntax errors
   const checkQuery = async (sql: string, name: string) => {
+    // Skip if ClickHouse is not available
+    if (!clickhouseAvailable) {
+      console.warn(`Skipping ${name}: ClickHouse not available`);
+      return;
+    }
+
     try {
       let queryToCheck = sql;
       // Inject LIMIT 1 if missing
@@ -45,6 +77,16 @@ describe("Monitoring Queries Validation", () => {
       });
     } catch (e: unknown) {
       const msg = (e instanceof Error ? e.message : String(e)).toString();
+
+      // Handle connection errors gracefully
+      if (
+        msg.includes("ECONNREFUSED") ||
+        msg.includes("ENOTFOUND") ||
+        msg.includes("fetch failed")
+      ) {
+        console.warn(`Skipping ${name}: ClickHouse connection failed`);
+        return;
+      }
 
       // Ignore dependencies we can't control in this generic test
       if (

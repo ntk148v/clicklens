@@ -30,11 +30,12 @@ test.describe("SQL Console", () => {
     const editor = page.locator(".cm-content");
     await expect(editor).toBeVisible();
 
-    // Click to focus
+    // Click to focus and wait for focus to settle
     await editor.click();
+    await page.waitForTimeout(200);
 
-    // Type a simple query
-    await page.keyboard.type("SELECT 1 AS test_value");
+    // Type a simple query with slower typing for reliability
+    await page.keyboard.type("SELECT 1 AS test_value", { delay: 50 });
 
     // Find and click run button
     const runButton = page
@@ -59,7 +60,8 @@ test.describe("SQL Console", () => {
     await expect(editor).toBeVisible();
 
     await editor.click();
-    await page.keyboard.type("INVALID SQL QUERY HERE");
+    await page.waitForTimeout(200);
+    await page.keyboard.type("INVALID SQL QUERY HERE", { delay: 50 });
 
     const runButton = page
       .getByRole("button", { name: /run|execute/i })
@@ -86,7 +88,8 @@ test.describe("SQL Console", () => {
     await expect(editor).toBeVisible();
 
     await editor.click();
-    await page.keyboard.type("SELECT version()");
+    await page.waitForTimeout(200);
+    await page.keyboard.type("SELECT version()", { delay: 50 });
 
     // Use Ctrl+Enter or Cmd+Enter to run
     await page.keyboard.press("Control+Enter");
@@ -110,8 +113,9 @@ test.describe("SQL Console", () => {
     await expect(editor).toBeVisible();
 
     await editor.click();
+    await page.waitForTimeout(200);
     const testQuery = "SELECT 'persistence_test' AS value";
-    await page.keyboard.type(testQuery);
+    await page.keyboard.type(testQuery, { delay: 50 });
 
     // The SQL editor might have local storage persistence
     // This test verifies the UX behavior
@@ -153,7 +157,8 @@ test.describe("SQL Console", () => {
 
     const editor = page.locator(".cm-content");
     await editor.click();
-    await page.keyboard.type("SELECT number FROM system.numbers LIMIT 5");
+    await page.waitForTimeout(200);
+    await page.keyboard.type("SELECT number FROM system.numbers LIMIT 5", { delay: 50 });
 
     const runButton = page
       .getByRole("button", { name: /run|execute/i })
@@ -180,7 +185,8 @@ test.describe("SQL Console", () => {
 
     const editor = page.locator(".cm-content");
     await editor.click();
-    await page.keyboard.type("SELECT sleep(1)");
+    await page.waitForTimeout(200);
+    await page.keyboard.type("SELECT sleep(1)", { delay: 50 });
 
     const runButton = page
       .getByRole("button", { name: /run|execute/i })

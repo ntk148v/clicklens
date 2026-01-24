@@ -18,10 +18,64 @@ test.describe("Discover Feature", () => {
     page,
     browserName,
   }) => {
-    test.skip(
-      browserName === "chromium" || browserName === "firefox",
-      "Radix UI Select interaction flaky in Chromium/Firefox headless",
-    );
+    // Remove skip - we're making this more reliable
+    // Disable animations for stability
+    await page.addStyleTag({
+      content:
+        "*, *::before, *::after { animation: none !important; transition: none !important; }",
+    });
+
+    await page.goto("/discover");
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500); // Allow UI to settle
+
+    // Ensure no error occurred
+    await expect(page.getByText("Failed to load databases")).not.toBeVisible();
+
+    // Select Database: system with retry logic
+    const dbTrigger = page.getByLabel("Select database");
+    await expect(dbTrigger).toBeEnabled({ timeout: 10000 });
+
+    // Click with force to ensure it opens
+    await dbTrigger.click({ force: true });
+    await page.waitForTimeout(300);
+
+    // Wait for options to appear
+    await expect(page.getByRole("option", { name: "system" })).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Click system option with force
+    await page.getByRole("option", { name: "system" }).click({ force: true });
+    await page.waitForTimeout(500);
+
+    // Select Table: tables
+    const tableTrigger = page.getByLabel("Select table");
+    await expect(tableTrigger).toBeEnabled({ timeout: 10000 });
+    await tableTrigger.click({ force: true });
+    await page.waitForTimeout(300);
+
+    // Find and click 'tables' option
+    const tablesOption = page
+      .getByRole("option", { name: "tables", exact: true })
+      .or(page.getByRole("option", { name: /^tables/ }))
+      .first();
+
+    await expect(tablesOption).toBeVisible({ timeout: 10000 });
+    await tablesOption.click({ force: true });
+    await page.waitForTimeout(500);
+
+    // Verify Grid Loading/Loaded
+    await expect(page.locator("table")).toBeVisible({ timeout: 15000 });
+
+    // Verify some data
+    await expect(
+      page.locator("td").filter({ hasText: "system" }).first(),
+    ).toBeVisible({ timeout: 5000 });
+  });
+
+  test("should filter columns", async ({ page, browserName }) => {
+    // Remove skip - we're making this more reliable
     // Disable animations
     await page.addStyleTag({
       content:
@@ -30,84 +84,38 @@ test.describe("Discover Feature", () => {
 
     await page.goto("/discover");
     await page.waitForLoadState("networkidle");
-    await page.reload();
-    await page.waitForLoadState("networkidle");
-
-    // Ensure no error occurred
-    await expect(page.getByText("Failed to load databases")).toBeHidden();
-
-    // Select Database: system
-    const dbTrigger = page.getByLabel("Select database");
-    await expect(dbTrigger).toBeEnabled();
-    await dbTrigger.click();
-
-    // Debug: Check if default is visible (fallback)
-    await expect(page.getByRole("option", { name: "default" })).toBeVisible({
-      timeout: 5000,
-    });
-
-    // Wait for system
-    await expect(page.getByRole("option", { name: "system" })).toBeVisible({
-      timeout: 15000,
-    });
-    await page.getByRole("option", { name: "system" }).click();
-
-    // Select Table: tables
-    const tableTrigger = page.getByLabel("Select table");
-    await expect(tableTrigger).toBeEnabled();
-    await tableTrigger.click();
-
-    // Type to search or just find 'tables'
-    await page
-      .getByRole("option", { name: "tables", exact: true })
-      .or(page.getByRole("option", { name: "tables (" }))
-      .first()
-      .click();
-
-    // Verify Grid Loading/Loaded
-    await expect(page.locator("table")).toBeVisible({ timeout: 10000 });
-
-    // Verify some data
-    await expect(
-      page.locator("td").filter({ hasText: "system" }).first(),
-    ).toBeVisible();
-  });
-
-  test("should filter columns", async ({ page, browserName }) => {
-    test.skip(
-      browserName === "chromium" || browserName === "firefox",
-      "Radix UI Select interaction flaky in Chromium/Firefox headless",
-    );
-    await page.goto("/discover");
-    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
 
     // Check for error toasts
-    await expect(page.getByText("Failed to load databases")).toBeHidden();
+    await expect(page.getByText("Failed to load databases")).not.toBeVisible();
 
     // Setup: Select system.tables
     const dbTrigger = page.getByLabel("Select database");
-    await expect(dbTrigger).toBeEnabled();
-    await dbTrigger.click();
-
-    // Debug: Check default
-    await expect(page.getByRole("option", { name: "default" })).toBeVisible();
+    await expect(dbTrigger).toBeEnabled({ timeout: 10000 });
+    await dbTrigger.click({ force: true });
+    await page.waitForTimeout(300);
 
     await expect(page.getByRole("option", { name: "system" })).toBeVisible({
       timeout: 15000,
     });
-    await page.getByRole("option", { name: "system" }).click();
+    await page.getByRole("option", { name: "system" }).click({ force: true });
+    await page.waitForTimeout(500);
 
     const tableTrigger = page.getByLabel("Select table");
-    await expect(tableTrigger).toBeEnabled();
-    await tableTrigger.click();
+    await expect(tableTrigger).toBeEnabled({ timeout: 10000 });
+    await tableTrigger.click({ force: true });
+    await page.waitForTimeout(300);
 
-    await page
+    const tablesOption = page
       .getByRole("option", { name: "tables", exact: true })
-      .or(page.getByRole("option", { name: "tables (" }))
-      .first()
-      .click();
+      .or(page.getByRole("option", { name: /^tables/ }))
+      .first();
 
-    await expect(page.locator("table")).toBeVisible();
+    await expect(tablesOption).toBeVisible({ timeout: 10000 });
+    await tablesOption.click({ force: true });
+    await page.waitForTimeout(500);
+
+    await expect(page.locator("table")).toBeVisible({ timeout: 15000 });
 
     // Sidebar interaction
     // Uncheck 'database' column if it's there
@@ -119,6 +127,7 @@ test.describe("Discover Feature", () => {
     if (await label.isVisible()) {
       // Click label to toggle
       await label.click();
+      await page.waitForTimeout(300);
 
       // Verify header is gone
       await expect(
@@ -127,6 +136,7 @@ test.describe("Discover Feature", () => {
 
       // Check it back
       await label.click();
+      await page.waitForTimeout(300);
       await expect(
         page.getByRole("columnheader", { name: colName }),
       ).toBeVisible();
@@ -134,50 +144,59 @@ test.describe("Discover Feature", () => {
   });
 
   test("should execute custom filter", async ({ page, browserName }) => {
-    test.skip(
-      browserName === "chromium" || browserName === "firefox",
-      "Radix UI Select interaction flaky in Chromium/Firefox headless",
-    );
+    // Remove skip - we're making this more reliable
+    // Disable animations
+    await page.addStyleTag({
+      content:
+        "*, *::before, *::after { animation: none !important; transition: none !important; }",
+    });
+
     await page.goto("/discover");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
 
     // Check for error toasts
-    await expect(page.getByText("Failed to load databases")).toBeHidden();
+    await expect(page.getByText("Failed to load databases")).not.toBeVisible();
 
     // Select system.tables
     const dbTrigger = page.getByLabel("Select database");
-    await expect(dbTrigger).toBeEnabled();
-    await dbTrigger.click();
-
-    // Debug: Check default
-    await expect(page.getByRole("option", { name: "default" })).toBeVisible();
+    await expect(dbTrigger).toBeEnabled({ timeout: 10000 });
+    await dbTrigger.click({ force: true });
+    await page.waitForTimeout(300);
 
     await expect(page.getByRole("option", { name: "system" })).toBeVisible({
       timeout: 15000,
     });
-    await page.getByRole("option", { name: "system" }).click();
+    await page.getByRole("option", { name: "system" }).click({ force: true });
+    await page.waitForTimeout(500);
 
     const tableTrigger = page.getByLabel("Select table");
-    await expect(tableTrigger).toBeEnabled();
-    await tableTrigger.click();
+    await expect(tableTrigger).toBeEnabled({ timeout: 10000 });
+    await tableTrigger.click({ force: true });
+    await page.waitForTimeout(300);
 
-    await page
+    const tablesOption = page
       .getByRole("option", { name: "tables", exact: true })
-      .or(page.getByRole("option", { name: "tables (" }))
-      .first()
-      .click();
+      .or(page.getByRole("option", { name: /^tables/ }))
+      .first();
+
+    await expect(tablesOption).toBeVisible({ timeout: 10000 });
+    await tablesOption.click({ force: true });
+    await page.waitForTimeout(500);
 
     // Type in Query Bar
     const editor = page.locator(".cm-content");
-    await expect(editor).toBeVisible();
+    await expect(editor).toBeVisible({ timeout: 10000 });
 
     await editor.click();
-    await page.keyboard.type("name = 'tables'");
+    await page.waitForTimeout(200);
+    await page.keyboard.type("name = 'tables'", { delay: 50 });
 
     // Execute
     await page.locator("button:has(.lucide-refresh-cw)").click();
+    await page.waitForTimeout(300);
 
-    await expect(page.locator("table")).toBeVisible();
+    await expect(page.locator("table")).toBeVisible({ timeout: 15000 });
 
     // Should only see row with name 'tables'
     await expect(page.getByText("Error")).not.toBeVisible();

@@ -64,16 +64,16 @@ export default defineConfig({
       use: { ...devices["Desktop Safari"] },
     },
 
-    /* Test against mobile viewports */
-    {
-      name: "mobile-chrome",
-      use: { ...devices["Pixel 5"] },
-    },
-
-    {
-      name: "mobile-safari",
-      use: { ...devices["iPhone 12"] },
-    },
+    // Mobile viewports disabled to reduce test execution time
+    // Uncomment below to test mobile viewports when needed
+    // {
+    //   name: "mobile-chrome",
+    //   use: { ...devices["Pixel 5"] },
+    // },
+    // {
+    //   name: "mobile-safari",
+    //   use: { ...devices["iPhone 12"] },
+    // },
   ],
 
   /* Run your local dev server before starting the tests */

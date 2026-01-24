@@ -16,6 +16,9 @@
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
       "bun run lint --fix"
+    ],
+    "*.test.{ts,tsx}": [
+      "bun test"
     ]
   },
   "dependencies": {
