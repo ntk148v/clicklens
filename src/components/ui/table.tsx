@@ -176,10 +176,13 @@ function SortableTableHead({
   );
 }
 
+// Row data can be either array-based or object-based
+// Using `object` to accept any object type including typed interfaces
+export type RowData = object | unknown[];
+
 // Clickable Table Row with Record Detail Sheet
 export interface ClickableTableRowProps extends React.ComponentProps<"tr"> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  record?: Record<string, any> | unknown[] | null;
+  record?: RowData | null;
   columns?: Array<{ name: string; type: string }>;
   rowIndex?: number;
   sheetTitle?: string;

@@ -25,8 +25,7 @@ interface ColumnMeta {
 interface RecordDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  record: Record<string, any> | unknown[] | null;
+  record: object | unknown[] | null;
   columns: ColumnMeta[];
   title?: string;
   rowIndex?: number;

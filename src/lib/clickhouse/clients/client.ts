@@ -1,9 +1,14 @@
 import {
   createClient,
   type ClickHouseClient as OfficialClickHouseClient,
+  type ClickHouseSettings,
 } from "@clickhouse/client";
 import { type ClickHouseConfig, buildConnectionUrl } from "../config";
-import { type ClickHouseClient, type ClickHouseQueryResult } from "./types";
+import {
+  type ClickHouseClient,
+  type ClickHouseFormat,
+  type ClickHouseQueryResult,
+} from "./types";
 
 /**
  * ClickHouse Client Implementation
@@ -85,15 +90,10 @@ export class ClickHouseClientImpl implements ClickHouseClient {
   }
 
   async version(): Promise<string> {
-    const result = await this.client.query({
-      query: "SELECT version()",
-      format: "JSON",
-    });
-    // The key in JSON is "version()"
-    const json = await result.json<{ data: Record<string, string>[] }>();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = (json as any).data as Record<string, string>[];
-    return rows[0]["version()"];
+    const result = await this.query<{ version: string }>(
+      "SELECT version() AS version"
+    );
+    return result.data[0].version;
   }
 
   async killQuery(queryId: string): Promise<void> {
@@ -113,13 +113,13 @@ export class ClickHouseClientImpl implements ClickHouseClient {
     options?: {
       timeout?: number;
       query_id?: string;
-      format?: string;
-      clickhouse_settings?: Record<string, unknown>;
+      format?: ClickHouseFormat;
+      clickhouse_settings?: ClickHouseSettings;
     }
   ): Promise<unknown> {
-    const settings: Record<string, unknown> = {
-      ...(this.settings || {}),
-      ...(options?.clickhouse_settings || {}),
+    const settings: ClickHouseSettings = {
+      ...(this.settings as ClickHouseSettings),
+      ...options?.clickhouse_settings,
     };
 
     if (options?.timeout) {
@@ -128,11 +128,9 @@ export class ClickHouseClientImpl implements ClickHouseClient {
 
     return this.client.query({
       query: sql,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      format: (options?.format as any) || "JSON",
+      format: options?.format ?? "JSON",
       query_id: options?.query_id,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      clickhouse_settings: settings as any,
+      clickhouse_settings: settings,
     });
   }
 }
