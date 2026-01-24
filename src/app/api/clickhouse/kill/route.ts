@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
+import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 
 interface KillRequest {
@@ -22,6 +22,10 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<KillResponse>> {
   try {
+    // Check authorization - requires canKillQueries permission
+    const authError = await checkPermission("canKillQueries");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {

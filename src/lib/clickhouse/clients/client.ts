@@ -97,8 +97,10 @@ export class ClickHouseClientImpl implements ClickHouseClient {
   }
 
   async killQuery(queryId: string): Promise<void> {
+    // Escape single quotes to prevent SQL injection
+    const escapedQueryId = queryId.replace(/'/g, "''");
     await this.client.command({
-      query: `KILL QUERY WHERE query_id = '${queryId}' SYNC`,
+      query: `KILL QUERY WHERE query_id = '${escapedQueryId}' SYNC`,
     });
   }
 

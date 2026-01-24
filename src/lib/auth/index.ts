@@ -8,6 +8,9 @@ import { sessionOptions, type SessionData, defaultSession } from "./session";
 import { getUserConfig } from "@/lib/clickhouse";
 import type { ClickHouseConfig } from "@/lib/clickhouse";
 
+// Re-export authorization utilities
+export { checkPermission, type Permission } from "./authorization";
+
 /**
  * Get the current session from cookies
  */

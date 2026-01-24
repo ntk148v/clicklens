@@ -52,9 +52,11 @@ export async function GET() {
     // Or we could try-catch the select and create if missing
     await ensureMetadataInfrastructure();
 
+    // Escape username to prevent SQL injection
+    const safeUsername = session.user.username.replace(/'/g, "''");
     const result = await client.query<SavedQuery>(`
       SELECT * FROM ${METADATA_DB}.${SAVED_QUERIES_TABLE}
-      WHERE created_by = '${session.user.username}'
+      WHERE created_by = '${safeUsername}'
       ORDER BY created_at DESC
     `);
 

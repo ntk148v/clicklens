@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
+import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import {
   createClient,
   isClickHouseError,
@@ -25,6 +25,10 @@ import { quoteIdentifier, escapeString } from "@/lib/clickhouse/utils";
 // GET: List all users with their assigned roles
 export async function GET(): Promise<NextResponse<UsersResponse>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -116,6 +120,10 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -227,6 +235,10 @@ export async function PUT(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -388,6 +400,10 @@ export async function DELETE(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {

@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
+import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    // Check authorization - requires canViewSettings permission
+    const authError = await checkPermission("canViewSettings");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
     if (!config) {
       return NextResponse.json(
@@ -87,6 +91,10 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    // Check authorization - requires canViewSettings permission
+    const authError = await checkPermission("canViewSettings");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
     if (!config) {
       return NextResponse.json(
