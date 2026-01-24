@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
+import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import {
   createClient,
   isClickHouseError,
@@ -107,6 +107,10 @@ function extractDataPrivileges(grants: SystemGrant[]): DataPrivilege[] {
 // GET: List all roles (including feature roles as view-only)
 export async function GET(): Promise<NextResponse<RolesResponse>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -247,6 +251,10 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -382,6 +390,10 @@ export async function PUT(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -427,12 +439,14 @@ export async function PUT(
     const quotedRole = quoteIdentifier(body.name);
 
     // Get current inherited roles
+    // Escape role name to prevent SQL injection
+    const safeRoleName = body.name.replace(/'/g, "''");
     const currentRoleGrants = await client.query<{
       granted_role_name: string;
     }>(`
       SELECT granted_role_name
       FROM system.role_grants
-      WHERE role_name = '${body.name}'
+      WHERE role_name = '${safeRoleName}'
     `);
 
     const currentInherited = currentRoleGrants.data.map(
@@ -547,6 +561,10 @@ export async function DELETE(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // Check authorization
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {

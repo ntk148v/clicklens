@@ -173,13 +173,38 @@ export async function GET(request: Request) {
 
     // Custom filter (user's WHERE expression)
     if (filter && filter.trim()) {
-      // Basic SQL injection protection:
-      // - Disallow dangerous keywords/statements
+      // Enhanced SQL injection protection:
+      // - Disallow dangerous keywords/statements with various bypass attempts
+      // - Block comment sequences that could be used for obfuscation
+      // - Block multiple statements
       // - The actual protection is via ClickHouse user permissions
+      //
+      // IMPORTANT: This is defense-in-depth. The primary protection is
+      // ClickHouse's permission system which restricts what queries the user can run.
       const dangerousPatterns = [
-        /;\s*(DROP|DELETE|TRUNCATE|ALTER|INSERT|UPDATE|CREATE|GRANT|REVOKE)/i,
-        /--/,
-        /\/\*/,
+        // Multiple statement execution (semicolon followed by keywords)
+        /;\s*(DROP|DELETE|TRUNCATE|ALTER|INSERT|UPDATE|CREATE|GRANT|REVOKE|ATTACH|DETACH|KILL|SYSTEM|RENAME|EXCHANGE)/i,
+        // Standalone dangerous keywords at word boundaries
+        /\b(DROP|TRUNCATE|ATTACH|DETACH|SYSTEM)\s+(TABLE|DATABASE|VIEW|DICTIONARY|FUNCTION)/i,
+        // Comment sequences (various forms)
+        /--/,           // Single-line comment
+        /\/\*/,         // Block comment start
+        /\*\//,         // Block comment end
+        /#/,            // MySQL-style comment
+        // Union-based injection attempts
+        /\bUNION\s+(ALL\s+)?SELECT/i,
+        // Stacked queries
+        /;\s*SELECT/i,
+        // INTO OUTFILE/DUMPFILE (data exfiltration)
+        /\bINTO\s+(OUTFILE|DUMPFILE)/i,
+        // LOAD DATA (file read)
+        /\bLOAD\s+DATA/i,
+        // Format injection (could bypass protections)
+        /\bFORMAT\s+/i,
+        // Settings override attempts
+        /\bSETTINGS\s+/i,
+        // Subquery in dangerous context (less strict, but flag obvious attempts)
+        /\(\s*SELECT\s+.*\s+FROM\s+system\./i,
       ];
 
       const hasDangerous = dangerousPatterns.some((p) => p.test(filter));
@@ -187,7 +212,18 @@ export async function GET(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: "Invalid filter expression: contains disallowed keywords",
+            error: "Invalid filter expression: contains disallowed patterns",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Additional length check to prevent extremely long filters
+      if (filter.length > 10000) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Filter expression too long (max 10000 characters)",
           },
           { status: 400 }
         );
@@ -225,17 +261,22 @@ export async function GET(request: Request) {
       // Cursor Logic: (time, id) < (cursorTime, cursorId)
       // Assuming DESC order (newest first)
       if (parsedCursor.timestamp) {
+        // Escape cursor values to prevent SQL injection
+        const safeTimestamp = parsedCursor.timestamp.replace(/'/g, "''");
+
         // Handle DateTime/Date quoting
         // We use parseDateTimeBestEffort for robustness, similar to min/maxTime
 
         // If we have a tie breaker
         if (tieBreakerCol && parsedCursor.id) {
           const safeTieBreaker = tieBreakerCol.replace(/[`]/g, "");
+          // Escape cursor id to prevent SQL injection
+          const safeCursorId = String(parsedCursor.id).replace(/'/g, "''");
           whereConditions.push(`(
-                \`${safeTimeCol}\` < parseDateTimeBestEffort('${parsedCursor.timestamp}')
+                \`${safeTimeCol}\` < parseDateTimeBestEffort('${safeTimestamp}')
                 OR (
-                    \`${safeTimeCol}\` = parseDateTimeBestEffort('${parsedCursor.timestamp}')
-                    AND \`${safeTieBreaker}\` < '${parsedCursor.id}'
+                    \`${safeTimeCol}\` = parseDateTimeBestEffort('${safeTimestamp}')
+                    AND \`${safeTieBreaker}\` < '${safeCursorId}'
                 )
             )`);
         } else {
@@ -244,7 +285,7 @@ export async function GET(request: Request) {
           // For logs, strictly older usually makes sense to avoid stuck pages.
           // Using < to ensure progress.
           whereConditions.push(
-            `\`${safeTimeCol}\` < parseDateTimeBestEffort('${parsedCursor.timestamp}')`
+            `\`${safeTimeCol}\` < parseDateTimeBestEffort('${safeTimestamp}')`
           );
         }
       }
