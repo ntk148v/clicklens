@@ -1,11 +1,11 @@
 # Deps: install all packages using Bun
-FROM oven/bun:latest AS deps
+FROM oven/bun:1.1.26 AS deps
 WORKDIR /app
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile
 
 # Builder: copy deps and build
-FROM oven/bun:latest AS builder
+FROM oven/bun:1.1.26 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

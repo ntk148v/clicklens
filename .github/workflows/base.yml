@@ -39,6 +39,7 @@ env:
   # ClickLens application environment variables
   CLICKHOUSE_HOST: localhost
   CLICKHOUSE_PORT: 8123
+  # TEST CREDENTIALS ONLY - Do not use in production
   LENS_USER: admin
   LENS_PASSWORD: password
   SESSION_SECRET: complex_password_at_least_32_characters_long_for_security
