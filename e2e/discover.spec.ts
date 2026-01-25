@@ -26,37 +26,34 @@ test.describe("Discover Feature", () => {
     // Ensure no error occurred
     await expect(page.getByText("Failed to load databases")).not.toBeVisible();
 
-    // Select Database: system with retry logic
+    // Select Database: system - click to open, wait for listbox, click option
     const dbTrigger = page.getByLabel("Select database");
     await expect(dbTrigger).toBeEnabled({ timeout: 10000 });
+    await dbTrigger.click();
 
-    // Click with force to ensure it opens
-    await dbTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    // Wait for listbox to appear
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(200);
 
-    // Wait for options to appear
-    await expect(page.getByRole("option", { name: "system" })).toBeVisible({
-      timeout: 15000,
-    });
-
-    // Click system option with force
-    await page.getByRole("option", { name: "system" }).click({ force: true });
+    // Click system option
+    const systemOption = page.getByRole("option", { name: "system" });
+    await systemOption.scrollIntoViewIfNeeded();
+    await systemOption.click();
     await page.waitForTimeout(500);
 
     // Select Table: tables
     const tableTrigger = page.getByLabel("Select table");
     await expect(tableTrigger).toBeEnabled({ timeout: 10000 });
-    await tableTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    await tableTrigger.click();
 
-    // Find and click 'tables' option
-    const tablesOption = page
-      .getByRole("option", { name: "tables", exact: true })
-      .or(page.getByRole("option", { name: /^tables/ }))
-      .first();
+    // Wait for listbox to appear
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(200);
 
-    await expect(tablesOption).toBeVisible({ timeout: 10000 });
-    await tablesOption.click({ force: true });
+    // Click tables option
+    const tablesOption = page.getByRole("option", { name: "tables" }).first();
+    await tablesOption.scrollIntoViewIfNeeded();
+    await tablesOption.click();
     await page.waitForTimeout(500);
 
     // Verify Grid Loading/Loaded
@@ -78,30 +75,33 @@ test.describe("Discover Feature", () => {
     // Check for error toasts
     await expect(page.getByText("Failed to load databases")).not.toBeVisible();
 
-    // Setup: Select system.tables
+    // Setup: Select system.tables - click to open, wait for listbox, click option
     const dbTrigger = page.getByLabel("Select database");
     await expect(dbTrigger).toBeEnabled({ timeout: 10000 });
-    await dbTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    await dbTrigger.click();
 
-    await expect(page.getByRole("option", { name: "system" })).toBeVisible({
-      timeout: 15000,
-    });
-    await page.getByRole("option", { name: "system" }).click({ force: true });
+    // Wait for listbox to appear
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(200);
+
+    // Click system option
+    const systemOption = page.getByRole("option", { name: "system" });
+    await systemOption.scrollIntoViewIfNeeded();
+    await systemOption.click();
     await page.waitForTimeout(500);
 
     const tableTrigger = page.getByLabel("Select table");
     await expect(tableTrigger).toBeEnabled({ timeout: 10000 });
-    await tableTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    await tableTrigger.click();
 
-    const tablesOption = page
-      .getByRole("option", { name: "tables", exact: true })
-      .or(page.getByRole("option", { name: /^tables/ }))
-      .first();
+    // Wait for listbox to appear
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(200);
 
-    await expect(tablesOption).toBeVisible({ timeout: 10000 });
-    await tablesOption.click({ force: true });
+    // Click tables option
+    const tablesOption = page.getByRole("option", { name: "tables" }).first();
+    await tablesOption.scrollIntoViewIfNeeded();
+    await tablesOption.click();
     await page.waitForTimeout(500);
 
     await expect(page.locator("table")).toBeVisible({ timeout: 15000 });
@@ -142,30 +142,33 @@ test.describe("Discover Feature", () => {
     // Check for error toasts
     await expect(page.getByText("Failed to load databases")).not.toBeVisible();
 
-    // Select system.tables
+    // Select system.tables - click to open, wait for listbox, click option
     const dbTrigger = page.getByLabel("Select database");
     await expect(dbTrigger).toBeEnabled({ timeout: 10000 });
-    await dbTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    await dbTrigger.click();
 
-    await expect(page.getByRole("option", { name: "system" })).toBeVisible({
-      timeout: 15000,
-    });
-    await page.getByRole("option", { name: "system" }).click({ force: true });
+    // Wait for listbox to appear
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(200);
+
+    // Click system option
+    const systemOption = page.getByRole("option", { name: "system" });
+    await systemOption.scrollIntoViewIfNeeded();
+    await systemOption.click();
     await page.waitForTimeout(500);
 
     const tableTrigger = page.getByLabel("Select table");
     await expect(tableTrigger).toBeEnabled({ timeout: 10000 });
-    await tableTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    await tableTrigger.click();
 
-    const tablesOption = page
-      .getByRole("option", { name: "tables", exact: true })
-      .or(page.getByRole("option", { name: /^tables/ }))
-      .first();
+    // Wait for listbox to appear
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(200);
 
-    await expect(tablesOption).toBeVisible({ timeout: 10000 });
-    await tablesOption.click({ force: true });
+    // Click tables option
+    const tablesOption = page.getByRole("option", { name: "tables" }).first();
+    await tablesOption.scrollIntoViewIfNeeded();
+    await tablesOption.click();
     await page.waitForTimeout(500);
 
     // Type in Query Bar
