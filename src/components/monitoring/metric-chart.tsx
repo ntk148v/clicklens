@@ -64,7 +64,8 @@ export function MetricChart({
     return value.toFixed(0);
   };
 
-  const formatTime = (timestamp: string) => {
+  const formatTime = (label: React.ReactNode): string => {
+    const timestamp = String(label ?? "");
     try {
       // Parse timestamp as local time (ClickHouse returns server local time)
       // Replace space with 'T' and don't add 'Z' to treat as local
@@ -259,7 +260,7 @@ export function MultiSeriesChart({
     });
 
     return Array.from(byTimestamp.values()).sort((a, b) =>
-      String(a.timestamp).localeCompare(String(b.timestamp))
+      String(a.timestamp).localeCompare(String(b.timestamp)),
     );
   }, [data]);
 
@@ -278,7 +279,8 @@ export function MultiSeriesChart({
     return value.toFixed(0);
   };
 
-  const formatTime = (timestamp: string) => {
+  const formatTime = (label: React.ReactNode): string => {
+    const timestamp = String(label ?? "");
     try {
       // Parse timestamp as local time (ClickHouse returns server local time)
       // Replace space with 'T' and don't add 'Z' to treat as local
