@@ -64,6 +64,7 @@ jobs:
           path: |
             .next
             public
+          include-hidden-files: true
           retention-days: 1
 
   test:
@@ -120,6 +121,7 @@ jobs:
       - name: Verify build artifacts
         run: |
           echo "Checking build artifacts..."
+          ls -la || echo "ERROR: listing root failed"
           ls -la .next/ || echo "ERROR: .next directory not found!"
           ls -la .next/standalone/ || echo "ERROR: .next/standalone directory not found!"
           test -f .next/standalone/server.js || (echo "ERROR: server.js not found!" && exit 1)
