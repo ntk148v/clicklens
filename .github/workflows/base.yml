@@ -72,6 +72,10 @@ jobs:
     services:
       clickhouse:
         image: ${{ matrix.clickhouse-version != 'none' && format('clickhouse/clickhouse-server:{0}', matrix.clickhouse-version) || 'clickhouse/clickhouse-server:latest' }}
+        env:
+          CLICKHOUSE_USER: admin
+          CLICKHOUSE_PASSWORD: password
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
         ports:
           - 8123:8123
           - 9000:9000

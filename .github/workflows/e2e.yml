@@ -79,6 +79,10 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:latest
+        env:
+          CLICKHOUSE_USER: admin
+          CLICKHOUSE_PASSWORD: password
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
         ports:
           - 8123:8123
           - 9000:9000
@@ -112,6 +116,14 @@ jobs:
         with:
           name: nextjs-build
           path: .
+
+      - name: Verify build artifacts
+        run: |
+          echo "Checking build artifacts..."
+          ls -la .next/ || echo "ERROR: .next directory not found!"
+          ls -la .next/standalone/ || echo "ERROR: .next/standalone directory not found!"
+          test -f .next/standalone/server.js || (echo "ERROR: server.js not found!" && exit 1)
+          echo "✅ Build artifacts verified successfully"
 
       - name: Get installed Playwright version
         id: playwright-version
