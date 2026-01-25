@@ -31,8 +31,15 @@ export const login = async (page: Page) => {
 
   // Wait for navigation to complete - dashboard is at /
   await expect(page).toHaveURL(/\/$/);
-  // Wait for the layout to be loaded (sidebar)
+
+  // Wait for full page load
+  await page.waitForLoadState("networkidle");
+
+  // Wait for the layout to be loaded (sidebar with navigation links)
   await expect(page.locator("nav").first()).toBeVisible();
+
+  // Wait for at least one navigation link to ensure full hydration
+  await expect(page.locator("a[href='/sql']")).toBeVisible({ timeout: 10000 });
 };
 
 /**

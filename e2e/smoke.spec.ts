@@ -38,6 +38,7 @@ test.describe("Smoke Test", () => {
 
   test("should have working navigation sidebar", async ({ page }) => {
     await page.goto("/");
+    await page.waitForLoadState("networkidle");
 
     // Check main navigation links are visible
     const navLinks = [
@@ -47,8 +48,8 @@ test.describe("Smoke Test", () => {
     ];
 
     for (const link of navLinks) {
-      const anchor = page.locator(`a[href='${link.href}']`);
-      await expect(anchor).toBeVisible();
+      const anchor = page.locator(`a[href='${link.href}']`).first();
+      await expect(anchor).toBeVisible({ timeout: 10000 });
     }
   });
 

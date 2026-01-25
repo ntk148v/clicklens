@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login } from "./utils";
+import { login, disableAnimations } from "./utils";
 
 /**
  * Accessibility tests for ClickLens
@@ -7,6 +7,7 @@ import { login } from "./utils";
  */
 test.describe("Accessibility", () => {
   test.beforeEach(async ({ page }) => {
+    await disableAnimations(page);
     await login(page);
   });
 
