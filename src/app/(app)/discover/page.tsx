@@ -512,16 +512,13 @@ export default function DiscoverPage() {
               value={selectedDatabase}
               onValueChange={setSelectedDatabase}
             >
-              <SelectTrigger className="w-[180px] h-9">
+              <SelectTrigger
+                className="w-[180px] h-9"
+                aria-label="Select database"
+              >
                 <SelectValue placeholder="Select database" />
               </SelectTrigger>
-              <SelectContent>
-                {databases.map((db) => (
-                  <SelectItem key={db} value={db}>
-                    {db}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              {/* ... */}
             </Select>
           </div>
 
@@ -533,7 +530,10 @@ export default function DiscoverPage() {
               onValueChange={handleTableChange}
               disabled={!selectedDatabase || tables.length === 0}
             >
-              <SelectTrigger className="w-[200px] h-9">
+              <SelectTrigger
+                className="w-[200px] h-9"
+                aria-label="Select table"
+              >
                 <SelectValue placeholder="Select table" />
               </SelectTrigger>
               <SelectContent>

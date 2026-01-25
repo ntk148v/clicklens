@@ -1,0 +1,125 @@
+import { Page, expect } from "@playwright/test";
+
+/**
+ * Login to the application with test credentials
+ */
+export const login = async (page: Page) => {
+  // Ensure animations are disabled if not already
+  await disableAnimations(page);
+
+  await page.goto("/login");
+  await page.waitForLoadState("domcontentloaded");
+
+  const user = process.env.CLICKHOUSE_USER || "default";
+  const password = process.env.CLICKHOUSE_PASSWORD || "";
+
+  // Try both Placeholder and Label to be safe across versions/changes
+  const userField = page
+    .getByPlaceholder("Username")
+    .or(page.getByLabel("Username"));
+  await expect(userField).toBeVisible();
+  await userField.fill(user);
+
+  if (password) {
+    const passField = page
+      .getByPlaceholder("Password")
+      .or(page.getByLabel("Password"));
+    await passField.fill(password);
+  }
+
+  await page.click("button[type=submit]");
+
+  // Wait for navigation to complete - dashboard is at /
+  await expect(page).toHaveURL(/\/$/);
+
+  // Wait for full page load
+  await page.waitForLoadState("networkidle");
+
+  // Wait for the layout to be loaded (sidebar with navigation links)
+  await expect(page.locator("nav").first()).toBeVisible();
+
+  // Wait for at least one navigation link to ensure full hydration
+  await expect(page.locator("a[href='/sql']")).toBeVisible({ timeout: 10000 });
+};
+
+/**
+ * Wait for page to be fully loaded and interactive
+ */
+export const waitForPageReady = async (page: Page) => {
+  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
+};
+
+/**
+ * Navigate to a page with login if needed
+ */
+export const navigateTo = async (page: Page, path: string) => {
+  await page.goto(path);
+
+  // If redirected to login, perform login
+  if (page.url().includes("/login")) {
+    await login(page);
+    await page.goto(path);
+  }
+
+  await waitForPageReady(page);
+};
+
+/**
+ * Disable animations for more stable tests
+ */
+export const disableAnimations = async (page: Page) => {
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      *, *::before, *::after {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+      }
+    `;
+    document.head.appendChild(style);
+  });
+};
+
+/**
+ * Wait for a toast notification to appear
+ */
+export const waitForToast = async (
+  page: Page,
+  textPattern?: RegExp | string,
+) => {
+  const toastLocator = page
+    .locator('[role="alert"]')
+    .or(page.locator("[data-radix-toast-announce]"))
+    .or(page.locator('[class*="toast"]'));
+
+  if (textPattern) {
+    await expect(
+      toastLocator.filter({ hasText: textPattern }).first(),
+    ).toBeVisible({
+      timeout: 5000,
+    });
+  } else {
+    await expect(toastLocator.first()).toBeVisible({ timeout: 5000 });
+  }
+};
+
+/**
+ * Check if element is in viewport
+ */
+export const isInViewport = async (page: Page, selector: string) => {
+  const element = page.locator(selector).first();
+  const box = await element.boundingBox();
+  const viewportSize = page.viewportSize();
+
+  if (!box || !viewportSize) return false;
+
+  return (
+    box.x >= 0 &&
+    box.y >= 0 &&
+    box.x + box.width <= viewportSize.width &&
+    box.y + box.height <= viewportSize.height
+  );
+};

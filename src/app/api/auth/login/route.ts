@@ -29,7 +29,7 @@ export interface LoginResponse {
 }
 
 export async function POST(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<LoginResponse>> {
   try {
     // Check if server is configured
@@ -40,7 +40,7 @@ export async function POST(
           error:
             "Server not configured. Please set CLICKHOUSE_HOST and LENS_USER environment variables.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -50,7 +50,7 @@ export async function POST(
     if (!body.username) {
       return NextResponse.json(
         { success: false, error: "Username is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -63,7 +63,7 @@ export async function POST(
     if (!config) {
       return NextResponse.json(
         { success: false, error: "Server connection not configured" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -94,7 +94,7 @@ export async function POST(
           success: false,
           error: errorText || "Invalid credentials",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -104,7 +104,7 @@ export async function POST(
     const cookieStore = await cookies();
     const session = await getIronSession<SessionData>(
       cookieStore,
-      sessionOptions
+      sessionOptions,
     );
 
     session.isLoggedIn = true;
@@ -128,7 +128,7 @@ export async function POST(
         success: false,
         error: error instanceof Error ? error.message : "Connection failed",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

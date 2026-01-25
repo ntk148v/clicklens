@@ -11,10 +11,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Disable telemetry during build
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 ARG APP_VERSION
 ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
+
+# Provide a dummy SESSION_SECRET for build (actual secret is provided at runtime)
+ENV SESSION_SECRET="build-time-placeholder-secret-32chars"
 
 RUN bun run build
 

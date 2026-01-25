@@ -1,11 +1,14 @@
-name: Image build and Push
+name: CI
 
 on:
   push:
     branches:
       - master
   release:
+    types: [published]
   pull_request:
+    branches:
+      - master
   workflow_dispatch:
 
 # Cancel in-progress runs for same workflow and branch/PR
@@ -19,33 +22,65 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    name: Unit Tests
+    uses: ./.github/workflows/base.yml
+    with:
+      job-type: test
+      clickhouse-versions: '["24.8", "25.12"]'
+
   build:
-    name: build
+    name: Build
     uses: ./.github/workflows/base.yml
     with:
       job-type: build
+      clickhouse-versions: '["none"]'
 
   lint:
-    name: lint
+    name: Lint
     uses: ./.github/workflows/base.yml
     with:
       job-type: lint
+      clickhouse-versions: '["none"]'
 
+  # For PRs: Quick validation with single platform + container test
+  # For main branch: Multi-platform build + push to registry
   build-docker:
-    name: build-docker
+    name: ${{ github.event_name == 'pull_request' && 'Validate Docker Image' || 'Build Docker Image' }}
+    needs: [test, build, lint]
     uses: ./.github/workflows/base.yml
     with:
       job-type: docker
       clickhouse-versions: '["25.12"]'
-      platforms: linux/amd64,linux/arm64
-      push-image: true
+      platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+      push-image: ${{ github.event_name != 'pull_request' }}
+      load-image: ${{ github.event_name == 'pull_request' }}
+      test-container: ${{ github.event_name == 'pull_request' }}
 
-  validate-docker:
-    name: validate-docker
-    uses: ./.github/workflows/base.yml
-    with:
-      job-type: docker
-      clickhouse-versions: '["25.12"]'
-      platforms: linux/amd64
-      load-image: true
-      test-container: true
+  # Summary job for PR status checks
+  ci-success:
+    name: CI Success
+    needs: [test, build, lint]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.test.result }}" != "success" ]] || \
+             [[ "${{ needs.build.result }}" != "success" ]] || \
+             [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo ""
+            echo "❌ One or more CI checks failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All CI checks passed!"

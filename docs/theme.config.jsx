@@ -1,4 +1,4 @@
-export default {
+const themeConfig = {
   logo: <span>ClickLens</span>,
   project: {
     link: 'https://github.com/ntk148v/clicklens'
@@ -13,3 +13,5 @@ export default {
     }
   }
 }
+
+export default themeConfig
