@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { login } from "./utils";
+import { login, disableAnimations } from "./utils";
 
 test.describe("SQL Console", () => {
   test.beforeEach(async ({ page }) => {
+    await disableAnimations(page);
     await login(page);
     await page.goto("/sql");
     await page.waitForLoadState("networkidle");
@@ -24,7 +25,7 @@ test.describe("SQL Console", () => {
   test("should execute a simple query", async ({ page, browserName }) => {
     test.skip(
       browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit"
+      "CodeMirror interaction flaky in WebKit",
     );
 
     const editor = page.locator(".cm-content");
@@ -46,14 +47,14 @@ test.describe("SQL Console", () => {
 
     // Wait for results - look for table or result indicator
     await expect(
-      page.locator("table").or(page.getByText("test_value"))
+      page.locator("table").or(page.getByText("test_value")),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test("should show error for invalid SQL", async ({ page, browserName }) => {
     test.skip(
       browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit"
+      "CodeMirror interaction flaky in WebKit",
     );
 
     const editor = page.locator(".cm-content");
@@ -70,9 +71,9 @@ test.describe("SQL Console", () => {
     await runButton.click();
 
     // Should show an error message
-    await expect(
-      page.getByText(/error|syntax|exception/i).first()
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/error|syntax|exception/i).first()).toBeVisible(
+      { timeout: 10000 },
+    );
   });
 
   test("should have keyboard shortcut for running queries", async ({
@@ -81,7 +82,7 @@ test.describe("SQL Console", () => {
   }) => {
     test.skip(
       browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit"
+      "CodeMirror interaction flaky in WebKit",
     );
 
     const editor = page.locator(".cm-content");
@@ -95,7 +96,9 @@ test.describe("SQL Console", () => {
     await page.keyboard.press("Control+Enter");
 
     // Wait for results
-    await expect(page.locator("table").or(page.getByText("version"))).toBeVisible({
+    await expect(
+      page.locator("table").or(page.getByText("version")),
+    ).toBeVisible({
       timeout: 10000,
     });
   });
@@ -106,7 +109,7 @@ test.describe("SQL Console", () => {
   }) => {
     test.skip(
       browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit"
+      "CodeMirror interaction flaky in WebKit",
     );
 
     const editor = page.locator(".cm-content");
@@ -152,13 +155,15 @@ test.describe("SQL Console", () => {
   }) => {
     test.skip(
       browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit"
+      "CodeMirror interaction flaky in WebKit",
     );
 
     const editor = page.locator(".cm-content");
     await editor.click();
     await page.waitForTimeout(200);
-    await page.keyboard.type("SELECT number FROM system.numbers LIMIT 5", { delay: 50 });
+    await page.keyboard.type("SELECT number FROM system.numbers LIMIT 5", {
+      delay: 50,
+    });
 
     const runButton = page
       .getByRole("button", { name: /run|execute/i })
@@ -180,7 +185,7 @@ test.describe("SQL Console", () => {
   }) => {
     test.skip(
       browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit"
+      "CodeMirror interaction flaky in WebKit",
     );
 
     const editor = page.locator(".cm-content");

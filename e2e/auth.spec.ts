@@ -1,7 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { login } from "./utils";
+import { login, disableAnimations } from "./utils";
 
 test.describe("Authentication", () => {
+  test.beforeEach(async ({ page }) => {
+    await disableAnimations(page);
+  });
+
   test("should allow user to login", async ({ page }) => {
     await login(page);
   });
@@ -177,8 +181,8 @@ test.describe("Authentication", () => {
 
     // Look for password visibility toggle
     const toggleButton = page
-      .locator('button:has(.lucide-eye)')
-      .or(page.locator('button:has(.lucide-eye-off)'))
+      .locator("button:has(.lucide-eye)")
+      .or(page.locator("button:has(.lucide-eye-off)"))
       .or(page.getByRole("button", { name: /show|hide password/i }));
 
     if (await toggleButton.first().isVisible()) {

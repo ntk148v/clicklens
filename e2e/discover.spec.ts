@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { login } from "./utils";
+import { login, disableAnimations } from "./utils";
 
 test.describe("Discover Feature", () => {
   test.beforeEach(async ({ page }) => {
+    // Disable animations
+    await disableAnimations(page);
     // Login first
     await login(page);
   });
@@ -14,16 +16,8 @@ test.describe("Discover Feature", () => {
     await expect(page.getByText("Select a database and table")).toBeVisible();
   });
 
-  test("should select system tables and display data", async ({
-    page,
-    browserName,
-  }) => {
+  test("should select system tables and display data", async ({ page }) => {
     // Remove skip - we're making this more reliable
-    // Disable animations for stability
-    await page.addStyleTag({
-      content:
-        "*, *::before, *::after { animation: none !important; transition: none !important; }",
-    });
 
     await page.goto("/discover");
     await page.waitForLoadState("networkidle");
@@ -74,13 +68,8 @@ test.describe("Discover Feature", () => {
     ).toBeVisible({ timeout: 5000 });
   });
 
-  test("should filter columns", async ({ page, browserName }) => {
+  test("should filter columns", async ({ page }) => {
     // Remove skip - we're making this more reliable
-    // Disable animations
-    await page.addStyleTag({
-      content:
-        "*, *::before, *::after { animation: none !important; transition: none !important; }",
-    });
 
     await page.goto("/discover");
     await page.waitForLoadState("networkidle");
@@ -143,13 +132,8 @@ test.describe("Discover Feature", () => {
     }
   });
 
-  test("should execute custom filter", async ({ page, browserName }) => {
+  test("should execute custom filter", async ({ page }) => {
     // Remove skip - we're making this more reliable
-    // Disable animations
-    await page.addStyleTag({
-      content:
-        "*, *::before, *::after { animation: none !important; transition: none !important; }",
-    });
 
     await page.goto("/discover");
     await page.waitForLoadState("networkidle");

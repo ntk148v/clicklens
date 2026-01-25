@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { login } from "./utils";
+import { login, disableAnimations } from "./utils";
 
 test.describe("Smoke Test", () => {
   test.beforeEach(async ({ page }) => {
+    await disableAnimations(page);
     await login(page);
   });
 

@@ -4,7 +4,11 @@ import { Page, expect } from "@playwright/test";
  * Login to the application with test credentials
  */
 export const login = async (page: Page) => {
+  // Ensure animations are disabled if not already
+  await disableAnimations(page);
+
   await page.goto("/login");
+  await page.waitForLoadState("domcontentloaded");
 
   const user = process.env.CLICKHOUSE_USER || "default";
   const password = process.env.CLICKHOUSE_PASSWORD || "";
@@ -13,6 +17,7 @@ export const login = async (page: Page) => {
   const userField = page
     .getByPlaceholder("Username")
     .or(page.getByLabel("Username"));
+  await expect(userField).toBeVisible();
   await userField.fill(user);
 
   if (password) {
@@ -26,6 +31,8 @@ export const login = async (page: Page) => {
 
   // Wait for navigation to complete - dashboard is at /
   await expect(page).toHaveURL(/\/$/);
+  // Wait for the layout to be loaded (sidebar)
+  await expect(page.locator("nav").first()).toBeVisible();
 };
 
 /**
@@ -55,15 +62,17 @@ export const navigateTo = async (page: Page, path: string) => {
  * Disable animations for more stable tests
  */
 export const disableAnimations = async (page: Page) => {
-  await page.addStyleTag({
-    content: `
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
       *, *::before, *::after {
         animation-duration: 0s !important;
         animation-delay: 0s !important;
         transition-duration: 0s !important;
         transition-delay: 0s !important;
       }
-    `,
+    `;
+    document.head.appendChild(style);
   });
 };
 
@@ -72,15 +81,17 @@ export const disableAnimations = async (page: Page) => {
  */
 export const waitForToast = async (
   page: Page,
-  textPattern?: RegExp | string
+  textPattern?: RegExp | string,
 ) => {
   const toastLocator = page
     .locator('[role="alert"]')
-    .or(page.locator('[data-radix-toast-announce]'))
+    .or(page.locator("[data-radix-toast-announce]"))
     .or(page.locator('[class*="toast"]'));
 
   if (textPattern) {
-    await expect(toastLocator.filter({ hasText: textPattern }).first()).toBeVisible({
+    await expect(
+      toastLocator.filter({ hasText: textPattern }).first(),
+    ).toBeVisible({
       timeout: 5000,
     });
   } else {
