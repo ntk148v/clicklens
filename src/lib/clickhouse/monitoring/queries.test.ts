@@ -15,7 +15,10 @@ describe("Monitoring Queries Validation", () => {
   const client = createClient({
     url: getConnectionUrl(),
     username: process.env.CLICKHOUSE_USER || process.env.LENS_USER || "admin",
-    password: process.env.CLICKHOUSE_PASSWORD || process.env.LENS_PASSWORD || "password",
+    password:
+      process.env.CLICKHOUSE_PASSWORD ||
+      process.env.LENS_PASSWORD ||
+      "password",
   });
 
   let clickhouseAvailable = false;
@@ -30,7 +33,11 @@ describe("Monitoring Queries Validation", () => {
       clickhouseAvailable = true;
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).toString();
-      if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND") || msg.includes("fetch failed")) {
+      if (
+        msg.includes("ECONNREFUSED") ||
+        msg.includes("ENOTFOUND") ||
+        msg.includes("fetch failed")
+      ) {
         console.warn(
           "⚠️  ClickHouse not available. Skipping monitoring queries validation tests.",
         );
@@ -93,6 +100,7 @@ describe("Monitoring Queries Validation", () => {
         msg.includes("Table system.zookeeper doesn't exist") ||
         msg.includes("Table system.replicas doesn't exist") ||
         msg.includes("UNKNOWN_TABLE") ||
+        msg.includes("Unknown table expression identifier") ||
         // Handle clusterAllReplicas errors on single node
         (msg.includes("Cluster") && msg.includes("not found")) ||
         (msg.includes("Requested cluster") && msg.includes("not found"))
