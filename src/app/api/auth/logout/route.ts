@@ -8,12 +8,18 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
 
+import { destroySession } from "@/lib/auth/storage";
+
 export async function POST(): Promise<NextResponse> {
   const cookieStore = await cookies();
   const session = await getIronSession<SessionData>(
     cookieStore,
-    sessionOptions
+    sessionOptions,
   );
+
+  if (session.sessionId) {
+    destroySession(session.sessionId);
+  }
 
   session.destroy();
 

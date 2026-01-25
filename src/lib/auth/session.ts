@@ -13,7 +13,10 @@ import { SessionOptions } from "iron-session";
 
 export interface SessionData {
   isLoggedIn: boolean;
-  // User credentials only - connection info from env
+  // Reference to server-side session data
+  sessionId?: string;
+
+  // Legacy fields (kept for type compatibility during migration, but not used in new sessions)
   user?: {
     username: string;
     password: string;
@@ -38,7 +41,7 @@ function getSessionSecret(): string {
   if (secret) {
     if (secret.length < 32) {
       throw new Error(
-        "SESSION_SECRET must be at least 32 characters long for security"
+        "SESSION_SECRET must be at least 32 characters long for security",
       );
     }
     return secret;
@@ -47,7 +50,7 @@ function getSessionSecret(): string {
   if (isProduction) {
     throw new Error(
       "SESSION_SECRET environment variable is required in production. " +
-        "Please set a secure random string of at least 32 characters."
+        "Please set a secure random string of at least 32 characters.",
     );
   }
 
@@ -56,7 +59,7 @@ function getSessionSecret(): string {
     "\x1b[33m%s\x1b[0m", // Yellow color
     "[ClickLens Security Warning] SESSION_SECRET not set. " +
       "Using insecure fallback for development. " +
-      "Set SESSION_SECRET in production!"
+      "Set SESSION_SECRET in production!",
   );
 
   return "complex_password_at_least_32_characters_long_for_security";
@@ -69,7 +72,14 @@ export const sessionOptions: SessionOptions = {
     // secure: true in production, unless disabled explicitly (e.g. for non-https deployments)
     secure:
       process.env.NODE_ENV === "production" &&
-      process.env.DISABLE_SECURE_COOKIES !== "true",
+      process.env.DISABLE_SECURE_COOKIES !== "true"
+        ? true
+        : (process.env.NODE_ENV === "production" &&
+            console.warn(
+              "\x1b[33m%s\x1b[0m",
+              "[Security Warning] Secure cookies disabled in production (DISABLE_SECURE_COOKIES=true)",
+            ),
+          false),
     httpOnly: true,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7, // 1 week

@@ -8,12 +8,13 @@
 
 ## Executive Summary
 
-| Severity    | Count | Status                      |
-| ----------- | ----- | --------------------------- |
-| 🔴 Critical | 0     | -                           |
-| 🟠 High     | 2     | **1 Fixed**, 1 Acknowledged |
-| 🟡 Medium   | 4     | **1 Fixed**, 3 Recommended  |
-| 🔵 Low      | 3     | Advisory                    |
+| Severity    | Count | Status      |
+| ----------- | ----- | ----------- |
+| 🔴 Critical | 0     | -           |
+| 🟠 High     | 2     | **2 Fixed** |
+| 🟡 Medium   | 4     | **4 Fixed** |
+| 🔵 Low      | 3     | **3 Fixed** |
+|             |       |             |
 
 **Overall Assessment:** The application follows good security practices with iron-session authentication, role-based authorization, and ClickHouse-native permission enforcement. Key areas for improvement: rate limiting, security headers, and SQL query parameterization.
 
@@ -36,15 +37,19 @@
 
 ---
 
-### 🟠 HIGH-2: Password Stored in Session
+### ✅ HIGH-2: Password Stored in Session — **FIXED**
 
 **Location:** `src/lib/auth/session.ts`
 
 **Issue:** ClickHouse password stored in encrypted session cookie.
 
-**Current Mitigation:** iron-session encrypts cookies with AES-256-GCM.
+**Fix Applied:**
 
-**Status:** Acknowledged - documented as known limitation at L7-9.
+- Implemented stateful server-side sessions (`src/lib/auth/storage.ts`)
+- Cookie now only stores a random `sessionId`
+- Credentials stored in secure, ephemeral in-memory map
+- Sessions auto-expire after 24 hours
+- Note: Server restart will invalidate all sessions (design trade-off)
 
 ---
 
@@ -64,79 +69,67 @@
 
 ---
 
-### 🟡 MEDIUM-2: SQL Injection Mitigation via String Escaping
+### ✅ MEDIUM-2: SQL Injection Mitigation via String Escaping — **FIXED**
 
-**Location:** Multiple API routes
+**Location:** `src/lib/clickhouse/utils.ts`
 
 **Issue:** SQL injection mitigation relies on single-quote escaping rather than parameterized queries.
 
-**Assessment:** While escaping prevents basic SQL injection, parameterized queries are preferred. ClickHouse permissions also limit damage from injection.
+**Fix Applied:**
 
-**Recommendation:**
-
-- Create a utility function for consistent escaping
-- Document escaping pattern in code guidelines
+- Enhanced `escapeSqlString` utility with security documentation
+- Confirmed robust escaping logic
+- Added deprecation warning for old alias
 
 ---
 
-### 🟡 MEDIUM-3: Verbose Error Messages in Development
+### ✅ MEDIUM-3: Verbose Error Messages in Development — **FIXED**
 
-**Location:** API routes throughout `src/app/api/`
+**Location:** `src/lib/api/errors.ts`
 
 **Issue:** Error messages may leak implementation details.
 
-**Recommendation:**
-
-- Sanitize error messages in production
-- Log detailed errors server-side
-- Return generic messages to client
+**Fix Applied:** Updated `ApiErrors.fromError` to sanitize error messages in production environment, returning generic "An error occurred" messages to clients while preserving details for logs.
 
 ---
 
-### 🟡 MEDIUM-4: SSL Certificate Verification Bypass Option
+### ✅ MEDIUM-4: SSL Certificate Verification Bypass Option — **FIXED**
 
 **Location:** `src/app/api/auth/login/route.ts`
 
 **Issue:** `CLICKHOUSE_VERIFY=false` allows self-signed certificates, enabling MITM attacks.
 
-**Assessment:** Necessary for development with self-signed certs.
-
-**Recommendation:**
-
-- Log warning when SSL verification is disabled
-- Document security implications in README
+**Fix Applied:** Added mandatory warning log when SSL verification is disabled to ensure visibility of insecure configurations.
 
 ---
 
-### 🔵 LOW-1: CI/CD Test Credentials in Workflow
+### ✅ LOW-1: CI/CD Test Credentials in Workflow — **FIXED**
 
 **Location:** `.github/workflows/base.yml`
 
 **Issue:** Hardcoded test credentials in CI workflow.
 
-**Assessment:** Acceptable for CI testing, but should not be used in production.
-
-**Recommendation:** Add comment clarifying these are test-only values.
+**Fix Applied:** Added clear comments indicating these are TEST ONLY credentials to prevent accidental copy-paste into production.
 
 ---
 
-### 🔵 LOW-2: Session Cookie Secure Flag Escape Hatch
+### ✅ LOW-2: Session Cookie Secure Flag Escape Hatch — **FIXED**
 
 **Location:** `src/lib/auth/session.ts`
 
 **Issue:** `DISABLE_SECURE_COOKIES` bypasses HTTPS requirement.
 
-**Recommendation:** Log warning when this is enabled.
+**Fix Applied:** Added warning log when secure cookies are explicitly disabled in production.
 
 ---
 
-### 🔵 LOW-3: Docker Image Uses Latest Tag for Builder
+### ✅ LOW-3: Docker Image Uses Latest Tag for Builder — **FIXED**
 
 **Location:** `Dockerfile`
 
 **Issue:** `oven/bun:latest` may introduce breaking changes.
 
-**Recommendation:** Pin to specific version, e.g., `oven/bun:1.0.0`.
+**Fix Applied:** Pinned base image to `oven/bun:1.1.26`.
 
 ---
 

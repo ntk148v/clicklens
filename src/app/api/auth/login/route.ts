@@ -13,6 +13,7 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
+import { createSession } from "@/lib/auth/storage";
 import {
   getUserConfig,
   buildConnectionUrl,
@@ -99,6 +100,10 @@ export async function POST(
     // Configure fetch options for SSL
     const fetchOptions: RequestInit = {};
     if (config.secure && !config.verifySsl) {
+      console.warn(
+        "\x1b[33m%s\x1b[0m",
+        "[Security Warning] SSL verification disabled for ClickHouse connection (CLICKHOUSE_VERIFY=false)",
+      );
       // @ts-expect-error - Node.js specific option
       fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
     }
@@ -132,13 +137,20 @@ export async function POST(
       sessionOptions,
     );
 
-    session.isLoggedIn = true;
-    session.user = {
+    // Store credentials in server-side session
+    const sessionId = createSession({
       username: body.username,
       password: body.password || "",
       host: config.host || process.env.CLICKHOUSE_HOST,
       database: config.database || "default",
-    };
+    });
+
+    session.isLoggedIn = true;
+    session.sessionId = sessionId;
+
+    // Clear legacy user object if present
+    session.user = undefined;
+
     await session.save();
 
     return NextResponse.json({
