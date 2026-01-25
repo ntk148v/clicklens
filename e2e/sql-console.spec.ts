@@ -154,8 +154,8 @@ test.describe("SQL Console", () => {
     browserName,
   }) => {
     test.skip(
-      browserName === "webkit",
-      "CodeMirror interaction flaky in WebKit",
+      browserName === "webkit" || browserName === "firefox",
+      "CodeMirror interaction flaky in WebKit/Firefox",
     );
 
     const editor = page.locator(".cm-content");

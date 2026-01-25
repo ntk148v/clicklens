@@ -121,6 +121,7 @@ test.describe("Monitoring - Queries Tab", () => {
 
 test.describe("Monitoring - Settings", () => {
   test.beforeEach(async ({ page }) => {
+    await disableAnimations(page);
     await login(page);
     await page.goto("/settings");
   });
