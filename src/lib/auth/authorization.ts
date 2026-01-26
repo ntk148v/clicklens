@@ -7,7 +7,11 @@
 
 import { NextResponse } from "next/server";
 import { getSession, getSessionClickHouseConfig } from "./index";
-import { createClient, isLensUserConfigured, getLensConfig } from "@/lib/clickhouse";
+import {
+  createClient,
+  isLensUserConfigured,
+  getLensConfig,
+} from "@/lib/clickhouse";
 
 /**
  * Available permission types
@@ -39,14 +43,14 @@ interface AuthErrorResponse {
  * Returns null if authorized, or a typed error response if not authorized
  */
 export async function checkPermission(
-  permission: Permission
+  permission: Permission,
 ): Promise<NextResponse<AuthErrorResponse> | null> {
   const session = await getSession();
 
   if (!session.isLoggedIn || !session.user) {
     return NextResponse.json<AuthErrorResponse>(
       { success: false, error: "Not authenticated" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -54,7 +58,7 @@ export async function checkPermission(
   if (!config) {
     return NextResponse.json<AuthErrorResponse>(
       { success: false, error: "Not authenticated" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -73,7 +77,8 @@ export async function checkPermission(
       client,
       permission,
       effectiveRoles,
-      hasGlobalAccess
+      hasGlobalAccess,
+      username,
     );
 
     if (!hasPermission) {
@@ -82,7 +87,7 @@ export async function checkPermission(
           success: false,
           error: `Permission denied: ${permission} required`,
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -91,7 +96,7 @@ export async function checkPermission(
     console.error("Authorization check failed:", error);
     return NextResponse.json<AuthErrorResponse>(
       { success: false, error: "Authorization check failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -101,7 +106,7 @@ export async function checkPermission(
  */
 async function getEffectiveRoles(
   client: ReturnType<typeof createClient>,
-  username: string
+  username: string,
 ): Promise<Set<string>> {
   const effectiveRoles = new Set<string>();
 
@@ -209,13 +214,65 @@ async function checkGlobalAccess(username: string): Promise<boolean> {
 }
 
 /**
+ * Check if user has access to any databases (for canExecuteQueries/canDiscover)
+ */
+async function hasAccessibleDatabases(username: string): Promise<boolean> {
+  if (!isLensUserConfigured()) {
+    return false;
+  }
+
+  const lensConfig = getLensConfig();
+  if (!lensConfig) {
+    return false;
+  }
+
+  try {
+    const client = createClient(lensConfig);
+    const safeUser = username.replace(/'/g, "''");
+
+    // Get user's roles
+    const rolesResult = await client.query(`
+      SELECT granted_role_name as role
+      FROM system.role_grants
+      WHERE user_name = '${safeUser}'
+    `);
+    const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
+
+    const userRoles = rolesData
+      .map((r) => `'${r.role.replace(/'/g, "''")}'`)
+      .join(",");
+
+    const grantFilter = userRoles
+      ? `(user_name = '${safeUser}' OR role_name IN (${userRoles}))`
+      : `user_name = '${safeUser}'`;
+
+    // Check for any database access (direct grants or role grants)
+    const dbCheckQuery = `
+      SELECT count() as cnt FROM system.grants
+      WHERE ${grantFilter}
+      AND database IS NOT NULL
+      AND database != '*'
+      AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+    `;
+
+    const dbCheck = await client.query(dbCheckQuery);
+    const dbData = dbCheck.data as unknown as Array<{ cnt: string | number }>;
+    const cnt = dbData[0]?.cnt;
+    return cnt !== 0 && cnt !== "0" && cnt !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check a specific permission based on roles and probes
  */
 async function checkSpecificPermission(
   client: ReturnType<typeof createClient>,
   permission: Permission,
   effectiveRoles: Set<string>,
-  hasGlobalAccess: boolean
+  hasGlobalAccess: boolean,
+  username: string,
 ): Promise<boolean> {
   switch (permission) {
     case "canManageUsers":
@@ -263,8 +320,10 @@ async function checkSpecificPermission(
 
     case "canExecuteQueries":
     case "canDiscover":
-      // Anyone with database access can execute queries
-      return hasGlobalAccess || effectiveRoles.size > 0;
+      // Anyone with database access can execute queries/discover
+      if (hasGlobalAccess) return true;
+      // Check for accessible databases (aligns with permissions/route.ts logic)
+      return await hasAccessibleDatabases(username);
 
     case "canViewSettings":
       if (effectiveRoles.has("clicklens_settings_admin")) return true;
