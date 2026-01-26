@@ -48,7 +48,7 @@ async function* fetchChunks({
   minTime,
   maxTime,
   limit,
-  initialOffset,
+  cursor,
   selectClause,
   orderByClause,
   safeTimeCol,
@@ -60,7 +60,7 @@ async function* fetchChunks({
   minTime?: string;
   maxTime?: string;
   limit: number;
-  initialOffset: number;
+  cursor?: string;
   selectClause: string;
   orderByClause: string;
   safeTimeCol: string;
@@ -78,7 +78,6 @@ async function* fetchChunks({
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : ""}
       ${orderByClause}
       LIMIT ${limit}
-      OFFSET ${initialOffset}
     `;
 
     try {
@@ -116,6 +115,13 @@ async function* fetchChunks({
   let currentHigh = End;
   let hasMoreChunks = true;
 
+  if (cursor) {
+    const cursorTime = new Date(cursor).toISOString();
+    whereConditions.push(
+      `\`${safeTimeCol}\` < parseDateTimeBestEffort('${cursorTime}')`,
+    );
+  }
+
   // First yield metadata
   let totalHits = 0;
   try {
@@ -129,28 +135,6 @@ async function* fetchChunks({
   }
 
   yield JSON.stringify({ meta: { totalHits } }) + "\n";
-
-  if (initialOffset > 0) {
-    const query = `
-      SELECT ${selectClause}
-      FROM ${tableSource}
-      ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : ""}
-      ${orderByClause}
-      LIMIT ${limit}
-      OFFSET ${initialOffset}
-    `;
-    try {
-      const rs = await client.query(query);
-      const rows = rs.data;
-      for (const row of rows) {
-        yield JSON.stringify(row) + "\n";
-      }
-    } catch (e) {
-      console.error("Query error", e);
-      yield JSON.stringify({ error: String(e) }) + "\n";
-    }
-    return;
-  }
 
   while (hasMoreChunks && rowsFetched < limit) {
     const currentLow = Math.max(Start, currentHigh - ChunkSize);
@@ -251,7 +235,7 @@ export async function GET(request: Request) {
     }
 
     const limit = Math.min(parseInt(searchParams.get("limit") || "100"), 10000);
-    const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0);
+    const cursor = searchParams.get("cursor");
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";
     const minTime = searchParams.get("minTime");
@@ -375,7 +359,7 @@ export async function GET(request: Request) {
       minTime: minTime || undefined,
       maxTime: maxTime || undefined,
       limit,
-      initialOffset: offset,
+      cursor: cursor || undefined,
       selectClause,
       orderByClause,
       safeTimeCol,
