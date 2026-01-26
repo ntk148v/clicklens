@@ -258,19 +258,29 @@ jobs:
         env:
           TAG: ${{ steps.first_tag.outputs.tag }}
         run: |
+          # Get the runner's IP address for ClickHouse connectivity in bridged network mode
+          RUNNER_IP=$(hostname -I | awk '{print $1}')
+
           docker run -d \
             --name test-app \
-            --network host \
-            -e CLICKHOUSE_HOST=localhost \
+            -p 3000:3000 \
+            -e CLICKHOUSE_HOST="$RUNNER_IP" \
             -e CLICKHOUSE_PORT=8123 \
             -e CLICKHOUSE_SECURE=false \
             -e LENS_USER=admin \
             -e LENS_PASSWORD=password \
-            -e SESSION_SECRET=complex_password_at_least_32_characters_long_for_security\
+            -e SESSION_SECRET=complex_password_at_least_32_characters_long_for_security \
             "$TAG"
 
-          # Wait for container health
-          timeout 60 bash -c 'until curl -sSf http://localhost:3000/ > /dev/null 2>&1; do sleep 2; done'
+          # Wait for container health with debugging on failure
+          if ! timeout 90 bash -c 'until curl -sSf http://localhost:3000/ > /dev/null 2>&1; do sleep 2; done'; then
+            echo "::error::Container failed to become healthy within 90 seconds"
+            echo "=== Container logs ==="
+            docker logs test-app
+            echo "=== Container status ==="
+            docker inspect test-app --format='{{.State.Status}} (ExitCode: {{.State.ExitCode}})'
+            exit 1
+          fi
 
           # Health checks
           curl -sSf http://localhost:3000/ | grep -qi "clicklens"
