@@ -456,7 +456,7 @@ export default function DiscoverPage() {
         });
       }
     },
-    []
+    [],
   );
 
   if (authLoading) {
@@ -518,7 +518,13 @@ export default function DiscoverPage() {
               >
                 <SelectValue placeholder="Select database" />
               </SelectTrigger>
-              {/* ... */}
+              <SelectContent>
+                {databases.map((db) => (
+                  <SelectItem key={db} value={db}>
+                    {db}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
 
