@@ -1,57 +1,33 @@
-# Deps: install all packages using Bun
-FROM oven/bun:latest AS deps
+# ---- Base ----
+FROM oven/bun:1.3.6 AS base
 WORKDIR /app
-COPY package.json bun.lockb* ./
+
+# ---- Install Dependencies ----
+FROM base AS deps
+COPY package.json ./
 RUN bun install --frozen-lockfile
 
-# Builder: copy deps and build
-FROM oven/bun:latest AS builder
-WORKDIR /app
+# ---- Build ----
+FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
-
 ARG APP_VERSION
 ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
-
 # Provide a dummy SESSION_SECRET for build (actual secret is provided at runtime)
 ENV SESSION_SECRET="build-time-placeholder-secret-32chars"
-
 RUN bun run build
 
-# Runner: use Alpine for smaller image
-FROM node:20-alpine AS runner
+# ---- Final Image ----
+FROM oven/bun:1.3.6-slim AS runner
 WORKDIR /app
-
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-
-# Install libc6-compat for compat with some native modules
-RUN apk add --no-cache libc6-compat
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy public folder
+# Copy standalone build and static assets
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
+ENV NODE_ENV=production
+USER bun
 EXPOSE 3000
-
-ENV PORT 3000
-# set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
-
-CMD ["node", "server.js"]
+# Run Next.js using Bun’s runtime entrypoint
+CMD ["bun", "server.js"]

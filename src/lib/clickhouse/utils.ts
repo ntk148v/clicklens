@@ -12,8 +12,16 @@ export function quoteIdentifier(name: string): string {
 
 /**
  * Escape a string literal for use in a SQL query
- * Escapes single quotes and backslashes
+ * Escapes single quotes and backslashes to prevent SQL injection.
+ *
+ * SECURITY NOTE: Prefer using parameterized queries where possible.
+ * Use this only when dynamic SQL construction is absolutely necessary.
  */
-export function escapeString(str: string): string {
+export function escapeSqlString(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
+
+/**
+ * @deprecated Use escapeSqlString instead
+ */
+export const escapeString = escapeSqlString;

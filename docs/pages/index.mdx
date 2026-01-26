@@ -74,9 +74,12 @@ Ready to try ClickLens? Head to the [Getting Started](/getting-started) guide.
 docker run -d \
   --name clicklens \
   -p 3000:3000 \
-  -e CLICKHOUSE_HOST=your-host \
+  -e CLICKHOUSE_HOST=your-clickhouse-host \
+  -e CLICKHOUSE_PORT=8123 \
   -e LENS_USER=lensuser \
-  -e SESSION_SECRET=your-32-char-secret \
+  -e LENS_PASSWORD=your-password \
+  -e SESSION_SECRET=your-32-character-secret-key-here \
+  -e NODE_ENV=production \
   ghcr.io/ntk148v/clicklens:latest
 ```
 

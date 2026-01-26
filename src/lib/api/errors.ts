@@ -46,7 +46,7 @@ export function apiError(
   code: number,
   type: ApiErrorType,
   message: string,
-  userMessage?: string
+  userMessage?: string,
 ): NextResponse<ApiErrorResponse> {
   return NextResponse.json(
     {
@@ -58,7 +58,7 @@ export function apiError(
         userMessage: userMessage ?? message,
       },
     },
-    { status: code }
+    { status: code },
   );
 }
 
@@ -72,7 +72,12 @@ export const ApiErrors = {
 
   /** 403 - User lacks permission */
   forbidden: (message = "Permission denied") =>
-    apiError(403, "FORBIDDEN", message, "You don't have permission to perform this action"),
+    apiError(
+      403,
+      "FORBIDDEN",
+      message,
+      "You don't have permission to perform this action",
+    ),
 
   /** 400 - Invalid request parameters */
   badRequest: (message: string) =>
@@ -80,7 +85,12 @@ export const ApiErrors = {
 
   /** 404 - Resource not found */
   notFound: (resource = "Resource") =>
-    apiError(404, "NOT_FOUND", `${resource} not found`, `${resource} not found`),
+    apiError(
+      404,
+      "NOT_FOUND",
+      `${resource} not found`,
+      `${resource} not found`,
+    ),
 
   /** 500 - Internal server error */
   internal: (message = "Internal server error") =>
@@ -94,15 +104,19 @@ export const ApiErrors = {
         500,
         "QUERY_ERROR",
         chError.message,
-        chError.userMessage ?? chError.message
+        chError.userMessage ?? chError.message,
       );
     }
 
     if (error instanceof Error) {
-      return apiError(500, "INTERNAL_ERROR", error.message, fallbackMessage);
+      const isProduction = process.env.NODE_ENV === "production";
+      const message = isProduction ? fallbackMessage : error.message;
+      return apiError(500, "INTERNAL_ERROR", message, fallbackMessage);
     }
 
-    return apiError(500, "INTERNAL_ERROR", String(error), fallbackMessage);
+    const isProduction = process.env.NODE_ENV === "production";
+    const message = isProduction ? fallbackMessage : String(error);
+    return apiError(500, "INTERNAL_ERROR", message, fallbackMessage);
   },
 } as const;
 
