@@ -1,56 +1,33 @@
-FROM oven/bun:1.3 AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-
+# ---- Base ----
+FROM oven/bun:1.3.6 AS base
 WORKDIR /app
 
-# Install dependencies
-COPY package.json bun.lockb ./
+# ---- Install Dependencies ----
+FROM base AS deps
+COPY package.json ./
 RUN bun install --frozen-lockfile
 
-# Rebuild the source code only when needed
+# ---- Build ----
 FROM base AS builder
-WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Disable telemetry during the build
-ENV NEXT_TELEMETRY_DISABLED 1
-
+# Disable telemetry during build
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG APP_VERSION
+ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
+# Provide a dummy SESSION_SECRET for build (actual secret is provided at runtime)
+ENV SESSION_SECRET="build-time-placeholder-secret-32chars"
 RUN bun run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# ---- Final Image ----
+FROM oven/bun:1.3.6-slim AS runner
 WORKDIR /app
-
-ENV NODE_ENV production
-
-# Disable telemetry
-ENV NEXT_TELEMETRY_DISABLED 1
-
-RUN adduser --system --uid 1001 nextjs
-
+# Copy standalone build and static assets
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:bun .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:bun /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:bun /app/.next/static ./.next/static
-
-USER nextjs
-
+ENV NODE_ENV=production
+USER bun
 EXPOSE 3000
-
-ENV PORT 3000
-
-# Set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
-
+# Run Next.js using Bun’s runtime entrypoint
 CMD ["bun", "server.js"]
