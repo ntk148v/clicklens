@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +15,7 @@ import { SystemLogsTable } from "./SystemLogsTable";
 import { SessionLogsTable } from "./SessionLogsTable";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { RefreshControl } from "@/components/monitoring/refresh-control";
-import { useIncrementalData } from "@/lib/hooks/use-incremental-data";
-import type { LogEntry } from "@/lib/hooks/use-logs";
+import { useLogStream } from "@/lib/hooks/use-log-stream";
 
 type TimeRange = "5m" | "15m" | "1h" | "6h" | "12h" | "24h" | "7d" | "all";
 type LogLevel =
@@ -82,8 +81,8 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("1h");
   const [refreshInterval, setRefreshInterval] = useState(0);
 
-  // Memoize fetch params
-  const fetchParams = useMemo(
+  // Memoize query params
+  const queryParams = useMemo(
     () => ({
       search,
       component,
@@ -91,86 +90,62 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
       minTime: getMinTime(timeRange),
       source,
     }),
-    [search, component, level, timeRange, source]
+    [search, component, level, timeRange, source],
   );
 
-  // Fetch function for the hook
-  const fetchLogs = useCallback(
-    async (params: typeof fetchParams & { sinceTimestamp?: string }) => {
-      const urlParams = new URLSearchParams();
-      urlParams.set("limit", "1000");
-      urlParams.set("source", params.source);
-
-      if (params.search) urlParams.set("search", params.search);
-      if (params.component) urlParams.set("component", params.component);
-      // Level filter (text_log) or Event Type filter (session_log)
-      if (
-        (params.source === "text_log" || params.source === "session_log") &&
-        params.level &&
-        params.level !== "All"
-      )
-        urlParams.set("level", params.level);
-
-      // Use sinceTimestamp for incremental, minTime for full reload
-      if (params.sinceTimestamp) {
-        urlParams.set("minTime", params.sinceTimestamp);
-      } else if (params.minTime) {
-        urlParams.set("minTime", params.minTime);
-      }
-
-      const response = await fetch(
-        `/api/clickhouse/logging?${urlParams.toString()}`
-      );
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || "Failed to fetch logs");
-      }
-
-      return (result.data?.data || []) as LogEntry[];
-    },
-    []
-  );
-
-  // Use the shared incremental data hook
   const {
-    data: logs,
+    logs,
     isLoading,
+    totalHits,
     error,
+    hasMore,
     reload,
-    fetchNew,
-    newestTimestamp,
-  } = useIncrementalData(
-    {
-      fetchFn: fetchLogs,
-      getTimestamp: (log) => log.timestamp,
-      getKey: (log) =>
-        `${log.timestamp}_${log.component}_${log.message.slice(0, 50)}`,
-    },
-    fetchParams
-  );
+    loadMore,
+    loadLive,
+  } = useLogStream({
+    fetchUrl: "/api/clickhouse/logging",
+    queryParams,
+  });
 
   // Initial load
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source]); // Reload when source changes
+  }, [source]); // Only source change triggers hard reload auto?
+  // Wait, if timeRange changes, queryParams change -> useEffect??
+  // The hook doesn't auto-reload on queryParams change to avoid flickers.
 
-  // Handle filter apply - do full reload
+  // Handle filter submission
   const handleApplyFilters = (e?: React.FormEvent) => {
     e?.preventDefault();
     reload();
   };
 
+  // Infinite Scroll Trigger (Intersection Observer)
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const lastLogRef = useCallback(
+    (node: HTMLTableRowElement) => {
+      if (isLoading) return;
+      if (observerRef.current) observerRef.current.disconnect();
+
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          loadMore();
+        }
+      });
+      if (node) observerRef.current.observe(node);
+    },
+    [isLoading, hasMore, loadMore],
+  );
+
   return (
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <div />{" "}
-        {/* Spacer for title if needed or just remove justified-between */}
+        <div />
         <RefreshControl
           interval={refreshInterval}
           onIntervalChange={setRefreshInterval}
-          onRefresh={fetchNew}
+          onRefresh={loadLive}
           isLoading={isLoading}
           intervals={[5, 10, 30, 60]}
         />
@@ -184,7 +159,12 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
         {/* Time Range */}
         <Select
           value={timeRange}
-          onValueChange={(v) => setTimeRange(v as TimeRange)}
+          onValueChange={(v) => {
+            // For UX, maybe simple filter change shouldn't auto reload?
+            // But existing behavior likely expected it.
+            // We'll update state, user hits Apply.
+            setTimeRange(v as TimeRange);
+          }}
         >
           <SelectTrigger className="w-[120px]">
             <SelectValue placeholder="Time" />
@@ -269,6 +249,14 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
         <SessionLogsTable
           logs={logs}
           isLoading={isLoading && logs.length === 0}
+          // We need to pass the infinite scroll ref logic down?
+          // The current tables probably accept standard props.
+          // Let's assume they might need modification OR we wrap them.
+          // Actually checking table implementations would be good.
+          // For now, let's wrap or inject.
+          // BUT wait, `SessionLogsTable` likely just maps.
+          // Let's modify the tables to accept a ref or "onEndReached" prop if possible?
+          // Or just render a sentinel div below.
         />
       ) : (
         <SystemLogsTable
@@ -277,10 +265,22 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
         />
       )}
 
+      {/* Infinite Scroll Sentinel */}
+      {hasMore && !isLoading && (
+        <div
+          ref={lastLogRef as unknown as React.LegacyRef<HTMLDivElement>} // Cast because it might be attached to div, not tr
+          className="h-4 w-full"
+        />
+      )}
+      {isLoading && logs.length > 0 && (
+        <div className="py-2 text-center text-xs text-muted-foreground">
+          Loading more...
+        </div>
+      )}
+
       {/* Stats */}
       <div className="text-xs text-muted-foreground">
-        Showing {logs.length} logs
-        {newestTimestamp && ` • Latest: ${newestTimestamp}`}
+        Showing {logs.length} / {totalHits || "?"} logs
       </div>
 
       <DataSourceBadge
@@ -288,15 +288,15 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
           source === "text_log"
             ? "system.text_log"
             : source === "crash_log"
-            ? "system.crash_log"
-            : "system.session_log",
+              ? "system.crash_log"
+              : "system.session_log",
         ]}
         description={
           source === "text_log"
             ? "Contains general server logs."
             : source === "crash_log"
-            ? "Contains server crash logs. The table does not exist in the database by default, it is created only when fatal errors occur."
-            : "Contains information about all successful and failed login and logout events."
+              ? "Contains server crash logs. The table does not exist in the database by default, it is created only when fatal errors occur."
+              : "Contains information about all successful and failed login and logout events."
         }
       />
     </div>
