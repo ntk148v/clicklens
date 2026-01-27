@@ -1,16 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  ClickableTableRow,
-  TableWrapper,
-} from "@/components/ui/table";
+import { VirtualizedDataTable } from "./VirtualizedDataTable";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import type { LogEntry } from "@/lib/hooks/use-logs";
@@ -75,6 +66,51 @@ function getLevelBadge(level: string) {
 export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
   const columns = useMemo(
     () => [
+      {
+        header: "Time",
+        width: 140, // Fixed width
+        cell: (log: LogEntry) => (
+          <div className="flex flex-col whitespace-nowrap">
+            <span>{formatDateTime(log.timestamp)}</span>
+          </div>
+        ),
+      },
+      {
+        header: "Level",
+        width: 80,
+        cell: (log: LogEntry) => getLevelBadge(log.type),
+      },
+      {
+        header: "Component",
+        width: 150,
+        cell: (log: LogEntry) => (
+          <TruncatedCell
+            value={log.component}
+            maxWidth={150}
+            className="text-muted-foreground"
+          />
+        ),
+      },
+      {
+        header: "Message",
+        // width: 'auto', // Flex
+        cell: (log: LogEntry) => (
+          <div className="max-w-[600px]">
+            <TruncatedCell
+              value={log.message}
+              maxWidth={800} // Increased max width since we have space
+              className="font-mono text-xs"
+            />
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
+
+  // Column definitions for the detailed sheet
+  const sheetColumns = useMemo(
+    () => [
       { name: "timestamp", type: "DateTime64" },
       { name: "type", type: "String" },
       { name: "component", type: "String" },
@@ -86,63 +122,19 @@ export function SystemLogsTable({ logs, isLoading }: SystemLogsTableProps) {
       { name: "source_file", type: "String" },
       { name: "source_line", type: "UInt64" },
     ],
-    []
+    [],
   );
 
-  // Timestamps are displayed with timezone conversion via formatDateTime
-
   return (
-    <TableWrapper>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[140px]">Time</TableHead>
-            <TableHead className="w-[80px]">Level</TableHead>
-            <TableHead className="w-[150px]">Component</TableHead>
-            <TableHead>Message</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody isLoading={isLoading}>
-          {logs.length > 0 ? (
-            logs.map((log, index) => (
-              <ClickableTableRow
-                key={`${log.timestamp}_${index}`}
-                record={log as unknown as Record<string, unknown>}
-                columns={columns}
-                rowIndex={index}
-                sheetTitle="Log Details"
-              >
-                <TableCell className="data-table-cell whitespace-nowrap">
-                  <div className="flex flex-col">
-                    <span>{formatDateTime(log.timestamp)}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="data-table-cell">
-                  {getLevelBadge(log.type)}
-                </TableCell>
-                <TableCell className="data-table-cell text-muted-foreground">
-                  <TruncatedCell value={log.component} maxWidth={150} />
-                </TableCell>
-                <TableCell className="data-table-cell">
-                  <div className="max-w-[600px]">
-                    <TruncatedCell
-                      value={log.message}
-                      maxWidth={600}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                </TableCell>
-              </ClickableTableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={4} className="h-24 text-center">
-                No logs found
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableWrapper>
+    <VirtualizedDataTable
+      data={logs}
+      columns={columns}
+      isLoading={isLoading}
+      estimateRowHeight={40}
+      emptyMessage="No logs found"
+      enableRecordDetails={true}
+      sheetColumns={sheetColumns}
+      sheetTitle="Log Details"
+    />
   );
 }

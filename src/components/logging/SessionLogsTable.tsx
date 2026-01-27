@@ -1,16 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  ClickableTableRow,
-  TableWrapper,
-} from "@/components/ui/table";
+import { VirtualizedDataTable } from "./VirtualizedDataTable";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 import type { LogEntry } from "@/lib/hooks/use-logs";
@@ -60,6 +51,68 @@ function getEventTypeBadge(type: string) {
 export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
   const columns = useMemo(
     () => [
+      {
+        header: "Time",
+        width: 140,
+        cell: (log: LogEntry) => (
+          <div className="flex flex-col whitespace-nowrap">
+            <span>{formatDateTime(log.timestamp)}</span>
+          </div>
+        ),
+      },
+      {
+        header: "Event Type",
+        width: 120,
+        cell: (log: LogEntry) => getEventTypeBadge(log.type),
+      },
+      {
+        header: "User",
+        width: 150,
+        cell: (log: LogEntry) => (
+          <div className="text-secondary-foreground font-medium">
+            {log.component}
+          </div>
+        ),
+      },
+      {
+        header: "Message",
+        // width: 'auto',
+        cell: (log: LogEntry) => (
+          <div className="max-w-[600px]">
+            <TruncatedCell
+              value={log.message}
+              maxWidth={800}
+              className="font-mono text-xs"
+            />
+          </div>
+        ),
+      },
+      // Hidden columns for RecordDetailSheet
+      // Not actually hidden, the Sheet uses them if they are in the 'data'.
+      // Wait, ClickableTableRow uses specific `columns` prop for the sheet content which is separate from visual table columns in my new wrapper?
+      // In my `VirtualizedDataTable`:
+      // const recordColumns = columns.map(...) -> this just maps visual columns.
+      // If we want FULL details in the sheet (e.g. query_id, thread_name), we need to ensure they are available or passed differently.
+      // The current implementation of `VirtualizedDataTable` with `enableRecordDetails={true}` uses the VISUAL columns for the sheet.
+      // This is a REGRESSION if we want to show fields that are NOT in the table.
+      // I should update VirtualizedDataTable to accept `sheetColumns` or similar.
+      // For now, let's stick to visual parity.
+      // Actually, looking at `VirtualizedDataTable` I implemented:
+      /*
+        const recordColumns = columns.map((c, i) => ({
+                name: i.toString(),
+                type: 'string', // dummy
+        }));
+      */
+      // This is definitely broken for the sheet, as it won't show proper keys/values.
+      // I need to fix `VirtualizedDataTable` to better support the Sheet.
+    ],
+    [],
+  );
+
+  // Sheet columns
+  const sheetColumns = useMemo(
+    () => [
       { name: "timestamp", type: "DateTime" },
       { name: "type", type: "String" },
       { name: "component", type: "String" }, // User
@@ -69,63 +122,19 @@ export function SessionLogsTable({ logs, isLoading }: SessionLogsTableProps) {
       { name: "thread_name", type: "String" },
       { name: "query_id", type: "String" },
     ],
-    []
+    [],
   );
 
-  // Timestamps are displayed with timezone conversion via formatDateTime
-
   return (
-    <TableWrapper>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[140px]">Time</TableHead>
-            <TableHead className="w-[120px]">Event Type</TableHead>
-            <TableHead className="w-[150px]">User</TableHead>
-            <TableHead>Message</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody isLoading={isLoading}>
-          {logs.length > 0 ? (
-            logs.map((log, index) => (
-              <ClickableTableRow
-                key={`${log.timestamp}_${index}`}
-                record={log as unknown as Record<string, unknown>}
-                columns={columns}
-                rowIndex={index}
-                sheetTitle="Session Detail"
-              >
-                <TableCell className="data-table-cell whitespace-nowrap">
-                  <div className="flex flex-col">
-                    <span>{formatDateTime(log.timestamp)}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="data-table-cell">
-                  {getEventTypeBadge(log.type)}
-                </TableCell>
-                <TableCell className="data-table-cell text-secondary-foreground font-medium">
-                  {log.component}
-                </TableCell>
-                <TableCell className="data-table-cell">
-                  <div className="max-w-[600px]">
-                    <TruncatedCell
-                      value={log.message}
-                      maxWidth={600}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                </TableCell>
-              </ClickableTableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={4} className="h-24 text-center">
-                No session logs found
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableWrapper>
+    <VirtualizedDataTable
+      data={logs}
+      columns={columns}
+      isLoading={isLoading}
+      estimateRowHeight={40}
+      emptyMessage="No session logs found"
+      enableRecordDetails={true}
+      sheetColumns={sheetColumns}
+      sheetTitle="Session Detail"
+    />
   );
 }

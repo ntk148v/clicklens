@@ -136,7 +136,12 @@ export function useLogStream<P extends Record<string, unknown>>({
                 (i) => !existingKeys.has(getKey(i)),
               );
               // New items on TOP
-              return [...filtered, ...prev];
+              const updated = [...filtered, ...prev];
+              // Safety limit for live logs to prevent memory issues
+              if (updated.length > 5000) {
+                return updated.slice(0, 5000);
+              }
+              return updated;
             });
             // Update newest
             if (newItems[0]?.timestamp) {
