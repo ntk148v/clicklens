@@ -75,7 +75,7 @@ When a time column is selected, a bar chart shows document distribution over tim
 
 - **Row Count**: Shows "X of Y hits"
 - **Row Detail**: Click any row to see all fields in a slide-out panel
-- **Load More**: Offset-based pagination for large result sets
+- **Load More**: Cursor-based infinite scroll for deep pagination
 
 ![](/screenshots/discovery-filter.png)
 
@@ -314,6 +314,7 @@ View and search through ClickHouse logs.
 - **② Filter by log level**: Filter to show only specific log levels (e.g., ERROR).
 - **③ Filter by component**: Enter a component name to filter logs.
 - **④ Filter by message**: Enter part of a message to search (uses `WHERE LIKE '%string%'`).
+- **Live Mode**: Auto-refresh uses efficient streaming to prepend only new logs.
 
 > The system.crash_log table does not exist in the database by default, it is created only when fatal errors occur.
 
