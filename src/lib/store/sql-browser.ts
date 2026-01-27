@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { fetchClient } from "@/lib/api/client";
 
 interface TableInfo {
   database?: string;
@@ -26,6 +27,12 @@ export interface AutocompleteColumnInfo {
   is_in_primary_key: boolean;
   is_in_sorting_key: boolean;
   comment: string;
+}
+
+interface TablePreviewResponse {
+  columns?: ColumnInfo[];
+  data?: Record<string, unknown>[];
+  meta?: Array<{ name: string; type: string }>;
 }
 
 interface ColumnsCacheEntry {
@@ -64,7 +71,7 @@ interface SqlBrowserState {
   selectTable: (table: string | null) => void;
   fetchTablePreview: (
     table: string,
-    type: "data" | "structure"
+    type: "data" | "structure",
   ) => Promise<void>;
   setPreviewTab: (tab: "data" | "structure") => void;
   toggleSidebar: () => void;
@@ -72,7 +79,7 @@ interface SqlBrowserState {
   // Column caching for autocomplete
   getColumnsForTable: (
     database: string,
-    table: string
+    table: string,
   ) => Promise<AutocompleteColumnInfo[]>;
   invalidateColumnsCache: (pattern?: string) => void;
 }
@@ -100,20 +107,19 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
   fetchDatabases: async () => {
     set({ loadingDatabases: true });
     try {
-      const res = await fetch("/api/clickhouse/databases");
-      const data = await res.json();
-      if (data.success && data.data) {
-        const dbNames = data.data.map((d: { name: string }) => d.name);
-        set({ databases: dbNames, loadingDatabases: false });
+      const dbNames = await fetchClient<{ name: string }[]>(
+        "/api/clickhouse/databases",
+      );
+      if (dbNames) {
+        const names = dbNames.map((d) => d.name);
+        set({ databases: names, loadingDatabases: false });
 
         // Preload all tables
-        // We do this in the background or immediately if list is small?
-        // Let's do it immediately to ensure cache is hot.
         try {
-          const tableRes = await fetch("/api/clickhouse/tables");
-          const tableResult = await tableRes.json();
-          if (tableResult.success && tableResult.data) {
-            const allTables = tableResult.data as TableInfo[];
+          const allTables = await fetchClient<TableInfo[]>(
+            "/api/clickhouse/tables",
+          );
+          if (allTables) {
             const cache: Record<string, TableInfo[]> = {};
 
             // Group by database
@@ -130,8 +136,8 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
         }
 
         // Auto-select first database if none selected
-        if (dbNames.length > 0 && !get().selectedDatabase) {
-          get().selectDatabase(dbNames[0]);
+        if (names.length > 0 && !get().selectedDatabase) {
+          get().selectDatabase(names[0]);
         }
       } else {
         set({ loadingDatabases: false });
@@ -158,15 +164,15 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
 
     // Fallback to fetch if not cached (though fetchDatabases should have populated it)
     try {
-      const res = await fetch(
-        `/api/clickhouse/tables?database=${encodeURIComponent(db)}`
+      const tables = await fetchClient<TableInfo[]>(
+        `/api/clickhouse/tables?database=${encodeURIComponent(db)}`,
       );
-      const data = await res.json();
-      if (data.success && data.data) {
+
+      if (tables) {
         set((state) => ({
-          tables: data.data,
+          tables: tables,
           loadingTables: false,
-          tablesCache: { ...state.tablesCache, [db]: data.data },
+          tablesCache: { ...state.tablesCache, [db]: tables },
         }));
       } else {
         set({ tables: [], loadingTables: false });
@@ -194,19 +200,19 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
 
     set({ loadingTablePreview: true });
     try {
-      const res = await fetch(
+      const result = await fetchClient<TablePreviewResponse>(
         `/api/clickhouse/tables/${encodeURIComponent(
-          table
-        )}?database=${encodeURIComponent(selectedDatabase)}&type=${type}`
+          table,
+        )}?database=${encodeURIComponent(selectedDatabase)}&type=${type}`,
       );
-      const data = await res.json();
-      if (data.success) {
-        if (type === "structure" && data.columns) {
-          set({ tableColumns: data.columns, loadingTablePreview: false });
-        } else if (type === "data" && data.data) {
+
+      if (result) {
+        if (type === "structure" && result.columns) {
+          set({ tableColumns: result.columns, loadingTablePreview: false });
+        } else if (type === "data" && result.data) {
           set({
-            tableData: data.data,
-            tableMeta: data.meta || [],
+            tableData: result.data,
+            tableMeta: result.meta || [],
             loadingTablePreview: false,
           });
         } else {
@@ -252,7 +258,7 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
 
   getColumnsForTable: async (
     database: string,
-    table: string
+    table: string,
   ): Promise<AutocompleteColumnInfo[]> => {
     const cacheKey = `${database}.${table}`;
     const { columnsCache } = get();
@@ -265,16 +271,13 @@ export const useSqlBrowserStore = create<SqlBrowserState>()((set, get) => ({
 
     // Fetch from API
     try {
-      const res = await fetch(
+      const columns = await fetchClient<AutocompleteColumnInfo[]>(
         `/api/clickhouse/schema/columns?database=${encodeURIComponent(
-          database
-        )}&table=${encodeURIComponent(table)}`
+          database,
+        )}&table=${encodeURIComponent(table)}`,
       );
-      const data = await res.json();
 
-      if (data.success && data.data) {
-        const columns = data.data as AutocompleteColumnInfo[];
-
+      if (columns) {
         // Update cache
         set((state) => ({
           columnsCache: {
@@ -325,7 +328,7 @@ export function useDatabases() {
       loadingDatabases: state.loadingDatabases,
       selectDatabase: state.selectDatabase,
       fetchDatabases: state.fetchDatabases,
-    }))
+    })),
   );
 }
 
@@ -335,7 +338,7 @@ export function useTables() {
     useShallow((state) => ({
       tables: state.tables,
       loadingTables: state.loadingTables,
-    }))
+    })),
   );
 }
 
@@ -345,7 +348,7 @@ export function useSidebarState() {
     useShallow((state) => ({
       sidebarCollapsed: state.sidebarCollapsed,
       toggleSidebar: state.toggleSidebar,
-    }))
+    })),
   );
 }
 

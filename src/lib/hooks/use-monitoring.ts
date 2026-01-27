@@ -7,7 +7,6 @@ import type {
   ReplicaSummary,
   OperationsResponse,
   HealthSummary,
-  MonitoringApiResponse,
 } from "@/lib/clickhouse/monitoring";
 import { fetchClient } from "@/lib/api/client";
 
@@ -46,22 +45,11 @@ function useMonitoringData<T>(
       setIsLoading(true);
       setError(null);
 
-      const result = await fetchClient<MonitoringApiResponse<T>>(endpoint);
+      const result = await fetchClient<T>(endpoint);
 
-      if (result.success && result.data) {
-        setData(result.data);
+      if (result) {
+        setData(result);
         setLastUpdated(new Date());
-      } else if (result.error) {
-        // This might be redundant if fetchClient throws on error,
-        // but if the API returns 200 with success: false (business logic error),
-        // we handle it here.
-        // Looking at fetchClient, it returns data if 200 OK.
-        // If the API wrapper returns { success: false, error: ... } with 200 OK,
-        // we need to handle it.
-        // However, standard API errors in this codebase seem to return non-200.
-        // Let's assume fetchClient throws on non-200.
-        // If 200 OK but success: false, fetchClient returns the body.
-        setError(result.error.userMessage || result.error.message);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");

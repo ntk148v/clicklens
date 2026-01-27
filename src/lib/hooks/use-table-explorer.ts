@@ -43,17 +43,9 @@ function useTableExplorerData<T>(
       setIsLoading(true);
       setError(null);
 
-      const result = await fetchClient<{
-        success: boolean;
-        data: T;
-        error?: { message: string; userMessage?: string };
-      }>(endpoint);
+      const result = await fetchClient<T>(endpoint);
 
-      if (result.success && result.data) {
-        setData(result.data);
-      } else if (result.error) {
-        setError(result.error.userMessage || result.error.message);
-      }
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
