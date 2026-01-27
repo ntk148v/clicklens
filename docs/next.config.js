@@ -6,6 +6,7 @@ const withNextra = require("nextra")({
 
 module.exports = withNextra({
   output: "export",
+  basePath: process.env.NODE_ENV === "production" ? "/clicklens" : "",
   images: {
     unoptimized: true,
   },
