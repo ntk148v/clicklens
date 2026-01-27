@@ -75,7 +75,7 @@ When a time column is selected, a bar chart shows document distribution over tim
 
 - **Row Count**: Shows "X of Y hits"
 - **Row Detail**: Click any row to see all fields in a slide-out panel
-- **Load More**: Cursor-based infinite scroll for deep pagination
+- **Load More**: Offset-based pagination for large result sets
 
 ![](/screenshots/discovery-filter.png)
 
@@ -112,7 +112,11 @@ A full-featured SQL editor for writing and executing ClickHouse queries.
 Built on CodeMirror 6 with ClickHouse-specific enhancements:
 
 - **Syntax Highlighting**: Keywords, functions, strings, numbers
-- **Autocomplete**: Tables, columns, ClickHouse functions, keywords
+- **Context-Aware Autocomplete**:
+  - Keywords after `FROM`, `JOIN` → table suggestions
+  - After `USE`, `DATABASE` → database suggestions
+  - After table reference → column suggestions (async fetch)
+  - Built-in functions and keywords
 - **Code Actions**: Execute, Explain, Format
 
 ![](/screenshots/sql-run.png)
