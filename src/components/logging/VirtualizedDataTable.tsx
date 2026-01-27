@@ -99,86 +99,108 @@ export function VirtualizedDataTable<T extends object>({
     <div className={cn("flex flex-col h-full", className)}>
       {headerContent}
 
-      {/* Table Header - Sticky outside virtual scroll */}
-      <div className="border rounded-t-md border-b-0 overflow-hidden flex-none">
-        <Table>
-          <TableHeader className="bg-background">
-            <TableRow className="hover:bg-transparent">
-              {columns.map((col, i) => (
-                <TableHead
-                  key={i}
-                  className={cn(col.className)}
-                  style={{ width: col.width }}
-                >
-                  {col.header}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-        </Table>
-      </div>
-
-      {/* Virtualized Body */}
-      <div
-        ref={parentRef}
-        className="flex-1 overflow-auto border-x border-b rounded-b-md relative"
-      >
-        <div
-          style={{
-            height: `${virtualizer.getTotalSize()}px`,
-            width: "100%",
-            position: "relative",
-          }}
-        >
-          <Table
-            className="absolute top-0 left-0 w-full"
-            style={{
-              transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
-            }}
-          >
-            {/* Invisible header to force column widths matching the sticky header */}
-            <TableHeader className="opacity-0 pointer-events-none invisible">
-              <TableRow>
+      {/* Table Border Wrapper */}
+      <div className="flex-1 flex flex-col border rounded-md overflow-hidden">
+        {/* Table Header - Sticky outside virtual scroll */}
+        <div className="flex-none overflow-hidden border-b z-10 bg-background">
+          <Table>
+            <TableHeader className="bg-background">
+              <TableRow className="hover:bg-transparent border-none">
                 {columns.map((col, i) => (
                   <TableHead
                     key={i}
                     className={cn(col.className)}
                     style={{ width: col.width }}
-                  />
+                  >
+                    {col.header}
+                  </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
+          </Table>
+        </div>
 
-            <TableBody>
-              {isEmpty && !isLoading && (
+        {/* Virtualized Body */}
+        <div ref={parentRef} className="flex-1 overflow-auto relative">
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            <Table
+              className="absolute top-0 left-0 w-full"
+              style={{
+                transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
+              }}
+            >
+              {/* Invisible header to force column widths matching the sticky header */}
+              <TableHeader className="opacity-0 pointer-events-none invisible">
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    {emptyMessage}
-                  </TableCell>
+                  {columns.map((col, i) => (
+                    <TableHead
+                      key={i}
+                      className={cn(col.className)}
+                      style={{ width: col.width }}
+                    />
+                  ))}
                 </TableRow>
-              )}
+              </TableHeader>
 
-              {virtualItems.map((virtualRow) => {
-                const item = data[virtualRow.index];
-                const rowKey = getRowId
-                  ? getRowId(item, virtualRow.index)
-                  : virtualRow.index;
+              <TableBody>
+                {isEmpty && !isLoading && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length}
+                      className="h-24 text-center"
+                    >
+                      {emptyMessage}
+                    </TableCell>
+                  </TableRow>
+                )}
 
-                // If using standard clickable row functionality
-                if (enableRecordDetails) {
+                {virtualItems.map((virtualRow) => {
+                  const item = data[virtualRow.index];
+                  const rowKey = getRowId
+                    ? getRowId(item, virtualRow.index)
+                    : virtualRow.index;
+
+                  // If using standard clickable row functionality
+                  if (enableRecordDetails) {
+                    return (
+                      <ClickableTableRow
+                        key={rowKey}
+                        record={item}
+                        rowIndex={virtualRow.index}
+                        columns={sheetColumns} // Use FULL sheet metadata
+                        sheetTitle={sheetTitle}
+                        data-index={virtualRow.index}
+                        ref={virtualizer.measureElement}
+                        className={cn("w-full")}
+                      >
+                        {columns.map((col, i) => (
+                          <TableCell
+                            key={i}
+                            className={cn("data-table-cell", col.className)}
+                            style={{ width: col.width }}
+                          >
+                            {col.cell(item)}
+                          </TableCell>
+                        ))}
+                      </ClickableTableRow>
+                    );
+                  }
+
                   return (
-                    <ClickableTableRow
+                    <TableRow
                       key={rowKey}
-                      record={item}
-                      rowIndex={virtualRow.index}
-                      columns={sheetColumns} // Use FULL sheet metadata
-                      sheetTitle={sheetTitle}
                       data-index={virtualRow.index}
                       ref={virtualizer.measureElement}
-                      className={cn("w-full")}
+                      className={cn(
+                        onRowClick ? "cursor-pointer hover:bg-muted/50" : "",
+                      )}
+                      onClick={() => onRowClick?.(item)}
                     >
                       {columns.map((col, i) => (
                         <TableCell
@@ -189,41 +211,19 @@ export function VirtualizedDataTable<T extends object>({
                           {col.cell(item)}
                         </TableCell>
                       ))}
-                    </ClickableTableRow>
+                    </TableRow>
                   );
-                }
-
-                return (
-                  <TableRow
-                    key={rowKey}
-                    data-index={virtualRow.index}
-                    ref={virtualizer.measureElement}
-                    className={cn(
-                      onRowClick ? "cursor-pointer hover:bg-muted/50" : "",
-                    )}
-                    onClick={() => onRowClick?.(item)}
-                  >
-                    {columns.map((col, i) => (
-                      <TableCell
-                        key={i}
-                        className={cn("data-table-cell", col.className)}
-                        style={{ width: col.width }}
-                      >
-                        {col.cell(item)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
-        {isLoading && (
-          <div className="absolute inset-x-0 bottom-0 p-2 text-center bg-background/80 backdrop-blur border-t text-xs text-muted-foreground">
-            Loading more...
+                })}
+              </TableBody>
+            </Table>
           </div>
-        )}
+
+          {isLoading && (
+            <div className="absolute inset-x-0 bottom-0 p-2 text-center bg-background/80 backdrop-blur border-t text-xs text-muted-foreground">
+              Loading more...
+            </div>
+          )}
+        </div>
       </div>
 
       {footerContent}
