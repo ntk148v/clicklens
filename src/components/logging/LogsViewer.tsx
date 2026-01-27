@@ -14,10 +14,9 @@ import { Search } from "lucide-react";
 import { SystemLogsTable } from "./SystemLogsTable";
 import { SessionLogsTable } from "./SessionLogsTable";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
-import { RefreshControl } from "@/components/monitoring/refresh-control";
 import { useLogStream } from "@/lib/hooks/use-log-stream";
+import { FlexibleTimeRange, TimeRange } from "@/lib/types/discover";
 
-type TimeRange = "5m" | "15m" | "1h" | "6h" | "12h" | "24h" | "7d" | "all";
 type LogLevel =
   | "All"
   | "Fatal"
@@ -39,47 +38,50 @@ const LOG_LEVELS: LogLevel[] = [
 
 const SESSION_EVENTS = ["All", "LoginSuccess", "LoginFailure", "Logout"];
 
-// Calculate time range start
-function getMinTime(range: TimeRange): string | undefined {
-  if (range === "all") return undefined;
-  const now = new Date();
-  switch (range) {
-    case "5m":
-      now.setMinutes(now.getMinutes() - 5);
-      break;
-    case "15m":
-      now.setMinutes(now.getMinutes() - 15);
-      break;
-    case "1h":
-      now.setHours(now.getHours() - 1);
-      break;
-    case "6h":
-      now.setHours(now.getHours() - 6);
-      break;
-    case "12h":
-      now.setHours(now.getHours() - 12);
-      break;
-    case "24h":
-      now.setHours(now.getHours() - 24);
-      break;
-    case "7d":
-      now.setDate(now.getDate() - 7);
-      break;
-  }
-  return now.toISOString();
-}
-
 interface LogsViewerProps {
   source?: "text_log" | "crash_log" | "session_log";
+  timeRange: FlexibleTimeRange;
+  refreshKey?: number;
 }
 
-export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
+export function LogsViewer({
+  source = "text_log",
+  timeRange,
+  refreshKey = 0,
+}: LogsViewerProps) {
   // Filters
   const [search, setSearch] = useState("");
   const [component, setComponent] = useState("");
   const [level, setLevel] = useState<LogLevel>("All");
-  const [timeRange, setTimeRange] = useState<TimeRange>("1h");
-  const [refreshInterval, setRefreshInterval] = useState(0);
+
+  // Calculate minTime from timeRange
+  const minTime = useMemo(() => {
+    if (timeRange.type === "absolute") {
+      return timeRange.from;
+    } else {
+      // Relative
+      const rangeKey = timeRange.from.replace("now-", "") as TimeRange;
+      const now = new Date();
+      // Reuse logic from discover or dup minimal logic here
+      // duplicating minimal logic for safety/speed without circular deps if helper is not perfect
+      // actually let's use a quick map helper inside or similar
+      const mapping: Record<string, number> = {
+        "5m": 5,
+        "15m": 15,
+        "30m": 30,
+        "60m": 60,
+        "1h": 60,
+        "3h": 180,
+        "6h": 360,
+        "12h": 720,
+        "24h": 1440,
+        "3d": 4320,
+        "7d": 10080,
+      };
+      const minutes = mapping[rangeKey] || 60;
+      return new Date(now.getTime() - minutes * 60 * 1000).toISOString();
+    }
+  }, [timeRange]);
 
   // Memoize query params
   const queryParams = useMemo(
@@ -87,10 +89,10 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
       search,
       component,
       level,
-      minTime: getMinTime(timeRange),
+      minTime,
       source,
     }),
-    [search, component, level, timeRange, source],
+    [search, component, level, minTime, source],
   );
 
   const {
@@ -111,9 +113,14 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source]); // Only source change triggers hard reload auto?
-  // Wait, if timeRange changes, queryParams change -> useEffect??
-  // The hook doesn't auto-reload on queryParams change to avoid flickers.
+  }, [source, minTime]); // Reload when source or time window changes
+
+  // Handle external refresh trigger
+  useEffect(() => {
+    if (refreshKey > 0) {
+      loadLive();
+    }
+  }, [refreshKey, loadLive]);
 
   // Handle filter submission
   const handleApplyFilters = (e?: React.FormEvent) => {
@@ -142,13 +149,6 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex items-center justify-between">
         <div />
-        <RefreshControl
-          interval={refreshInterval}
-          onIntervalChange={setRefreshInterval}
-          onRefresh={loadLive}
-          isLoading={isLoading}
-          intervals={[5, 10, 30, 60]}
-        />
       </div>
 
       {/* Filters */}
@@ -156,31 +156,6 @@ export function LogsViewer({ source = "text_log" }: LogsViewerProps) {
         onSubmit={handleApplyFilters}
         className="flex flex-wrap items-center gap-2"
       >
-        {/* Time Range */}
-        <Select
-          value={timeRange}
-          onValueChange={(v) => {
-            // For UX, maybe simple filter change shouldn't auto reload?
-            // But existing behavior likely expected it.
-            // We'll update state, user hits Apply.
-            setTimeRange(v as TimeRange);
-          }}
-        >
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="Time" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="5m">Last 5 min</SelectItem>
-            <SelectItem value="15m">Last 15 min</SelectItem>
-            <SelectItem value="1h">Last 1 hour</SelectItem>
-            <SelectItem value="6h">Last 6 hours</SelectItem>
-            <SelectItem value="12h">Last 12 hours</SelectItem>
-            <SelectItem value="24h">Last 24 hours</SelectItem>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="all">All Time</SelectItem>
-          </SelectContent>
-        </Select>
-
         {/* Event Type Filter - for session_log */}
         {source === "session_log" && (
           <Select value={level} onValueChange={(v) => setLevel(v as LogLevel)}>

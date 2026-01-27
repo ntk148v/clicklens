@@ -7,7 +7,7 @@ import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
-import { DiscoverTimeSelector } from "@/components/discover/DiscoverTimeSelector";
+import { TimeSelector, RefreshControl } from "@/components/shared";
 import {
   Select,
   SelectContent,
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FilterX, Database, Table2 } from "lucide-react";
+import { FilterX, Database, Table2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import type {
   TableSchema,
@@ -65,6 +65,9 @@ export default function DiscoverPage() {
   const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
     getFlexibleRangeFromEnum("1h"),
   );
+
+  // Refresh state
+  const [refreshInterval, setRefreshInterval] = useState(0);
 
   // Results state
   const [rows, setRows] = useState<DiscoverRow[]>([]);
@@ -559,22 +562,14 @@ export default function DiscoverPage() {
         title="Discover"
         actions={
           <div className="flex items-center gap-2">
-            <DiscoverTimeSelector
-              value={flexibleRange}
-              onChange={setFlexibleRange}
-            />
+            <TimeSelector value={flexibleRange} onChange={setFlexibleRange} />
 
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={handleSearch}
-              disabled={isLoading || !selectedTable}
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-              />
-            </Button>
+            <RefreshControl
+              onRefresh={() => handleSearch()}
+              interval={refreshInterval}
+              onIntervalChange={setRefreshInterval}
+              isLoading={isLoading}
+            />
           </div>
         }
       >
