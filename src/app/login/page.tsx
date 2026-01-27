@@ -113,7 +113,9 @@ export default function LoginPage() {
             )}
 
             <div>
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="block mb-3">
+                Username
+              </Label>
               <Input
                 id="username"
                 placeholder="default"
@@ -125,7 +127,9 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="block mb-3">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
