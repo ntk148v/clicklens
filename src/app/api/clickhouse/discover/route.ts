@@ -119,14 +119,18 @@ export async function GET(request: Request) {
       let histogramQuery = "";
 
       const whereConds = [];
-      if (minTime)
+      if (minTime) {
+        const minTimeNum = new Date(minTime).getTime();
         whereConds.push(
-          `\`${safeTimeCol}\` >= parseDateTimeBestEffort('${minTime.replace(/'/g, "''")}')`,
+          `\`${safeTimeCol}\` >= toDateTime64(${minTimeNum / 1000}, 3)`,
         );
-      if (maxTime)
+      }
+      if (maxTime) {
+        const maxTimeNum = new Date(maxTime).getTime();
         whereConds.push(
-          `\`${safeTimeCol}\` <= parseDateTimeBestEffort('${maxTime.replace(/'/g, "''")}')`,
+          `\`${safeTimeCol}\` <= toDateTime64(${maxTimeNum / 1000}, 3)`,
         );
+      }
       if (filter) whereConds.push(`(${filter})`);
 
       const whereClause = whereConds.length

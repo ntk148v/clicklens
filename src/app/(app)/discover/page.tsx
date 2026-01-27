@@ -584,7 +584,15 @@ export default function DiscoverPage() {
             <Database className="h-4 w-4 text-muted-foreground" />
             <Select
               value={selectedDatabase}
-              onValueChange={setSelectedDatabase}
+              onValueChange={(db) => {
+                setSelectedDatabase(db);
+                // Reset table and schema immediately to prevent stale queries
+                setSelectedTable("");
+                setSchema(null);
+                setRows([]);
+                setHistogramData([]);
+                setTables([]); // Clear tables while loading new ones
+              }}
             >
               <SelectTrigger
                 className="w-[180px] h-9"

@@ -82,9 +82,9 @@ export async function* fetchChunks({
   let hasMoreChunks = true;
 
   if (cursor) {
-    const cursorTime = new Date(cursor).toISOString();
+    const cursorTimeNum = new Date(cursor).getTime();
     whereConditions.push(
-      `\`${safeTimeCol}\` < parseDateTimeBestEffort('${cursorTime}')`,
+      `\`${safeTimeCol}\` < toDateTime64(${cursorTimeNum / 1000}, 3)`,
     );
   }
 
@@ -109,9 +109,6 @@ export async function* fetchChunks({
 
     const chunkWhere = [...whereConditions];
 
-    const lowIso = new Date(currentLow).toISOString();
-    const highIso = new Date(currentHigh).toISOString();
-
     // Chunk Time Range
     // If we are at the very top (End), we include <= highIso IF it's the first chunk logic,
     // but typically we want < highIso for subsequent chunks.
@@ -125,19 +122,24 @@ export async function* fetchChunks({
 
     // Original Logic:
     if (currentHigh === End) {
-      // If cursor is present, we are already strictly LESS than cursor.
-      // So asking for <= End is fine, intersection handles it.
-      // But wait, if NO cursor, we want <= End.
-      chunkWhere.push(
-        `\`${safeTimeCol}\` <= parseDateTimeBestEffort('${highIso}')`,
-      );
+      if (cursor) {
+        // If cursor exists, we use < cursor explicitly handled before loop
+        // But for the range top check in loop:
+        chunkWhere.push(
+          `\`${safeTimeCol}\` <= toDateTime64(${currentHigh / 1000}, 3)`,
+        );
+      } else {
+        chunkWhere.push(
+          `\`${safeTimeCol}\` <= toDateTime64(${currentHigh / 1000}, 3)`,
+        );
+      }
     } else {
       chunkWhere.push(
-        `\`${safeTimeCol}\` < parseDateTimeBestEffort('${highIso}')`,
+        `\`${safeTimeCol}\` < toDateTime64(${currentHigh / 1000}, 3)`,
       );
     }
     chunkWhere.push(
-      `\`${safeTimeCol}\` >= parseDateTimeBestEffort('${lowIso}')`,
+      `\`${safeTimeCol}\` >= toDateTime64(${currentLow / 1000}, 3)`,
     );
 
     const chunkLimit = limit - rowsFetched;
