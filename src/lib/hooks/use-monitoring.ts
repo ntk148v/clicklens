@@ -9,6 +9,7 @@ import type {
   HealthSummary,
   MonitoringApiResponse,
 } from "@/lib/clickhouse/monitoring";
+import { fetchClient } from "@/lib/api/client";
 
 // =============================================================================
 // Generic fetcher hook
@@ -29,7 +30,7 @@ interface UseMonitoringDataResult<T> {
 
 function useMonitoringData<T>(
   endpoint: string,
-  options: UseMonitoringDataOptions = {}
+  options: UseMonitoringDataOptions = {},
 ): UseMonitoringDataResult<T> {
   const { refreshInterval = 0, enabled = true } = options;
 
@@ -45,13 +46,21 @@ function useMonitoringData<T>(
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(endpoint);
-      const result: MonitoringApiResponse<T> = await response.json();
+      const result = await fetchClient<MonitoringApiResponse<T>>(endpoint);
 
       if (result.success && result.data) {
         setData(result.data);
         setLastUpdated(new Date());
       } else if (result.error) {
+        // This might be redundant if fetchClient throws on error,
+        // but if the API returns 200 with success: false (business logic error),
+        // we handle it here.
+        // Looking at fetchClient, it returns data if 200 OK.
+        // If the API wrapper returns { success: false, error: ... } with 200 OK,
+        // we need to handle it.
+        // However, standard API errors in this codebase seem to return non-200.
+        // Let's assume fetchClient throws on non-200.
+        // If 200 OK but success: false, fetchClient returns the body.
         setError(result.error.userMessage || result.error.message);
       }
     } catch (err) {
@@ -108,7 +117,7 @@ function useMonitoringData<T>(
 
 export function useMetrics(
   params?: { category?: string; type?: string },
-  options?: UseMonitoringDataOptions
+  options?: UseMonitoringDataOptions,
 ) {
   const searchParams = new URLSearchParams();
   if (params?.category) searchParams.set("category", params.category);
@@ -130,21 +139,21 @@ export interface ReplicasData {
 export function useReplicas(options?: UseMonitoringDataOptions) {
   return useMonitoringData<ReplicasData>(
     "/api/clickhouse/monitoring/replicas",
-    options
+    options,
   );
 }
 
 export function useOperations(options?: UseMonitoringDataOptions) {
   return useMonitoringData<OperationsResponse>(
     "/api/clickhouse/monitoring/operations",
-    options
+    options,
   );
 }
 
 export function useHealthChecks(options?: UseMonitoringDataOptions) {
   return useMonitoringData<HealthSummary>(
     "/api/clickhouse/monitoring/health",
-    options
+    options,
   );
 }
 
@@ -179,7 +188,7 @@ export interface DisksData {
 export function useDisks(options?: UseMonitoringDataOptions) {
   return useMonitoringData<DisksData>(
     "/api/clickhouse/monitoring/disks",
-    options
+    options,
   );
 }
 

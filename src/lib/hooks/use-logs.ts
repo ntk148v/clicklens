@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { fetchClient } from "@/lib/api/client";
 
 // =============================================================================
 // Types
@@ -70,17 +71,15 @@ export function useSystemLogs(filters: LogFilters = {}): UseLogsResult {
       if (filters.maxTime) params.set("maxTime", filters.maxTime);
       if (filters.mode) params.set("mode", filters.mode);
 
-      const response = await fetch(
-        `/api/clickhouse/logging?${params.toString()}`
+      const data = await fetchClient<LogsResponse>(
+        `/api/clickhouse/logging?${params.toString()}`,
       );
-      const result = await response.json();
 
-      if (result.success) {
-        setData(result.data);
-      } else {
-        setError(result.error || "Failed to fetch logs");
-      }
+      setData(data);
     } catch (err) {
+      // Errors are already handled by fetchClient (toast + throw)
+      // We just need to capture the message for local state if needed
+      // or let the UI fallback to empty state
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);

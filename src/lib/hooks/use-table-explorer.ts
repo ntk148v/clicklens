@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { fetchClient } from "@/lib/api/client";
 
 // Types
 import type { TableOverview } from "@/app/api/clickhouse/tables/explorer/route";
@@ -27,7 +28,7 @@ interface UseTableExplorerDataResult<T> {
 
 function useTableExplorerData<T>(
   endpoint: string,
-  options: UseTableExplorerDataOptions = {}
+  options: UseTableExplorerDataOptions = {},
 ): UseTableExplorerDataResult<T> {
   const { enabled = true } = options;
 
@@ -42,8 +43,11 @@ function useTableExplorerData<T>(
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(endpoint);
-      const result = await response.json();
+      const result = await fetchClient<{
+        success: boolean;
+        data: T;
+        error?: { message: string; userMessage?: string };
+      }>(endpoint);
 
       if (result.success && result.data) {
         setData(result.data);
@@ -75,12 +79,12 @@ function useTableExplorerData<T>(
 
 export function useTableOverview(
   database: string | null,
-  table: string | null
+  table: string | null,
 ) {
   const endpoint =
     database && table
       ? `/api/clickhouse/tables/explorer?database=${encodeURIComponent(
-          database
+          database,
         )}&table=${encodeURIComponent(table)}`
       : "";
 
@@ -105,7 +109,7 @@ export function useTableParts(database: string | null, table: string | null) {
   const endpoint =
     database && table
       ? `/api/clickhouse/tables/explorer/parts?database=${encodeURIComponent(
-          database
+          database,
         )}&table=${encodeURIComponent(table)}`
       : "";
 
@@ -129,7 +133,7 @@ export function useTableColumns(database: string | null, table: string | null) {
   const endpoint =
     database && table
       ? `/api/clickhouse/tables/explorer/columns?database=${encodeURIComponent(
-          database
+          database,
         )}&table=${encodeURIComponent(table)}`
       : "";
 
@@ -145,12 +149,12 @@ export interface ReplicasData {
 
 export function useTableReplicas(
   database: string | null,
-  table: string | null
+  table: string | null,
 ) {
   const endpoint =
     database && table
       ? `/api/clickhouse/tables/explorer/replicas?database=${encodeURIComponent(
-          database
+          database,
         )}&table=${encodeURIComponent(table)}`
       : "";
 
@@ -171,12 +175,12 @@ export interface MutationsData {
 
 export function useTableMutations(
   database: string | null,
-  table: string | null
+  table: string | null,
 ) {
   const endpoint =
     database && table
       ? `/api/clickhouse/tables/explorer/mutations?database=${encodeURIComponent(
-          database
+          database,
         )}&table=${encodeURIComponent(table)}`
       : "";
 
@@ -198,7 +202,7 @@ export function useTableMerges(database: string | null, table: string | null) {
   const endpoint =
     database && table
       ? `/api/clickhouse/tables/explorer/merges?database=${encodeURIComponent(
-          database
+          database,
         )}&table=${encodeURIComponent(table)}`
       : "";
 
