@@ -26,6 +26,12 @@ export interface IncrementalDataConfig<T, P extends Record<string, unknown>> {
    * @returns Unique string key
    */
   getKey: (item: T) => string;
+
+  /**
+   * Maximum number of items to keep in memory
+   * @default 5000
+   */
+  limit?: number;
 }
 
 export interface UseIncrementalDataResult<T> {
@@ -69,7 +75,7 @@ export function useIncrementalData<
   T,
   P extends Record<string, unknown> = Record<string, unknown>
 >(config: IncrementalDataConfig<T, P>, params: P): UseIncrementalDataResult<T> {
-  const { fetchFn, getTimestamp, getKey } = config;
+  const { fetchFn, getTimestamp, getKey, limit = 5000 } = config;
 
   const [data, setData] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,13 +126,14 @@ export function useIncrementalData<
       });
 
       if (items.length > 0) {
-        // Deduplicate and prepend
+        // Deduplicate and prepend, respecting the limit
         setData((prev) => {
           const existingKeys = new Set(prev.map(getKey));
           const uniqueNew = items.filter(
             (item) => !existingKeys.has(getKey(item))
           );
-          return [...uniqueNew, ...prev];
+          const merged = [...uniqueNew, ...prev];
+          return merged.slice(0, limit);
         });
 
         // Update newest timestamp
@@ -138,7 +145,7 @@ export function useIncrementalData<
     } finally {
       setIsLoading(false);
     }
-  }, [fetchFn, params, getTimestamp, getKey, reload]);
+  }, [fetchFn, params, getTimestamp, getKey, reload, limit]);
 
   /**
    * Clear all data

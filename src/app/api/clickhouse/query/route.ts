@@ -99,6 +99,8 @@ export async function POST(request: NextRequest) {
         try {
           let lineCount = 0;
           let colNames: string[] = [];
+          const batch: unknown[] = [];
+          const BATCH_SIZE = 1000;
 
           for await (const chunk of stream) {
             const items = Array.isArray(chunk) ? chunk : [chunk];
@@ -156,8 +158,18 @@ export async function POST(request: NextRequest) {
 
                 rowsRead++;
 
-                // Send row data
-                push({ type: "data", data: [data], rows_count: rowsRead });
+                // Add to batch
+                batch.push(data);
+
+                // Flush batch if full
+                if (batch.length >= BATCH_SIZE) {
+                  push({
+                    type: "data",
+                    data: batch,
+                    rows_count: rowsRead,
+                  });
+                  batch.length = 0; // Clear array
+                }
 
                 // Send progress occasionally
                 if (rowsRead % 1000 === 0) {
@@ -166,6 +178,15 @@ export async function POST(request: NextRequest) {
               }
             }
             if (limitReached) break;
+          }
+
+          // Flush remaining items
+          if (batch.length > 0) {
+            push({
+              type: "data",
+              data: batch,
+              rows_count: rowsRead,
+            });
           }
 
           if (limitReached) {

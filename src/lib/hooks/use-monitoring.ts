@@ -66,12 +66,31 @@ function useMonitoringData<T>(
     fetchData();
   }, [fetchData]);
 
-  // Auto-refresh
+  // Auto-refresh with visibility handling
   useEffect(() => {
     if (refreshInterval <= 0 || !enabled) return;
 
-    const interval = window.setInterval(fetchData, refreshInterval);
-    return () => window.clearInterval(interval);
+    const tick = () => {
+      // Don't fetch if the tab is hidden to save resources
+      if (document.hidden) return;
+      fetchData();
+    };
+
+    const interval = window.setInterval(tick, refreshInterval);
+
+    // Also listen for visibility changes to refresh immediately when returning
+    const handleVisibilityChange = () => {
+      if (!document.hidden && enabled) {
+        fetchData();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [refreshInterval, fetchData, enabled]);
 
   return {
