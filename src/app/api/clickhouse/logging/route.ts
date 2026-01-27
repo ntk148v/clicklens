@@ -1,8 +1,13 @@
-import { NextResponse } from "next/server";
+// ... imports
 import { getSessionClickHouseConfig } from "@/lib/auth";
-import { createClient, isClickHouseError, type ClickHouseError } from "@/lib/clickhouse";
+import {
+  createClient,
+  isClickHouseError,
+  type ClickHouseError,
+} from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { ApiErrors } from "@/lib/api";
+import { fetchChunks } from "@/lib/clickhouse/stream";
 
 export async function GET(request: Request) {
   let source = "text_log";
@@ -15,24 +20,60 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "1000");
+    const limit = Math.min(
+      parseInt(searchParams.get("limit") || "1000"),
+      10000,
+    );
     const search = searchParams.get("search");
     const level = searchParams.get("level");
     const component = searchParams.get("component");
-    const minTime = searchParams.get("minTime");
+    const minTimeParam = searchParams.get("minTime"); // For Time Range or Live Mode (if no cursor)
+    const cursor = searchParams.get("cursor"); // For history (older than cursor)
     source = searchParams.get("source") || "text_log"; // "text_log" or "crash_log"
 
     const client = createClient(config);
     const clusterName = await getClusterName(client);
 
-    let query = "";
-    if (source === "crash_log") {
-      const tableSource = clusterName
-        ? `clusterAllReplicas('${clusterName}', system.crash_log)`
-        : "system.crash_log";
+    // Determine Table and Columns
+    const database = "system";
+    let table = "text_log";
+    // let filterCols: Record<string, string> = {}; // internal logic for custom filters
 
-      query = `
-        SELECT
+    if (source === "crash_log") {
+      table = "crash_log";
+    } else if (source === "session_log") {
+      table = "session_log";
+    }
+
+    const safeDatabase = database;
+    const safeTable = table;
+
+    const tableSource = clusterName
+      ? `clusterAllReplicas('${clusterName}', \`${safeDatabase}\`.\`${safeTable}\`)`
+      : `\`${safeDatabase}\`.\`${safeTable}\``;
+
+    // Time Column logic
+    const timeColumn =
+      source === "crash_log" || source === "session_log"
+        ? "event_time"
+        : "event_time_microseconds";
+
+    // safeTimeCol for wrapper
+    // const safeTimeCol = timeColumn;
+
+    // Build SELECT and WHERE
+    // We construct the "Projection" (columns) and "Selection" (rows)
+
+    // Columns mapping
+    // We want to return standard JSON objects matching our frontend LogEntry
+    // BUT `fetchChunks` yields raw rows.
+    // So we should construct a SELECT clause that aliases columns to the expected JSON keys
+    // OR we transform in the stream?
+    // Streaming raw text is faster. Let's do alias in SQL.
+
+    let selectClause = "";
+    if (source === "crash_log") {
+      selectClause = `
           event_time as timestamp,
           'Fatal' as type,
           toString(signal) as component,
@@ -43,17 +84,11 @@ export async function GET(request: Request) {
           query_id,
           source_file,
           source_line
-        FROM ${tableSource}
       `;
     } else if (source === "session_log") {
-      const tableSource = clusterName
-        ? `clusterAllReplicas('${clusterName}', system.session_log)`
-        : "system.session_log";
-
-      query = `
-        SELECT
+      selectClause = `
           event_time as timestamp,
-          toString(type) as event_type,
+          toString(type) as type,
           user as component,
           concat('Auth: ', toString(auth_type), ', Remote: ', toString(client_address), ', Client: ', client_name) as message,
           concat('Interface: ', toString(interface), ', Session ID: ', session_id, if(failure_reason != '', concat(', Reason: ', failure_reason), '')) as details,
@@ -62,15 +97,10 @@ export async function GET(request: Request) {
           session_id as query_id,
           '' as source_file,
           0 as source_line
-        FROM ${tableSource}
       `;
     } else {
-      const tableSource = clusterName
-        ? `clusterAllReplicas('${clusterName}', system.text_log)`
-        : "system.text_log";
-
-      query = `
-        SELECT
+      // text_log
+      selectClause = `
           event_time_microseconds as timestamp,
           level as type,
           logger_name as component,
@@ -81,25 +111,20 @@ export async function GET(request: Request) {
           query_id,
           source_file,
           source_line
-        FROM ${tableSource}
       `;
     }
 
+    // Build WHERE
     const whereConditions: string[] = [];
 
-    // Message search filter
     if (search) {
       const safeSearch = search.replace(/'/g, "''");
       whereConditions.push(`message ILIKE '%${safeSearch}%'`);
     }
 
-    // Component filter
     if (component) {
       const safeComponent = component.replace(/'/g, "''");
       if (source === "crash_log") {
-        // for crash log "component" is mostly signal or we can just ignore component filter or filter on other fields
-        // but consistent UI might send it. Let's filter on thread_name or something relevant if needed?
-        // Mapped component is 'signal'
         whereConditions.push(`toString(signal) ILIKE '%${safeComponent}%'`);
       } else if (source === "session_log") {
         whereConditions.push(`user ILIKE '%${safeComponent}%'`);
@@ -108,7 +133,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Level/Type filter (text_log uses level, session_log uses type)
     if (level && level !== "All") {
       const safeLevel = level.replace(/'/g, "''");
       if (source === "text_log") {
@@ -118,57 +142,70 @@ export async function GET(request: Request) {
       }
     }
 
-    // Time filter
-    if (minTime) {
-      const safeMin = minTime.replace(/'/g, "''");
-      const timeCol =
-        source === "crash_log" || source === "session_log"
-          ? "event_time"
-          : "event_time_microseconds";
-      whereConditions.push(
-        `${timeCol} > parseDateTimeBestEffort('${safeMin}')`,
-      );
-    }
+    // minTime logic for Live Mode or Time Range
+    // If we are scrolling BACK (cursor provided), minTime is strictly a lower bound (stop condition).
+    // If we are refreshing LIVE (no cursor, maybe minTime is "last seen"), we want > minTime.
 
-    if (whereConditions.length > 0) {
-      query += ` WHERE ${whereConditions.join(" AND ")}`;
-    }
+    // BUT `fetchChunks` assumes we are paginating DESCENDING (History).
+    // How do we handle "Live Mode" (Newest, > last timestamp)?
+    // `fetchChunks` is built for "History" (fetch older).
 
-    const orderCol =
-      source === "crash_log" || source === "session_log"
-        ? "event_time"
-        : "event_time_microseconds";
-    query += ` ORDER BY ${orderCol} DESC LIMIT ${limit}`;
+    // If this is a "Live Update" request, we probably don't need chunking, just a simple query.
+    // Live update = "Give me everything since X". Usually small.
+    // Let's differentiate:
+    // 1. History Mode (standard load / scroll): ORDER BY time DESC.
+    // 2. Live Mode (auto-refresh): ORDER BY time ASC (or DESC) WHERE time > last_seen.
 
-    // Define the expected row structure
-    interface LogRow {
-      timestamp: string | number;
-      type?: string;
-      event_type?: string;
-      component: string;
-      message: string;
-      details: string;
-      event_time: string;
-      thread_name: string;
-      query_id: string;
-      source_file: string;
-      source_line: number;
-    }
+    // Check if we are in "Live Mode" (fetching NEW data)
+    // We can use a flag or infer from params.
+    // Discover API unified everything into `fetchChunks` but it only supports [min, max] range.
+    // If we want "Everything > minTime", we can set minTime=X, maxTime=Now.
+    // `fetchChunks` works for that too! It chunks from Max down to Min.
 
-    const resultSet = await client.query<LogRow>(query);
+    // However, for "Live Mode", typically we only want strict `> minTime`.
+    // The current `fetchChunks` uses `>= minTime` (inclusive low) and `< maxTime` (exclusive high).
 
-    // Map result rows to standard LogEntry format
-    const data = resultSet.data.map((row) => ({
-      ...row,
-      // For session_log, we aliased `type` as `event_type` to avoid ambiguity
-      type: row.event_type || row.type,
-    }));
+    // Let's trust `fetchChunks`. If we set `minTime` to the last seen timestamp,
+    // it will fetch everything from Now down to that timestamp.
+    // We just need to handle deduplication on frontend (since it is inclusive low).
+    // OR we pass `minTime` slightly adjusted?
+    // It's safer to just set `minTime`.
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        data: data,
-        rows: resultSet.rows || resultSet.data.length,
+    const minTime = minTimeParam || undefined;
+    const maxTime = undefined;
+
+    const orderByClause = `ORDER BY ${timeColumn} DESC`;
+
+    // Start Stream
+    const iterator = fetchChunks({
+      client,
+      tableSource,
+      whereConditions,
+      timeColumn,
+      minTime,
+      maxTime,
+      limit,
+      cursor: cursor || undefined,
+      selectClause,
+      orderByClause,
+      safeTimeCol: timeColumn,
+    });
+
+    const stream = new ReadableStream({
+      async pull(controller) {
+        const { value, done } = await iterator.next();
+        if (done) {
+          controller.close();
+        } else {
+          controller.enqueue(value);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {
@@ -176,13 +213,12 @@ export async function GET(request: Request) {
 
     if (isClickHouseError(error)) {
       const chError = error as ClickHouseError;
-      // Handle UNKNOWN_TABLE (60) specifically for session_log
       if (chError.code === 60 && source === "session_log") {
         return ApiErrors.badRequest(
-          "Session logging is not enabled on this server. Please configure 'session_log' in config.xml."
+          "Session logging is not enabled on this server. Please configure 'session_log' in config.xml.",
         );
       }
-
+      // We can't return JSON if we started streaming, but here we haven't started yet.
       return ApiErrors.fromError(error, "Failed to fetch logs");
     }
 

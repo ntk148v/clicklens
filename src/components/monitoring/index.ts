@@ -10,7 +10,7 @@ export {
   type StatusBadgeProps,
   type StatusType,
 } from "./status-badge";
-export { RefreshControl, type RefreshControlProps } from "./refresh-control";
+export { RefreshControl, type RefreshControlProps } from "@/components/shared";
 export {
   MetricChart,
   Sparkline,

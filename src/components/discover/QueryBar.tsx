@@ -268,8 +268,6 @@ export function QueryBar({
           </>
         )}
       </Button>
-
-      {error && <p className="text-sm text-destructive ml-2">{error}</p>}
     </div>
   );
 }

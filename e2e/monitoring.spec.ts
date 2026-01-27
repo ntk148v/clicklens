@@ -72,7 +72,7 @@ test.describe("Monitoring", () => {
     await page.waitForLoadState("networkidle");
 
     // Look for chart containers (Recharts uses svg)
-    const charts = page.locator("svg").or(page.locator('[class*="chart"]'));
+    // const charts = page.locator("svg").or(page.locator('[class*="chart"]'));
     // Charts may or may not be present depending on data
     // Just verify the page loads without error
     await expect(page.locator("body")).toBeVisible();
@@ -135,9 +135,9 @@ test.describe("Monitoring - Settings", () => {
     await page.waitForLoadState("networkidle");
 
     // Look for settings table or list
-    const settingsContent = page
-      .locator("table")
-      .or(page.locator('[class*="settings"]'));
+    // const settingsContent = page
+    //   .locator("table")
+    //   .or(page.locator('[class*="settings"]'));
     // Settings may require certain permissions
     await expect(page.locator("body")).toBeVisible();
   });

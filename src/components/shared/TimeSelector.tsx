@@ -22,7 +22,7 @@ import {
 } from "@/lib/types/discover";
 import { format } from "date-fns";
 
-interface DiscoverTimeSelectorProps {
+interface TimeSelectorProps {
   value: FlexibleTimeRange;
   onChange: (range: FlexibleTimeRange) => void;
   disabled?: boolean;
@@ -39,15 +39,11 @@ const formatForInput = (date: Date) => {
   // YYYY-MM-DDThh:mm
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
+    date.getDate(),
   )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export function DiscoverTimeSelector({
-  value,
-  onChange,
-  disabled,
-}: DiscoverTimeSelectorProps) {
+export function TimeSelector({ value, onChange, disabled }: TimeSelectorProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"preset" | "custom">("preset");
   // Default preset or "custom" if active value is absolute
@@ -66,7 +62,7 @@ export function DiscoverTimeSelector({
         // extract "1h" from "now-1h"
         const rangeKey = value.from.replace("now-", "") as TimeRange;
         // Simple check if it's a valid preset key, if not default to 1h
-        setPreset(rangeKey);
+        setPreset(rangeKey as TimeRange);
       } else {
         setMode("custom");
         // Initialize inputs from absolute value
@@ -110,7 +106,7 @@ export function DiscoverTimeSelector({
           to: end.toISOString(),
           label: `${format(start, "MMM d, HH:mm")} to ${format(
             end,
-            "MMM d, HH:mm"
+            "MMM d, HH:mm",
           )}`,
         });
       } catch (e) {

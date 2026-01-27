@@ -7,7 +7,7 @@ import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
-import { DiscoverTimeSelector } from "@/components/discover/DiscoverTimeSelector";
+import { TimeSelector, RefreshControl } from "@/components/shared";
 import {
   Select,
   SelectContent,
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FilterX, Database, Table2 } from "lucide-react";
+import { FilterX, Database, Table2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import type {
   TableSchema,
@@ -65,6 +65,9 @@ export default function DiscoverPage() {
   const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
     getFlexibleRangeFromEnum("1h"),
   );
+
+  // Refresh state
+  const [refreshInterval, setRefreshInterval] = useState(0);
 
   // Results state
   const [rows, setRows] = useState<DiscoverRow[]>([]);
@@ -268,7 +271,7 @@ export default function DiscoverPage() {
     setAppliedFilter("");
   }, []);
 
-  // Fetch data
+  // Fetch data with Streaming
   const fetchData = useCallback(async () => {
     if (!selectedDatabase || !selectedTable) {
       return;
@@ -276,6 +279,15 @@ export default function DiscoverPage() {
 
     setIsLoading(true);
     setError(null);
+    setRows([]); // Clear rows before new search? Or keep old? Clear is safer for now.
+    // If we are paging (page > 1 or offset > 0), we clear.
+    // Actually, "Infinite Scroll" usually appends.
+    // But this component currently uses `page` state (Pagination UI).
+    // Streaming fills the CURRENT page.
+    // So yes, clear rows for the new page load.
+
+    // Note: totalHits needs reset too?
+    // We will get totalHits from the stream metadata.
 
     try {
       const offset = (page - 1) * pageSize;
@@ -303,26 +315,91 @@ export default function DiscoverPage() {
         params.set("maxTime", activeMaxTime);
       }
 
-      // Use appliedFilter instead of customFilter for data fetching
       if (appliedFilter.trim()) {
         params.set("filter", appliedFilter.trim());
       }
 
-      const res = await fetch(`/api/clickhouse/discover?${params}`);
-      const data = await res.json();
+      // New: Search param for Smart Search (if we had a search input separate from filter)
+      // Currently `appliedFilter` carries the SQL.
+      // If we want to support the "Smart Search" generic term, we need to know if it IS a generic term.
+      // The current UI `QueryBar` produces SQL.
+      // If the user wants to use Smart Search, they should probably have a way to input raw text.
+      // But the QueryBarPlaceholder says "Filter with ClickHouse SQL...".
+      // Let's assume `appliedFilter` is SQL.
+      // IF we want to check for "Smart Search" behavior:
+      // Maybe if the filter DOESN'T look like SQL (no operators)?
+      // Heuristic: If filter has no `=`, `>`, `<`, `LIKE`, `IN`, etc. treat as Search Term?
+      // Or just pass generic filter as filter.
+      // The Backend checks `search` param.
+      // Let's stick to `filter` per existing UI contract unless we add a Search Box.
+      // For now, simple standard fetch.
 
-      if (data.success && data.data) {
-        setRows(data.data.rows || []);
-        setTotalHits(data.data.totalHits || 0);
-      } else {
-        const errorMessage = data.error || "Failed to fetch data";
-        setError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Query Error",
-          description: errorMessage,
-        });
-        setRows([]);
+      const res = await fetch(`/api/clickhouse/discover?${params}`);
+
+      if (!res.ok) {
+        try {
+          const err = await res.json();
+          throw new Error(err.error || res.statusText);
+        } catch {
+          throw new Error(res.statusText);
+        }
+      }
+
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+
+        // Process all complete lines
+        buffer = lines.pop() || ""; // Keep the last incomplete line in buffer
+
+        const newRows: DiscoverRow[] = [];
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const json = JSON.parse(line);
+
+            // Check for Meta chunk (first chunk)
+            if (json.meta) {
+              if (typeof json.meta.totalHits === "number") {
+                setTotalHits(json.meta.totalHits);
+              }
+              continue;
+            }
+
+            // Check for Error chunk
+            if (json.error) {
+              console.error("Stream error:", json.error);
+              toast({
+                variant: "destructive",
+                title: "Stream Error",
+                description: json.error,
+              });
+              continue;
+            }
+
+            // Normal Row
+            newRows.push(json);
+          } catch (e) {
+            console.error("JSON parse error", e);
+          }
+        }
+
+        if (newRows.length > 0) {
+          // Batch update rows to reduce renders?
+          // Actually React state updates are batched mostly.
+          // But we can just append.
+          setRows((prev) => [...prev, ...newRows]);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -485,22 +562,14 @@ export default function DiscoverPage() {
         title="Discover"
         actions={
           <div className="flex items-center gap-2">
-            <DiscoverTimeSelector
-              value={flexibleRange}
-              onChange={setFlexibleRange}
-            />
+            <TimeSelector value={flexibleRange} onChange={setFlexibleRange} />
 
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={handleSearch}
-              disabled={isLoading || !selectedTable}
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-              />
-            </Button>
+            <RefreshControl
+              onRefresh={() => handleSearch()}
+              interval={refreshInterval}
+              onIntervalChange={setRefreshInterval}
+              isLoading={isLoading}
+            />
           </div>
         }
       >
@@ -510,7 +579,15 @@ export default function DiscoverPage() {
             <Database className="h-4 w-4 text-muted-foreground" />
             <Select
               value={selectedDatabase}
-              onValueChange={setSelectedDatabase}
+              onValueChange={(db) => {
+                setSelectedDatabase(db);
+                // Reset table and schema immediately to prevent stale queries
+                setSelectedTable("");
+                setSchema(null);
+                setRows([]);
+                setHistogramData([]);
+                setTables([]); // Clear tables while loading new ones
+              }}
             >
               <SelectTrigger
                 className="w-[180px] h-9"

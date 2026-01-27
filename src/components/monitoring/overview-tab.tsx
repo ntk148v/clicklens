@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Server,
-  Clock,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -16,13 +15,6 @@ import {
   HeartPulse,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Collapsible,
   CollapsibleContent,
@@ -116,13 +108,10 @@ function transformToSingleSeries(data: TimeSeriesPoint[]) {
   }));
 }
 
-export function OverviewTab({
-  timeRange: initialTimeRange = 60,
-}: OverviewTabProps) {
+export function OverviewTab({ timeRange = 60 }: OverviewTabProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState(initialTimeRange);
   const [healthExpanded, setHealthExpanded] = useState(false);
 
   // Health checks
@@ -136,7 +125,7 @@ export function OverviewTab({
       setError(null);
 
       const response = await fetch(
-        `/api/clickhouse/monitoring/dashboard?timeRange=${timeRange}`
+        `/api/clickhouse/monitoring/dashboard?timeRange=${timeRange}`,
       );
       const result: MonitoringApiResponse<DashboardData> =
         await response.json();
@@ -177,7 +166,7 @@ export function OverviewTab({
   const renderChart = (
     title: string,
     chartData: TimeSeriesPoint[],
-    options: { isBytes?: boolean; unit?: string } = {}
+    options: { isBytes?: boolean; unit?: string } = {},
   ) => {
     const transformedData = transformToChartData(chartData);
     const nodes = data?.nodes || [];
@@ -226,25 +215,6 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
-      {/* Time Range Selector */}
-      <div className="flex justify-end">
-        <Select
-          value={String(timeRange)}
-          onValueChange={(v) => setTimeRange(Number(v))}
-        >
-          <SelectTrigger className="w-[160px]">
-            <Clock className="w-4 h-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="15">Last 15 min</SelectItem>
-            <SelectItem value="60">Last 1 hour</SelectItem>
-            <SelectItem value="360">Last 6 hours</SelectItem>
-            <SelectItem value="1440">Last 24 hours</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Cluster Info + Nodes */}
       {data?.cluster && (
         <TooltipProvider>
@@ -279,8 +249,8 @@ export function OverviewTab({
                             !node.isActive
                               ? "border-red-500/50 bg-red-500/5"
                               : node.errorsCount > 0
-                              ? "border-yellow-500/50 bg-yellow-500/5"
-                              : "border-green-500/50 bg-green-500/5"
+                                ? "border-yellow-500/50 bg-yellow-500/5"
+                                : "border-green-500/50 bg-green-500/5"
                           }
                         `}
                       >
@@ -356,10 +326,10 @@ export function OverviewTab({
             healthData?.overallStatus === "ok"
               ? "border-green-500/50 bg-green-500/5"
               : healthData?.overallStatus === "warning"
-              ? "border-yellow-500/50 bg-yellow-500/5"
-              : healthData?.overallStatus === "critical"
-              ? "border-red-500/50 bg-red-500/5"
-              : ""
+                ? "border-yellow-500/50 bg-yellow-500/5"
+                : healthData?.overallStatus === "critical"
+                  ? "border-red-500/50 bg-red-500/5"
+                  : ""
           }
         >
           <CollapsibleTrigger asChild>
@@ -421,22 +391,22 @@ export function OverviewTab({
           })}
           {renderChart(
             "Queries Running",
-            data?.clickhouse.queriesRunning || []
+            data?.clickhouse.queriesRunning || [],
           )}
           {renderChart(
             "Selected Rows/sec",
             data?.clickhouse.selectedRowsPerSec || [],
-            { unit: "/s" }
+            { unit: "/s" },
           )}
           {renderChart(
             "Inserted Rows/sec",
             data?.clickhouse.insertedRowsPerSec || [],
-            { unit: "/s" }
+            { unit: "/s" },
           )}
           {renderChart("Merges Running", data?.clickhouse.mergesRunning || [])}
           {renderChart(
             "Max Parts/Partition",
-            data?.clickhouse.maxPartsPerPartition || []
+            data?.clickhouse.maxPartsPerPartition || [],
           )}
         </div>
       </section>
@@ -451,7 +421,7 @@ export function OverviewTab({
           {renderChart(
             "Memory (tracked)",
             data?.systemHealth.memoryTracked || [],
-            { isBytes: true }
+            { isBytes: true },
           )}
           {renderChart("CPU Usage", data?.systemHealth.cpuUsage || [])}
           {renderChart("IO Wait", data?.systemHealth.ioWait || [], {
@@ -460,12 +430,12 @@ export function OverviewTab({
           {renderChart(
             "Filesystem Used",
             data?.systemHealth.filesystemUsed || [],
-            { isBytes: true }
+            { isBytes: true },
           )}
           {renderChart(
             "Network Received",
             data?.systemHealth.networkReceived || [],
-            { isBytes: true }
+            { isBytes: true },
           )}
         </div>
       </section>
