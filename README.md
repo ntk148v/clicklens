@@ -23,6 +23,8 @@
 
 ![](docs/public/screenshots/home-page.png)
 
+<video src="https://github.com/user-attachments/assets/63685b9b-29f1-4fe1-b650-7f29bb7ff2be" controls></video>
+
 ## 1. Introduction
 
 ClickLens provides a comprehensive suite of tools for developers, analysts, and administrators to interact with their ClickHouse clusters efficiently.
