@@ -28,6 +28,7 @@ import {
   Combine,
   Code,
   AlertCircle,
+  Network,
 } from "lucide-react";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import {
@@ -38,6 +39,7 @@ import {
   MutationsTab,
   MergesTab,
   DdlTab,
+  DependenciesTab,
 } from "@/components/tables";
 
 export default function TablesPage() {
@@ -176,7 +178,7 @@ export default function TablesPage() {
             onValueChange={setActiveTab}
             className="flex-1 flex flex-col overflow-hidden"
           >
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="overview" className="text-xs">
                 <LayoutDashboard className="h-3 w-3 mr-1" />
                 Overview
@@ -200,6 +202,10 @@ export default function TablesPage() {
               <TabsTrigger value="merges" className="text-xs">
                 <Combine className="h-3 w-3 mr-1" />
                 Merges
+              </TabsTrigger>
+              <TabsTrigger value="dependencies" className="text-xs">
+                <Network className="h-3 w-3 mr-1" />
+                Dependencies
               </TabsTrigger>
               <TabsTrigger value="ddl" className="text-xs">
                 <Code className="h-3 w-3 mr-1" />
@@ -260,6 +266,16 @@ export default function TablesPage() {
                 <MergesTab database={selectedDatabase} table={selectedTable} />
               </TabsContent>
               <TabsContent
+                value="dependencies"
+                className="m-0 h-full"
+                key={`deps-${refreshKey}`}
+              >
+                <DependenciesTab
+                  database={selectedDatabase}
+                  selectedTable={selectedTable}
+                />
+              </TabsContent>
+              <TabsContent
                 value="ddl"
                 className="m-0 h-full"
                 key={`ddl-${refreshKey}`}
@@ -272,7 +288,7 @@ export default function TablesPage() {
 
         <DataSourceBadge
           sources={["system.tables", "system.columns", "system.parts"]}
-          description="Basic table metadata."
+          description="Basic table metadata and dependency information."
         />
       </div>
     </div>

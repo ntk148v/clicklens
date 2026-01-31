@@ -5,3 +5,4 @@ export { ReplicasTab } from "./replicas-tab";
 export { MutationsTab } from "./mutations-tab";
 export { MergesTab } from "./merges-tab";
 export { DdlTab } from "./ddl-tab";
+export { DependenciesTab } from "./dependencies-tab";

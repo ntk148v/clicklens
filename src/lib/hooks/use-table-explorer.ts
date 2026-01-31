@@ -203,6 +203,27 @@ export function useTableMerges(database: string | null, table: string | null) {
   });
 }
 
+// Types for dependencies
+import type {
+  TableNode,
+  TableEdge,
+  DependencyGraph,
+} from "@/app/api/clickhouse/tables/explorer/dependencies/route";
+
+export type { TableNode, TableEdge, DependencyGraph };
+
+export type DependenciesData = DependencyGraph;
+
+export function useTableDependencies(database: string | null) {
+  const endpoint = database
+    ? `/api/clickhouse/tables/explorer/dependencies?database=${encodeURIComponent(database)}`
+    : "";
+
+  return useTableExplorerData<DependenciesData>(endpoint, {
+    enabled: !!database,
+  });
+}
+
 // Re-export types for convenience
 export type {
   TableOverview,
