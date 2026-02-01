@@ -298,9 +298,9 @@ function parseCreateQuery(
   const joins = extractJoinedTables(cleanedQuery, defaultDb);
   deps.push(...joins);
 
-  // Extract Distributed table reference
-  if (engine.toLowerCase().startsWith("distributed")) {
-    const dist = extractDistributedTable(cleanedQuery, defaultDb);
+  // Extract Distributed table reference - use original query since params are in strings
+  if (engineLower.startsWith("distributed")) {
+    const dist = extractDistributedTable(query, defaultDb);
     if (dist) deps.push(dist);
   }
 
