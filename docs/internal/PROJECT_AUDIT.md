@@ -169,15 +169,33 @@ Browse and inspect all databases, tables, and parts.
 
 #### Table Detail Tabs
 
-| Tab       | Component           | Description            |
-| --------- | ------------------- | ---------------------- |
-| Overview  | `overview-tab.tsx`  | Summary stats          |
-| Columns   | `columns-tab.tsx`   | Column definitions     |
-| Parts     | `parts-tab.tsx`     | Data parts             |
-| Merges    | `merges-tab.tsx`    | Active merges          |
-| Mutations | `mutations-tab.tsx` | Pending mutations      |
-| Replicas  | `replicas-tab.tsx`  | Replica status         |
-| DDL       | `ddl-tab.tsx`       | CREATE TABLE statement |
+| Tab          | Component              | Description                          |
+| ------------ | ---------------------- | ------------------------------------ |
+| Overview     | `overview-tab.tsx`     | Summary stats                        |
+| Columns      | `columns-tab.tsx`      | Column definitions                   |
+| Parts        | `parts-tab.tsx`        | Data parts                           |
+| Merges       | `merges-tab.tsx`       | Active merges                        |
+| Mutations    | `mutations-tab.tsx`    | Pending mutations                    |
+| Replicas     | `replicas-tab.tsx`     | Replica status                       |
+| Dependencies | `dependencies-tab.tsx` | Interactive table relationship graph |
+| DDL          | `ddl-tab.tsx`          | CREATE TABLE statement               |
+
+#### Dependencies Graph
+
+The Dependencies tab visualizes table relationships using React Flow:
+
+- **Components:** `src/components/tables/dependency-graph/`
+  - `dependency-graph.tsx` - Main React Flow container
+  - `table-node.tsx` - Custom node component with type icons
+  - `layout.ts` - Dagre-based hierarchical layout
+  - `types.ts` - TypeScript type definitions
+- **API:** `/api/clickhouse/tables/explorer/dependencies`
+- **Data Source:** `system.tables` (dependencies_database, dependencies_table columns)
+- **Features:**
+  - Pan/zoom with minimap navigation
+  - Node types: Table, MaterializedView, View, Distributed, Dictionary
+  - Hierarchical layout (sources at top, dependents below)
+  - Connected node highlighting on selection
 
 ---
 
@@ -402,14 +420,15 @@ Feature roles are ClickHouse roles prefixed with `clicklens_`. Defined in `src/l
 
 **Table Explorer Endpoints:**
 
-| Endpoint                                    | Method | Description         |
-| ------------------------------------------- | ------ | ------------------- |
-| `/api/clickhouse/tables/explorer`           | GET    | Table explorer data |
-| `/api/clickhouse/tables/explorer/columns`   | GET    | Table columns       |
-| `/api/clickhouse/tables/explorer/parts`     | GET    | Table parts         |
-| `/api/clickhouse/tables/explorer/merges`    | GET    | Active merges       |
-| `/api/clickhouse/tables/explorer/mutations` | GET    | Pending mutations   |
-| `/api/clickhouse/tables/explorer/replicas`  | GET    | Replica status      |
+| Endpoint                                       | Method | Description              |
+| ---------------------------------------------- | ------ | ------------------------ |
+| `/api/clickhouse/tables/explorer`              | GET    | Table explorer data      |
+| `/api/clickhouse/tables/explorer/columns`      | GET    | Table columns            |
+| `/api/clickhouse/tables/explorer/parts`        | GET    | Table parts              |
+| `/api/clickhouse/tables/explorer/merges`       | GET    | Active merges            |
+| `/api/clickhouse/tables/explorer/mutations`    | GET    | Pending mutations        |
+| `/api/clickhouse/tables/explorer/replicas`     | GET    | Replica status           |
+| `/api/clickhouse/tables/explorer/dependencies` | GET    | Table dependency graph   |
 
 **Monitoring Endpoints:**
 
@@ -478,14 +497,15 @@ interface ClickHouseConfig {
 
 ### Custom Hooks
 
-| Hook                 | File                      | Purpose                           |
-| -------------------- | ------------------------- | --------------------------------- |
-| `useIncrementalData` | `use-incremental-data.ts` | Polling with incremental updates  |
-| `useLogs`            | `use-logs.ts`             | Log fetching and filtering        |
-| `useMonitoring`      | `use-monitoring.ts`       | Monitoring data with auto-refresh |
-| `useQueryAnalytics`  | `use-query-analytics.ts`  | Query performance analysis        |
-| `useSettings`        | `use-settings.ts`         | Settings management               |
-| `useTableExplorer`   | `use-table-explorer.ts`   | Table browsing state              |
+| Hook                   | File                      | Purpose                           |
+| ---------------------- | ------------------------- | --------------------------------- |
+| `useIncrementalData`   | `use-incremental-data.ts` | Polling with incremental updates  |
+| `useLogs`              | `use-logs.ts`             | Log fetching and filtering        |
+| `useMonitoring`        | `use-monitoring.ts`       | Monitoring data with auto-refresh |
+| `useQueryAnalytics`    | `use-query-analytics.ts`  | Query performance analysis        |
+| `useSettings`          | `use-settings.ts`         | Settings management               |
+| `useTableExplorer`     | `use-table-explorer.ts`   | Table browsing state              |
+| `useTableDependencies` | `use-table-explorer.ts`   | Table dependency graph data       |
 
 ---
 
