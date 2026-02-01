@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Loader2, Network, AlertCircle, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTableDependencies } from "@/lib/hooks/use-table-explorer";
@@ -15,6 +16,25 @@ export function DependenciesTab({
   selectedTable,
 }: DependenciesTabProps) {
   const { data, isLoading, error } = useTableDependencies(database);
+
+  // Filter to only show tables that have relationships
+  const { filteredNodes, filteredEdges } = useMemo(() => {
+    if (!data) return { filteredNodes: [], filteredEdges: [] };
+
+    const { nodes, edges } = data;
+
+    // Get all node IDs that appear in edges (have relationships)
+    const connectedNodeIds = new Set<string>();
+    for (const edge of edges) {
+      connectedNodeIds.add(edge.source);
+      connectedNodeIds.add(edge.target);
+    }
+
+    // Filter nodes to only include those with relationships
+    const filteredNodes = nodes.filter((node) => connectedNodeIds.has(node.id));
+
+    return { filteredNodes, filteredEdges: edges };
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -41,16 +61,18 @@ export function DependenciesTab({
     );
   }
 
-  const { nodes, edges } = data;
-
   // Check if there are any dependencies
-  const hasDependencies = edges.length > 0;
+  const hasDependencies = filteredEdges.length > 0;
 
-  if (nodes.length === 0) {
+  if (!hasDependencies) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground gap-2">
         <Network className="h-12 w-12 opacity-50" />
-        <p>No tables found in this database</p>
+        <p>No table dependencies found in this database</p>
+        <p className="text-sm text-center max-w-md">
+          Tables with dependencies (Materialized Views, Views referencing other
+          tables, Distributed tables) will appear here.
+        </p>
       </div>
     );
   }
@@ -58,18 +80,15 @@ export function DependenciesTab({
   return (
     <div className="flex flex-col h-full">
       {/* Info banner */}
-      {!hasDependencies && (
-        <Card className="m-4 mb-0 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
-          <CardContent className="flex items-center gap-3 py-3">
-            <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">
-              No dependencies found between tables in this database. Tables with
-              dependencies (Materialized Views, Views referencing other tables,
-              Distributed tables) will show connections here.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="m-4 mb-0 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
+        <CardContent className="flex items-center gap-3 py-3">
+          <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            Showing only tables with dependencies. Arrows indicate data flow
+            direction (source → dependent).
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Legend */}
       <div className="px-4 pt-4 pb-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
@@ -95,7 +114,7 @@ export function DependenciesTab({
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
           <span className="text-muted-foreground/60">
-            {nodes.length} tables, {edges.length} dependencies
+            {filteredNodes.length} tables, {filteredEdges.length} dependencies
           </span>
         </div>
       </div>
@@ -103,8 +122,8 @@ export function DependenciesTab({
       {/* Graph */}
       <div className="flex-1 min-h-[400px]">
         <DependencyGraph
-          nodes={nodes}
-          edges={edges}
+          nodes={filteredNodes}
+          edges={filteredEdges}
           selectedTable={selectedTable}
         />
       </div>
