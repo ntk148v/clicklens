@@ -3,12 +3,76 @@
 import { useMemo } from "react";
 import { Loader2, Network, AlertCircle, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useTableDependencies } from "@/lib/hooks/use-table-explorer";
+import {
+  useTableDependencies,
+  type TableNode,
+  type TableEdge,
+} from "@/lib/hooks/use-table-explorer";
 import { DependencyGraph } from "./dependency-graph";
 
 interface DependenciesTabProps {
   database: string;
   selectedTable?: string | null;
+}
+
+/**
+ * Find all nodes connected to the selected table (directly or transitively)
+ * Uses BFS to traverse the graph in both directions
+ */
+function getConnectedSubgraph(
+  selectedTableId: string,
+  nodes: TableNode[],
+  edges: TableEdge[]
+): { nodes: TableNode[]; edges: TableEdge[] } {
+  // Build adjacency lists for both directions
+  const outgoing = new Map<string, Set<string>>();
+  const incoming = new Map<string, Set<string>>();
+
+  for (const edge of edges) {
+    if (!outgoing.has(edge.source)) outgoing.set(edge.source, new Set());
+    if (!incoming.has(edge.target)) incoming.set(edge.target, new Set());
+    outgoing.get(edge.source)!.add(edge.target);
+    incoming.get(edge.target)!.add(edge.source);
+  }
+
+  // BFS to find all connected nodes
+  const connectedNodeIds = new Set<string>();
+  const queue: string[] = [selectedTableId];
+  connectedNodeIds.add(selectedTableId);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    // Add outgoing neighbors (tables this depends on / writes to)
+    const outNeighbors = outgoing.get(current);
+    if (outNeighbors) {
+      for (const neighbor of outNeighbors) {
+        if (!connectedNodeIds.has(neighbor)) {
+          connectedNodeIds.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    // Add incoming neighbors (tables that depend on this)
+    const inNeighbors = incoming.get(current);
+    if (inNeighbors) {
+      for (const neighbor of inNeighbors) {
+        if (!connectedNodeIds.has(neighbor)) {
+          connectedNodeIds.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+  }
+
+  // Filter nodes and edges
+  const filteredNodes = nodes.filter((n) => connectedNodeIds.has(n.id));
+  const filteredEdges = edges.filter(
+    (e) => connectedNodeIds.has(e.source) && connectedNodeIds.has(e.target)
+  );
+
+  return { nodes: filteredNodes, edges: filteredEdges };
 }
 
 export function DependenciesTab({
@@ -17,24 +81,30 @@ export function DependenciesTab({
 }: DependenciesTabProps) {
   const { data, isLoading, error } = useTableDependencies(database);
 
-  // Filter to only show tables that have relationships
+  // Filter to only show tables related to the selected table
   const { filteredNodes, filteredEdges } = useMemo(() => {
-    if (!data) return { filteredNodes: [], filteredEdges: [] };
+    if (!data || !selectedTable)
+      return { filteredNodes: [], filteredEdges: [] };
 
     const { nodes, edges } = data;
 
-    // Get all node IDs that appear in edges (have relationships)
-    const connectedNodeIds = new Set<string>();
-    for (const edge of edges) {
-      connectedNodeIds.add(edge.source);
-      connectedNodeIds.add(edge.target);
+    // Find the selected table node ID
+    const selectedNode = nodes.find(
+      (n) =>
+        n.id === selectedTable ||
+        n.name === selectedTable ||
+        n.id === `${database}.${selectedTable}`
+    );
+
+    if (!selectedNode) {
+      return { filteredNodes: [], filteredEdges: [] };
     }
 
-    // Filter nodes to only include those with relationships
-    const filteredNodes = nodes.filter((node) => connectedNodeIds.has(node.id));
+    // Get the subgraph connected to the selected table
+    const subgraph = getConnectedSubgraph(selectedNode.id, nodes, edges);
 
-    return { filteredNodes, filteredEdges: edges };
-  }, [data]);
+    return { filteredNodes: subgraph.nodes, filteredEdges: subgraph.edges };
+  }, [data, selectedTable, database]);
 
   if (isLoading) {
     return (
@@ -61,17 +131,27 @@ export function DependenciesTab({
     );
   }
 
-  // Check if there are any dependencies
+  if (!selectedTable) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground gap-2">
+        <Network className="h-12 w-12 opacity-50" />
+        <p>Select a table to view its dependencies</p>
+      </div>
+    );
+  }
+
+  // Check if there are any dependencies for the selected table
   const hasDependencies = filteredEdges.length > 0;
 
   if (!hasDependencies) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground gap-2">
         <Network className="h-12 w-12 opacity-50" />
-        <p>No table dependencies found in this database</p>
+        <p className="font-medium">{selectedTable}</p>
         <p className="text-sm text-center max-w-md">
-          Tables with dependencies (Materialized Views, Views referencing other
-          tables, Distributed tables) will appear here.
+          This table has no dependencies. It is not referenced by any
+          Materialized Views, Views, or Distributed tables, and does not
+          reference other tables.
         </p>
       </div>
     );
@@ -84,8 +164,8 @@ export function DependenciesTab({
         <CardContent className="flex items-center gap-3 py-3">
           <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
           <p className="text-sm text-muted-foreground">
-            Showing only tables with dependencies. Arrows indicate data flow
-            direction (source → dependent).
+            Showing dependencies for <strong>{selectedTable}</strong>. Arrows
+            indicate data flow direction (source → dependent).
           </p>
         </CardContent>
       </Card>
@@ -138,7 +218,10 @@ export function DependenciesTab({
           <div className="flex items-center gap-1.5">
             <div
               className="w-4 h-0.5 bg-violet-500"
-              style={{ backgroundImage: "repeating-linear-gradient(90deg, #8b5cf6 0, #8b5cf6 3px, transparent 3px, transparent 6px)" }}
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, #8b5cf6 0, #8b5cf6 3px, transparent 3px, transparent 6px)",
+              }}
             />
             <span>Dictionary</span>
           </div>
