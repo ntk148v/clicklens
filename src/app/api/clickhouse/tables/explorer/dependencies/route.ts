@@ -140,6 +140,47 @@ function extractMVTargetTable(
 }
 
 /**
+ * Extract source tables from FROM clause
+ * Example: SELECT ... FROM database.table AS alias
+ * Handles: FROM table, FROM db.table, FROM db.table AS alias
+ */
+function extractFromTables(
+  query: string,
+  defaultDb: string
+): ParsedDependency[] {
+  const results: ParsedDependency[] = [];
+
+  // Match FROM [database.]table patterns
+  // Handles: FROM table, FROM db.table, FROM `db`.`table`, FROM table AS alias
+  const fromRegex =
+    /\bFROM\s+(?:`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?(?:\s+(?:AS\s+)?[a-zA-Z_][a-zA-Z0-9_]*)?/gi;
+
+  let match;
+  while ((match = fromRegex.exec(query)) !== null) {
+    const db = match[1] || defaultDb;
+    const table = match[2];
+
+    // Skip if table name looks like a subquery keyword
+    if (
+      ["select", "with", "values"].includes(table.toLowerCase())
+    ) {
+      continue;
+    }
+
+    // Avoid duplicates
+    if (!results.some((r) => r.database === db && r.table === table)) {
+      results.push({
+        database: db,
+        table: table,
+        type: "source",
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Extract joined tables from JOIN clauses
  * Example: ... JOIN other_db.other_table ON ...
  */
@@ -239,10 +280,18 @@ function parseCreateQuery(
   // Strip comments and string literals to avoid false positives
   const cleanedQuery = stripCommentsAndStrings(query);
 
+  const engineLower = engine.toLowerCase();
+
   // Extract MV target table (TO clause)
-  if (engine.toLowerCase() === "materializedview") {
+  if (engineLower === "materializedview") {
     const target = extractMVTargetTable(cleanedQuery, defaultDb);
     if (target) deps.push(target);
+  }
+
+  // Extract FROM tables for views and materialized views
+  if (engineLower === "view" || engineLower === "materializedview") {
+    const fromTables = extractFromTables(cleanedQuery, defaultDb);
+    deps.push(...fromTables);
   }
 
   // Extract joined tables
