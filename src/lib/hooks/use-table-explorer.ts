@@ -208,9 +208,10 @@ import type {
   TableNode,
   TableEdge,
   DependencyGraph,
+  EdgeType,
 } from "@/app/api/clickhouse/tables/explorer/dependencies/route";
 
-export type { TableNode, TableEdge, DependencyGraph };
+export type { TableNode, TableEdge, DependencyGraph, EdgeType };
 
 export type DependenciesData = DependencyGraph;
 

@@ -19,6 +19,7 @@ import { RotateCcw } from "lucide-react";
 import type {
   TableNode as ApiTableNode,
   TableEdge as ApiTableEdge,
+  EdgeType,
 } from "@/lib/hooks/use-table-explorer";
 import type { TableFlowNode, TableFlowEdge, TableNodeData } from "./types";
 import { TableNode } from "./table-node";
@@ -29,6 +30,15 @@ import { applyDagreLayout, getConnectedNodeIds } from "./layout";
 const nodeTypes = {
   tableNode: TableNode,
 } as const;
+
+// Edge colors and styles based on dependency type
+const edgeStyles: Record<EdgeType, { stroke: string; strokeDasharray?: string }> = {
+  source: { stroke: "#6366f1" }, // indigo - MV reads from source
+  target: { stroke: "#22c55e" }, // green - MV writes to target
+  join: { stroke: "#f59e0b" }, // amber - joined table
+  distributed: { stroke: "#ec4899" }, // pink - distributed references
+  dictionary: { stroke: "#8b5cf6", strokeDasharray: "5,5" }, // violet dashed - dictionary
+};
 
 interface DependencyGraphProps {
   nodes: ApiTableNode[];
@@ -71,21 +81,32 @@ function convertToFlowData(
     };
   });
 
-  const flowEdges: TableFlowEdge[] = apiEdges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    type: "smoothstep",
-    animated: false,
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      width: 15,
-      height: 15,
-    },
-    style: {
-      strokeWidth: 2,
-    },
-  }));
+  const flowEdges: TableFlowEdge[] = apiEdges.map((edge) => {
+    const edgeType = edge.type as EdgeType;
+    const style = edgeStyles[edgeType] || edgeStyles.source;
+
+    return {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      type: "smoothstep",
+      animated: edgeType === "target", // Animate MV target edges
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 15,
+        height: 15,
+        color: style.stroke,
+      },
+      style: {
+        strokeWidth: 2,
+        stroke: style.stroke,
+        strokeDasharray: style.strokeDasharray,
+      },
+      label: edgeType !== "source" ? edgeType : undefined,
+      labelStyle: { fill: style.stroke, fontSize: 10 },
+      labelBgStyle: { fill: "white", fillOpacity: 0.8 },
+    };
+  });
 
   return { nodes: flowNodes, edges: flowEdges };
 }

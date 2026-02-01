@@ -1,6 +1,14 @@
 /**
  * API route for table dependencies graph
  * GET /api/clickhouse/tables/explorer/dependencies?database=xxx
+ *
+ * Extracts dependencies from:
+ * - dependencies_table column in system.tables
+ * - create_table_query column:
+ *   - Materialized view TO clause (target table)
+ *   - JOIN clauses (joined tables)
+ *   - Distributed engine definition
+ *   - Dictionary functions (dictGet, dictGetString, etc.)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -23,11 +31,20 @@ export interface TableNode {
   totalBytes: number | null;
 }
 
+// Edge types for different dependency relationships
+export type EdgeType =
+  | "source" // MV reads from source table (dependencies_table)
+  | "target" // MV writes to target table (TO clause)
+  | "join" // Table is joined in query
+  | "distributed" // Distributed table references local table
+  | "dictionary"; // Uses dictionary via dictGet functions
+
 export interface TableEdge {
-  id: string; // "{source}->{target}"
-  source: string; // source table id (the dependency)
-  target: string; // target table id (the dependent)
-  type: "dependency";
+  id: string; // "{source}->{target}:{type}"
+  source: string; // source table id
+  target: string; // target table id
+  type: EdgeType;
+  label?: string; // Optional label for the edge
 }
 
 export interface DependencyGraph {
@@ -55,6 +72,14 @@ interface RawTableRow {
   total_bytes: number | null;
   dependencies_database: string[];
   dependencies_table: string[];
+  create_table_query: string;
+}
+
+// Parsed dependency from create query
+interface ParsedDependency {
+  database: string;
+  table: string;
+  type: EdgeType;
 }
 
 // Determine table type from engine
@@ -67,6 +92,149 @@ function getTableType(
   if (engineLower.startsWith("distributed")) return "distributed";
   if (engineLower === "dictionary") return "dictionary";
   return "table";
+}
+
+/**
+ * Extract target table from Materialized View TO clause
+ * Example: CREATE MATERIALIZED VIEW mv TO target_db.target_table AS SELECT ...
+ */
+function extractMVTargetTable(
+  query: string,
+  defaultDb: string
+): ParsedDependency | null {
+  // Match: TO [database.]table
+  // Handle both `TO db.table` and `TO table`
+  const toMatch = query.match(
+    /\bTO\s+(?:`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?/i
+  );
+  if (toMatch) {
+    return {
+      database: toMatch[1] || defaultDb,
+      table: toMatch[2],
+      type: "target",
+    };
+  }
+  return null;
+}
+
+/**
+ * Extract joined tables from JOIN clauses
+ * Example: ... JOIN other_db.other_table ON ...
+ */
+function extractJoinedTables(
+  query: string,
+  defaultDb: string
+): ParsedDependency[] {
+  const results: ParsedDependency[] = [];
+
+  // Match various JOIN types: JOIN, LEFT JOIN, RIGHT JOIN, INNER JOIN, etc.
+  // Pattern: [type] JOIN [database.]table [alias] ON|USING
+  const joinRegex =
+    /\b(?:LEFT\s+|RIGHT\s+|INNER\s+|OUTER\s+|CROSS\s+|FULL\s+|SEMI\s+|ANTI\s+|ANY\s+|ALL\s+|ASOF\s+|GLOBAL\s+)*JOIN\s+(?:`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?/gi;
+
+  let match;
+  while ((match = joinRegex.exec(query)) !== null) {
+    const db = match[1] || defaultDb;
+    const table = match[2];
+    // Avoid duplicates
+    if (!results.some((r) => r.database === db && r.table === table)) {
+      results.push({
+        database: db,
+        table: table,
+        type: "join",
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Extract local table from Distributed engine definition
+ * Example: ENGINE = Distributed(cluster, database, table, ...)
+ */
+function extractDistributedTable(
+  query: string,
+  defaultDb: string
+): ParsedDependency | null {
+  // Match: Distributed(cluster, database, table, ...) or Distributed(cluster, currentDatabase(), table, ...)
+  const distMatch = query.match(
+    /\bDistributed\s*\(\s*'?[^,']+'?\s*,\s*(?:'([^']+)'|currentDatabase\(\))\s*,\s*'?([a-zA-Z_][a-zA-Z0-9_]*)'?/i
+  );
+  if (distMatch) {
+    return {
+      database: distMatch[1] || defaultDb,
+      table: distMatch[2],
+      type: "distributed",
+    };
+  }
+  return null;
+}
+
+/**
+ * Extract dictionaries from dictGet* function calls
+ * Example: dictGet('dict_name', 'attr', key) or dictGetString('db.dict_name', ...)
+ */
+function extractDictionaries(
+  query: string,
+  defaultDb: string
+): ParsedDependency[] {
+  const results: ParsedDependency[] = [];
+
+  // Match dictGet* functions: dictGet, dictGetString, dictGetUInt64, dictGetOrDefault, etc.
+  const dictRegex =
+    /\bdict(?:Get|Has|GetOrDefault|GetOrNull|GetHierarchy|GetDescendants|GetAll|GetString|GetUInt8|GetUInt16|GetUInt32|GetUInt64|GetInt8|GetInt16|GetInt32|GetInt64|GetFloat32|GetFloat64|GetDate|GetDateTime|GetUUID)\s*\(\s*'(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)'/gi;
+
+  let match;
+  while ((match = dictRegex.exec(query)) !== null) {
+    const db = match[1] || defaultDb;
+    const dict = match[2];
+    // Avoid duplicates
+    if (!results.some((r) => r.database === db && r.table === dict)) {
+      results.push({
+        database: db,
+        table: dict,
+        type: "dictionary",
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Parse create_table_query to extract all dependencies
+ */
+function parseCreateQuery(
+  query: string,
+  engine: string,
+  defaultDb: string
+): ParsedDependency[] {
+  const deps: ParsedDependency[] = [];
+
+  if (!query) return deps;
+
+  // Extract MV target table (TO clause)
+  if (engine.toLowerCase() === "materializedview") {
+    const target = extractMVTargetTable(query, defaultDb);
+    if (target) deps.push(target);
+  }
+
+  // Extract joined tables
+  const joins = extractJoinedTables(query, defaultDb);
+  deps.push(...joins);
+
+  // Extract Distributed table reference
+  if (engine.toLowerCase().startsWith("distributed")) {
+    const dist = extractDistributedTable(query, defaultDb);
+    if (dist) deps.push(dist);
+  }
+
+  // Extract dictionary references
+  const dicts = extractDictionaries(query, defaultDb);
+  deps.push(...dicts);
+
+  return deps;
 }
 
 export async function GET(
@@ -138,7 +306,7 @@ export async function GET(
     const client = createClient(lensConfig);
     const safeDatabase = database.replace(/'/g, "''");
 
-    // Query all tables with dependency info
+    // Query all tables with dependency info and create query
     const result = await client.query<RawTableRow>(`
       SELECT
         database,
@@ -147,7 +315,8 @@ export async function GET(
         total_rows,
         total_bytes,
         dependencies_database,
-        dependencies_table
+        dependencies_table,
+        create_table_query
       FROM system.tables
       WHERE database = '${safeDatabase}'
     `);
@@ -156,6 +325,42 @@ export async function GET(
     const nodes: TableNode[] = [];
     const edges: TableEdge[] = [];
     const nodeIds = new Set<string>();
+    const edgeIds = new Set<string>();
+
+    // Helper to add a node if not exists
+    const addNode = (
+      id: string,
+      database: string,
+      name: string,
+      engine: string = "Unknown"
+    ) => {
+      if (!nodeIds.has(id)) {
+        nodeIds.add(id);
+        nodes.push({
+          id,
+          database,
+          name,
+          engine,
+          type: getTableType(engine),
+          totalRows: null,
+          totalBytes: null,
+        });
+      }
+    };
+
+    // Helper to add an edge if not exists
+    const addEdge = (source: string, target: string, type: EdgeType) => {
+      const edgeId = `${source}->${target}:${type}`;
+      if (!edgeIds.has(edgeId)) {
+        edgeIds.add(edgeId);
+        edges.push({
+          id: edgeId,
+          source,
+          target,
+          type,
+        });
+      }
+    };
 
     // First pass: create nodes for all tables in the database
     for (const row of result.data) {
@@ -173,40 +378,49 @@ export async function GET(
       });
     }
 
-    // Second pass: create edges and add external dependency nodes
+    // Second pass: create edges from all dependency sources
     for (const row of result.data) {
-      const targetId = `${row.database}.${row.name}`;
+      const tableId = `${row.database}.${row.name}`;
+
+      // 1. Dependencies from dependencies_table column (source tables)
       const depDbs = row.dependencies_database || [];
       const depTables = row.dependencies_table || [];
 
-      // Create edges for each dependency
       for (let i = 0; i < depTables.length; i++) {
         const depDb = depDbs[i] || row.database;
         const depTable = depTables[i];
         const sourceId = `${depDb}.${depTable}`;
 
         // Add external node if not already present
-        if (!nodeIds.has(sourceId)) {
-          nodeIds.add(sourceId);
-          nodes.push({
-            id: sourceId,
-            database: depDb,
-            name: depTable,
-            engine: "Unknown",
-            type: "table",
-            totalRows: null,
-            totalBytes: null,
-          });
-        }
+        addNode(sourceId, depDb, depTable);
 
-        // Create edge from dependency to dependent
-        const edgeId = `${sourceId}->${targetId}`;
-        edges.push({
-          id: edgeId,
-          source: sourceId,
-          target: targetId,
-          type: "dependency",
-        });
+        // Edge: source table -> this table (this table depends on source)
+        addEdge(sourceId, tableId, "source");
+      }
+
+      // 2. Dependencies parsed from create_table_query
+      const parsedDeps = parseCreateQuery(
+        row.create_table_query,
+        row.engine,
+        row.database
+      );
+
+      for (const dep of parsedDeps) {
+        const depId = `${dep.database}.${dep.table}`;
+
+        // Add external node if not already present
+        addNode(depId, dep.database, dep.table);
+
+        if (dep.type === "target") {
+          // MV writes TO target: this MV -> target table
+          addEdge(tableId, depId, "target");
+        } else if (dep.type === "distributed") {
+          // Distributed references local: this distributed -> local table
+          addEdge(tableId, depId, "distributed");
+        } else {
+          // join, dictionary: dep table -> this table
+          addEdge(depId, tableId, dep.type);
+        }
       }
     }
 

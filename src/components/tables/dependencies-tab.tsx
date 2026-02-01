@@ -91,31 +91,62 @@ export function DependenciesTab({
       </Card>
 
       {/* Legend */}
-      <div className="px-4 pt-4 pb-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-muted-foreground/20 border border-muted-foreground/40" />
-          <span>Table</span>
+      <div className="px-4 pt-4 pb-2 space-y-2 text-xs text-muted-foreground">
+        {/* Node types */}
+        <div className="flex flex-wrap gap-4">
+          <span className="font-medium w-12">Nodes:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-muted-foreground/20 border border-muted-foreground/40" />
+            <span>Table</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-purple-500/20 border border-purple-500" />
+            <span>Materialized View</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500" />
+            <span>View</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-orange-500/20 border border-orange-500" />
+            <span>Distributed</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded border-2 border-dashed border-muted-foreground/40" />
+            <span>External</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-purple-500/20 border border-purple-500" />
-          <span>Materialized View</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500" />
-          <span>View</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-orange-500/20 border border-orange-500" />
-          <span>Distributed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded border-2 border-dashed border-muted-foreground/40" />
-          <span>External Table</span>
-        </div>
-        <div className="flex items-center gap-1.5 ml-auto">
-          <span className="text-muted-foreground/60">
-            {filteredNodes.length} tables, {filteredEdges.length} dependencies
-          </span>
+        {/* Edge types */}
+        <div className="flex flex-wrap gap-4">
+          <span className="font-medium w-12">Edges:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-0.5 bg-indigo-500" />
+            <span>Source</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-0.5 bg-green-500" />
+            <span>Target (TO)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-0.5 bg-amber-500" />
+            <span>Join</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-0.5 bg-pink-500" />
+            <span>Distributed</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div
+              className="w-4 h-0.5 bg-violet-500"
+              style={{ backgroundImage: "repeating-linear-gradient(90deg, #8b5cf6 0, #8b5cf6 3px, transparent 3px, transparent 6px)" }}
+            />
+            <span>Dictionary</span>
+          </div>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-muted-foreground/60">
+              {filteredNodes.length} tables, {filteredEdges.length} edges
+            </span>
+          </div>
         </div>
       </div>
 
