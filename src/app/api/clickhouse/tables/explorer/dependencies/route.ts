@@ -20,6 +20,9 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 
+// Force dynamic rendering to ensure cookies are read on each request
+export const dynamic = "force-dynamic";
+
 // Types for dependency graph
 export interface TableNode {
   id: string; // "{database}.{table}"
