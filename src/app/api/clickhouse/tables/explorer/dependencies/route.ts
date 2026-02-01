@@ -82,6 +82,25 @@ interface ParsedDependency {
   type: EdgeType;
 }
 
+/**
+ * Remove SQL comments and string literals from query to avoid false positives
+ * This prevents matching table names inside comments or strings
+ */
+function stripCommentsAndStrings(query: string): string {
+  // Remove single-line comments (-- ...)
+  let result = query.replace(/--[^\n]*/g, " ");
+
+  // Remove multi-line comments (/* ... */)
+  result = result.replace(/\/\*[\s\S]*?\*\//g, " ");
+
+  // Remove string literals ('...' and "...")
+  // Handle escaped quotes inside strings
+  result = result.replace(/'(?:[^'\\]|\\.)*'/g, "''");
+  result = result.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+
+  return result;
+}
+
 // Determine table type from engine
 function getTableType(
   engine: string
@@ -214,23 +233,26 @@ function parseCreateQuery(
 
   if (!query) return deps;
 
+  // Strip comments and string literals to avoid false positives
+  const cleanedQuery = stripCommentsAndStrings(query);
+
   // Extract MV target table (TO clause)
   if (engine.toLowerCase() === "materializedview") {
-    const target = extractMVTargetTable(query, defaultDb);
+    const target = extractMVTargetTable(cleanedQuery, defaultDb);
     if (target) deps.push(target);
   }
 
   // Extract joined tables
-  const joins = extractJoinedTables(query, defaultDb);
+  const joins = extractJoinedTables(cleanedQuery, defaultDb);
   deps.push(...joins);
 
   // Extract Distributed table reference
   if (engine.toLowerCase().startsWith("distributed")) {
-    const dist = extractDistributedTable(query, defaultDb);
+    const dist = extractDistributedTable(cleanedQuery, defaultDb);
     if (dist) deps.push(dist);
   }
 
-  // Extract dictionary references
+  // Extract dictionary references - use original query since dict names are in strings
   const dicts = extractDictionaries(query, defaultDb);
   deps.push(...dicts);
 
@@ -321,6 +343,25 @@ export async function GET(
       WHERE database = '${safeDatabase}'
     `);
 
+    // Query all existing tables in the system to validate external references
+    const allTablesResult = await client.query<{
+      database: string;
+      name: string;
+      engine: string;
+    }>(`
+      SELECT database, name, engine
+      FROM system.tables
+    `);
+
+    // Build a set of existing table IDs for fast lookup
+    const existingTables = new Map<
+      string,
+      { database: string; name: string; engine: string }
+    >();
+    for (const row of allTablesResult.data) {
+      existingTables.set(`${row.database}.${row.name}`, row);
+    }
+
     // Build the graph
     const nodes: TableNode[] = [];
     const edges: TableEdge[] = [];
@@ -328,24 +369,40 @@ export async function GET(
     const edgeIds = new Set<string>();
 
     // Helper to add a node if not exists
+    // Returns true if the node was added or already exists, false if the table doesn't exist
     const addNode = (
       id: string,
       database: string,
       name: string,
-      engine: string = "Unknown"
-    ) => {
-      if (!nodeIds.has(id)) {
-        nodeIds.add(id);
-        nodes.push({
-          id,
-          database,
-          name,
-          engine,
-          type: getTableType(engine),
-          totalRows: null,
-          totalBytes: null,
-        });
+      engine: string = "Unknown",
+      validateExists: boolean = false
+    ): boolean => {
+      if (nodeIds.has(id)) {
+        return true;
       }
+
+      // If validation is requested, check if table exists
+      if (validateExists) {
+        const existingTable = existingTables.get(id);
+        if (!existingTable) {
+          // Table doesn't exist, skip it
+          return false;
+        }
+        // Use the actual engine from the database
+        engine = existingTable.engine;
+      }
+
+      nodeIds.add(id);
+      nodes.push({
+        id,
+        database,
+        name,
+        engine,
+        type: getTableType(engine),
+        totalRows: null,
+        totalBytes: null,
+      });
+      return true;
     };
 
     // Helper to add an edge if not exists
@@ -383,6 +440,7 @@ export async function GET(
       const tableId = `${row.database}.${row.name}`;
 
       // 1. Dependencies from dependencies_table column (source tables)
+      // These are from ClickHouse's metadata, so we validate they exist
       const depDbs = row.dependencies_database || [];
       const depTables = row.dependencies_table || [];
 
@@ -391,14 +449,16 @@ export async function GET(
         const depTable = depTables[i];
         const sourceId = `${depDb}.${depTable}`;
 
-        // Add external node if not already present
-        addNode(sourceId, depDb, depTable);
-
-        // Edge: source table -> this table (this table depends on source)
-        addEdge(sourceId, tableId, "source");
+        // Add external node if it exists, skip if it doesn't
+        const nodeAdded = addNode(sourceId, depDb, depTable, "Unknown", true);
+        if (nodeAdded) {
+          // Edge: source table -> this table (this table depends on source)
+          addEdge(sourceId, tableId, "source");
+        }
       }
 
       // 2. Dependencies parsed from create_table_query
+      // These are from regex parsing, so we validate they exist to avoid false positives
       const parsedDeps = parseCreateQuery(
         row.create_table_query,
         row.engine,
@@ -408,8 +468,12 @@ export async function GET(
       for (const dep of parsedDeps) {
         const depId = `${dep.database}.${dep.table}`;
 
-        // Add external node if not already present
-        addNode(depId, dep.database, dep.table);
+        // Add external node only if it exists in the database
+        const nodeAdded = addNode(depId, dep.database, dep.table, "Unknown", true);
+        if (!nodeAdded) {
+          // Table doesn't exist, skip this dependency
+          continue;
+        }
 
         if (dep.type === "target") {
           // MV writes TO target: this MV -> target table
