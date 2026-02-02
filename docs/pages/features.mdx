@@ -204,19 +204,41 @@ Browse and inspect your ClickHouse schema in detail.
 
 ### 3.2. Table Detail Tabs
 
-| Tab           | Description                                |
-| ------------- | ------------------------------------------ |
-| **Overview**  | Summary statistics (rows, size, engine)    |
-| **Columns**   | Column definitions with types and defaults |
-| **Parts**     | Data parts with sizes and row counts       |
-| **Merges**    | Active merge operations                    |
-| **Mutations** | Pending ALTER mutations                    |
-| **Replicas**  | Replication status (for replicated tables) |
-| **DDL**       | `CREATE TABLE` statement                   |
+| Tab              | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| **Overview**     | Summary statistics (rows, size, engine)          |
+| **Columns**      | Column definitions with types and defaults       |
+| **Parts**        | Data parts with sizes and row counts             |
+| **Merges**       | Active merge operations                          |
+| **Mutations**    | Pending ALTER mutations                          |
+| **Replicas**     | Replication status (for replicated tables)       |
+| **Dependencies** | Interactive graph of table relationships         |
+| **DDL**          | `CREATE TABLE` statement                         |
 
 ![](/screenshots/tables-columns.png)
 
 ![](/screenshots/tables-parts.png)
+
+### 3.3. Dependencies Graph
+
+The **Dependencies** tab visualizes relationships between tables as an interactive graph. This helps understand data flow between tables, especially for:
+
+- **Materialized Views** - Shows source tables that feed into the view
+- **Views** - Shows tables referenced in the view definition
+- **Distributed Tables** - Shows underlying local tables
+
+Features:
+
+- **Interactive Graph**: Pan, zoom, and explore the dependency tree
+- **Visual Node Types**: Different colors and icons for table types (MergeTree, View, MaterializedView, Distributed)
+- **Hierarchical Layout**: Source tables appear at the top, dependent tables flow downward
+- **MiniMap**: Navigate large graphs easily
+- **Connected Highlighting**: When a table is selected, its dependencies are highlighted
+
+<Callout type="info">
+  Only tables with dependencies are shown in the graph. Isolated tables without
+  any relationships are filtered out for clarity.
+</Callout>
 
 ---
 
