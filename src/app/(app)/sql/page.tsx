@@ -30,7 +30,7 @@ const SqlEditor = dynamic(
       </div>
     ),
     ssr: false, // CodeMirror requires browser APIs
-  }
+  },
 );
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
@@ -77,6 +77,88 @@ interface QueryResult {
     memory_usage?: number;
   };
 }
+
+// Error structure from API (matches QueryError from @/lib/errors)
+interface ApiError {
+  code: number;
+  type: string;
+  category?: string;
+  message: string;
+  userMessage: string;
+  hint?: string;
+}
+
+// Get error info from various error types
+// This now primarily handles client-side errors (network, etc.)
+// Server-side errors come pre-formatted from the API
+const getErrorInfo = (error: unknown): ApiError => {
+  // Handle pre-formatted API errors
+  if (
+    error &&
+    typeof error === "object" &&
+    "userMessage" in error &&
+    "message" in error
+  ) {
+    return error as ApiError;
+  }
+
+  if (error instanceof TypeError) {
+    // Network errors often manifest as TypeErrors
+    return {
+      code: 0,
+      message: error.message,
+      type: "NETWORK_ERROR",
+      category: "NETWORK",
+      userMessage: "Network error",
+      hint: "Unable to connect to the server. Please check your connection.",
+    };
+  }
+
+  if (error instanceof Error) {
+    const message = error.message;
+
+    if (
+      message.includes("Failed to fetch") ||
+      message.includes("NetworkError")
+    ) {
+      return {
+        code: 0,
+        message: message,
+        type: "NETWORK_ERROR",
+        category: "NETWORK",
+        userMessage: "Network error",
+        hint: "Unable to connect to the server. Please check your connection.",
+      };
+    }
+
+    if (message.includes("aborted") || message.includes("AbortError")) {
+      return {
+        code: 0,
+        message: message,
+        type: "ABORTED",
+        category: "NETWORK",
+        userMessage: "Request was aborted",
+      };
+    }
+
+    return {
+      code: 0,
+      message: message,
+      type: "UNKNOWN_ERROR",
+      category: "UNKNOWN",
+      userMessage: "Query execution failed",
+      hint: message,
+    };
+  }
+
+  return {
+    code: 0,
+    message: String(error),
+    type: "UNKNOWN_ERROR",
+    category: "UNKNOWN",
+    userMessage: "An unexpected error occurred",
+  };
+};
 
 export default function SqlConsolePage() {
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory } =
@@ -163,8 +245,34 @@ export default function SqlConsolePage() {
             }),
           });
 
-          if (!response.ok || !response.body) {
-            throw new Error("Failed to start query execution");
+          if (!response.ok) {
+            // Parse error response for detailed error information
+            let errorDetails: ApiError = {
+              code: response.status,
+              message: response.statusText || `HTTP ${response.status} error`,
+              type: "HTTP_ERROR",
+              userMessage: `Request failed with status ${response.status}`,
+            };
+            try {
+              const errorData = await response.json();
+              if (errorData.error) {
+                errorDetails = errorData.error;
+              }
+            } catch {
+              // Use default errorDetails
+            }
+
+            // Throw the error object directly - getErrorInfo will handle it
+            throw errorDetails;
+          }
+
+          if (!response.body) {
+            throw {
+              code: 0,
+              message: "Response body is empty",
+              type: "EMPTY_RESPONSE",
+              userMessage: "Server returned an empty response",
+            } as ApiError;
           }
 
           const reader = response.body.getReader();
@@ -258,7 +366,8 @@ export default function SqlConsolePage() {
           }
 
           if (queryError) {
-            throw new Error(queryError.message || "Query failed");
+            // The API now returns properly formatted errors
+            throw queryError;
           }
 
           executedCount++;
@@ -331,25 +440,21 @@ export default function SqlConsolePage() {
           });
         }
       } catch (error) {
+        const errorInfo = getErrorInfo(error);
         updateTab(tab.id, {
           isRunning: false,
           result: null,
-          error: {
-            code: 0,
-            message: error instanceof Error ? error.message : "Unknown error",
-            type: "network",
-            userMessage: "Failed to connect to server",
-          },
+          error: errorInfo,
           queryId: undefined,
         });
 
         addToHistory({
           sql,
-          error: "Network error",
+          error: errorInfo.userMessage,
         });
       }
     },
-    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase]
+    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase],
   );
 
   const handlePageChange = useCallback(
@@ -358,7 +463,7 @@ export default function SqlConsolePage() {
       const currentSize = tabPagination[activeTabId || ""]?.pageSize || 100;
       handleExecute(page - 1, currentSize);
     },
-    [handleExecute, tabPagination, activeTabId]
+    [handleExecute, tabPagination, activeTabId],
   );
 
   const handlePageSizeChange = useCallback(
@@ -366,7 +471,7 @@ export default function SqlConsolePage() {
       // Reset to page 0 when size changes
       handleExecute(0, size);
     },
-    [handleExecute]
+    [handleExecute],
   );
 
   const handleCancel = useCallback(async () => {
@@ -401,7 +506,7 @@ export default function SqlConsolePage() {
         updateTab(activeTabId, { sql: value });
       }
     },
-    [activeTabId, activeQueryTab, updateTab]
+    [activeTabId, activeQueryTab, updateTab],
   );
 
   const handleCursorChange = useCallback((position: number) => {
@@ -435,8 +540,33 @@ export default function SqlConsolePage() {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error("Failed to start query execution");
+      if (!response.ok) {
+        // Parse error response for detailed error information
+        let errorDetails: ApiError = {
+          code: response.status,
+          message: response.statusText || `HTTP ${response.status} error`,
+          type: "HTTP_ERROR",
+          userMessage: `Request failed with status ${response.status}`,
+        };
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorDetails = errorData.error;
+          }
+        } catch {
+          // Use default errorDetails
+        }
+
+        throw errorDetails;
+      }
+
+      if (!response.body) {
+        throw {
+          code: 0,
+          message: "Response body is empty",
+          type: "EMPTY_RESPONSE",
+          userMessage: "Server returned an empty response",
+        } as ApiError;
       }
 
       const reader = response.body.getReader();
@@ -508,7 +638,8 @@ export default function SqlConsolePage() {
       }
 
       if (queryError) {
-        throw new Error(queryError.message || "Query failed");
+        // The API now returns properly formatted errors
+        throw queryError;
       }
 
       const currentTab = getActiveQueryTab();
@@ -538,21 +669,17 @@ export default function SqlConsolePage() {
         user: user?.username,
       });
     } catch (error) {
+      const errorInfo = getErrorInfo(error);
       updateTab(tab.id, {
         isRunning: false,
         result: null,
-        error: {
-          code: 0,
-          message: error instanceof Error ? error.message : "Unknown error",
-          type: "network",
-          userMessage: "Failed to connect to server",
-        },
+        error: errorInfo,
         queryId: undefined,
       });
 
       addToHistory({
         sql: statement,
-        error: "Network error",
+        error: errorInfo.userMessage,
       });
     }
   }, [
@@ -606,8 +733,21 @@ export default function SqlConsolePage() {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || "Failed to explain");
+          let errorDetails: ApiError = {
+            code: response.status,
+            message: response.statusText || `HTTP ${response.status} error`,
+            type: "HTTP_ERROR",
+            userMessage: `Request failed with status ${response.status}`,
+          };
+          try {
+            const errorData = await response.json();
+            if (errorData.error) {
+              errorDetails = errorData.error;
+            }
+          } catch {
+            // Use default errorDetails
+          }
+          throw errorDetails;
         }
 
         // Read the stream
@@ -662,18 +802,22 @@ export default function SqlConsolePage() {
           explainResult: { type, data: finalData },
         });
       } catch (error) {
+        const errorInfo = getErrorInfo(error);
         updateTab(tab.id, {
           isRunning: false,
           error: {
-            code: 0,
-            message: error instanceof Error ? error.message : "Unknown error",
+            code: errorInfo.code,
+            message: errorInfo.message,
             type: "EXPLAIN_ERROR",
-            userMessage: "Failed to explain query",
+            userMessage:
+              errorInfo.userMessage === "Query execution failed"
+                ? "Failed to explain query"
+                : errorInfo.userMessage,
           },
         });
       }
     },
-    [getActiveQueryTab, updateTab, selectedDatabase]
+    [getActiveQueryTab, updateTab, selectedDatabase],
   );
 
   const handleApplyTimeRange = useCallback(
@@ -684,7 +828,7 @@ export default function SqlConsolePage() {
       const formatSqlDate = (d: Date) => {
         const pad = (n: number) => n.toString().padStart(2, "0");
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-          d.getDate()
+          d.getDate(),
         )} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       };
 
@@ -758,7 +902,7 @@ export default function SqlConsolePage() {
         description: `Using column '${safeColumn}'. Applied correctly to query structure.`,
       });
     },
-    [getActiveQueryTab, updateTab]
+    [getActiveQueryTab, updateTab],
   );
 
   const handleHistorySelect = useCallback(
@@ -768,7 +912,7 @@ export default function SqlConsolePage() {
         setHistoryOpen(false);
       }
     },
-    [activeTabId, activeQueryTab, updateTab]
+    [activeTabId, activeQueryTab, updateTab],
   );
 
   // Show loading while checking permissions
@@ -850,7 +994,7 @@ export default function SqlConsolePage() {
               onClick={() =>
                 handleExecute(
                   0,
-                  tabPagination[activeTabId || ""]?.pageSize || 100
+                  tabPagination[activeTabId || ""]?.pageSize || 100,
                 )
               } // Maintain current page size
               disabled={!activeQueryTab || activeQueryTab.isRunning}
@@ -883,7 +1027,7 @@ export default function SqlConsolePage() {
                   onClick={() =>
                     handleExecute(
                       0,
-                      tabPagination[activeTabId || ""]?.pageSize || 100
+                      tabPagination[activeTabId || ""]?.pageSize || 100,
                     )
                   }
                 >
@@ -1006,12 +1150,34 @@ export default function SqlConsolePage() {
                     <div className="flex items-start gap-3 p-4 m-4 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-900">
                       <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-red-800 dark:text-red-300">
-                          {activeQueryTab.error.userMessage}
-                        </p>
-                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap break-all overflow-x-auto">
-                          {activeQueryTab.error.message}
-                        </pre>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-red-800 dark:text-red-300">
+                            {activeQueryTab.error.userMessage}
+                          </p>
+                          {activeQueryTab.error.code > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 font-mono">
+                              Code: {activeQueryTab.error.code}
+                            </span>
+                          )}
+                          {activeQueryTab.error.category && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400">
+                              {activeQueryTab.error.category}
+                            </span>
+                          )}
+                        </div>
+                        {activeQueryTab.error.message &&
+                          activeQueryTab.error.message !==
+                            activeQueryTab.error.userMessage && (
+                            <pre className="mt-2 text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap break-all overflow-x-auto max-h-32 overflow-y-auto">
+                              {activeQueryTab.error.message}
+                            </pre>
+                          )}
+                        {activeQueryTab.error.hint && (
+                          <p className="mt-2 text-xs text-red-600/80 dark:text-red-400/80 flex items-center gap-1">
+                            <span className="font-medium">Hint:</span>{" "}
+                            {activeQueryTab.error.hint}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : activeQueryTab.result ? (

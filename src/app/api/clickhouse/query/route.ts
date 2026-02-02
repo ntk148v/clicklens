@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
+import { formatQueryError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
             userMessage: "Please log in to ClickHouse first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
             userMessage: "SQL query is required",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -205,12 +206,15 @@ export async function POST(request: NextRequest) {
             },
           });
         } catch (err) {
-          console.error("Stream processing error", err);
+          // Format error using secure error handler
+          const formattedError = formatQueryError(
+            err instanceof Error ? err : String(err),
+            undefined,
+            true, // Log full details server-side
+          );
           push({
             type: "error",
-            error: {
-              message: err instanceof Error ? err.message : String(err),
-            },
+            error: formattedError,
           });
         } finally {
           controller.close();
@@ -226,10 +230,15 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("API Error", error);
+    // Format error using secure error handler
+    const formattedError = formatQueryError(
+      error instanceof Error ? error : String(error),
+      500,
+      true, // Log full details server-side
+    );
     return NextResponse.json(
-      { success: false, error: { message: "Internal server error" } },
-      { status: 500 }
+      { success: false, error: formattedError },
+      { status: 500 },
     );
   }
 }

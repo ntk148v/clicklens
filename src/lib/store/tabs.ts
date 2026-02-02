@@ -40,6 +40,8 @@ interface QueryTab {
     message: string;
     type: string;
     userMessage: string;
+    category?: string;
+    hint?: string;
   } | null;
   queryId?: string;
   explainResult?: {
@@ -85,7 +87,7 @@ function generateId(): string {
 
 function generateTabName(existingTabs: Tab[]): string {
   const queryTabs = existingTabs.filter(
-    (t) => t.type === "query"
+    (t) => t.type === "query",
   ) as QueryTab[];
   const existingNumbers = queryTabs
     .map((t) => {
@@ -135,7 +137,7 @@ export const useTabsStore = create<TabsState>()(
         // Check if table tab already exists
         const existing = tabs.find(
           (t) =>
-            t.type === "table" && t.database === database && t.table === table
+            t.type === "table" && t.database === database && t.table === table,
         );
 
         if (existing) {
@@ -188,7 +190,9 @@ export const useTabsStore = create<TabsState>()(
       updateTab: (id, updates) => {
         set((state) => ({
           tabs: state.tabs.map((tab) =>
-            tab.id === id && tab.type === "query" ? { ...tab, ...updates } : tab
+            tab.id === id && tab.type === "query"
+              ? { ...tab, ...updates }
+              : tab,
           ),
         }));
       },
@@ -214,7 +218,7 @@ export const useTabsStore = create<TabsState>()(
         set((state) => ({
           history: [historyEntry, ...state.history].slice(
             0,
-            state.maxHistorySize
+            state.maxHistorySize,
           ),
         }));
       },
@@ -242,8 +246,8 @@ export const useTabsStore = create<TabsState>()(
         activeTabId: state.activeTabId,
         history: state.history,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Initialize with a default tab if none exist
@@ -269,7 +273,7 @@ export function useTabsOnly() {
     useShallow((state) => ({
       tabs: state.tabs,
       activeTabId: state.activeTabId,
-    }))
+    })),
   );
 }
 
@@ -282,7 +286,7 @@ export function useTabActions() {
       removeTab: state.removeTab,
       setActiveTab: state.setActiveTab,
       updateTab: state.updateTab,
-    }))
+    })),
   );
 }
 
@@ -293,7 +297,7 @@ export function useQueryHistory() {
       history: state.history,
       addToHistory: state.addToHistory,
       clearHistory: state.clearHistory,
-    }))
+    })),
   );
 }
 
