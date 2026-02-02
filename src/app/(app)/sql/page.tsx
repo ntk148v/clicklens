@@ -448,6 +448,13 @@ export default function SqlConsolePage() {
           queryId: undefined,
         });
 
+        // Show toast notification
+        toast({
+          variant: "destructive",
+          title: errorInfo.userMessage,
+          description: errorInfo.hint || errorInfo.message,
+        });
+
         addToHistory({
           sql,
           error: errorInfo.userMessage,
@@ -677,6 +684,13 @@ export default function SqlConsolePage() {
         queryId: undefined,
       });
 
+      // Show toast notification
+      toast({
+        variant: "destructive",
+        title: errorInfo.userMessage,
+        description: errorInfo.hint || errorInfo.message,
+      });
+
       addToHistory({
         sql: statement,
         error: errorInfo.userMessage,
@@ -803,17 +817,27 @@ export default function SqlConsolePage() {
         });
       } catch (error) {
         const errorInfo = getErrorInfo(error);
+        const userMessage =
+          errorInfo.userMessage === "Query execution failed"
+            ? "Failed to explain query"
+            : errorInfo.userMessage;
         updateTab(tab.id, {
           isRunning: false,
           error: {
             code: errorInfo.code,
             message: errorInfo.message,
             type: "EXPLAIN_ERROR",
-            userMessage:
-              errorInfo.userMessage === "Query execution failed"
-                ? "Failed to explain query"
-                : errorInfo.userMessage,
+            userMessage,
+            category: errorInfo.category,
+            hint: errorInfo.hint,
           },
+        });
+
+        // Show toast notification
+        toast({
+          variant: "destructive",
+          title: userMessage,
+          description: errorInfo.hint || errorInfo.message,
         });
       }
     },
@@ -1147,38 +1171,23 @@ export default function SqlConsolePage() {
                 {/* Result area */}
                 <div className="flex-1 min-h-0">
                   {activeQueryTab.error ? (
-                    <div className="flex items-start gap-3 p-4 m-4 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-900">
-                      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-center gap-3 p-3 m-4 rounded-md bg-destructive/10 border border-destructive/20">
+                      <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-red-800 dark:text-red-300">
-                            {activeQueryTab.error.userMessage}
-                          </p>
-                          {activeQueryTab.error.code > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 font-mono">
-                              Code: {activeQueryTab.error.code}
-                            </span>
-                          )}
-                          {activeQueryTab.error.category && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400">
-                              {activeQueryTab.error.category}
-                            </span>
-                          )}
-                        </div>
-                        {activeQueryTab.error.message &&
-                          activeQueryTab.error.message !==
-                            activeQueryTab.error.userMessage && (
-                            <pre className="mt-2 text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap break-all overflow-x-auto max-h-32 overflow-y-auto">
-                              {activeQueryTab.error.message}
-                            </pre>
-                          )}
+                        <p className="text-sm font-medium text-destructive">
+                          {activeQueryTab.error.userMessage}
+                        </p>
                         {activeQueryTab.error.hint && (
-                          <p className="mt-2 text-xs text-red-600/80 dark:text-red-400/80 flex items-center gap-1">
-                            <span className="font-medium">Hint:</span>{" "}
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             {activeQueryTab.error.hint}
                           </p>
                         )}
                       </div>
+                      {activeQueryTab.error.code > 0 && (
+                        <span className="text-xs text-muted-foreground font-mono">
+                          Code: {activeQueryTab.error.code}
+                        </span>
+                      )}
                     </div>
                   ) : activeQueryTab.result ? (
                     <ResultGrid
