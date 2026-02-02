@@ -1170,26 +1170,7 @@ export default function SqlConsolePage() {
 
                 {/* Result area */}
                 <div className="flex-1 min-h-0">
-                  {activeQueryTab.error ? (
-                    <div className="flex items-center gap-3 p-3 m-4 rounded-md bg-destructive/10 border border-destructive/20">
-                      <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-destructive">
-                          {activeQueryTab.error.userMessage}
-                        </p>
-                        {activeQueryTab.error.hint && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {activeQueryTab.error.hint}
-                          </p>
-                        )}
-                      </div>
-                      {activeQueryTab.error.code > 0 && (
-                        <span className="text-xs text-muted-foreground font-mono">
-                          Code: {activeQueryTab.error.code}
-                        </span>
-                      )}
-                    </div>
-                  ) : activeQueryTab.result ? (
+                  {activeQueryTab.result ? (
                     <ResultGrid
                       data={activeQueryTab.result.data}
                       meta={activeQueryTab.result.meta}
