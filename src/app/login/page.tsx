@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,9 +21,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    username: "default",
+    username: "",
     password: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
 
   // Check if already logged in
   useEffect(() => {
@@ -107,7 +109,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="flex items-start gap-2 p-3 rounded-md border text-sm status-critical bg-status-critical border-status-critical">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -118,7 +120,7 @@ export default function LoginPage() {
               </Label>
               <Input
                 id="username"
-                placeholder="default"
+                placeholder="Enter username"
                 value={formData.username}
                 onChange={handleChange("username")}
                 required
@@ -130,14 +132,26 @@ export default function LoginPage() {
               <Label htmlFor="password" className="block mb-3">
                 Password
               </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter password"
-                value={formData.password}
-                onChange={handleChange("password")}
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={formData.password}
+                  onChange={handleChange("password")}
+                  autoComplete="current-password"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
