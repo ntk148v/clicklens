@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: kiennt26/clicklens:latest
     ports:
       - "3000:3000"
     volumes:

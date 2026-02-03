@@ -106,7 +106,7 @@ function stripCommentsAndStrings(query: string): string {
 
 // Determine table type from engine
 function getTableType(
-  engine: string
+  engine: string,
 ): "table" | "materialized_view" | "view" | "distributed" | "dictionary" {
   const engineLower = engine.toLowerCase();
   if (engineLower === "materializedview") return "materialized_view";
@@ -122,12 +122,12 @@ function getTableType(
  */
 function extractMVTargetTable(
   query: string,
-  defaultDb: string
+  defaultDb: string,
 ): ParsedDependency | null {
   // Match: TO [database.]table
   // Handle both `TO db.table` and `TO table`
   const toMatch = query.match(
-    /\bTO\s+(?:`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?/i
+    /\bTO\s+(?:`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?/i,
   );
   if (toMatch) {
     return {
@@ -146,7 +146,7 @@ function extractMVTargetTable(
  */
 function extractFromTables(
   query: string,
-  defaultDb: string
+  defaultDb: string,
 ): ParsedDependency[] {
   const results: ParsedDependency[] = [];
 
@@ -161,9 +161,7 @@ function extractFromTables(
     const table = match[2];
 
     // Skip if table name looks like a subquery keyword
-    if (
-      ["select", "with", "values"].includes(table.toLowerCase())
-    ) {
+    if (["select", "with", "values"].includes(table.toLowerCase())) {
       continue;
     }
 
@@ -186,7 +184,7 @@ function extractFromTables(
  */
 function extractJoinedTables(
   query: string,
-  defaultDb: string
+  defaultDb: string,
 ): ParsedDependency[] {
   const results: ParsedDependency[] = [];
 
@@ -218,11 +216,11 @@ function extractJoinedTables(
  */
 function extractDistributedTable(
   query: string,
-  defaultDb: string
+  defaultDb: string,
 ): ParsedDependency | null {
   // Match: Distributed(cluster, database, table, ...) or Distributed(cluster, currentDatabase(), table, ...)
   const distMatch = query.match(
-    /\bDistributed\s*\(\s*'?[^,']+'?\s*,\s*(?:'([^']+)'|currentDatabase\(\))\s*,\s*'?([a-zA-Z_][a-zA-Z0-9_]*)'?/i
+    /\bDistributed\s*\(\s*'?[^,']+'?\s*,\s*(?:'([^']+)'|currentDatabase\(\))\s*,\s*'?([a-zA-Z_][a-zA-Z0-9_]*)'?/i,
   );
   if (distMatch) {
     return {
@@ -240,7 +238,7 @@ function extractDistributedTable(
  */
 function extractDictionaries(
   query: string,
-  defaultDb: string
+  defaultDb: string,
 ): ParsedDependency[] {
   const results: ParsedDependency[] = [];
 
@@ -271,7 +269,7 @@ function extractDictionaries(
 function parseCreateQuery(
   query: string,
   engine: string,
-  defaultDb: string
+  defaultDb: string,
 ): ParsedDependency[] {
   const deps: ParsedDependency[] = [];
 
@@ -312,7 +310,7 @@ function parseCreateQuery(
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<DependencyGraphResponse>> {
   try {
     const session = await getSession();
@@ -327,7 +325,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -342,7 +340,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -360,7 +358,7 @@ export async function GET(
             userMessage: "Please specify a database",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -427,7 +425,7 @@ export async function GET(
       database: string,
       name: string,
       engine: string = "Unknown",
-      validateExists: boolean = false
+      validateExists: boolean = false,
     ): boolean => {
       if (nodeIds.has(id)) {
         return true;
@@ -490,16 +488,62 @@ export async function GET(
     // Second pass: create edges from all dependency sources
     for (const row of result.data) {
       const tableId = `${row.database}.${row.name}`;
+      const engineLower = row.engine.toLowerCase();
+
+      // For Materialized Views with TO clause, extract the target first
+      // ClickHouse includes the TO target in dependencies_table, but we handle it
+      // separately as a "target" edge to avoid creating circular references
+      let mvTargetId: string | null = null;
+      if (engineLower === "materializedview" && row.create_table_query) {
+        const cleanedQuery = stripCommentsAndStrings(row.create_table_query);
+        const mvTarget = extractMVTargetTable(cleanedQuery, row.database);
+        if (mvTarget) {
+          mvTargetId = `${mvTarget.database}.${mvTarget.table}`;
+        }
+      }
 
       // 1. Dependencies from dependencies_table column (source tables)
       // These are from ClickHouse's metadata, so we validate they exist
       const depDbs = row.dependencies_database || [];
       const depTables = row.dependencies_table || [];
 
+      // Check if this is a queue/streaming engine table
+      // These engines list attached MVs in dependencies_table, but the data flow
+      // is from the engine table TO the MV, not the other way around.
+      // Queue-like engines: Kafka, RabbitMQ, NATS, S3Queue, AzureQueue
+      const queueEngines = [
+        "kafka",
+        "rabbitmq",
+        "nats",
+        "s3queue",
+        "azurequeue",
+      ];
+      const isQueueEngine = queueEngines.includes(engineLower);
+
       for (let i = 0; i < depTables.length; i++) {
         const depDb = depDbs[i] || row.database;
         const depTable = depTables[i];
         const sourceId = `${depDb}.${depTable}`;
+
+        // Skip the MV target table - it's a write target, not a read source
+        // This prevents circular dependency: MV -> target and target -> MV
+        if (sourceId === mvTargetId) {
+          continue;
+        }
+
+        // For queue/streaming engine tables, skip Materialized Views in dependencies_table
+        // These engines list attached MVs as "dependencies" but the data flow is
+        // Engine -> MV, not MV -> Engine. The MV will add the correct edge from
+        // its own dependencies_table (engine table as source)
+        if (isQueueEngine) {
+          const depTableInfo = existingTables.get(sourceId);
+          if (
+            depTableInfo &&
+            depTableInfo.engine.toLowerCase() === "materializedview"
+          ) {
+            continue;
+          }
+        }
 
         // Add external node if it exists, skip if it doesn't
         const nodeAdded = addNode(sourceId, depDb, depTable, "Unknown", true);
@@ -514,14 +558,20 @@ export async function GET(
       const parsedDeps = parseCreateQuery(
         row.create_table_query,
         row.engine,
-        row.database
+        row.database,
       );
 
       for (const dep of parsedDeps) {
         const depId = `${dep.database}.${dep.table}`;
 
         // Add external node only if it exists in the database
-        const nodeAdded = addNode(depId, dep.database, dep.table, "Unknown", true);
+        const nodeAdded = addNode(
+          depId,
+          dep.database,
+          dep.table,
+          "Unknown",
+          true,
+        );
         if (!nodeAdded) {
           // Table doesn't exist, skip this dependency
           continue;
