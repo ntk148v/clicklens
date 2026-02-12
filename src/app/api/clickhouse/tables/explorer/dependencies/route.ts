@@ -364,15 +364,18 @@ export async function GET(
 
     const lensConfig = getLensConfig();
     if (!lensConfig) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 500,
-          message: "Lens config not available",
-          type: "CONFIG_ERROR",
-          userMessage: "Server not properly configured",
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 500,
+            message: "Lens config not available",
+            type: "CONFIG_ERROR",
+            userMessage: "Server not properly configured",
+          },
         },
-      });
+        { status: 500 },
+      );
     }
 
     const client = createClient(lensConfig);
@@ -601,25 +604,43 @@ export async function GET(
     console.error("Table dependencies error:", error);
 
     if (isClickHouseError(error)) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          type: error.type,
-          userMessage: error.userMessage || error.message,
+      // Map ClickHouse error codes to appropriate HTTP status codes
+      const chCode =
+        typeof error.code === "string"
+          ? parseInt(error.code, 10)
+          : error.code;
+      let httpStatus = 500;
+      if (chCode === 497 || chCode === 516) httpStatus = 403;
+      else if (chCode === 60 || chCode === 81 || chCode === 16)
+        httpStatus = 404;
+      else if (chCode === 62 || chCode === 53 || chCode === 36)
+        httpStatus = 400;
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            type: error.type,
+            userMessage: error.userMessage || error.message,
+          },
         },
-      });
+        { status: httpStatus },
+      );
     }
 
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: 500,
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "INTERNAL_ERROR",
-        userMessage: "Failed to fetch table dependencies",
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 500,
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "INTERNAL_ERROR",
+          userMessage: "Failed to fetch table dependencies",
+        },
       },
-    });
+      { status: 500 },
+    );
   }
 }

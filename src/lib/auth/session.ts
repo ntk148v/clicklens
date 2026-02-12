@@ -82,6 +82,8 @@ export const sessionOptions: SessionOptions = {
           false),
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 1 week
+    // Align with server-side session store TTL (24 hours in storage.ts)
+    // to prevent stale cookies outliving their server-side counterpart
+    maxAge: 60 * 60 * 24, // 24 hours
   },
 };

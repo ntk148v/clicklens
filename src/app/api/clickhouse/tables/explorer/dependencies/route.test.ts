@@ -850,7 +850,8 @@ describe("Table Dependencies API Route", () => {
       const res = await GET(req);
       const json = await res.json();
 
-      expect(res.status).toBe(200);
+      // ClickHouse error code 60 (UNKNOWN_TABLE) maps to HTTP 404
+      expect(res.status).toBe(404);
       expect(json.success).toBe(false);
       expect(json.error.code).toBe(60);
     });
@@ -862,7 +863,7 @@ describe("Table Dependencies API Route", () => {
       const res = await GET(req);
       const json = await res.json();
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(500);
       expect(json.success).toBe(false);
       expect(json.error.type).toBe("INTERNAL_ERROR");
     });

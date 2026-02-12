@@ -21,7 +21,7 @@ export interface FetchChunksParams {
 export async function* fetchChunks({
   client,
   tableSource,
-  whereConditions,
+  whereConditions: callerConditions,
   timeColumn,
   minTime,
   maxTime,
@@ -31,6 +31,8 @@ export async function* fetchChunks({
   orderByClause,
   safeTimeCol,
 }: FetchChunksParams) {
+  // Clone to avoid mutating the caller's array (e.g. on retry or parallel calls)
+  const whereConditions = [...callerConditions];
   let rowsFetched = 0;
 
   // If no time column, we can't chunk by time. Fallback to single query.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -157,7 +157,7 @@ export function DependencyGraph({
   const [edges, setEdges, onEdgesChange] = useEdgesState<TableFlowEdge>(initialEdges);
 
   // Update nodes/edges when initial data changes
-  useMemo(() => {
+  useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);

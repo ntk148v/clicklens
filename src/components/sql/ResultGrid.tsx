@@ -299,12 +299,20 @@ export const ResultGrid = memo(function ResultGrid({
             ))}
           </TableHeader>
           <TableBody isLoading={isLoading}>
-            {table.getRowModel().rows.map((row, rowIndex) => (
+            {table.getRowModel().rows.map((row, rowIndex) => {
+              // When manualPagination is enabled, data contains only the current
+              // page's rows so we index with rowIndex directly. When using
+              // client-side pagination, TanStack Table slices the data for us,
+              // so rowIndex is also the correct local index.
+              const displayIndex = onPageChange
+                ? page * pageSize + rowIndex
+                : rowIndex;
+              return (
               <ClickableTableRow
                 key={row.id}
-                record={data[page * pageSize + rowIndex] as RowData}
+                record={data[rowIndex] as RowData}
                 columns={meta}
-                rowIndex={page * pageSize + rowIndex}
+                rowIndex={displayIndex}
                 sheetTitle="Query Result"
               >
                 {row.getVisibleCells().map((cell) => (
@@ -313,7 +321,8 @@ export const ResultGrid = memo(function ResultGrid({
                   </TableCell>
                 ))}
               </ClickableTableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </TableWrapper>

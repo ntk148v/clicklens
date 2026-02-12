@@ -3,12 +3,14 @@ import { POST } from "./route";
 
 // Mock dependencies
 const mockGetSessionClickHouseConfig = mock();
+const mockCheckPermission = mock();
 const mockCreateClient = mock();
 const mockQueryStream = mock();
 
 // Mock module imports
 mock.module("@/lib/auth", () => ({
   getSessionClickHouseConfig: mockGetSessionClickHouseConfig,
+  checkPermission: mockCheckPermission,
 }));
 
 mock.module("@/lib/clickhouse", () => ({
@@ -54,8 +56,12 @@ async function* mockStreamGenerator(data: unknown[]) {
 describe("Query API Route (Streaming)", () => {
   beforeEach(() => {
     mockGetSessionClickHouseConfig.mockReset();
+    mockCheckPermission.mockReset();
     mockCreateClient.mockReset();
     mockQueryStream.mockReset();
+
+    // Default: permission check passes (returns null = authorized)
+    mockCheckPermission.mockResolvedValue(null);
 
     // Default valid session
     mockGetSessionClickHouseConfig.mockResolvedValue({

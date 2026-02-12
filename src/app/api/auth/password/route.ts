@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
 import { getUserConfig, getLensConfig, createClient } from "@/lib/clickhouse";
+import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
+import { updateSessionPassword } from "@/lib/auth/storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,30 +80,31 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createClient(adminConfig);
 
-    // Escape single quotes in password to prevent SQL injection in DDL
-    // ClickHouse string literal escaping: ' -> \'
-    const escapedPassword = newPassword
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'");
+    // Use consistent escaping from shared utility to prevent SQL injection
+    const escapedPassword = escapeSqlString(newPassword);
+    const quotedUsername = quoteIdentifier(session.user.username);
 
     try {
       await adminClient.command(
-        `ALTER USER \`${session.user.username}\` IDENTIFIED BY '${escapedPassword}'`
+        `ALTER USER ${quotedUsername} IDENTIFIED BY '${escapedPassword}'`,
       );
     } catch (e) {
       console.error("ClickHouse password change error:", e);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorMessage = (e as any).message || "Unknown error";
       return NextResponse.json(
         {
           success: false,
-          error: "Failed to change password: " + errorMessage,
+          error: "Failed to change password",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    // 3. Update Session
+    // 3. Update both session stores to keep credentials in sync
+    // Update server-side session store
+    if (session.sessionId) {
+      updateSessionPassword(session.sessionId, newPassword);
+    }
+    // Update iron-session cookie (for hydration on next request)
     session.user.password = newPassword;
     await session.save();
 
