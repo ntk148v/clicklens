@@ -301,11 +301,11 @@ export function useQueryHistory() {
   );
 }
 
-/** Get the active tab with selector - only re-renders when the active tab changes */
+/** Get the active tab — only re-renders when the active tab itself changes */
 export function useActiveTab() {
-  const tabs = useTabsStore((state) => state.tabs);
-  const activeTabId = useTabsStore((state) => state.activeTabId);
-  return tabs.find((t) => t.id === activeTabId);
+  return useTabsStore(
+    (state) => state.tabs.find((t) => t.id === state.activeTabId),
+  );
 }
 
 /** Get the active query tab only - returns undefined if active tab is not a query */
