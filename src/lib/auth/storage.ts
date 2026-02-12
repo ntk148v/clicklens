@@ -84,6 +84,27 @@ export function getSessionUser(sessionId?: string): UserSession | null {
 }
 
 /**
+ * Update password for an existing session (e.g., after password change)
+ */
+export function updateSessionPassword(
+  sessionId: string | undefined,
+  newPassword: string,
+): boolean {
+  if (!sessionId) return false;
+
+  const entry = sessionStore.get(sessionId);
+  if (!entry) return false;
+
+  if (Date.now() > entry.expiresAt) {
+    sessionStore.delete(sessionId);
+    return false;
+  }
+
+  entry.user.password = newPassword;
+  return true;
+}
+
+/**
  * Remove session (logout)
  */
 export function destroySession(sessionId?: string): void {

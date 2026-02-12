@@ -11,6 +11,7 @@ import {
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { generateUUID } from "@/lib/utils";
 import {
   ensureMetadataInfrastructure,
@@ -47,8 +48,7 @@ export async function GET() {
     // Or we could try-catch the select and create if missing
     await ensureMetadataInfrastructure();
 
-    // Escape username to prevent SQL injection
-    const safeUsername = session.user.username.replace(/'/g, "''");
+    const safeUsername = escapeSqlString(session.user.username);
     const result = await client.query<SavedQuery>(`
       SELECT * FROM ${METADATA_DB}.${SAVED_QUERIES_TABLE}
       WHERE created_by = '${safeUsername}'
@@ -76,6 +76,30 @@ export async function POST(request: NextRequest) {
       return ApiErrors.badRequest("Name and SQL are required");
     }
 
+    // Validate input lengths to prevent abuse
+    const MAX_NAME_LENGTH = 255;
+    const MAX_SQL_LENGTH = 100000;
+    const MAX_DESCRIPTION_LENGTH = 2000;
+
+    if (typeof name !== "string" || name.length > MAX_NAME_LENGTH) {
+      return ApiErrors.badRequest(
+        `Name must be a string of at most ${MAX_NAME_LENGTH} characters`,
+      );
+    }
+    if (typeof sql !== "string" || sql.length > MAX_SQL_LENGTH) {
+      return ApiErrors.badRequest(
+        `SQL must be a string of at most ${MAX_SQL_LENGTH} characters`,
+      );
+    }
+    if (
+      typeof description !== "string" ||
+      description.length > MAX_DESCRIPTION_LENGTH
+    ) {
+      return ApiErrors.badRequest(
+        `Description must be a string of at most ${MAX_DESCRIPTION_LENGTH} characters`,
+      );
+    }
+
     const config = getLensConfig();
     if (!config) {
       return apiError(503, "INTERNAL_ERROR", "Metadata storage not configured", "Saved queries feature is not configured");
@@ -85,10 +109,10 @@ export async function POST(request: NextRequest) {
     await ensureMetadataInfrastructure();
 
     const id = generateUUID();
-    const safeSql = sql.replace(/'/g, "''");
-    const safeName = name.replace(/'/g, "''");
-    const safeDesc = description.replace(/'/g, "''");
-    const safeUser = session.user.username.replace(/'/g, "''");
+    const safeSql = escapeSqlString(sql);
+    const safeName = escapeSqlString(name);
+    const safeDesc = escapeSqlString(description);
+    const safeUser = escapeSqlString(session.user.username);
 
     await client.command(`
       INSERT INTO ${METADATA_DB}.${SAVED_QUERIES_TABLE} (id, name, sql, description, created_by)
