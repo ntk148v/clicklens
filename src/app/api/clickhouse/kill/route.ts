@@ -45,7 +45,9 @@ export async function POST(
     }
 
     const client = createClient(config);
-    await client.killQuery(body.queryId);
+    // Prefix query_id to match the format used in the query execution endpoint
+    const prefixedQueryId = `clicklens-${config.username}-${body.queryId}`;
+    await client.killQuery(prefixedQueryId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

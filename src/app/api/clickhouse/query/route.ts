@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
+import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
 import { formatQueryError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
 const MAX_ROWS = 500000;
+const MAX_QUERY_TIMEOUT_MS = 300000; // 5 minutes max timeout
+const QUERY_ID_PREFIX = "clicklens-";
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await checkPermission("canExecuteQueries");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -72,10 +77,21 @@ export async function POST(request: NextRequest) {
       clickhouseSettings.database = body.database;
     }
 
+    // Validate and sanitize timeout
+    const timeout =
+      typeof body.timeout === "number" && body.timeout > 0
+        ? Math.min(body.timeout, MAX_QUERY_TIMEOUT_MS)
+        : undefined;
+
+    // Prefix query_id with app identifier to prevent collision with other users' queries
+    const queryId = body.query_id
+      ? `${QUERY_ID_PREFIX}${config.username}-${body.query_id}`
+      : undefined;
+
     // Get the ClickHouse stream
     const resultSet = await client.queryStream(sql, {
-      timeout: body.timeout,
-      query_id: body.query_id,
+      timeout,
+      query_id: queryId,
       format: "JSONCompactEachRowWithNamesAndTypes",
       clickhouse_settings: clickhouseSettings,
     });

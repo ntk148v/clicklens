@@ -82,12 +82,18 @@ export function VirtualizedDataTable<T extends object>({
 
   const virtualItems = virtualizer.getVirtualItems();
 
+  // Track previous count to prevent re-triggering onEndReached for the same data set
+  const prevCountRef = useRef(count);
+
   // Handle Infinite Scroll
   useEffect(() => {
     if (!onEndReached || !virtualItems.length || isLoading) return;
 
     const lastItem = virtualItems[virtualItems.length - 1];
-    if (lastItem.index >= count - 1) {
+    // Only trigger when the user scrolls to the bottom AND the count has
+    // changed since the last trigger (prevents infinite fetch loops)
+    if (lastItem.index >= count - 1 && count !== prevCountRef.current) {
+      prevCountRef.current = count;
       onEndReached();
     }
   }, [virtualItems, count, isLoading, onEndReached]);

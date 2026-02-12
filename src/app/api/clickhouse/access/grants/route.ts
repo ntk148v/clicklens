@@ -6,12 +6,87 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionClickHouseConfig } from "@/lib/auth";
+import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import {
   createClient,
   isClickHouseError,
   type SystemGrant,
 } from "@/lib/clickhouse";
+
+/**
+ * Allowlist of valid ClickHouse access types to prevent SQL injection.
+ * These are the standard privilege types recognized by ClickHouse.
+ */
+const VALID_ACCESS_TYPES = new Set([
+  "SELECT",
+  "INSERT",
+  "ALTER",
+  "CREATE",
+  "DROP",
+  "TRUNCATE",
+  "OPTIMIZE",
+  "SHOW",
+  "KILL QUERY",
+  "ACCESS MANAGEMENT",
+  "SYSTEM",
+  "INTROSPECTION",
+  "SOURCES",
+  "CLUSTER",
+  "ALL",
+  // Granular ALTER privileges
+  "ALTER TABLE",
+  "ALTER VIEW",
+  "ALTER UPDATE",
+  "ALTER DELETE",
+  "ALTER COLUMN",
+  "ALTER INDEX",
+  "ALTER CONSTRAINT",
+  "ALTER TTL",
+  "ALTER SETTINGS",
+  "ALTER MOVE PARTITION",
+  "ALTER FETCH PARTITION",
+  "ALTER FREEZE PARTITION",
+  // Granular CREATE/DROP privileges
+  "CREATE DATABASE",
+  "CREATE TABLE",
+  "CREATE VIEW",
+  "CREATE DICTIONARY",
+  "CREATE TEMPORARY TABLE",
+  "CREATE FUNCTION",
+  "DROP DATABASE",
+  "DROP TABLE",
+  "DROP VIEW",
+  "DROP DICTIONARY",
+  "DROP FUNCTION",
+  // Granular SHOW privileges
+  "SHOW DATABASES",
+  "SHOW TABLES",
+  "SHOW COLUMNS",
+  "SHOW DICTIONARIES",
+  // System privileges
+  "SYSTEM RELOAD",
+  "SYSTEM SHUTDOWN",
+  "SYSTEM DROP CACHE",
+  "SYSTEM FLUSH",
+  "SYSTEM MERGES",
+  "SYSTEM TTL MERGES",
+  "SYSTEM FETCHES",
+  "SYSTEM MOVES",
+  "SYSTEM SENDS",
+  "SYSTEM REPLICATION QUEUES",
+  "SYSTEM RESTART REPLICA",
+  "SYSTEM SYNC REPLICA",
+  // dictGet
+  "dictGet",
+]);
+
+/**
+ * Validate that an access type string is a known ClickHouse privilege.
+ * Prevents SQL injection by rejecting any value not in the allowlist.
+ */
+function isValidAccessType(accessType: string): boolean {
+  return VALID_ACCESS_TYPES.has(accessType.toUpperCase());
+}
 
 export interface GrantsResponse {
   success: boolean;
@@ -21,6 +96,9 @@ export interface GrantsResponse {
 
 export async function GET(): Promise<NextResponse<GrantsResponse>> {
   try {
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -84,6 +162,9 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -98,6 +179,14 @@ export async function POST(
     if (!body.accessType || !body.granteeName) {
       return NextResponse.json(
         { success: false, error: "Access type and grantee name are required" },
+        { status: 400 },
+      );
+    }
+
+    // Validate accessType against allowlist to prevent SQL injection
+    if (!isValidAccessType(body.accessType)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid access type: ${body.accessType}` },
         { status: 400 },
       );
     }
@@ -119,7 +208,7 @@ export async function POST(
         ? `ROLE ${quoteIdentifier(body.granteeName)}`
         : quoteIdentifier(body.granteeName);
 
-    let sql = `GRANT ${body.accessType} ${target} TO ${grantee}`;
+    let sql = `GRANT ${body.accessType.toUpperCase()} ${target} TO ${grantee}`;
 
     if (body.withGrantOption) {
       sql += " WITH GRANT OPTION";
@@ -128,7 +217,7 @@ export async function POST(
     const client = createClient(config);
     await client.command(sql);
 
-    return NextResponse.json({ success: true }, { status: 500 });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error granting permission:", error);
 
@@ -159,6 +248,9 @@ export async function DELETE(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    const authError = await checkPermission("canManageUsers");
+    if (authError) return authError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -173,6 +265,14 @@ export async function DELETE(
     if (!body.accessType || !body.granteeName) {
       return NextResponse.json(
         { success: false, error: "Access type and grantee name are required" },
+        { status: 400 },
+      );
+    }
+
+    // Validate accessType against allowlist to prevent SQL injection
+    if (!isValidAccessType(body.accessType)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid access type: ${body.accessType}` },
         { status: 400 },
       );
     }
@@ -194,12 +294,12 @@ export async function DELETE(
         ? `ROLE ${quoteIdentifier(body.granteeName)}`
         : quoteIdentifier(body.granteeName);
 
-    const sql = `REVOKE ${body.accessType} ${target} FROM ${grantee}`;
+    const sql = `REVOKE ${body.accessType.toUpperCase()} ${target} FROM ${grantee}`;
 
     const client = createClient(config);
     await client.command(sql);
 
-    return NextResponse.json({ success: true }, { status: 500 });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error revoking permission:", error);
 
