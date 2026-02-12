@@ -63,6 +63,28 @@ export function apiError(
 }
 
 /**
+ * Map ClickHouse error codes to appropriate HTTP status codes.
+ * ClickHouse error codes reference: https://clickhouse.com/docs/en/interfaces/http
+ */
+function mapClickHouseErrorToHttpStatus(code: number | string): number {
+  const numCode = typeof code === "string" ? parseInt(code, 10) : code;
+
+  // Permission/access denied errors -> 403
+  if (numCode === 497 || numCode === 516) return 403;
+  // Unknown table/database/column -> 404
+  if (numCode === 60 || numCode === 81 || numCode === 16) return 404;
+  // Syntax errors, type errors, bad arguments -> 400
+  if (numCode === 62 || numCode === 53 || numCode === 36 || numCode === 47)
+    return 400;
+  // Query was cancelled -> 499
+  if (numCode === 394) return 499;
+  // Timeout -> 504
+  if (numCode === 159) return 504;
+
+  return 500;
+}
+
+/**
  * Common error responses
  */
 export const ApiErrors = {
@@ -100,8 +122,10 @@ export const ApiErrors = {
   fromError: (error: unknown, fallbackMessage = "An error occurred") => {
     if (isClickHouseError(error)) {
       const chError = error as ClickHouseError;
+      // Map ClickHouse error codes to appropriate HTTP status codes
+      const httpStatus = mapClickHouseErrorToHttpStatus(chError.code);
       return apiError(
-        500,
+        httpStatus,
         "QUERY_ERROR",
         chError.message,
         chError.userMessage ?? chError.message,

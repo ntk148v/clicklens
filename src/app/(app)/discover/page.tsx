@@ -26,7 +26,10 @@ import type {
   TimeColumnCandidate,
   FlexibleTimeRange,
 } from "@/lib/types/discover";
-import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
+import {
+  getFlexibleRangeFromEnum,
+  getMinTimeFromRange,
+} from "@/lib/types/discover";
 
 /**
  * Discover Page - Flexible data exploration for any ClickHouse table
@@ -93,38 +96,7 @@ export default function DiscoverPage() {
     } else {
       // Relative: "now-1h" -> parse "1h"
       const rangeKey = flexibleRange.from.replace("now-", "") as TimeRange;
-      // This function is now internal to getFlexibleRangeFromEnum or similar,
-      // but for direct use, we'd need a helper. For now, let's assume the API
-      // can handle "now-1h" directly or we need to calculate it here.
-      // Given the original `getMinTimeFromRange` was used, we'll re-introduce a similar logic.
-      const getMinTimeFromRangeLocal = (range: TimeRange): Date | null => {
-        const now = new Date();
-        switch (range) {
-          case "5m":
-            return new Date(now.getTime() - 5 * 60 * 1000);
-          case "15m":
-            return new Date(now.getTime() - 15 * 60 * 1000);
-          case "30m":
-            return new Date(now.getTime() - 30 * 60 * 1000);
-          case "1h":
-            return new Date(now.getTime() - 60 * 60 * 1000);
-          case "3h":
-            return new Date(now.getTime() - 3 * 60 * 60 * 1000);
-          case "6h":
-            return new Date(now.getTime() - 6 * 60 * 60 * 1000);
-          case "12h":
-            return new Date(now.getTime() - 12 * 60 * 60 * 1000);
-          case "24h":
-            return new Date(now.getTime() - 24 * 60 * 60 * 1000);
-          case "3d":
-            return new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-          case "7d":
-            return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          default:
-            return null;
-        }
-      };
-      const minDate = getMinTimeFromRangeLocal(rangeKey);
+      const minDate = getMinTimeFromRange(rangeKey);
       return {
         activeMinTime: minDate ? minDate.toISOString() : undefined,
         activeMaxTime: undefined,
