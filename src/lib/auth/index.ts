@@ -4,6 +4,7 @@
 
 import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
+import { NextResponse } from "next/server";
 import { sessionOptions, type SessionData, defaultSession } from "./session";
 import { getUserConfig } from "@/lib/clickhouse";
 import type { ClickHouseConfig } from "@/lib/clickhouse";
@@ -65,4 +66,36 @@ export async function getSessionClickHouseConfig(): Promise<ClickHouseConfig | n
   }
 
   return getUserConfig(session.user);
+}
+
+/**
+ * Require authenticated session with a valid ClickHouse config.
+ * Returns session data and config, or a NextResponse error.
+ *
+ * Usage:
+ *   const auth = await requireAuth();
+ *   if (auth instanceof NextResponse) return auth;
+ *   const { session, config } = auth;
+ */
+export async function requireAuth(): Promise<
+  | { session: SessionData; config: ClickHouseConfig }
+  | NextResponse<{ success: false; error: string }>
+> {
+  const session = await getSession();
+  if (!session.isLoggedIn || !session.user) {
+    return NextResponse.json(
+      { success: false as const, error: "Not authenticated" },
+      { status: 401 },
+    );
+  }
+
+  const config = getUserConfig(session.user);
+  if (!config) {
+    return NextResponse.json(
+      { success: false as const, error: "Server configuration error" },
+      { status: 500 },
+    );
+  }
+
+  return { session: session as SessionData, config };
 }

@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  getUserConfig,
-  createClient,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { requireAuth } from "@/lib/auth";
+import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import {
   buildSmartSearchCondition,
   ColumnDefinition,
 } from "@/lib/clickhouse/search";
 import { fetchChunks } from "@/lib/clickhouse/stream";
+import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 
 // ... Legacy sources handling could be preserved or refactored.
 // For this major refactor, I will keep legacy support but adapt it to the new structure where possible.
@@ -40,24 +37,9 @@ const LEGACY_SOURCES: Record<
 
 export async function GET(request: Request) {
   try {
-    // Explicit session check matching databases/route.ts pattern
-    const session = await getSession();
-    if (!session.isLoggedIn || !session.user) {
-      return NextResponse.json(
-        { success: false, error: "Not authenticated" },
-        { status: 401 },
-      );
-    }
-
-    // Get config using helper
-    const config = getUserConfig(session.user);
-    if (!config) {
-      // This generally means server environment variables are missing
-      return NextResponse.json(
-        { success: false, error: "Server configuration error" },
-        { status: 500 },
-      );
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    const { config } = auth;
 
     const { searchParams } = new URL(request.url);
     const legacySource = searchParams.get("source");
@@ -96,18 +78,20 @@ export async function GET(request: Request) {
     const client = createClient(config);
     const clusterName = await getClusterName(client);
 
-    const safeDatabase = database.replace(/[`]/g, "");
-    const safeTable = table.replace(/[`]/g, "");
+    const quotedDb = quoteIdentifier(database);
+    const quotedTable = quoteIdentifier(table);
+    const safeDbStr = escapeSqlString(database);
+    const safeTableStr = escapeSqlString(table);
     const tableSource = clusterName
-      ? `clusterAllReplicas('${clusterName}', \`${safeDatabase}\`.\`${safeTable}\`)`
-      : `\`${safeDatabase}\`.\`${safeTable}\``;
+      ? `clusterAllReplicas('${escapeSqlString(clusterName)}', ${quotedDb}.${quotedTable})`
+      : `${quotedDb}.${quotedTable}`;
 
     if (mode === "histogram") {
       if (!timeColumn)
         return NextResponse.json({ success: true, histogram: [] });
-      const safeTimeCol = timeColumn.replace(/[`]/g, "");
+      const quotedTimeCol = quoteIdentifier(timeColumn);
 
-      const typeQuery = `SELECT type FROM system.columns WHERE database = '${safeDatabase}' AND table = '${safeTable}' AND name = '${safeTimeCol}'`;
+      const typeQuery = `SELECT type FROM system.columns WHERE database = '${safeDbStr}' AND table = '${safeTableStr}' AND name = '${escapeSqlString(timeColumn)}'`;
       let columnType = "DateTime";
       try {
         const dataRes = await client.query(typeQuery);
@@ -122,13 +106,13 @@ export async function GET(request: Request) {
       if (minTime) {
         const minTimeNum = new Date(minTime).getTime();
         whereConds.push(
-          `\`${safeTimeCol}\` >= toDateTime64(${minTimeNum / 1000}, 3)`,
+          `${quotedTimeCol} >= toDateTime64(${minTimeNum / 1000}, 3)`,
         );
       }
       if (maxTime) {
         const maxTimeNum = new Date(maxTime).getTime();
         whereConds.push(
-          `\`${safeTimeCol}\` <= toDateTime64(${maxTimeNum / 1000}, 3)`,
+          `${quotedTimeCol} <= toDateTime64(${maxTimeNum / 1000}, 3)`,
         );
       }
       if (filter) whereConds.push(`(${filter})`);
@@ -138,7 +122,7 @@ export async function GET(request: Request) {
         : "";
 
       if (isDateOnly) {
-        histogramQuery = `SELECT \`${safeTimeCol}\` as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
+        histogramQuery = `SELECT ${quotedTimeCol} as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
       } else {
         let interval = "1 hour";
         if (minTime) {
@@ -150,7 +134,7 @@ export async function GET(request: Request) {
           else if (diffHours <= 72) interval = "1 hour";
           else interval = "6 hour";
         }
-        histogramQuery = `SELECT toStartOfInterval(\`${safeTimeCol}\`, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
+        histogramQuery = `SELECT toStartOfInterval(${quotedTimeCol}, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
       }
 
       const histRes = await client.query(histogramQuery);
@@ -163,11 +147,16 @@ export async function GET(request: Request) {
     const baseWhere: string[] = [];
 
     if (filter && filter.trim()) {
-      // Sanitize
-      const dangerousPatterns = [/;\s*(DROP|DELETE|ALTER|GRANT)/i];
-      if (dangerousPatterns.some((p) => p.test(filter))) {
+      // Defense-in-depth: block dangerous SQL keywords that could modify data/schema
+      const DANGEROUS_KEYWORDS =
+        /\b(DROP|DELETE|ALTER|GRANT|REVOKE|TRUNCATE|INSERT|UPDATE|CREATE|ATTACH|DETACH|RENAME|KILL|SYSTEM)\b/i;
+      const DANGEROUS_PATTERNS = /;\s*\S/; // semicolons followed by more SQL
+      if (DANGEROUS_KEYWORDS.test(filter) || DANGEROUS_PATTERNS.test(filter)) {
         return NextResponse.json(
-          { success: false, error: "Invalid filter" },
+          {
+            success: false,
+            error: "Invalid filter: contains disallowed keywords",
+          },
           { status: 400 },
         );
       }
@@ -176,7 +165,7 @@ export async function GET(request: Request) {
 
     const searchTerm = searchParams.get("search");
     if (searchTerm) {
-      const colsQuery = `SELECT name, type FROM system.columns WHERE database = '${safeDatabase}' AND table = '${safeTable}'`;
+      const colsQuery = `SELECT name, type FROM system.columns WHERE database = '${safeDbStr}' AND table = '${safeTableStr}'`;
       const colsRes = await client.query(colsQuery);
       const tableCols = colsRes.data as unknown as ColumnDefinition[];
 
@@ -193,11 +182,13 @@ export async function GET(request: Request) {
 
     // 2. Prepare Chunker
     const selectClause = columns.length
-      ? columns.map((c: string) => `\`${c.replace(/`/g, "")}\``).join(", ")
+      ? columns.map((c: string) => quoteIdentifier(c)).join(", ")
       : "*";
 
-    const safeTimeCol = timeColumn ? timeColumn.replace(/[`]/g, "") : "";
-    const orderByClause = safeTimeCol ? `ORDER BY \`${safeTimeCol}\` DESC` : "";
+    const quotedTimeSortCol = timeColumn ? quoteIdentifier(timeColumn) : "";
+    const orderByClause = quotedTimeSortCol
+      ? `ORDER BY ${quotedTimeSortCol} DESC`
+      : "";
 
     // 3. Start Stream
     const iterator = fetchChunks({
@@ -211,7 +202,7 @@ export async function GET(request: Request) {
       cursor: cursor || undefined,
       selectClause,
       orderByClause,
-      safeTimeCol,
+      safeTimeCol: quotedTimeSortCol,
     });
 
     const stream = new ReadableStream({
