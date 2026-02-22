@@ -61,7 +61,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const limit = Math.min(parseInt(searchParams.get("limit") || "100"), 10000);
+    const parsedLimit = parseInt(searchParams.get("limit") || "100", 10);
+    const limit = isNaN(parsedLimit) ? 100 : Math.min(parsedLimit, 10000);
     const cursor = searchParams.get("cursor");
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";

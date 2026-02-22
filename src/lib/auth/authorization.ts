@@ -94,7 +94,7 @@ export async function checkPermission(
 
     return null; // Authorized
   } catch (error) {
-    console.error("Authorization check failed:", error);
+    console.error("Authorization check failed for user:", username);
     return NextResponse.json<AuthErrorResponse>(
       { success: false, error: "Authorization check failed" },
       { status: 500 },
