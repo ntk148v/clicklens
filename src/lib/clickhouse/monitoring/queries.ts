@@ -1232,7 +1232,7 @@ SELECT
   avg(value) AS value
 FROM merge('system', '^asynchronous_metric_log')
 WHERE ${timeRangeWhere(from, to)}
-  AND metric = 'NetworkReceiveBytes_default'
+  AND metric = 'NetworkReceiveBytes%'
 GROUP BY t, node
 ORDER BY t, node
 `;
@@ -1243,7 +1243,7 @@ SELECT
   avg(value) AS value
 FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
 WHERE ${timeRangeWhere(from, to)}
-  AND metric = 'NetworkReceiveBytes_default'
+  AND metric = 'NetworkReceiveBytes%'
 GROUP BY t, node
 ORDER BY t, node
 SETTINGS skip_unavailable_shards = 1
