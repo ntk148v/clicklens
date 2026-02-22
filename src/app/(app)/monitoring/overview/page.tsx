@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth";
 import { Header } from "@/components/layout";
@@ -10,7 +10,6 @@ import { Loader2 } from "lucide-react";
 import {
   FlexibleTimeRange,
   getFlexibleRangeFromEnum,
-  TimeRange,
 } from "@/lib/types/discover";
 
 export default function MonitoringOverviewPage() {
@@ -21,28 +20,6 @@ export default function MonitoringOverviewPage() {
   const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
     getFlexibleRangeFromEnum("1h"),
   );
-
-  // Convert FlexibleTimeRange to minutes for the API
-  const timeRangeMinutes = useMemo(() => {
-    if (flexibleRange.type === "absolute") {
-      return 60; // Fallback for absolute dates in this view
-    }
-    const rangeKey = flexibleRange.from.replace("now-", "") as TimeRange;
-    const mapping: Record<string, number> = {
-      "5m": 5,
-      "15m": 15,
-      "30m": 30,
-      "60m": 60,
-      "1h": 60,
-      "3h": 180,
-      "6h": 360,
-      "12h": 720,
-      "24h": 1440,
-      "3d": 4320,
-      "7d": 10080,
-    };
-    return mapping[rangeKey] || 60;
-  }, [flexibleRange]);
 
   useEffect(() => {
     if (!authLoading && !permissions?.canViewCluster) {
@@ -83,7 +60,7 @@ export default function MonitoringOverviewPage() {
         <OverviewTab
           key={`overview-${refreshKey}`}
           refreshInterval={interval * 1000}
-          timeRange={timeRangeMinutes}
+          timeRange={flexibleRange}
         />
       </div>
     </div>

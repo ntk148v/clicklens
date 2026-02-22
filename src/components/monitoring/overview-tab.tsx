@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Server,
   CheckCircle2,
@@ -36,6 +36,8 @@ import type {
   MonitoringApiResponse,
   HealthStatus,
 } from "@/lib/clickhouse/monitoring";
+import type { FlexibleTimeRange } from "@/lib/types/discover";
+import { getMinTimeFromRange, type TimeRange } from "@/lib/types/discover";
 
 interface TimeSeriesPoint {
   t: string;
@@ -88,7 +90,7 @@ interface DashboardData {
 
 interface OverviewTabProps {
   refreshInterval?: number;
-  timeRange?: number;
+  timeRange: FlexibleTimeRange;
 }
 
 // Transform per-node data for charts
@@ -108,7 +110,7 @@ function transformToSingleSeries(data: TimeSeriesPoint[]) {
   }));
 }
 
-export function OverviewTab({ timeRange = 60 }: OverviewTabProps) {
+export function OverviewTab({ timeRange }: OverviewTabProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,13 +121,36 @@ export function OverviewTab({ timeRange = 60 }: OverviewTabProps) {
     refreshInterval: 0,
   });
 
+  // Build API URL params from FlexibleTimeRange
+  const apiParams = useMemo(() => {
+    const params = new URLSearchParams();
+
+    if (timeRange.type === "absolute") {
+      params.set("from", timeRange.from);
+      params.set("to", timeRange.to);
+    } else {
+      // Relative range: compute from/to from the range key
+      const rangeKey = timeRange.from.replace("now-", "") as TimeRange;
+      const minTime = getMinTimeFromRange(rangeKey);
+      if (minTime) {
+        params.set("from", minTime.toISOString());
+        params.set("to", new Date().toISOString());
+      } else {
+        // Fallback to timeRange minutes
+        params.set("timeRange", "60");
+      }
+    }
+
+    return params.toString();
+  }, [timeRange]);
+
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
       const response = await fetch(
-        `/api/clickhouse/monitoring/dashboard?timeRange=${timeRange}`,
+        `/api/clickhouse/monitoring/dashboard?${apiParams}`,
       );
       const result: MonitoringApiResponse<DashboardData> =
         await response.json();
@@ -140,7 +165,7 @@ export function OverviewTab({ timeRange = 60 }: OverviewTabProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange]);
+  }, [apiParams]);
 
   useEffect(() => {
     fetchData();

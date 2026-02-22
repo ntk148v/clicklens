@@ -19,6 +19,7 @@ import {
   CLUSTER_SUMMARY_QUERY,
   CLUSTER_NODES_QUERY,
   OVERVIEW_QUERY,
+  computeRounding,
   getDashboardQueriesPerSecQuery,
   getDashboardQueriesRunningQuery,
   getDashboardMergesRunningQuery,
@@ -118,6 +119,52 @@ interface DashboardResponse {
   nodes: string[]; // List of unique node names
 }
 
+/**
+ * Parse time range from URL search params.
+ * Supports both relative (timeRange minutes) and absolute (from/to ISO strings).
+ * Returns { from, to } as ISO datetime strings and rounding in seconds.
+ */
+const parseTimeRange = (searchParams: URLSearchParams) => {
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
+  const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
+
+  let fromDateTime: string;
+  let toDateTime: string;
+
+  if (fromParam && toParam) {
+    // Absolute time range from FlexibleTimeRange
+    const fromDate = new Date(fromParam);
+    const toDate = toParam === "now" ? new Date() : new Date(toParam);
+
+    // Validate parsed dates
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      // Fall back to relative range if ISO parsing fails
+      const now = new Date();
+      toDateTime = now.toISOString();
+      fromDateTime = new Date(
+        now.getTime() - timeRange * 60 * 1000,
+      ).toISOString();
+    } else {
+      fromDateTime = fromDate.toISOString();
+      toDateTime = toDate.toISOString();
+    }
+  } else {
+    // Relative time range (default behavior)
+    const now = new Date();
+    toDateTime = now.toISOString();
+    fromDateTime = new Date(
+      now.getTime() - timeRange * 60 * 1000,
+    ).toISOString();
+  }
+
+  const durationMs =
+    new Date(toDateTime).getTime() - new Date(fromDateTime).getTime();
+  const rounding = computeRounding(durationMs);
+
+  return { from: fromDateTime, to: toDateTime, rounding };
+};
+
 export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<MonitoringApiResponse<DashboardResponse>>> {
@@ -141,7 +188,7 @@ export async function GET(
 
     const client = createClient(config);
     const { searchParams } = new URL(request.url);
-    const timeRange = parseInt(searchParams.get("timeRange") || "60", 10);
+    const { from, to, rounding } = parseTimeRange(searchParams);
 
     // Detect cluster
     let clusterName: string | undefined;
@@ -190,37 +237,37 @@ export async function GET(
       networkResult,
     ] = await Promise.all([
       client.query<TimeSeriesPoint>(
-        getDashboardQueriesPerSecQuery(timeRange, clusterName),
+        getDashboardQueriesPerSecQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardQueriesRunningQuery(timeRange, clusterName),
+        getDashboardQueriesRunningQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardMergesRunningQuery(timeRange, clusterName),
+        getDashboardMergesRunningQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardSelectedRowsQuery(timeRange, clusterName),
+        getDashboardSelectedRowsQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardInsertedRowsQuery(timeRange, clusterName),
+        getDashboardInsertedRowsQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardMaxPartsQuery(timeRange, clusterName),
+        getDashboardMaxPartsQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardMemoryQuery(timeRange, clusterName),
+        getDashboardMemoryQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardCPUQuery(timeRange, clusterName),
+        getDashboardCPUQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardIOWaitQuery(timeRange, clusterName),
+        getDashboardIOWaitQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardFilesystemQuery(timeRange, clusterName),
+        getDashboardFilesystemQuery(from, to, rounding, clusterName),
       ),
       client.query<TimeSeriesPoint>(
-        getDashboardNetworkQuery(timeRange, clusterName),
+        getDashboardNetworkQuery(from, to, rounding, clusterName),
       ),
     ]);
 

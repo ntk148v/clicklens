@@ -115,29 +115,48 @@ describe("Monitoring Queries Validation", () => {
     }
   };
 
+  // Test time range params for dashboard queries (from/to/rounding pattern)
+  const testFrom = new Date(Date.now() - 3600000).toISOString(); // 1 hour ago
+  const testTo = new Date().toISOString();
+  const testRounding = 60;
+
+  // Skip non-query exports (utility functions that don't return SQL)
+  const skipKeys = new Set(["computeRounding"]);
+
   for (const [key, value] of Object.entries(queries)) {
+    if (skipKeys.has(key)) continue;
+
     if (typeof value === "string") {
       test(`Query: ${key}`, async () => {
         await checkQuery(value, key);
       });
     } else if (typeof value === "function") {
       test(`Function Query: ${key}`, async () => {
-        let sql = "";
+        let sql: string;
 
         // Handle different signatures
         // PerNode queries REQUIRE a cluster name, so we provide a dummy one
         // and expect the "Cluster not found" handler to catch it.
         if (key.includes("PerNode")) {
-          sql = value(60, "dummy_cluster");
+          sql = (value as (...args: unknown[]) => string)(60, "dummy_cluster");
+        }
+        // Dashboard queries take (from, to, rounding, clusterName?)
+        else if (key.startsWith("getDashboard")) {
+          sql = (value as (...args: unknown[]) => string)(
+            testFrom,
+            testTo,
+            testRounding,
+            undefined,
+          );
         }
         // Single-arg functions usually take optional clusterName (passed as undefined)
         // or just return string.
         else if (value.length <= 1) {
-          sql = value(undefined);
+          sql = (value as (...args: unknown[]) => string)(undefined);
         }
         // Two-arg functions usually take (interval, clusterName)
         else {
-          sql = value(60, undefined);
+          sql = (value as (...args: unknown[]) => string)(60, undefined);
         }
 
         await checkQuery(sql, key);
