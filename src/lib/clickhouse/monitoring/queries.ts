@@ -886,15 +886,17 @@ export type DashboardQuery = {
 
 /**
  * Compute appropriate rounding interval (seconds) based on time range duration.
- * Ensures a reasonable number of data points for chart display.
+ * Targets ~300-500 data points per chart for readable density.
+ * Less aggressive rounding preserves detail when metric_log has limited data.
  */
 export const computeRounding = (durationMs: number): number => {
-  const minutes = durationMs / (60 * 1000);
-  if (minutes <= 30) return 10;
-  if (minutes <= 180) return 60; // 3 hours
-  if (minutes <= 720) return 300; // 12 hours
-  if (minutes <= 4320) return 900; // 3 days
-  return 3600;
+  const seconds = durationMs / 1000;
+  if (seconds <= 600) return 1; // ≤10 min: per-second
+  if (seconds <= 1800) return 5; // ≤30 min: 5s intervals
+  if (seconds <= 7200) return 30; // ≤2h: 30s intervals (~240 points)
+  if (seconds <= 86400) return 60; // ≤24h: 1 min intervals (~1440 max)
+  if (seconds <= 259200) return 300; // ≤3d: 5 min intervals
+  return 600; // >3d: 10 min intervals
 };
 
 // Common WHERE clause using typed String parameters with parseDateTimeBestEffort for timezone-safe parsing.
