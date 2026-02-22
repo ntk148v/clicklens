@@ -12,6 +12,7 @@ import {
   isClickHouseError,
   type SystemGrant,
 } from "@/lib/clickhouse";
+import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 /**
  * Allowlist of valid ClickHouse access types to prevent SQL injection.
@@ -315,8 +316,4 @@ export async function DELETE(
       { status: 500 },
     );
   }
-}
-
-function quoteIdentifier(name: string): string {
-  return `\`${name.replace(/`/g, "``")}\``;
 }

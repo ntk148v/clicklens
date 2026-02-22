@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
+import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 interface RoleGrant {
   user_name: string | null;
@@ -188,9 +189,4 @@ export async function DELETE(
       { status: 500 },
     );
   }
-}
-
-// Helper function
-function quoteIdentifier(name: string): string {
-  return `\`${name.replace(/`/g, "``")}\``;
 }
