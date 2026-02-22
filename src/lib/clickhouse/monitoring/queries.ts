@@ -884,17 +884,11 @@ export const computeRounding = (durationMs: number): number => {
   return 3600;
 };
 
-// Helper: build WHERE clause for time range with event_date partition pruning (for metric_log)
+// Helper: build WHERE clause for time range with event_date partition pruning
 const timeRangeWhere = (from: string, to: string) =>
   `event_date >= toDate(parseDateTimeBestEffort('${from}'))
   AND event_date <= toDate(parseDateTimeBestEffort('${to}'))
   AND event_time >= parseDateTimeBestEffort('${from}')
-  AND event_time <= parseDateTimeBestEffort('${to}')`;
-
-// Helper: build WHERE clause for time range WITHOUT event_date pruning
-// (asynchronous_metric_log stores epoch dates in event_date, so partition pruning would exclude all rows)
-const timeRangeWhereNoDate = (from: string, to: string) =>
-  `event_time >= parseDateTimeBestEffort('${from}')
   AND event_time <= parseDateTimeBestEffort('${to}')`;
 
 // Helper to create single-node or cluster query
@@ -1074,7 +1068,7 @@ SELECT
   hostName() AS node,
   max(value) AS value
 FROM merge('system', '^asynchronous_metric_log')
-WHERE ${timeRangeWhereNoDate(from, to)}
+WHERE ${timeRangeWhere(from, to)}
   AND metric = 'MaxPartCountForPartition'
 GROUP BY t, node
 ORDER BY t, node
@@ -1085,7 +1079,7 @@ SELECT
   hostname AS node,
   max(value) AS value
 FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
-WHERE ${timeRangeWhereNoDate(from, to)}
+WHERE ${timeRangeWhere(from, to)}
   AND metric = 'MaxPartCountForPartition'
 GROUP BY t, node
 ORDER BY t, node
@@ -1140,7 +1134,7 @@ SELECT
   hostName() AS node,
   avg(value) AS value
 FROM merge('system', '^asynchronous_metric_log')
-WHERE ${timeRangeWhereNoDate(from, to)}
+WHERE ${timeRangeWhere(from, to)}
   AND metric = 'OSUserTimeNormalized'
 GROUP BY t, node
 ORDER BY t, node
@@ -1151,7 +1145,7 @@ SELECT
   hostname AS node,
   avg(value) AS value
 FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
-WHERE ${timeRangeWhereNoDate(from, to)}
+WHERE ${timeRangeWhere(from, to)}
   AND metric = 'OSUserTimeNormalized'
 GROUP BY t, node
 ORDER BY t, node
@@ -1204,7 +1198,7 @@ SELECT
   hostName() AS node,
   avg(value) AS value
 FROM merge('system', '^asynchronous_metric_log')
-WHERE ${timeRangeWhereNoDate(from, to)}
+WHERE ${timeRangeWhere(from, to)}
   AND metric = 'FilesystemMainPathUsedBytes'
 GROUP BY t, node
 ORDER BY t, node
@@ -1215,7 +1209,7 @@ SELECT
   hostname AS node,
   avg(value) AS value
 FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
-WHERE ${timeRangeWhereNoDate(from, to)}
+WHERE ${timeRangeWhere(from, to)}
   AND metric = 'FilesystemMainPathUsedBytes'
 GROUP BY t, node
 ORDER BY t, node
@@ -1237,8 +1231,8 @@ SELECT
   hostName() AS node,
   avg(value) AS value
 FROM merge('system', '^asynchronous_metric_log')
-WHERE ${timeRangeWhereNoDate(from, to)}
-  AND metric = 'NetworkReceiveBytes%'
+WHERE ${timeRangeWhere(from, to)}
+  AND metric = 'NetworkReceiveBytes_default'
 GROUP BY t, node
 ORDER BY t, node
 `;
@@ -1248,8 +1242,8 @@ SELECT
   hostname AS node,
   avg(value) AS value
 FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
-WHERE ${timeRangeWhereNoDate(from, to)}
-  AND metric = 'NetworkReceiveBytes%'
+WHERE ${timeRangeWhere(from, to)}
+  AND metric = 'NetworkReceiveBytes_default'
 GROUP BY t, node
 ORDER BY t, node
 SETTINGS skip_unavailable_shards = 1
