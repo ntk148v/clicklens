@@ -12,6 +12,7 @@ import {
   isLensUserConfigured,
   getLensConfig,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 /**
  * Available permission types
@@ -177,7 +178,7 @@ async function checkGlobalAccess(username: string): Promise<boolean> {
 
   try {
     const client = createClient(lensConfig);
-    const safeUser = username.replace(/'/g, "''");
+    const safeUser = escapeSqlString(username);
 
     // Get user's roles
     const rolesResult = await client.query(`
@@ -188,7 +189,7 @@ async function checkGlobalAccess(username: string): Promise<boolean> {
     const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
 
     const userRoles = rolesData
-      .map((r) => `'${r.role.replace(/'/g, "''")}'`)
+      .map((r) => `'${escapeSqlString(r.role)}'`)
       .join(",");
 
     const grantFilter = userRoles
@@ -228,7 +229,7 @@ async function hasAccessibleDatabases(username: string): Promise<boolean> {
 
   try {
     const client = createClient(lensConfig);
-    const safeUser = username.replace(/'/g, "''");
+    const safeUser = escapeSqlString(username);
 
     // Get user's roles
     const rolesResult = await client.query(`
@@ -239,7 +240,7 @@ async function hasAccessibleDatabases(username: string): Promise<boolean> {
     const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
 
     const userRoles = rolesData
-      .map((r) => `'${r.role.replace(/'/g, "''")}'`)
+      .map((r) => `'${escapeSqlString(r.role)}'`)
       .join(",");
 
     const grantFilter = userRoles

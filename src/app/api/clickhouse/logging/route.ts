@@ -8,6 +8,7 @@ import {
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { ApiErrors } from "@/lib/api";
 import { fetchChunks } from "@/lib/clickhouse/stream";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export async function GET(request: Request) {
   let source = "text_log";
@@ -118,12 +119,12 @@ export async function GET(request: Request) {
     const whereConditions: string[] = [];
 
     if (search) {
-      const safeSearch = search.replace(/'/g, "''");
+      const safeSearch = escapeSqlString(search);
       whereConditions.push(`message ILIKE '%${safeSearch}%'`);
     }
 
     if (component) {
-      const safeComponent = component.replace(/'/g, "''");
+      const safeComponent = escapeSqlString(component);
       if (source === "crash_log") {
         whereConditions.push(`toString(signal) ILIKE '%${safeComponent}%'`);
       } else if (source === "session_log") {
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
     }
 
     if (level && level !== "All") {
-      const safeLevel = level.replace(/'/g, "''");
+      const safeLevel = escapeSqlString(level);
       if (source === "text_log") {
         whereConditions.push(`level = '${safeLevel}'`);
       } else if (source === "session_log") {

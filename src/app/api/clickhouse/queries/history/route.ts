@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface QueryHistoryEntry {
   event_time: string;
@@ -46,7 +47,7 @@ interface QueryHistoryResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<QueryHistoryResponse>> {
   try {
     const session = await getSession();
@@ -61,7 +62,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -76,7 +77,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -114,12 +115,12 @@ export async function GET(
       conditions.push("type = 'QueryFinish' AND exception_code = 0");
     } else if (status === "error") {
       conditions.push(
-        "(type = 'ExceptionWhileProcessing' OR exception_code != 0)"
+        "(type = 'ExceptionWhileProcessing' OR exception_code != 0)",
       );
     }
 
     if (user) {
-      const safeUser = user.replace(/'/g, "''");
+      const safeUser = escapeSqlString(user);
       conditions.push(`user = '${safeUser}'`);
     }
 
@@ -131,12 +132,12 @@ export async function GET(
     }
 
     if (queryType) {
-      const safeType = queryType.replace(/'/g, "''");
+      const safeType = escapeSqlString(queryType);
       conditions.push(`query_kind = '${safeType}'`);
     }
 
     if (fingerprint) {
-      const safeFingerprint = fingerprint.replace(/'/g, "''");
+      const safeFingerprint = escapeSqlString(fingerprint);
       conditions.push(`normalized_query_hash = '${safeFingerprint}'`);
     }
 

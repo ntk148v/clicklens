@@ -19,6 +19,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 // Force dynamic rendering to ensure cookies are read on each request
 export const dynamic = "force-dynamic";
@@ -379,7 +380,7 @@ export async function GET(
     }
 
     const client = createClient(lensConfig);
-    const safeDatabase = database.replace(/'/g, "''");
+    const safeDatabase = escapeSqlString(database);
 
     // Query all tables with dependency info and create query
     const result = await client.query<RawTableRow>(`
@@ -606,9 +607,7 @@ export async function GET(
     if (isClickHouseError(error)) {
       // Map ClickHouse error codes to appropriate HTTP status codes
       const chCode =
-        typeof error.code === "string"
-          ? parseInt(error.code, 10)
-          : error.code;
+        typeof error.code === "string" ? parseInt(error.code, 10) : error.code;
       let httpStatus = 500;
       if (chCode === 497 || chCode === 516) httpStatus = 403;
       else if (chCode === 60 || chCode === 81 || chCode === 16)

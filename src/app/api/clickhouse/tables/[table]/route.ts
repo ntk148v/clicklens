@@ -14,6 +14,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 interface ColumnInfo {
   name: string;
@@ -38,7 +39,7 @@ interface TableDetailResponse {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ table: string }> }
+  { params }: { params: Promise<{ table: string }> },
 ): Promise<NextResponse<TableDetailResponse>> {
   try {
     // Check session
@@ -54,7 +55,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -75,12 +76,12 @@ export async function GET(
             userMessage: "Please specify a database",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const safeDatabase = database.replace(/'/g, "''");
-    const safeTable = table.replace(/'/g, "''");
+    const safeDatabase = escapeSqlString(database);
+    const safeTable = escapeSqlString(table);
 
     if (type === "structure") {
       // Structure query uses LENS_USER (system metadata)
@@ -95,7 +96,7 @@ export async function GET(
               userMessage: "Server not properly configured",
             },
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -136,7 +137,7 @@ export async function GET(
               userMessage: "Session error",
             },
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -167,7 +168,7 @@ export async function GET(
               userMessage: "Invalid table or database name",
             },
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -177,7 +178,7 @@ export async function GET(
           clickhouse_settings: {
             date_time_output_format: "iso",
           },
-        }
+        },
       );
 
       return NextResponse.json({

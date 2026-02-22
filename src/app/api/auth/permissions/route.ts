@@ -14,6 +14,7 @@ import {
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 interface PermissionsResponse {
   success: boolean;
@@ -121,7 +122,7 @@ async function getAccessInfo(username: string): Promise<{
   }
 
   const client = createClient(lensConfig);
-  const safeUser = username.replace(/'/g, "''");
+  const safeUser = escapeSqlString(username);
 
   try {
     // Get roles assigned to the user
@@ -133,7 +134,7 @@ async function getAccessInfo(username: string): Promise<{
     const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
 
     const userRoles = rolesData
-      .map((r) => `'${r.role.replace(/'/g, "''")}'`)
+      .map((r) => `'${escapeSqlString(r.role)}'`)
       .join(",");
 
     const grantFilter = userRoles

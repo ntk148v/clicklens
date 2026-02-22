@@ -14,6 +14,7 @@ import {
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 interface DatabasesResponse {
   success: boolean;
@@ -41,7 +42,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -57,7 +58,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -70,7 +71,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
     }
 
     const client = createClient(lensConfig);
-    const safeUser = session.user.username.replace(/'/g, "''");
+    const safeUser = escapeSqlString(session.user.username);
 
     try {
       // Get roles assigned to the user
@@ -82,7 +83,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
 
       const userRoles = rolesData
-        .map((r) => `'${r.role.replace(/'/g, "''")}'`)
+        .map((r) => `'${escapeSqlString(r.role)}'`)
         .join(",");
 
       // Check global access (direct or through roles)
@@ -115,7 +116,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       if (hasGlobalAccess) {
         // User has global access, show all databases
         result = await client.query(
-          `SELECT name FROM system.databases ORDER BY name`
+          `SELECT name FROM system.databases ORDER BY name`,
         );
       } else {
         // Get databases from direct grants and role grants

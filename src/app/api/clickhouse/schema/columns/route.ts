@@ -13,6 +13,7 @@ import {
   getUserConfig,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface ColumnInfo {
   name: string;
@@ -34,7 +35,7 @@ interface ColumnsResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<ColumnsResponse>> {
   try {
     const session = await getSession();
@@ -49,7 +50,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -68,7 +69,7 @@ export async function GET(
             userMessage: "Please specify database and table",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,15 +90,15 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const client = createClient(config);
 
     // Escape single quotes in identifiers
-    const safeDatabase = database.replace(/'/g, "''");
-    const safeTable = table.replace(/'/g, "''");
+    const safeDatabase = escapeSqlString(database);
+    const safeTable = escapeSqlString(table);
 
     // Lightweight query optimized for autocomplete
     const result = await client.query<ColumnInfo>(`
@@ -130,7 +131,7 @@ export async function GET(
             userMessage: error.userMessage || error.message,
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -144,7 +145,7 @@ export async function GET(
           userMessage: "Failed to fetch columns",
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface ColumnStats {
   column: string;
@@ -43,7 +44,7 @@ interface ColumnsResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<ColumnsResponse>> {
   try {
     const session = await getSession();
@@ -58,7 +59,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -73,7 +74,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -92,7 +93,7 @@ export async function GET(
             userMessage: "Please specify database and table",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -110,8 +111,8 @@ export async function GET(
     }
 
     const client = createClient(lensConfig);
-    const safeDatabase = database.replace(/'/g, "''");
-    const safeTable = table.replace(/'/g, "''");
+    const safeDatabase = escapeSqlString(database);
+    const safeTable = escapeSqlString(table);
 
     const result = await client.query<ColumnStats>(`
       SELECT
@@ -157,11 +158,11 @@ export async function GET(
       total_bytes: columns.reduce((sum, c) => sum + Number(c.bytes_on_disk), 0),
       total_compressed: columns.reduce(
         (sum, c) => sum + Number(c.compressed_bytes),
-        0
+        0,
       ),
       total_uncompressed: columns.reduce(
         (sum, c) => sum + Number(c.uncompressed_bytes),
-        0
+        0,
       ),
       avg_compression_ratio: 0,
     };

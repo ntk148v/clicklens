@@ -43,7 +43,7 @@ export interface RolesResponse {
   error?: string;
 }
 
-import { quoteIdentifier } from "@/lib/clickhouse/utils";
+import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 
 // Ensure feature roles exist (auto-create on first access)
 async function ensureFeatureRoles(
@@ -440,7 +440,7 @@ export async function PUT(
 
     // Get current inherited roles
     // Escape role name to prevent SQL injection
-    const safeRoleName = body.name.replace(/'/g, "''");
+    const safeRoleName = escapeSqlString(body.name);
     const currentRoleGrants = await client.query<{
       granted_role_name: string;
     }>(`

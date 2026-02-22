@@ -9,6 +9,7 @@ import {
   type ClickHouseFormat,
   type ClickHouseQueryResult,
 } from "./types";
+import { escapeSqlString } from "../utils";
 
 /**
  * ClickHouse Client Implementation
@@ -38,7 +39,7 @@ export class ClickHouseClientImpl implements ClickHouseClient {
       timeout?: number;
       query_id?: string;
       clickhouse_settings?: Record<string, unknown>;
-    }
+    },
   ): Promise<ClickHouseQueryResult<T>> {
     const resultSet = await this.client.query({
       query: sql,
@@ -91,14 +92,13 @@ export class ClickHouseClientImpl implements ClickHouseClient {
 
   async version(): Promise<string> {
     const result = await this.query<{ version: string }>(
-      "SELECT version() AS version"
+      "SELECT version() AS version",
     );
     return result.data[0].version;
   }
 
   async killQuery(queryId: string): Promise<void> {
-    // Escape single quotes to prevent SQL injection
-    const escapedQueryId = queryId.replace(/'/g, "''");
+    const escapedQueryId = escapeSqlString(queryId);
     await this.client.command({
       query: `KILL QUERY WHERE query_id = '${escapedQueryId}' SYNC`,
     });
@@ -115,7 +115,7 @@ export class ClickHouseClientImpl implements ClickHouseClient {
       query_id?: string;
       format?: ClickHouseFormat;
       clickhouse_settings?: ClickHouseSettings;
-    }
+    },
   ): Promise<unknown> {
     const settings: ClickHouseSettings = {
       ...(this.settings as ClickHouseSettings),

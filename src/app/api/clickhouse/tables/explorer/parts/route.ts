@@ -12,6 +12,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface PartInfo {
   partition: string;
@@ -50,7 +51,7 @@ interface PartsResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<PartsResponse>> {
   try {
     const session = await getSession();
@@ -65,7 +66,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -80,7 +81,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -99,7 +100,7 @@ export async function GET(
             userMessage: "Please specify database and table",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -119,8 +120,8 @@ export async function GET(
     const client = createClient(lensConfig);
     const clusterName = await getClusterName(client);
 
-    const safeDatabase = database.replace(/'/g, "''");
-    const safeTable = table.replace(/'/g, "''");
+    const safeDatabase = escapeSqlString(database);
+    const safeTable = escapeSqlString(table);
 
     const tableSource = clusterName
       ? `clusterAllReplicas('${clusterName}', system.parts)`
@@ -161,11 +162,11 @@ export async function GET(
       total_bytes: parts.reduce((sum, p) => sum + Number(p.bytes_on_disk), 0),
       total_compressed: parts.reduce(
         (sum, p) => sum + Number(p.data_compressed_bytes),
-        0
+        0,
       ),
       total_uncompressed: parts.reduce(
         (sum, p) => sum + Number(p.data_uncompressed_bytes),
-        0
+        0,
       ),
       avg_compression_ratio: 0,
     };

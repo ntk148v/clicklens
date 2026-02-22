@@ -14,6 +14,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 interface TableInfo {
   database?: string;
@@ -35,7 +36,7 @@ interface TablesResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<TablesResponse>> {
   try {
     // Check session
@@ -51,7 +52,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -67,7 +68,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -86,8 +87,8 @@ export async function GET(
     }
 
     const client = createClient(lensConfig);
-    const safeUser = session.user.username.replace(/'/g, "''");
-    const safeDatabase = database ? database.replace(/'/g, "''") : null;
+    const safeUser = escapeSqlString(session.user.username);
+    const safeDatabase = database ? escapeSqlString(database) : null;
 
     try {
       // Get roles assigned to the user
@@ -99,7 +100,7 @@ export async function GET(
       const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
 
       const userRoles = rolesData
-        .map((r) => `'${r.role.replace(/'/g, "''")}'`)
+        .map((r) => `'${escapeSqlString(r.role)}'`)
         .join(",");
 
       const grantFilter = userRoles

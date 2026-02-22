@@ -14,6 +14,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { escapeSqlString } from "@/lib/clickhouse/utils";
 import type {
   ColumnMetadata,
   TimeColumnCandidate,
@@ -44,7 +45,7 @@ function isTimeType(type: string): boolean {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<SchemaResponse>> {
   try {
     const session = await getSession();
@@ -59,7 +60,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -74,7 +75,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -93,7 +94,7 @@ export async function GET(
             userMessage: "Database and table parameters are required",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -111,8 +112,8 @@ export async function GET(
     }
 
     const client = createClient(lensConfig);
-    const safeDatabase = database.replace(/'/g, "''");
-    const safeTable = table.replace(/'/g, "''");
+    const safeDatabase = escapeSqlString(database);
+    const safeTable = escapeSqlString(table);
 
     // Fetch column information
     const columnsResult = await client.query(`
@@ -153,7 +154,7 @@ export async function GET(
             userMessage: `Table ${database}.${table} not found or not accessible`,
           },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 

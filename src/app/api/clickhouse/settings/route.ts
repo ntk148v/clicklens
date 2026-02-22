@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
+import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 
     const client = createClient(config);
 
-    const safeSearch = search.replace(/'/g, "''");
+    const safeSearch = escapeSqlString(search);
     let query = "";
 
     if (scope === "server") {
@@ -133,11 +134,10 @@ export async function PUT(request: Request) {
     // Note: This requires privileges to ALTER USER
     // We sanitize input manually as the client wrapper expects a string
     const safeName = name.replace(/[^a-zA-Z0-9_.]/g, ""); // Strict allowlist for setting name
-    const safeValue = String(value).replace(/'/g, "''");
-    // Sanitize username as well to prevent injection
-    const safeUsername = String(currentUsername).replace(/`/g, "``");
+    const safeValue = escapeSqlString(String(value));
+    const quotedUsername = quoteIdentifier(String(currentUsername));
 
-    const query = `ALTER USER \`${safeUsername}\` SETTINGS ${safeName} = '${safeValue}'`;
+    const query = `ALTER USER ${quotedUsername} SETTINGS ${safeName} = '${safeValue}'`;
 
     await client.command(query);
 
