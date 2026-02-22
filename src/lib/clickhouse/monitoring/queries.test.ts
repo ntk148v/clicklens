@@ -56,7 +56,11 @@ describe("Monitoring Queries Validation", () => {
   });
 
   // Helper to wrap query with LIMIT 1 avoiding syntax errors
-  const checkQuery = async (sql: string, name: string) => {
+  const checkQuery = async (
+    sql: string,
+    name: string,
+    queryParams?: Record<string, string | number>,
+  ) => {
     // Skip if ClickHouse is not available
     if (!clickhouseAvailable) {
       console.warn(`Skipping ${name}: ClickHouse not available`);
@@ -81,6 +85,7 @@ describe("Monitoring Queries Validation", () => {
       await client.query({
         query: queryToCheck,
         format: "JSONEachRow",
+        query_params: queryParams,
       });
     } catch (e: unknown) {
       const msg = (e instanceof Error ? e.message : String(e)).toString();
@@ -120,8 +125,12 @@ describe("Monitoring Queries Validation", () => {
   const testTo = new Date().toISOString();
   const testRounding = 60;
 
-  // Skip non-query exports (utility functions that don't return SQL)
-  const skipKeys = new Set(["computeRounding"]);
+  // Skip non-query exports (types, utility functions, constants)
+  const skipKeys = new Set([
+    "computeRounding",
+    "DashboardQuery",
+    "TIME_RANGE_WHERE",
+  ]);
 
   for (const [key, value] of Object.entries(queries)) {
     if (skipKeys.has(key)) continue;
@@ -132,34 +141,38 @@ describe("Monitoring Queries Validation", () => {
       });
     } else if (typeof value === "function") {
       test(`Function Query: ${key}`, async () => {
-        let sql: string;
-
         // Handle different signatures
         // PerNode queries REQUIRE a cluster name, so we provide a dummy one
         // and expect the "Cluster not found" handler to catch it.
         if (key.includes("PerNode")) {
-          sql = (value as (...args: unknown[]) => string)(60, "dummy_cluster");
-        }
-        // Dashboard queries take (from, to, rounding, clusterName?)
-        else if (key.startsWith("getDashboard")) {
-          sql = (value as (...args: unknown[]) => string)(
-            testFrom,
-            testTo,
-            testRounding,
-            undefined,
+          const sql = (value as (...args: unknown[]) => string)(
+            60,
+            "dummy_cluster",
           );
+          await checkQuery(sql, key);
+        }
+        // Dashboard time-series queries return DashboardQuery { query, query_params }
+        // (they take 3+ args: from, to, rounding, clusterName?)
+        else if (key.startsWith("getDashboard") && value.length >= 3) {
+          const dq = (
+            value as (...args: unknown[]) => {
+              query: string;
+              query_params: Record<string, string | number>;
+            }
+          )(testFrom, testTo, testRounding, undefined);
+          await checkQuery(dq.query, key, dq.query_params);
         }
         // Single-arg functions usually take optional clusterName (passed as undefined)
         // or just return string.
         else if (value.length <= 1) {
-          sql = (value as (...args: unknown[]) => string)(undefined);
+          const sql = (value as (...args: unknown[]) => string)(undefined);
+          await checkQuery(sql, key);
         }
         // Two-arg functions usually take (interval, clusterName)
         else {
-          sql = (value as (...args: unknown[]) => string)(60, undefined);
+          const sql = (value as (...args: unknown[]) => string)(60, undefined);
+          await checkQuery(sql, key);
         }
-
-        await checkQuery(sql, key);
       });
     }
   }
