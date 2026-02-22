@@ -38,6 +38,7 @@ export class ClickHouseClientImpl implements ClickHouseClient {
     options?: {
       timeout?: number;
       query_id?: string;
+      query_params?: Record<string, string | number>;
       clickhouse_settings?: Record<string, unknown>;
     },
   ): Promise<ClickHouseQueryResult<T>> {
@@ -45,6 +46,7 @@ export class ClickHouseClientImpl implements ClickHouseClient {
       query: sql,
       format: "JSON",
       query_id: options?.query_id,
+      query_params: options?.query_params,
       clickhouse_settings: {
         date_time_output_format: "iso",
         ...(this.settings || {}),

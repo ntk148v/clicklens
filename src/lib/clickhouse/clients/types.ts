@@ -45,8 +45,9 @@ export interface ClickHouseClient {
     options?: {
       timeout?: number;
       query_id?: string;
+      query_params?: Record<string, string | number>;
       clickhouse_settings?: Record<string, unknown>;
-    }
+    },
   ): Promise<ClickHouseQueryResult<T>>;
 
   /**
@@ -79,7 +80,7 @@ export interface ClickHouseClient {
       query_id?: string;
       format?: ClickHouseFormat;
       clickhouse_settings?: Record<string, unknown>;
-    }
+    },
   ): Promise<unknown>; // returning unknown to avoid deep type dependencies for now, or use complex type
 
   explain(sql: string): Promise<string[]>;
