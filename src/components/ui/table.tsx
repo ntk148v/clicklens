@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
-    <ScrollArea className="w-full h-full relative" type="auto">
+    <ScrollArea className="w-full h-full relative flex-1 min-h-0" type="auto">
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
@@ -29,7 +29,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
       data-slot="table-header"
       className={cn(
         "[&_tr]:border-b sticky top-0 bg-background z-10 shadow-sm",
-        className
+        className,
       )}
       {...props}
     />
@@ -48,7 +48,7 @@ function TableBody({ className, isLoading, ...props }: TableBodyProps) {
         "[&_tr:last-child]:border-0",
         isLoading &&
           "opacity-50 pointer-events-none select-none transition-opacity duration-200",
-        className
+        className,
       )}
       {...props}
     />
@@ -61,7 +61,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
       data-slot="table-footer"
       className={cn(
         "bg-muted/50 border-t font-medium [&>tr]:last:border-b-0",
-        className
+        className,
       )}
       {...props}
     />
@@ -74,7 +74,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
       data-slot="table-row"
       className={cn(
         "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
-        className
+        className,
       )}
       {...props}
     />
@@ -87,7 +87,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
       data-slot="table-head"
       className={cn(
         "text-foreground h-10 px-2 text-left align-middle font-semibold whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        className
+        className,
       )}
       {...props}
     />
@@ -100,7 +100,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       data-slot="table-cell"
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-mono",
-        className
+        className,
       )}
       {...props}
     />
@@ -215,7 +215,7 @@ function ClickableTableRow({
         data-slot="table-row"
         className={cn(
           "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
-          className
+          className,
         )}
         onClick={() => setSheetOpen(true)}
         {...props}
@@ -247,11 +247,11 @@ function TableWrapper({
   return (
     <Card
       className={cn(
-        "flex-1 flex flex-col overflow-hidden border-none shadow-none",
-        className
+        "flex-1 flex flex-col min-h-0 overflow-hidden border-none shadow-none",
+        className,
       )}
     >
-      <div className="flex-1 border rounded-md overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-h-0 border rounded-md overflow-hidden relative">
         {children}
       </div>
     </Card>
