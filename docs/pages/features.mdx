@@ -204,16 +204,16 @@ Browse and inspect your ClickHouse schema in detail.
 
 ### 3.2. Table Detail Tabs
 
-| Tab              | Description                                      |
-| ---------------- | ------------------------------------------------ |
-| **Overview**     | Summary statistics (rows, size, engine)          |
-| **Columns**      | Column definitions with types and defaults       |
-| **Parts**        | Data parts with sizes and row counts             |
-| **Merges**       | Active merge operations                          |
-| **Mutations**    | Pending ALTER mutations                          |
-| **Replicas**     | Replication status (for replicated tables)       |
-| **Dependencies** | Interactive graph of table relationships         |
-| **DDL**          | `CREATE TABLE` statement                         |
+| Tab              | Description                                |
+| ---------------- | ------------------------------------------ |
+| **Overview**     | Summary statistics (rows, size, engine)    |
+| **Columns**      | Column definitions with types and defaults |
+| **Parts**        | Data parts with sizes and row counts       |
+| **Merges**       | Active merge operations                    |
+| **Mutations**    | Pending ALTER mutations                    |
+| **Replicas**     | Replication status (for replicated tables) |
+| **Dependencies** | Interactive graph of table relationships   |
+| **DDL**          | `CREATE TABLE` statement                   |
 
 ![](/screenshots/tables-columns.png)
 
@@ -268,7 +268,7 @@ Real-time cluster health and performance monitoring.
 
 - **① The Cluster status**: shows the number of shards, replicas, as well as the cluster name.
 - **② The Overall healthcheck**: ClickLens performs multiple checks: uptime, readonly replicas, parts to check, max parts per partition, active queries, memory usage, and replication delay.
-- **③ Multiple Graphs**: these graphs are based on [ClickHouse built-in advanced monitoring dashboards](https://clickhouse.com/docs/operations/system-tables/dashboards). ClickLens selects metrics following the [ClickHouse operations documentation](https://clickhouse.com/docs/operations/monitoring).
+- **③ Multiple Graphs**: these graphs are based on [ClickHouse built-in advanced monitoring dashboards](https://clickhouse.com/docs/operations/system-tables/dashboards). ClickLens selects metrics following the [ClickHouse operations documentation](https://clickhouse.com/docs/operations/monitoring). Charts are grouped into **ClickHouse Metrics**, **System Health**, and **Network Metrics**, and they support multiline timestamps on their X-axis for optimal readability over extended time ranges.
 
 ![](/screenshots/monitoring-metrics.png)
 
