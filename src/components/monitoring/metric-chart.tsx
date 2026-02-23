@@ -89,7 +89,7 @@ export function MetricChart({
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="pb-4">
+      <CardContent>
         {loading ? (
           <div
             className="animate-pulse bg-muted rounded"
