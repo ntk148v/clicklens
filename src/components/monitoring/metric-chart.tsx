@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import React, { useId, useCallback, useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -12,6 +12,94 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
+
+/** Parse a ClickHouse timestamp string into a Date (local time). */
+const parseTimestamp = (raw: string): Date | null => {
+  try {
+    const d = new Date(raw.replace(" ", "T"));
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+};
+
+/** Format time as HH:mm */
+const fmtTime = (d: Date): string =>
+  d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/** Format date as short month + day, e.g. "Feb 23" */
+const fmtDate = (d: Date): string =>
+  d.toLocaleDateString([], { month: "short", day: "numeric" });
+
+/** Format full label for tooltip: "Feb 23, 14:05" */
+const fmtTooltipLabel = (label: React.ReactNode): string => {
+  const d = parseTimestamp(String(label ?? ""));
+  if (!d) return String(label ?? "");
+  return `${fmtDate(d)}, ${fmtTime(d)}`;
+};
+
+/**
+ * Determine which tick indices should show a date label.
+ * The first tick always gets a date, and then each tick whose date
+ * differs from the previous tick's date.
+ */
+const buildDateIndices = (data: Array<{ timestamp: string }>): Set<number> => {
+  const indices = new Set<number>();
+  let prevDateStr = "";
+  data.forEach((d, i) => {
+    const parsed = parseTimestamp(d.timestamp);
+    if (!parsed) return;
+    const dateStr = `${parsed.getFullYear()}-${parsed.getMonth()}-${parsed.getDate()}`;
+    if (dateStr !== prevDateStr) {
+      indices.add(i);
+      prevDateStr = dateStr;
+    }
+  });
+  return indices;
+};
+
+interface CustomTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value: string; index: number };
+  dateIndices: Set<number>;
+}
+
+/** Custom XAxis tick that shows date on a new line when the day changes. */
+const CustomXAxisTick = ({ x, y, payload, dateIndices }: CustomTickProps) => {
+  if (!payload) return null;
+  const d = parseTimestamp(payload.value);
+  if (!d) return null;
+
+  const showDate = dateIndices.has(payload.index);
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={12}
+        textAnchor="middle"
+        fill="#9ca3af"
+        fontSize={10}
+      >
+        {fmtTime(d)}
+      </text>
+      {showDate && (
+        <text
+          x={0}
+          y={0}
+          dy={24}
+          textAnchor="middle"
+          fill="#6b7280"
+          fontSize={9}
+        >
+          {fmtDate(d)}
+        </text>
+      )}
+    </g>
+  );
+};
 
 export interface MetricChartProps {
   title: string;
@@ -64,32 +152,26 @@ export function MetricChart({
     return value.toFixed(0);
   };
 
-  const formatTime = (label: React.ReactNode): string => {
-    const timestamp = String(label ?? "");
-    try {
-      // Parse timestamp as local time (ClickHouse returns server local time)
-      // Replace space with 'T' and don't add 'Z' to treat as local
-      const localTimestamp = timestamp.replace(" ", "T");
-      const date = new Date(localTimestamp);
-      // If invalid, try parsing directly
-      if (isNaN(date.getTime())) {
-        return timestamp.slice(11, 16) || "";
-      }
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  };
+  // Precompute which datapoint indices should show a date label
+  const dateIndices = useMemo(() => buildDateIndices(data), [data]);
+
+  // Stable tick component reference to avoid Recharts re-renders
+  const renderTick = useCallback(
+    (props: Record<string, unknown>) => (
+      <CustomXAxisTick
+        {...(props as Omit<CustomTickProps, "dateIndices">)}
+        dateIndices={dateIndices}
+      />
+    ),
+    [dateIndices],
+  );
 
   return (
     <Card className={cn(className)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pl-0 pb-0">
         {loading ? (
           <div
             className="animate-pulse bg-muted rounded"
@@ -106,7 +188,12 @@ export function MetricChart({
           <ResponsiveContainer width="100%" height={height}>
             <AreaChart
               data={data}
-              margin={{ top: 5, right: 5, left: showAxis ? 35 : 5, bottom: 5 }}
+              margin={{
+                top: 5,
+                right: 5,
+                left: showAxis ? 35 : 5,
+                bottom: showAxis ? 20 : 5,
+              }}
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -120,9 +207,9 @@ export function MetricChart({
                     dataKey="timestamp"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    tickFormatter={formatTime}
-                    minTickGap={30}
+                    tick={renderTick}
+                    minTickGap={50}
+                    height={40}
                   />
                   <YAxis
                     axisLine={false}
@@ -143,7 +230,7 @@ export function MetricChart({
                 }}
                 labelStyle={{ color: "#9ca3af" }}
                 itemStyle={{ color: "#f9fafb" }}
-                labelFormatter={formatTime}
+                labelFormatter={fmtTooltipLabel}
                 formatter={(value) => {
                   const numValue = typeof value === "number" ? value : 0;
                   const formatted = formatValue(numValue);
@@ -279,25 +366,21 @@ export function MultiSeriesChart({
     return value.toFixed(0);
   };
 
-  const formatTime = (label: React.ReactNode): string => {
-    const timestamp = String(label ?? "");
-    try {
-      // Parse timestamp as local time (ClickHouse returns server local time)
-      // Replace space with 'T' and don't add 'Z' to treat as local
-      const localTimestamp = timestamp.replace(" ", "T");
-      const date = new Date(localTimestamp);
-      // If invalid, try parsing directly
-      if (isNaN(date.getTime())) {
-        return timestamp.slice(11, 16) || "";
-      }
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  };
+  // Precompute which datapoint indices should show a date label
+  const dateIndicesForPivoted = useMemo(
+    () => buildDateIndices(pivotedData as Array<{ timestamp: string }>),
+    [pivotedData],
+  );
+
+  const renderTick = useCallback(
+    (props: Record<string, unknown>) => (
+      <CustomXAxisTick
+        {...(props as Omit<CustomTickProps, "dateIndices">)}
+        dateIndices={dateIndicesForPivoted}
+      />
+    ),
+    [dateIndicesForPivoted],
+  );
 
   // Get color for node
   const getNodeColor = (index: number) =>
@@ -344,7 +427,12 @@ export function MultiSeriesChart({
           <ResponsiveContainer width="100%" height={height}>
             <AreaChart
               data={pivotedData}
-              margin={{ top: 5, right: 5, left: showAxis ? 35 : 5, bottom: 5 }}
+              margin={{
+                top: 5,
+                right: 5,
+                left: showAxis ? 35 : 5,
+                bottom: showAxis ? 20 : 5,
+              }}
             >
               {showAxis && (
                 <>
@@ -352,9 +440,9 @@ export function MultiSeriesChart({
                     dataKey="timestamp"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    tickFormatter={formatTime}
-                    minTickGap={30}
+                    tick={renderTick}
+                    minTickGap={50}
+                    height={40}
                   />
                   <YAxis
                     axisLine={false}
@@ -374,7 +462,7 @@ export function MultiSeriesChart({
                   color: "#f9fafb",
                 }}
                 labelStyle={{ color: "#9ca3af" }}
-                labelFormatter={formatTime}
+                labelFormatter={fmtTooltipLabel}
                 formatter={(value, name) => {
                   const numValue = typeof value === "number" ? value : 0;
                   const formatted = formatValue(numValue);
@@ -403,6 +491,3 @@ export function MultiSeriesChart({
     </Card>
   );
 }
-
-// Import React for useMemo
-import React from "react";
