@@ -1346,3 +1346,273 @@ SETTINGS skip_unavailable_shards = 1
     clusterName,
   );
 };
+
+// OS CPU Usage (Kernel) (CH ref: avg(value) from asynchronous_metric_log where metric = 'OSSystemTimeNormalized')
+export const getDashboardCPUKernelQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(value) AS value
+FROM merge('system', '^asynchronous_metric_log')
+WHERE ${TIME_RANGE_WHERE}
+  AND metric = 'OSSystemTimeNormalized'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(value) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+  AND metric = 'OSSystemTimeNormalized'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};
+
+// Network send bytes/sec (CH ref: avg(value) from asynchronous_metric_log where metric LIKE 'NetworkSendBytes%')
+export const getDashboardNetworkSendQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(value) AS value
+FROM merge('system', '^asynchronous_metric_log')
+WHERE ${TIME_RANGE_WHERE}
+  AND metric LIKE 'NetworkSendBytes%'
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(value) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+  AND metric LIKE 'NetworkSendBytes%'
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};
+
+// Concurrent network connections (CH ref: avg(CurrentMetric_TCPConnection + CurrentMetric_HTTPConnection + CurrentMetric_MySQLConnection) from metric_log)
+export const getDashboardNetworkConnectionsQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(CurrentMetric_TCPConnection + CurrentMetric_HTTPConnection + CurrentMetric_MySQLConnection) AS value
+FROM merge('system', '^metric_log')
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(CurrentMetric_TCPConnection + CurrentMetric_HTTPConnection + CurrentMetric_MySQLConnection) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};
+
+// Selected bytes/sec (CH ref: avg(ProfileEvent_SelectedBytes) from metric_log)
+export const getDashboardSelectedBytesQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(ProfileEvent_SelectedBytes) AS value
+FROM merge('system', '^metric_log')
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(ProfileEvent_SelectedBytes) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};
+
+// Inserted bytes/sec (CH ref: avg(ProfileEvent_InsertedBytes) from metric_log)
+export const getDashboardInsertedBytesQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(ProfileEvent_InsertedBytes) AS value
+FROM merge('system', '^metric_log')
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(ProfileEvent_InsertedBytes) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};
+
+// Read from disk bytes/sec (CH ref: avg(ProfileEvent_OSReadBytes) from metric_log)
+export const getDashboardDiskReadQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(ProfileEvent_OSReadBytes) AS value
+FROM merge('system', '^metric_log')
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(ProfileEvent_OSReadBytes) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};
+
+// Written to disk bytes/sec (CH ref: avg(ProfileEvent_OSWriteBytes) from metric_log)
+export const getDashboardDiskWriteQuery = (
+  from: string,
+  to: string,
+  rounding: number,
+  clusterName?: string,
+): DashboardQuery => {
+  const singleNode = `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostName() AS node,
+  avg(ProfileEvent_OSWriteBytes) AS value
+FROM merge('system', '^metric_log')
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+`;
+  const cluster = (c: string) => `
+SELECT
+  toStartOfInterval(event_time, INTERVAL {rounding:UInt32} SECOND) AS t,
+  hostname AS node,
+  avg(ProfileEvent_OSWriteBytes) AS value
+FROM clusterAllReplicas('${c}', merge('system', '^metric_log'))
+WHERE ${TIME_RANGE_WHERE}
+GROUP BY t, node
+ORDER BY t, node
+SETTINGS skip_unavailable_shards = 1
+`;
+  return createDashboardQuery(
+    singleNode,
+    cluster,
+    from,
+    to,
+    rounding,
+    clusterName,
+  );
+};

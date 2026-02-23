@@ -13,6 +13,7 @@ import {
   Cpu,
   Database,
   HeartPulse,
+  Network,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -76,14 +77,21 @@ interface DashboardData {
     mergesRunning: TimeSeriesPoint[];
     selectedRowsPerSec: TimeSeriesPoint[];
     insertedRowsPerSec: TimeSeriesPoint[];
+    selectedBytesPerSec: TimeSeriesPoint[];
+    insertedBytesPerSec: TimeSeriesPoint[];
     maxPartsPerPartition: TimeSeriesPoint[];
   };
   systemHealth: {
     memoryTracked: TimeSeriesPoint[];
     cpuUsage: TimeSeriesPoint[];
+    cpuKernel: TimeSeriesPoint[];
     ioWait: TimeSeriesPoint[];
     filesystemUsed: TimeSeriesPoint[];
     networkReceived: TimeSeriesPoint[];
+    networkSent: TimeSeriesPoint[];
+    networkConnections: TimeSeriesPoint[];
+    diskRead: TimeSeriesPoint[];
+    diskWrite: TimeSeriesPoint[];
   };
   nodes: string[];
 }
@@ -428,6 +436,16 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
             data?.clickhouse.insertedRowsPerSec || [],
             { unit: "/s" },
           )}
+          {renderChart(
+            "Selected Bytes/sec",
+            data?.clickhouse.selectedBytesPerSec || [],
+            { isBytes: true },
+          )}
+          {renderChart(
+            "Inserted Bytes/sec",
+            data?.clickhouse.insertedBytesPerSec || [],
+            { isBytes: true },
+          )}
           {renderChart("Merges Running", data?.clickhouse.mergesRunning || [])}
           {renderChart(
             "Max Parts/Partition",
@@ -452,6 +470,10 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
             "OS CPU Usage (Userspace)",
             data?.systemHealth.cpuUsage || [],
           )}
+          {renderChart(
+            "OS CPU Usage (Kernel)",
+            data?.systemHealth.cpuKernel || [],
+          )}
           {renderChart("IO Wait", data?.systemHealth.ioWait || [], {
             unit: "s",
           })}
@@ -460,10 +482,35 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
             data?.systemHealth.filesystemUsed || [],
             { isBytes: true },
           )}
+          {renderChart("Read from Disk", data?.systemHealth.diskRead || [], {
+            isBytes: true,
+          })}
+          {renderChart("Written to Disk", data?.systemHealth.diskWrite || [], {
+            isBytes: true,
+          })}
+        </div>
+      </section>
+
+      {/* Network Metrics */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Network className="w-5 h-5" />
+          Network
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderChart(
             "Network Received Bytes/sec",
             data?.systemHealth.networkReceived || [],
             { isBytes: true },
+          )}
+          {renderChart(
+            "Network Send Bytes/sec",
+            data?.systemHealth.networkSent || [],
+            { isBytes: true },
+          )}
+          {renderChart(
+            "Concurrent Network Connections",
+            data?.systemHealth.networkConnections || [],
           )}
         </div>
       </section>

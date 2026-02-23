@@ -28,9 +28,16 @@ import {
   getDashboardMaxPartsQuery,
   getDashboardMemoryQuery,
   getDashboardCPUQuery,
+  getDashboardCPUKernelQuery,
   getDashboardIOWaitQuery,
   getDashboardFilesystemQuery,
   getDashboardNetworkQuery,
+  getDashboardNetworkSendQuery,
+  getDashboardNetworkConnectionsQuery,
+  getDashboardSelectedBytesQuery,
+  getDashboardInsertedBytesQuery,
+  getDashboardDiskReadQuery,
+  getDashboardDiskWriteQuery,
   type DashboardQuery,
   type MonitoringApiResponse,
 } from "@/lib/clickhouse/monitoring";
@@ -108,14 +115,21 @@ interface DashboardResponse {
     mergesRunning: TimeSeriesPoint[];
     selectedRowsPerSec: TimeSeriesPoint[];
     insertedRowsPerSec: TimeSeriesPoint[];
+    selectedBytesPerSec: TimeSeriesPoint[];
+    insertedBytesPerSec: TimeSeriesPoint[];
     maxPartsPerPartition: TimeSeriesPoint[];
   };
   systemHealth: {
     memoryTracked: TimeSeriesPoint[];
     cpuUsage: TimeSeriesPoint[];
+    cpuKernel: TimeSeriesPoint[];
     ioWait: TimeSeriesPoint[];
     filesystemUsed: TimeSeriesPoint[];
     networkReceived: TimeSeriesPoint[];
+    networkSent: TimeSeriesPoint[];
+    networkConnections: TimeSeriesPoint[];
+    diskRead: TimeSeriesPoint[];
+    diskWrite: TimeSeriesPoint[];
   };
   nodes: string[]; // List of unique node names
 }
@@ -229,12 +243,19 @@ export async function GET(
       mergesRunningResult,
       selectedRowsResult,
       insertedRowsResult,
+      selectedBytesResult,
+      insertedBytesResult,
       maxPartsResult,
       memoryResult,
       cpuResult,
+      cpuKernelResult,
       ioWaitResult,
       filesystemResult,
       networkResult,
+      networkSendResult,
+      networkConnectionsResult,
+      diskReadResult,
+      diskWriteResult,
     ] = await Promise.all([
       execDashboardQuery(
         getDashboardQueriesPerSecQuery(from, to, rounding, clusterName),
@@ -252,12 +273,21 @@ export async function GET(
         getDashboardInsertedRowsQuery(from, to, rounding, clusterName),
       ),
       execDashboardQuery(
+        getDashboardSelectedBytesQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardInsertedBytesQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
         getDashboardMaxPartsQuery(from, to, rounding, clusterName),
       ),
       execDashboardQuery(
         getDashboardMemoryQuery(from, to, rounding, clusterName),
       ),
       execDashboardQuery(getDashboardCPUQuery(from, to, rounding, clusterName)),
+      execDashboardQuery(
+        getDashboardCPUKernelQuery(from, to, rounding, clusterName),
+      ),
       execDashboardQuery(
         getDashboardIOWaitQuery(from, to, rounding, clusterName),
       ),
@@ -266,6 +296,18 @@ export async function GET(
       ),
       execDashboardQuery(
         getDashboardNetworkQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardNetworkSendQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardNetworkConnectionsQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardDiskReadQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardDiskWriteQuery(from, to, rounding, clusterName),
       ),
     ]);
 
@@ -289,14 +331,21 @@ export async function GET(
         mergesRunning: mergesRunningResult.data,
         selectedRowsPerSec: selectedRowsResult.data,
         insertedRowsPerSec: insertedRowsResult.data,
+        selectedBytesPerSec: selectedBytesResult.data,
+        insertedBytesPerSec: insertedBytesResult.data,
         maxPartsPerPartition: maxPartsResult.data,
       },
       systemHealth: {
         memoryTracked: memoryResult.data,
         cpuUsage: cpuResult.data,
+        cpuKernel: cpuKernelResult.data,
         ioWait: ioWaitResult.data,
         filesystemUsed: filesystemResult.data,
         networkReceived: networkResult.data,
+        networkSent: networkSendResult.data,
+        networkConnections: networkConnectionsResult.data,
+        diskRead: diskReadResult.data,
+        diskWrite: diskWriteResult.data,
       },
       nodes,
     };
