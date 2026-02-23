@@ -448,7 +448,10 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
             data?.systemHealth.memoryTracked || [],
             { isBytes: true },
           )}
-          {renderChart("CPU Usage", data?.systemHealth.cpuUsage || [])}
+          {renderChart(
+            "OS CPU Usage (Userspace)",
+            data?.systemHealth.cpuUsage || [],
+          )}
           {renderChart("IO Wait", data?.systemHealth.ioWait || [], {
             unit: "s",
           })}
@@ -458,7 +461,7 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
             { isBytes: true },
           )}
           {renderChart(
-            "Network Received",
+            "Network Received Bytes/sec",
             data?.systemHealth.networkReceived || [],
             { isBytes: true },
           )}

@@ -1189,7 +1189,7 @@ SETTINGS skip_unavailable_shards = 1
   );
 };
 
-// CPU usage — OS CPU Usage Userspace (CH ref: avg(value) from asynchronous_metric_log where metric = 'OSUserTimeNormalized')
+// OS CPU Usage (Userspace) (CH ref: avg(value) from asynchronous_metric_log where metric = 'OSUserTimeNormalized')
 export const getDashboardCPUQuery = (
   from: string,
   to: string,
@@ -1321,7 +1321,7 @@ SELECT
   avg(value) AS value
 FROM merge('system', '^asynchronous_metric_log')
 WHERE ${TIME_RANGE_WHERE}
-  AND metric = 'NetworkReceiveBytes_default'
+  AND metric LIKE 'NetworkReceiveBytes%'
 GROUP BY t, node
 ORDER BY t, node
 `;
@@ -1332,7 +1332,7 @@ SELECT
   avg(value) AS value
 FROM clusterAllReplicas('${c}', merge('system', '^asynchronous_metric_log'))
 WHERE ${TIME_RANGE_WHERE}
-  AND metric = 'NetworkReceiveBytes_default'
+  AND metric LIKE 'NetworkReceiveBytes%'
 GROUP BY t, node
 ORDER BY t, node
 SETTINGS skip_unavailable_shards = 1
