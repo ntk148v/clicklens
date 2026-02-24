@@ -115,7 +115,9 @@ export function findStatementAtPosition(
   cursorPosition: number
 ): string | null {
   let current = "";
+  let lastValidStatement = "";
   let statementStart = 0;
+  let gapEnd = 0; // Track end of gap between statements
   let i = 0;
 
   while (i < sql.length) {
@@ -179,16 +181,29 @@ export function findStatementAtPosition(
 
     // Check for statement terminator
     if (char === ";") {
-      const statementEnd = i; // Position of the semicolon
+      const trimmed = current.trim();
+      if (trimmed) {
+        lastValidStatement = trimmed;
+      }
 
-      // Check if cursor is within this statement
+      const statementEnd = i; // Position of the semicolon
+      // Include semicolon in the statement check (cursor can be at semicolon)
       if (cursorPosition >= statementStart && cursorPosition <= statementEnd) {
-        const trimmed = current.trim();
         return trimmed || null;
       }
 
       current = "";
-      statementStart = i + 1;
+      // Track where the gap ends (after skipping whitespace)
+      let nextStart = i + 1;
+      while (nextStart < sql.length && /[\s\n\r]/.test(sql[nextStart])) {
+        nextStart++;
+      }
+      gapEnd = nextStart;
+      // Cursor in the gap should return previous statement
+      if (cursorPosition >= statementStart && cursorPosition < gapEnd) {
+        return lastValidStatement || null;
+      }
+      statementStart = nextStart;
       i++;
       continue;
     }
@@ -198,9 +213,15 @@ export function findStatementAtPosition(
   }
 
   // Check if cursor is in the last statement (no trailing semicolon)
-  if (cursorPosition >= statementStart) {
-    const trimmed = current.trim();
-    return trimmed || null;
+  // or in trailing whitespace after the last statement
+  const trimmed = current.trim();
+  if (trimmed) {
+    lastValidStatement = trimmed;
+  }
+
+  // Return last valid statement if cursor is past all content or in trailing whitespace
+  if (cursorPosition >= statementStart || cursorPosition >= sql.length) {
+    return lastValidStatement || null;
   }
 
   return null;
