@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Header } from "@/components/layout";
 import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
@@ -21,7 +21,7 @@ import { AccessDenied } from "@/components/ui/access-denied";
 import { useAuth } from "@/components/auth";
 import { useDiscoverState } from "@/lib/hooks/use-discover-state";
 
-export default function DiscoverPage() {
+function DiscoverPageContent() {
   const { permissions, isLoading: authLoading } = useAuth();
 
   const {
@@ -303,5 +303,19 @@ export default function DiscoverPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+export default function DiscoverPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-full flex items-center justify-center">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        </div>
+      }
+    >
+      <DiscoverPageContent />
+    </Suspense>
   );
 }
