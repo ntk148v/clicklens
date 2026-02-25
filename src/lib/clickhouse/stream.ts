@@ -86,7 +86,7 @@ export async function* fetchChunks({
   if (cursor) {
     const cursorTimeNum = new Date(cursor).getTime();
     whereConditions.push(
-      `\`${safeTimeCol}\` < toDateTime64(${cursorTimeNum / 1000}, 3)`,
+      `${safeTimeCol} < toDateTime64(${cursorTimeNum / 1000}, 3)`,
     );
   }
 
@@ -124,24 +124,16 @@ export async function* fetchChunks({
 
     // Original Logic:
     if (currentHigh === End) {
-      if (cursor) {
-        // If cursor exists, we use < cursor explicitly handled before loop
-        // But for the range top check in loop:
-        chunkWhere.push(
-          `\`${safeTimeCol}\` <= toDateTime64(${currentHigh / 1000}, 3)`,
-        );
-      } else {
-        chunkWhere.push(
-          `\`${safeTimeCol}\` <= toDateTime64(${currentHigh / 1000}, 3)`,
-        );
-      }
+      chunkWhere.push(
+        `${safeTimeCol} <= toDateTime64(${currentHigh / 1000}, 3)`,
+      );
     } else {
       chunkWhere.push(
-        `\`${safeTimeCol}\` < toDateTime64(${currentHigh / 1000}, 3)`,
+        `${safeTimeCol} < toDateTime64(${currentHigh / 1000}, 3)`,
       );
     }
     chunkWhere.push(
-      `\`${safeTimeCol}\` >= toDateTime64(${currentLow / 1000}, 3)`,
+      `${safeTimeCol} >= toDateTime64(${currentLow / 1000}, 3)`,
     );
 
     const chunkLimit = limit - rowsFetched;
