@@ -1,13 +1,25 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import { Search, Clock, Hash, Type, Calendar, Binary } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Search,
+  Clock,
+  Hash,
+  Type,
+  Calendar,
+  Binary,
+  ChevronRight,
+  ChevronDown,
+  Filter,
+  FilterX,
+  Loader2,
+} from "lucide-react";
 import type { ColumnMetadata, TimeColumnCandidate } from "@/lib/types/discover";
 import { cn } from "@/lib/utils";
 import { TruncatedCell } from "@/components/monitoring";
@@ -20,10 +32,19 @@ interface FieldsSidebarProps {
   selectedTimeColumn: string | null;
   onTimeColumnChange: (column: string) => void;
   onResetColumns?: () => void;
+  onFilterForValue?: (column: string, value: unknown) => void;
+  onFilterOutValue?: (column: string, value: unknown) => void;
+  fieldValuesParams?: {
+    database: string;
+    table: string;
+    timeColumn?: string;
+    minTime?: string;
+    maxTime?: string;
+    filter?: string;
+  };
   className?: string;
 }
 
-// Map ClickHouse types to icons
 function getTypeIcon(type: string) {
   const baseType = type
     .replace(/^Nullable\(/, "")
@@ -50,7 +71,6 @@ function getTypeIcon(type: string) {
   return <Type className="h-3.5 w-3.5 text-muted-foreground" />;
 }
 
-// Shorten ClickHouse type for display
 function shortenType(type: string): string {
   return type
     .replace(/^Nullable\(/, "")
@@ -65,15 +85,11 @@ function shortenType(type: string): string {
     .replace(/Nested\(.+\)/, "Nested");
 }
 
-/**
- * Sidebar for selecting which columns to include in the query
- *
- * Features:
- * - Search/filter columns
- * - Select/deselect columns (affects SQL SELECT clause)
- * - Time column selector (affects ORDER BY and WHERE)
- * - Type indicators with icons
- */
+interface FieldValue {
+  value: unknown;
+  count: number;
+}
+
 export function FieldsSidebar({
   columns,
   timeColumns,
@@ -82,9 +98,17 @@ export function FieldsSidebar({
   selectedTimeColumn,
   onTimeColumnChange,
   onResetColumns,
+  onFilterForValue,
+  onFilterOutValue,
+  fieldValuesParams,
   className,
 }: FieldsSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
+  const [fieldValues, setFieldValues] = useState<
+    Record<string, FieldValue[]>
+  >({});
+  const [loadingFields, setLoadingFields] = useState<Set<string>>(new Set());
 
   const filteredColumns = useMemo(() => {
     if (!searchTerm.trim()) return columns;
@@ -111,11 +135,65 @@ export function FieldsSidebar({
   const isTimeColumn = (name: string) =>
     timeColumns.some((tc) => tc.name === name);
 
+  const toggleFieldExpanded = useCallback(
+    async (fieldName: string) => {
+      const next = new Set(expandedFields);
+      if (next.has(fieldName)) {
+        next.delete(fieldName);
+        setExpandedFields(next);
+        return;
+      }
+
+      next.add(fieldName);
+      setExpandedFields(next);
+
+      if (fieldValues[fieldName] || !fieldValuesParams) return;
+
+      setLoadingFields((prev) => new Set(prev).add(fieldName));
+
+      try {
+        const params = new URLSearchParams({
+          database: fieldValuesParams.database,
+          table: fieldValuesParams.table,
+          column: fieldName,
+        });
+        if (fieldValuesParams.timeColumn)
+          params.set("timeColumn", fieldValuesParams.timeColumn);
+        if (fieldValuesParams.minTime)
+          params.set("minTime", fieldValuesParams.minTime);
+        if (fieldValuesParams.maxTime)
+          params.set("maxTime", fieldValuesParams.maxTime);
+        if (fieldValuesParams.filter)
+          params.set("filter", fieldValuesParams.filter);
+
+        const res = await fetch(
+          `/api/clickhouse/discover/field-values?${params}`,
+        );
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          setFieldValues((prev) => ({ ...prev, [fieldName]: data.data }));
+        }
+      } catch (err) {
+        console.error("Failed to load field values:", err);
+      } finally {
+        setLoadingFields((prev) => {
+          const next = new Set(prev);
+          next.delete(fieldName);
+          return next;
+        });
+      }
+    },
+    [expandedFields, fieldValues, fieldValuesParams],
+  );
+
+  const canExpand = !!fieldValuesParams && (!!onFilterForValue || !!onFilterOutValue);
+
   return (
     <div
       className={cn(
         "flex flex-col border rounded-md bg-card overflow-hidden",
-        className
+        className,
       )}
     >
       {/* Header */}
@@ -150,7 +228,6 @@ export function FieldsSidebar({
           </div>
         </div>
 
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -161,7 +238,6 @@ export function FieldsSidebar({
           />
         </div>
 
-        {/* Time column selector */}
         {timeColumns.length > 0 && (
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground flex items-center gap-1">
@@ -186,56 +262,140 @@ export function FieldsSidebar({
 
       {/* Column list */}
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+        <div className="p-2 space-y-0.5">
           {filteredColumns.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">
               {searchTerm ? "No matching fields" : "No columns available"}
             </p>
           ) : (
-            filteredColumns.map((col) => (
-              <div
-                key={col.name}
-                className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors",
-                  selectedColumns.includes(col.name) && "bg-muted/30"
-                )}
-              >
-                <Checkbox
-                  id={`field-${col.name}`}
-                  checked={selectedColumns.includes(col.name)}
-                  onCheckedChange={(checked) =>
-                    handleColumnToggle(col.name, checked === true)
-                  }
-                  className="h-3.5 w-3.5"
-                />
-                <Label
-                  htmlFor={`field-${col.name}`}
-                  className="flex items-center gap-1.5 text-xs font-normal cursor-pointer truncate min-w-0"
-                >
-                  {getTypeIcon(col.type)}
-                  <span className="truncate">{col.name}</span>
-                  {isTimeColumn(col.name) && (
-                    <Clock className="h-3 w-3 text-purple-500 shrink-0" />
+            filteredColumns.map((col) => {
+              const isExpanded = expandedFields.has(col.name);
+              const values = fieldValues[col.name];
+              const isLoadingValues = loadingFields.has(col.name);
+
+              return (
+                <div key={col.name}>
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors",
+                      selectedColumns.includes(col.name) && "bg-muted/30",
+                    )}
+                  >
+                    {/* Expand chevron */}
+                    {canExpand ? (
+                      <button
+                        onClick={() => toggleFieldExpanded(col.name)}
+                        className="shrink-0 p-0.5 hover:bg-muted rounded"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="w-4 shrink-0" />
+                    )}
+
+                    <Checkbox
+                      id={`field-${col.name}`}
+                      checked={selectedColumns.includes(col.name)}
+                      onCheckedChange={(checked) =>
+                        handleColumnToggle(col.name, checked === true)
+                      }
+                      className="h-3.5 w-3.5"
+                    />
+                    <Label
+                      htmlFor={`field-${col.name}`}
+                      className="flex items-center gap-1.5 text-xs font-normal cursor-pointer truncate min-w-0"
+                    >
+                      {getTypeIcon(col.type)}
+                      <span className="truncate">{col.name}</span>
+                      {isTimeColumn(col.name) && (
+                        <Clock className="h-3 w-3 text-purple-500 shrink-0" />
+                      )}
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1 py-0 h-4 shrink-0 font-mono max-w-[80px]"
+                    >
+                      <TruncatedCell
+                        value={shortenType(col.type)}
+                        tooltipContent={col.type}
+                        className="truncate"
+                      />
+                    </Badge>
+                  </div>
+
+                  {/* Expanded field values */}
+                  {isExpanded && canExpand && (
+                    <div className="ml-8 pl-2 border-l border-muted mb-1">
+                      {isLoadingValues ? (
+                        <div className="flex items-center gap-1.5 py-1 px-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading values...
+                        </div>
+                      ) : values && values.length > 0 ? (
+                        values.map((fv, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between gap-1 py-0.5 px-2 rounded hover:bg-muted/50 group text-xs"
+                          >
+                            <span className="truncate font-mono min-w-0">
+                              {fv.value === null || fv.value === undefined
+                                ? "null"
+                                : String(fv.value)}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-muted-foreground tabular-nums">
+                                {fv.count.toLocaleString()}
+                              </span>
+                              <div className="hidden group-hover:flex items-center gap-0.5">
+                                {onFilterForValue && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    title="Filter for value"
+                                    onClick={() =>
+                                      onFilterForValue(col.name, fv.value)
+                                    }
+                                  >
+                                    <Filter className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                {onFilterOutValue && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    title="Filter out value"
+                                    onClick={() =>
+                                      onFilterOutValue(col.name, fv.value)
+                                    }
+                                  >
+                                    <FilterX className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground py-1 px-2">
+                          No values found
+                        </p>
+                      )}
+                    </div>
                   )}
-                </Label>
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-1 py-0 h-4 shrink-0 font-mono max-w-[80px]"
-                >
-                  <TruncatedCell
-                    value={shortenType(col.type)}
-                    // Show full type in tooltip
-                    tooltipContent={col.type}
-                    className="truncate"
-                  />
-                </Badge>
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </div>
       </ScrollArea>
 
-      {/* Footer with count */}
+      {/* Footer */}
       <div className="p-2 border-t text-xs text-muted-foreground">
         {selectedColumns.length} of {columns.length} fields selected
       </div>

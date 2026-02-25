@@ -115,6 +115,8 @@ export interface DiscoverState {
 
   // Time range
   flexibleRange: FlexibleTimeRange;
+  activeMinTime: string | undefined;
+  activeMaxTime: string | undefined;
 
   // Refresh
   refreshInterval: number;
@@ -829,6 +831,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     appliedFilter,
     isQueryDirty,
     flexibleRange,
+    activeMinTime,
+    activeMaxTime,
     refreshInterval,
     rows,
     totalHits,

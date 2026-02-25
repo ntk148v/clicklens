@@ -15,13 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import {
-  FilterX,
-  Database,
-  Table2,
-  AlertCircle,
-  RotateCcw,
-} from "lucide-react";
+import { FilterX, Database, Table2, AlertCircle } from "lucide-react";
 import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
 import { AccessDenied } from "@/components/ui/access-denied";
 import { useAuth } from "@/components/auth";
@@ -40,8 +34,11 @@ export default function DiscoverPage() {
     selectedColumns,
     selectedTimeColumn,
     customFilter,
+    appliedFilter,
     isQueryDirty,
     flexibleRange,
+    activeMinTime,
+    activeMaxTime,
     refreshInterval,
     rows,
     totalHits,
@@ -257,6 +254,16 @@ export default function DiscoverPage() {
                 selectedTimeColumn={selectedTimeColumn}
                 onTimeColumnChange={setSelectedTimeColumn}
                 onResetColumns={resetColumns}
+                onFilterForValue={filterForValue}
+                onFilterOutValue={filterOutValue}
+                fieldValuesParams={{
+                  database: selectedDatabase,
+                  table: selectedTable,
+                  timeColumn: selectedTimeColumn || undefined,
+                  minTime: activeMinTime,
+                  maxTime: activeMaxTime,
+                  filter: appliedFilter || undefined,
+                }}
                 className="hidden md:flex w-64 max-h-[calc(100vh-280px)]"
               />
 
