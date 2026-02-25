@@ -144,6 +144,8 @@ export interface DiscoverActions {
   handleHistogramBarClick: (startTime: string, endTime?: string) => void;
   cancelQuery: () => void;
   resetColumns: () => void;
+  filterForValue: (column: string, value: unknown) => void;
+  filterOutValue: (column: string, value: unknown) => void;
 }
 
 export function useDiscoverState(): DiscoverState & DiscoverActions {
@@ -502,6 +504,48 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     setAppliedFilter("");
   }, []);
 
+  // -- Click-to-filter helpers (P2a) --
+
+  const buildFilterClause = useCallback(
+    (column: string, value: unknown, operator: "=" | "!="): string => {
+      if (value === null || value === undefined) {
+        return operator === "="
+          ? `${column} IS NULL`
+          : `${column} IS NOT NULL`;
+      }
+      if (typeof value === "number" || typeof value === "boolean") {
+        return `${column} ${operator} ${value}`;
+      }
+      const escaped = String(value).replace(/'/g, "\\'");
+      return `${column} ${operator} '${escaped}'`;
+    },
+    [],
+  );
+
+  const filterForValue = useCallback(
+    (column: string, value: unknown) => {
+      const clause = buildFilterClause(column, value, "=");
+      const newFilter = customFilter.trim()
+        ? `${customFilter.trim()} AND ${clause}`
+        : clause;
+      setCustomFilter(newFilter);
+      handleSearch(newFilter);
+    },
+    [customFilter, buildFilterClause, handleSearch],
+  );
+
+  const filterOutValue = useCallback(
+    (column: string, value: unknown) => {
+      const clause = buildFilterClause(column, value, "!=");
+      const newFilter = customFilter.trim()
+        ? `${customFilter.trim()} AND ${clause}`
+        : clause;
+      setCustomFilter(newFilter);
+      handleSearch(newFilter);
+    },
+    [customFilter, buildFilterClause, handleSearch],
+  );
+
   // -- Reset columns to schema defaults --
 
   const resetColumns = useCallback(() => {
@@ -809,5 +853,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     handleHistogramBarClick,
     cancelQuery,
     resetColumns,
+    filterForValue,
+    filterOutValue,
   };
 }

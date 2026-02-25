@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -18,50 +18,54 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RecordDetailSheet } from "@/components/ui/record-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, Expand } from "lucide-react";
+import { ArrowUpDown, Expand, Filter, FilterX } from "lucide-react";
 import type { DiscoverRow } from "@/lib/types/discover";
 import type { ColumnMetadata } from "@/lib/types/discover";
 import { cn, formatDateTime, formatDate } from "@/lib/utils";
 import { TruncatedCell } from "@/components/monitoring";
+import { PaginationControls } from "@/components/monitoring";
 
 interface DiscoverGridProps {
   rows: DiscoverRow[];
   columns: ColumnMetadata[];
   selectedColumns: string[];
   isLoading: boolean;
-  // Pagination props
-  page: number; // 1-indexed for display
+  page: number;
   pageSize: number;
   totalHits: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  onFilterForValue?: (column: string, value: unknown) => void;
+  onFilterOutValue?: (column: string, value: unknown) => void;
 }
 
 const columnHelper = createColumnHelper<DiscoverRow>();
 
-// Determine if a type is a datetime type (includes time)
 function isDateTimeType(type: string): boolean {
   const base = type.replace(/^Nullable\(/, "").replace(/\)$/, "");
   return base.startsWith("DateTime");
 }
 
-// Determine if a type is a date-only type (no time)
 function isDateOnlyType(type: string): boolean {
   const base = type.replace(/^Nullable\(/, "").replace(/\)$/, "");
   return base === "Date" || base === "Date32";
 }
 
-// Format cell value based on type
-// Uses formatDateTime/formatDate from utils for proper timezone conversion
 function formatCellValue(value: unknown, type: string): React.ReactNode {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground italic">null</span>;
   }
 
-  // Boolean - Keep generic badge style
   if (typeof value === "boolean") {
     return (
       <Badge variant={value ? "default" : "secondary"}>
@@ -70,27 +74,21 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
     );
   }
 
-  // Determine styling
   let className = "";
   if (typeof value === "number")
     className = "text-right font-mono text-blue-600";
 
-  // Convert to string for display
   let displayValue = String(value);
 
-  // Object/Array - JSON stringify
   if (typeof value === "object") {
     displayValue = JSON.stringify(value);
   } else if (typeof value === "number") {
     displayValue = value.toLocaleString();
   }
 
-  // Date/DateTime - convert timezone using standard utilities
   if (isDateTimeType(type) && typeof value === "string") {
-    // DateTime columns: convert UTC to user's local timezone
     displayValue = formatDateTime(value);
   } else if (isDateOnlyType(type) && typeof value === "string") {
-    // Date-only columns: format consistently
     displayValue = formatDate(value);
   }
 
@@ -99,7 +97,6 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
   );
 }
 
-// Log level badge
 function getLevelBadge(level: string) {
   const levelLower = level?.toLowerCase() || "";
   if (levelLower.includes("fatal") || levelLower.includes("critical")) {
@@ -140,19 +137,13 @@ function getLevelBadge(level: string) {
   return <Badge variant="outline">{level}</Badge>;
 }
 
-// Import PaginationControls
-import { PaginationControls } from "@/components/monitoring";
+interface CellContextMenuState {
+  column: string;
+  value: unknown;
+  x: number;
+  y: number;
+}
 
-/**
- * Data grid for Discover results with dynamic columns
- *
- * Features:
- * - Dynamic column generation based on selected fields
- * - Smart cell formatting based on data type
- * - Sortable columns
- * - Row detail sheet for viewing full record
- * - Pagination controls
- */
 export const DiscoverGrid = memo(function DiscoverGrid({
   rows,
   columns: columnMetadata,
@@ -163,13 +154,17 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   totalHits,
   onPageChange,
   onPageSizeChange,
+  onFilterForValue,
+  onFilterOutValue,
 }: DiscoverGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<CellContextMenuState | null>(
+    null,
+  );
 
-  // Create column type lookup
   const columnTypes = useMemo(() => {
     const types: Record<string, string> = {};
     columnMetadata.forEach((col) => {
@@ -178,7 +173,6 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     return types;
   }, [columnMetadata]);
 
-  // Convert columns to meta format for RecordDetailSheet
   const sheetColumns = useMemo(() => {
     return columnMetadata.map((col) => ({
       name: col.name,
@@ -186,9 +180,17 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     }));
   }, [columnMetadata]);
 
-  // Generate table columns dynamically
+  const handleCellContextMenu = useCallback(
+    (e: React.MouseEvent, column: string, value: unknown) => {
+      if (!onFilterForValue && !onFilterOutValue) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ column, value, x: e.clientX, y: e.clientY });
+    },
+    [onFilterForValue, onFilterOutValue],
+  );
+
   const tableColumns = useMemo(() => {
-    // Determine which columns to show
     const columnsToShow =
       selectedColumns.length > 0 ? selectedColumns : Object.keys(rows[0] || {});
 
@@ -216,7 +218,6 @@ export const DiscoverGrid = memo(function DiscoverGrid({
           cell: (info) => {
             const value = info.getValue();
 
-            // Special handling for log level columns
             if (isLevel && typeof value === "string") {
               return getLevelBadge(value);
             }
@@ -224,7 +225,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
             return formatCellValue(value, colType);
           },
         });
-      }
+      },
     );
 
     return cols;
@@ -237,7 +238,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     state: {
       sorting,
       pagination: {
-        pageIndex: page - 1, // Adjust for 0-indexed internal state
+        pageIndex: page - 1,
         pageSize: pageSize,
       },
     },
@@ -273,6 +274,12 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     );
   }
 
+  const displayValue = (val: unknown): string => {
+    if (val === null || val === undefined) return "null";
+    if (typeof val === "object") return JSON.stringify(val);
+    return String(val);
+  };
+
   return (
     <>
       <div className="flex flex-col h-full">
@@ -287,12 +294,11 @@ export const DiscoverGrid = memo(function DiscoverGrid({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   ))}
                   <TableHead className="w-8" />
-                  {/* Expand icon column */}
                 </TableRow>
               ))}
             </TableHeader>
@@ -303,7 +309,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
                   data-slot="table-row"
                   className={cn(
                     "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
-                    selectedRow === row.original && sheetOpen && "bg-muted"
+                    selectedRow === row.original && sheetOpen && "bg-muted",
                   )}
                   onClick={() => handleRowClick(row.original, index)}
                 >
@@ -311,10 +317,17 @@ export const DiscoverGrid = memo(function DiscoverGrid({
                     <TableCell
                       key={cell.id}
                       className="data-table-cell last:border-r-0"
+                      onContextMenu={(e) =>
+                        handleCellContextMenu(
+                          e,
+                          cell.column.id,
+                          cell.getValue(),
+                        )
+                      }
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
@@ -327,7 +340,6 @@ export const DiscoverGrid = memo(function DiscoverGrid({
           </Table>
         </div>
 
-        {/* Pagination Controls */}
         <PaginationControls
           page={page}
           totalPages={Math.ceil(totalHits / pageSize)}
@@ -338,7 +350,6 @@ export const DiscoverGrid = memo(function DiscoverGrid({
         />
       </div>
 
-      {/* Row Detail Sheet - using RecordDetailSheet for consistency */}
       <RecordDetailSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
@@ -347,6 +358,55 @@ export const DiscoverGrid = memo(function DiscoverGrid({
         title="Record Details"
         rowIndex={selectedRowIndex ?? undefined}
       />
+
+      {/* Context menu for click-to-filter */}
+      {contextMenu && (
+        <DropdownMenu
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setContextMenu(null);
+          }}
+        >
+          <DropdownMenuTrigger asChild>
+            <div
+              className="fixed w-0 h-0"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="bottom" className="w-64">
+            <div className="px-2 py-1.5 text-xs text-muted-foreground truncate">
+              <span className="font-medium">{contextMenu.column}</span>
+              {" = "}
+              <span className="font-mono">
+                {displayValue(contextMenu.value)}
+              </span>
+            </div>
+            <DropdownMenuSeparator />
+            {onFilterForValue && (
+              <DropdownMenuItem
+                onClick={() => {
+                  onFilterForValue(contextMenu.column, contextMenu.value);
+                  setContextMenu(null);
+                }}
+              >
+                <Filter className="mr-2 h-3.5 w-3.5" />
+                Filter for value
+              </DropdownMenuItem>
+            )}
+            {onFilterOutValue && (
+              <DropdownMenuItem
+                onClick={() => {
+                  onFilterOutValue(contextMenu.column, contextMenu.value);
+                  setContextMenu(null);
+                }}
+              >
+                <FilterX className="mr-2 h-3.5 w-3.5" />
+                Filter out value
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </>
   );
 });

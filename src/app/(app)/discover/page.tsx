@@ -65,6 +65,8 @@ export default function DiscoverPage() {
     handleHistogramBarClick,
     cancelQuery,
     resetColumns,
+    filterForValue,
+    filterOutValue,
   } = useDiscoverState();
 
   // Keyboard shortcuts: Cmd/Ctrl+Enter to execute, Esc to cancel (P8)
@@ -279,6 +281,8 @@ export default function DiscoverPage() {
                     totalHits={totalHits}
                     onPageChange={setPage}
                     onPageSizeChange={setPageSize}
+                    onFilterForValue={filterForValue}
+                    onFilterOutValue={filterOutValue}
                   />
                   {isLoading && rows.length > 0 && (
                     <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
