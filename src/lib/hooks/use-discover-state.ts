@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
 import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
@@ -20,6 +21,51 @@ import {
 const COLUMN_PREFS_PREFIX = "clicklens_discover_columns_";
 const DEFAULT_PAGE_SIZE = 100;
 const DEFAULT_COLUMN_COUNT = 10;
+
+// Valid relative time range values for URL param validation
+const VALID_RELATIVE_RANGES = new Set([
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "3h",
+  "6h",
+  "12h",
+  "24h",
+  "3d",
+  "7d",
+]);
+
+function parseTimeRangeFromURL(
+  params: URLSearchParams,
+): FlexibleTimeRange | null {
+  const t = params.get("t");
+  if (t && VALID_RELATIVE_RANGES.has(t)) {
+    return getFlexibleRangeFromEnum(t as TimeRange);
+  }
+
+  const start = params.get("start");
+  const end = params.get("end");
+  if (start) {
+    const from = start;
+    const to = end || "now";
+    try {
+      const fromDate = new Date(from);
+      const toDate = to === "now" ? new Date() : new Date(to);
+      if (isNaN(fromDate.getTime())) return null;
+      return {
+        type: "absolute",
+        from,
+        to,
+        label: `${format(fromDate, "MMM d, HH:mm")} to ${format(toDate, "MMM d, HH:mm")}`,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
 
 function loadColumnPrefs(
   db: string,
@@ -101,6 +147,13 @@ export interface DiscoverActions {
 }
 
 export function useDiscoverState(): DiscoverState & DiscoverActions {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Track whether initial URL hydration has completed to avoid overwriting URL on mount
+  const hydratedRef = useRef(false);
+
   // Source selection
   const [databases, setDatabases] = useState<string[]>([]);
   const [tables, setTables] = useState<{ name: string; engine: string }[]>([]);
@@ -471,8 +524,14 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
 
   // -- Side effects --
 
-  // Load databases on mount
+  // Load databases on mount + hydrate from URL (P1)
   useEffect(() => {
+    const urlDb = searchParams.get("db");
+    const urlTable = searchParams.get("table");
+    const urlFilter = searchParams.get("filter");
+    const urlPage = searchParams.get("page");
+    const urlTimeRange = parseTimeRangeFromURL(searchParams);
+
     const loadDatabases = async () => {
       try {
         const res = await fetch("/api/clickhouse/databases");
@@ -480,7 +539,11 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
         if (data.success && data.data) {
           const dbNames = data.data.map((d: { name: string }) => d.name);
           setDatabases(dbNames);
-          if (dbNames.includes("default")) {
+
+          // Hydrate database from URL, or fall back to "default"
+          if (urlDb && dbNames.includes(urlDb)) {
+            setSelectedDatabaseRaw(urlDb);
+          } else if (dbNames.includes("default")) {
             setSelectedDatabaseRaw("default");
           } else if (dbNames.length > 0) {
             setSelectedDatabaseRaw(dbNames[0]);
@@ -495,7 +558,24 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
         });
       }
     };
-    loadDatabases();
+
+    // Hydrate non-database URL state
+    if (urlTable) setSelectedTable(urlTable);
+    if (urlFilter) {
+      setCustomFilter(urlFilter);
+      setAppliedFilter(urlFilter);
+    }
+    if (urlPage) {
+      const p = parseInt(urlPage, 10);
+      if (!isNaN(p) && p > 0) setPage(p);
+    }
+    if (urlTimeRange) setFlexibleRange(urlTimeRange);
+
+    loadDatabases().then(() => {
+      hydratedRef.current = true;
+    });
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load tables when database changes
@@ -653,6 +733,43 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       histAbortRef.current?.abort();
     };
   }, []);
+
+  // Sync state → URL (P1): update URL when key state changes
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+
+    const params = new URLSearchParams();
+    if (selectedDatabase) params.set("db", selectedDatabase);
+    if (selectedTable) params.set("table", selectedTable);
+    if (appliedFilter) params.set("filter", appliedFilter);
+
+    if (flexibleRange.type === "relative") {
+      const rangeKey = flexibleRange.from.replace("now-", "");
+      params.set("t", rangeKey);
+    } else {
+      params.set("start", flexibleRange.from);
+      if (flexibleRange.to !== "now") {
+        params.set("end", flexibleRange.to);
+      }
+    }
+
+    if (page > 1) params.set("page", String(page));
+
+    const newSearch = params.toString();
+    const currentSearch = searchParams.toString();
+    if (newSearch !== currentSearch) {
+      router.replace(`${pathname}?${newSearch}`, { scroll: false });
+    }
+  }, [
+    selectedDatabase,
+    selectedTable,
+    appliedFilter,
+    flexibleRange,
+    page,
+    pathname,
+    router,
+    searchParams,
+  ]);
 
   return {
     // State
