@@ -14,14 +14,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Search, HelpCircle, History, X } from "lucide-react";
+import { Search, HelpCircle, History, X, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QueryBarProps {
   value: string;
   onChange: (query: string) => void;
   onExecute: (query: string) => void;
+  onCancel?: () => void;
   isLoading?: boolean;
+  isDirty?: boolean;
   placeholder?: string;
   error?: string | null;
   className?: string;
@@ -30,34 +32,24 @@ interface QueryBarProps {
 const QUERY_HISTORY_KEY = "clicklens_discover_query_history";
 const MAX_HISTORY_ITEMS = 20;
 
-/**
- * QueryBar component for entering custom WHERE clause expressions
- *
- * Features:
- * - Text input for ClickHouse WHERE expressions
- * - Syntax help tooltip
- * - Query history with localStorage persistence
- * - Execute on Enter or button click
- */
 export function QueryBar({
   value,
   onChange,
   onExecute,
+  onCancel,
   isLoading = false,
+  isDirty = false,
   placeholder = "Enter filter expression, e.g. status >= 400 AND host LIKE '%api%'",
   error = null,
   className,
 }: QueryBarProps) {
-  // Local state for immediate feedback
   const [localValue, setLocalValue] = useState(value);
   const debouncedChangeRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync local value when prop changes (external update)
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
 
-  // Load history from localStorage using initializer function
   const [history, setHistory] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -73,15 +65,12 @@ export function QueryBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Save to history when executing
   const handleExecute = useCallback(() => {
     if (debouncedChangeRef.current) {
       clearTimeout(debouncedChangeRef.current);
     }
 
     const query = localValue;
-
-    // Ensure parent has latest value before executing
     onChange(query);
 
     if (query.trim()) {
@@ -97,14 +86,12 @@ export function QueryBar({
       });
     }
 
-    // Execute with the current value immediately
     onExecute(query);
   }, [localValue, onChange, onExecute]);
 
   const handleChange = (newValue: string) => {
     setLocalValue(newValue);
 
-    // Debounce update to parent to avoid re-rendering entire page on every keystroke
     if (debouncedChangeRef.current) {
       clearTimeout(debouncedChangeRef.current);
     }
@@ -153,6 +140,9 @@ export function QueryBar({
           className={cn(
             "pl-10 pr-20 font-mono text-sm",
             error && "border-destructive focus-visible:ring-destructive",
+            isDirty &&
+              !error &&
+              "border-yellow-500/50 focus-visible:ring-yellow-500/50",
           )}
           disabled={isLoading}
         />
@@ -169,7 +159,6 @@ export function QueryBar({
             </Button>
           )}
 
-          {/* History dropdown */}
           <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -199,7 +188,6 @@ export function QueryBar({
             </PopoverContent>
           </Popover>
 
-          {/* Help tooltip */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -242,11 +230,11 @@ export function QueryBar({
                     </li>
                   </ul>
                   <p className="text-muted-foreground text-xs">
-                    <strong>Note:</strong> String values must be in single
-                    quotes
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    Press Enter to execute
+                    Press <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px]">Enter</kbd> to execute
+                    {" "}&bull;{" "}
+                    <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px]">⌘/Ctrl+Enter</kbd> from anywhere
+                    {" "}&bull;{" "}
+                    <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px]">Esc</kbd> to cancel
                   </p>
                 </div>
               </TooltipContent>
@@ -255,19 +243,28 @@ export function QueryBar({
         </div>
       </div>
 
-      <Button onClick={handleExecute} disabled={isLoading} className="shrink-0">
-        {isLoading ? (
-          <span className="flex items-center gap-2">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            Searching...
-          </span>
-        ) : (
-          <>
-            <Search className="mr-2 h-4 w-4" />
-            Search
-          </>
-        )}
-      </Button>
+      {isLoading ? (
+        <Button
+          variant="destructive"
+          onClick={onCancel}
+          className="shrink-0"
+        >
+          <Square className="mr-2 h-4 w-4" />
+          Cancel
+        </Button>
+      ) : (
+        <Button
+          onClick={handleExecute}
+          className={cn(
+            "shrink-0",
+            isDirty &&
+              "ring-2 ring-yellow-500/50 ring-offset-1 ring-offset-background",
+          )}
+        >
+          <Search className="mr-2 h-4 w-4" />
+          Search
+        </Button>
+      )}
     </div>
   );
 }

@@ -19,6 +19,7 @@ interface FieldsSidebarProps {
   onSelectedColumnsChange: (columns: string[]) => void;
   selectedTimeColumn: string | null;
   onTimeColumnChange: (column: string) => void;
+  onResetColumns?: () => void;
   className?: string;
 }
 
@@ -80,6 +81,7 @@ export function FieldsSidebar({
   onSelectedColumnsChange,
   selectedTimeColumn,
   onTimeColumnChange,
+  onResetColumns,
   className,
 }: FieldsSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -134,6 +136,17 @@ export function FieldsSidebar({
             >
               None
             </button>
+            {onResetColumns && (
+              <>
+                <span className="text-muted-foreground">/</span>
+                <button
+                  onClick={onResetColumns}
+                  className="text-primary hover:underline"
+                >
+                  Reset
+                </button>
+              </>
+            )}
           </div>
         </div>
 

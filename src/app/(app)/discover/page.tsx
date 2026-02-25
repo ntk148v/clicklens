@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { format } from "date-fns";
+import { useEffect } from "react";
 import { Header } from "@/components/layout";
 import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
@@ -16,500 +15,76 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { FilterX, Database, Table2 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-import type {
-  TableSchema,
-  DiscoverRow,
-  TimeRange,
-  ColumnMetadata,
-  TimeColumnCandidate,
-  FlexibleTimeRange,
-} from "@/lib/types/discover";
 import {
-  getFlexibleRangeFromEnum,
-  getMinTimeFromRange,
-} from "@/lib/types/discover";
-
-/**
- * Discover Page - Flexible data exploration for any ClickHouse table
- *
- * Features:
- * - Database/table selection
- * - Dynamic field sidebar (controls SELECT clause)
- * - Custom query bar (controls WHERE clause)
- * - Time range filtering
- * - Log volume histogram
- * - Results grid with sorting and detail view
- */
+  FilterX,
+  Database,
+  Table2,
+  AlertCircle,
+  RotateCcw,
+} from "lucide-react";
+import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
 import { AccessDenied } from "@/components/ui/access-denied";
 import { useAuth } from "@/components/auth";
+import { useDiscoverState } from "@/lib/hooks/use-discover-state";
 
 export default function DiscoverPage() {
   const { permissions, isLoading: authLoading } = useAuth();
 
-  // Source selection state
-  const [databases, setDatabases] = useState<string[]>([]);
-  const [tables, setTables] = useState<{ name: string; engine: string }[]>([]);
-  const [selectedDatabase, setSelectedDatabase] = useState<string>("");
-  const [selectedTable, setSelectedTable] = useState<string>("");
-
-  // Schema state
-  const [schema, setSchema] = useState<TableSchema | null>(null);
-  const [schemaLoading, setSchemaLoading] = useState(false);
-
-  // Query state
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
-  const [selectedTimeColumn, setSelectedTimeColumn] = useState<string>("");
-  const [customFilter, setCustomFilter] = useState("");
-  const [appliedFilter, setAppliedFilter] = useState("");
-
-  // Time range state (Unified)
-  const [flexibleRange, setFlexibleRange] = useState<FlexibleTimeRange>(
-    getFlexibleRangeFromEnum("1h"),
-  );
-
-  // Refresh state
-  const [refreshInterval, setRefreshInterval] = useState(0);
-
-  // Results state
-  const [rows, setRows] = useState<DiscoverRow[]>([]);
-  const [totalHits, setTotalHits] = useState(0);
-  const [histogramData, setHistogramData] = useState<
-    { time: string; count: number }[]
-  >([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const [histLoading, setHistLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
-
-  // Derived values for API calls
-  const { activeMinTime, activeMaxTime } = useMemo(() => {
-    if (flexibleRange.type === "absolute") {
-      return {
-        activeMinTime: flexibleRange.from,
-        activeMaxTime:
-          flexibleRange.to === "now" ? undefined : flexibleRange.to, // API handles missing maxTime as "now" usually, but for absolute we might want explicit
-      };
-    } else {
-      // Relative: "now-1h" -> parse "1h"
-      const rangeKey = flexibleRange.from.replace("now-", "") as TimeRange;
-      const minDate = getMinTimeFromRange(rangeKey);
-      return {
-        activeMinTime: minDate ? minDate.toISOString() : undefined,
-        activeMaxTime: undefined,
-      };
-    }
-  }, [flexibleRange]);
-
-  // Load databases on mount
-  useEffect(() => {
-    const loadDatabases = async () => {
-      try {
-        const res = await fetch("/api/clickhouse/databases");
-        const data = await res.json();
-        if (data.success && data.data) {
-          const dbNames = data.data.map((d: { name: string }) => d.name);
-          setDatabases(dbNames);
-          // Default to first database or 'default' if available
-          if (dbNames.includes("default")) {
-            setSelectedDatabase("default");
-          } else if (dbNames.length > 0) {
-            setSelectedDatabase(dbNames[0]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load databases:", err);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load databases",
-        });
-      }
-    };
-    loadDatabases();
-  }, []);
-
-  // Load tables when database changes
-  useEffect(() => {
-    if (!selectedDatabase) {
-      setTables([]);
-      return;
-    }
-
-    const loadTables = async () => {
-      try {
-        const res = await fetch(
-          `/api/clickhouse/tables?database=${encodeURIComponent(
-            selectedDatabase,
-          )}`,
-        );
-        const data = await res.json();
-        if (data.success && data.data) {
-          setTables(
-            data.data.map((t: { name: string; engine: string }) => ({
-              name: t.name,
-              engine: t.engine,
-            })),
-          );
-        }
-      } catch (err) {
-        console.error("Failed to load tables:", err);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load tables",
-        });
-      }
-    };
-    loadTables();
-
-    // Reset table selection when database changes
-    setSelectedTable("");
-    setSchema(null);
-    setRows([]);
-    setHistogramData([]);
-  }, [selectedDatabase]);
-
-  // Load schema when table changes
-  useEffect(() => {
-    if (!selectedDatabase || !selectedTable) {
-      setSchema(null);
-      return;
-    }
-
-    // Reset schema immediately to prevent stale queries while loading
-    // Handled in handleTableChange now, but useEffect dependencies still manage loading logic
-    const loadSchema = async () => {
-      setSchemaLoading(true);
-      try {
-        const res = await fetch(
-          `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(
-            selectedDatabase,
-          )}&table=${encodeURIComponent(selectedTable)}`,
-        );
-        const data = await res.json();
-        if (data.success && data.data) {
-          setSchema(data.data);
-
-          // Auto-select first 10 columns by default
-          const defaultCols = data.data.columns
-            .slice(0, 10)
-            .map((c: ColumnMetadata) => c.name);
-          setSelectedColumns(defaultCols);
-
-          // Auto-select primary time column if available
-          const primaryTime = data.data.timeColumns.find(
-            (tc: TimeColumnCandidate) => tc.isPrimary,
-          );
-          if (primaryTime) {
-            setSelectedTimeColumn(primaryTime.name);
-          } else if (data.data.timeColumns.length > 0) {
-            setSelectedTimeColumn(data.data.timeColumns[0].name);
-          } else {
-            setSelectedTimeColumn("");
-          }
-        } else if (data.error) {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: data.error.userMessage || data.error,
-          });
-          setSchema(null);
-        }
-      } catch (err) {
-        console.error("Failed to load schema:", err);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load table schema",
-        });
-      } finally {
-        setSchemaLoading(false);
-      }
-    };
-    loadSchema();
-  }, [selectedDatabase, selectedTable]);
-
-  const handleTableChange = useCallback((table: string) => {
-    setSelectedTable(table);
-    setSchema(null);
-    setSelectedColumns([]);
-    setRows([]);
-    setHistogramData([]);
-    setCustomFilter("");
-    setAppliedFilter("");
-  }, []);
-
-  // Fetch data with Streaming
-  const fetchData = useCallback(async () => {
-    if (!selectedDatabase || !selectedTable) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setRows([]); // Clear rows before new search? Or keep old? Clear is safer for now.
-    // If we are paging (page > 1 or offset > 0), we clear.
-    // Actually, "Infinite Scroll" usually appends.
-    // But this component currently uses `page` state (Pagination UI).
-    // Streaming fills the CURRENT page.
-    // So yes, clear rows for the new page load.
-
-    // Note: totalHits needs reset too?
-    // We will get totalHits from the stream metadata.
-
-    try {
-      const offset = (page - 1) * pageSize;
-      const params = new URLSearchParams({
-        database: selectedDatabase,
-        table: selectedTable,
-        mode: "data",
-        limit: String(pageSize),
-        offset: String(offset),
-      });
-
-      if (selectedColumns.length > 0) {
-        params.set("columns", selectedColumns.join(","));
-      }
-
-      if (selectedTimeColumn) {
-        params.set("timeColumn", selectedTimeColumn);
-      }
-
-      if (activeMinTime) {
-        params.set("minTime", activeMinTime);
-      }
-
-      if (activeMaxTime) {
-        params.set("maxTime", activeMaxTime);
-      }
-
-      if (appliedFilter.trim()) {
-        params.set("filter", appliedFilter.trim());
-      }
-
-      // New: Search param for Smart Search (if we had a search input separate from filter)
-      // Currently `appliedFilter` carries the SQL.
-      // If we want to support the "Smart Search" generic term, we need to know if it IS a generic term.
-      // The current UI `QueryBar` produces SQL.
-      // If the user wants to use Smart Search, they should probably have a way to input raw text.
-      // But the QueryBarPlaceholder says "Filter with ClickHouse SQL...".
-      // Let's assume `appliedFilter` is SQL.
-      // IF we want to check for "Smart Search" behavior:
-      // Maybe if the filter DOESN'T look like SQL (no operators)?
-      // Heuristic: If filter has no `=`, `>`, `<`, `LIKE`, `IN`, etc. treat as Search Term?
-      // Or just pass generic filter as filter.
-      // The Backend checks `search` param.
-      // Let's stick to `filter` per existing UI contract unless we add a Search Box.
-      // For now, simple standard fetch.
-
-      const res = await fetch(`/api/clickhouse/discover?${params}`);
-
-      if (!res.ok) {
-        try {
-          const err = await res.json();
-          throw new Error(err.error || res.statusText);
-        } catch {
-          throw new Error(res.statusText);
-        }
-      }
-
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-
-        // Process all complete lines
-        buffer = lines.pop() || ""; // Keep the last incomplete line in buffer
-
-        const newRows: DiscoverRow[] = [];
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const json = JSON.parse(line);
-
-            // Check for Meta chunk (first chunk)
-            if (json.meta) {
-              if (typeof json.meta.totalHits === "number") {
-                setTotalHits(json.meta.totalHits);
-              }
-              continue;
-            }
-
-            // Check for Error chunk
-            if (json.error) {
-              console.error("Stream error:", json.error);
-              toast({
-                variant: "destructive",
-                title: "Stream Error",
-                description: json.error,
-              });
-              continue;
-            }
-
-            // Normal Row
-            newRows.push(json);
-          } catch (e) {
-            console.error("JSON parse error", e);
-          }
-        }
-
-        if (newRows.length > 0) {
-          // Batch update rows to reduce renders?
-          // Actually React state updates are batched mostly.
-          // But we can just append.
-          setRows((prev) => [...prev, ...newRows]);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch data";
-      setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Query Error",
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
+  const {
+    databases,
+    tables,
     selectedDatabase,
     selectedTable,
+    schema,
+    schemaLoading,
     selectedColumns,
     selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    appliedFilter, // Dependency is now appliedFilter
+    customFilter,
+    isQueryDirty,
+    flexibleRange,
+    refreshInterval,
+    rows,
+    totalHits,
+    histogramData,
+    isLoading,
+    histLoading,
+    error,
     page,
     pageSize,
-  ]);
 
-  // Fetch histogram
-  const fetchHistogram = useCallback(async () => {
-    if (!selectedDatabase || !selectedTable || !selectedTimeColumn) {
-      setHistogramData([]);
-      return;
-    }
+    setSelectedDatabase,
+    handleTableChange,
+    setSelectedColumns,
+    setSelectedTimeColumn,
+    setCustomFilter,
+    setFlexibleRange,
+    setRefreshInterval,
+    setPage,
+    setPageSize,
+    handleSearch,
+    handleHistogramBarClick,
+    cancelQuery,
+    resetColumns,
+  } = useDiscoverState();
 
-    setHistLoading(true);
-
-    try {
-      const params = new URLSearchParams({
-        database: selectedDatabase,
-        table: selectedTable,
-        mode: "histogram",
-        timeColumn: selectedTimeColumn,
-      });
-
-      if (activeMinTime) {
-        params.set("minTime", activeMinTime);
-      }
-
-      if (activeMaxTime) {
-        params.set("maxTime", activeMaxTime);
-      }
-
-      // Use appliedFilter
-      if (appliedFilter.trim()) {
-        params.set("filter", appliedFilter.trim());
-      }
-
-      const res = await fetch(`/api/clickhouse/discover?${params}`);
-      const data = await res.json();
-
-      if (data.success && data.histogram) {
-        setHistogramData(data.histogram);
-      }
-    } catch (err) {
-      console.error("Failed to fetch histogram:", err);
-    } finally {
-      setHistLoading(false);
-    }
-  }, [
-    selectedDatabase,
-    selectedTable,
-    selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    appliedFilter,
-  ]);
-
-  // Execute search
-  const handleSearch = useCallback(
-    (filterOverride?: string | unknown) => {
-      const filterToApply =
-        typeof filterOverride === "string" ? filterOverride : customFilter;
-
-      // Ensure custom filter is synced (useful if driven by external triggers)
-      if (
-        typeof filterOverride === "string" &&
-        filterOverride !== customFilter
-      ) {
-        setCustomFilter(filterOverride);
-      }
-
-      setAppliedFilter(filterToApply);
-      if (page !== 1) {
-        setPage(1);
-      } else if (filterToApply === appliedFilter) {
-        fetchData();
-        fetchHistogram();
-      }
-    },
-    [page, customFilter, appliedFilter, fetchData, fetchHistogram],
-  );
-
-  // Effect to fetch active data when deps change (initial load or filter change)
+  // Keyboard shortcuts: Cmd/Ctrl+Enter to execute, Esc to cancel (P8)
   useEffect(() => {
-    if (schema) {
-      fetchData();
-    }
-  }, [schema, fetchData]); // fetchData includes filters in dependencies
-
-  // Effect to fetch histogram when deps change (excluding pagination)
-  useEffect(() => {
-    if (schema) {
-      fetchHistogram();
-    }
-  }, [schema, fetchHistogram]);
-
-  // Handle histogram bar click (Zoom in)
-  const handleHistogramBarClick = useCallback(
-    (startTime: string, endTime?: string) => {
-      if (endTime) {
-        const fromDate = new Date(startTime);
-        const toDate = new Date(endTime);
-
-        setFlexibleRange({
-          type: "absolute",
-          from: startTime,
-          to: endTime,
-          label: `${format(fromDate, "MMM d, HH:mm")} to ${format(
-            toDate,
-            "MMM d, HH:mm",
-          )}`,
-        });
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        handleSearch();
       }
-    },
-    [],
-  );
+      if (e.key === "Escape" && isLoading) {
+        e.preventDefault();
+        cancelQuery();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleSearch, cancelQuery, isLoading]);
 
   if (authLoading) {
-    return null; // Or skeleton
+    return null;
   }
 
   if (!permissions?.canDiscover) {
@@ -529,13 +104,11 @@ export default function DiscoverPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header / Source Selection */}
       <Header
         title="Discover"
         actions={
           <div className="flex items-center gap-2">
             <TimeSelector value={flexibleRange} onChange={setFlexibleRange} />
-
             <RefreshControl
               onRefresh={() => handleSearch()}
               interval={refreshInterval}
@@ -546,20 +119,11 @@ export default function DiscoverPage() {
         }
       >
         <div className="flex items-center gap-3">
-          {/* Database selector */}
           <div className="flex items-center gap-1.5">
             <Database className="h-4 w-4 text-muted-foreground" />
             <Select
               value={selectedDatabase}
-              onValueChange={(db) => {
-                setSelectedDatabase(db);
-                // Reset table and schema immediately to prevent stale queries
-                setSelectedTable("");
-                setSchema(null);
-                setRows([]);
-                setHistogramData([]);
-                setTables([]); // Clear tables while loading new ones
-              }}
+              onValueChange={setSelectedDatabase}
             >
               <SelectTrigger
                 className="w-[180px] h-9"
@@ -577,7 +141,6 @@ export default function DiscoverPage() {
             </Select>
           </div>
 
-          {/* Table selector */}
           <div className="flex items-center gap-1.5">
             <Table2 className="h-4 w-4 text-muted-foreground" />
             <Select
@@ -615,12 +178,25 @@ export default function DiscoverPage() {
             value={customFilter}
             onChange={setCustomFilter}
             onExecute={handleSearch}
+            onCancel={cancelQuery}
             isLoading={isLoading}
+            isDirty={isQueryDirty}
             error={error}
             placeholder={`Filter with ClickHouse SQL, e.g. ${
               schema.columns[0]?.name || "column"
             } = 'value'`}
           />
+        )}
+
+        {/* Inline error display (P7) */}
+        {error && !isLoading && (
+          <div className="flex items-start gap-2 p-3 rounded-md border border-destructive/50 bg-destructive/5 text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium">Query Error</p>
+              <p className="text-xs mt-0.5 opacity-90 break-all">{error}</p>
+            </div>
+          </div>
         )}
 
         {/* Main Content */}
@@ -671,7 +247,6 @@ export default function DiscoverPage() {
 
             {/* Grid + Sidebar */}
             <div className="flex-1 flex gap-4 min-h-0">
-              {/* Left Sidebar: Fields */}
               <FieldsSidebar
                 columns={schema.columns}
                 timeColumns={schema.timeColumns}
@@ -679,10 +254,10 @@ export default function DiscoverPage() {
                 onSelectedColumnsChange={setSelectedColumns}
                 selectedTimeColumn={selectedTimeColumn}
                 onTimeColumnChange={setSelectedTimeColumn}
+                onResetColumns={resetColumns}
                 className="hidden md:flex w-64 max-h-[calc(100vh-280px)]"
               />
 
-              {/* Main Grid */}
               <div className="flex-1 flex flex-col min-h-0 bg-card border rounded-md shadow-sm overflow-hidden">
                 <div className="p-2 border-b text-xs text-muted-foreground flex justify-between items-center">
                   <span>
@@ -693,13 +268,12 @@ export default function DiscoverPage() {
                     {selectedDatabase}.{selectedTable}
                   </span>
                 </div>
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 overflow-auto relative">
                   <DiscoverGrid
                     rows={rows}
                     columns={schema.columns}
                     selectedColumns={selectedColumns}
                     isLoading={isLoading && rows.length === 0}
-                    // Pagination
                     page={page}
                     pageSize={pageSize}
                     totalHits={totalHits}
