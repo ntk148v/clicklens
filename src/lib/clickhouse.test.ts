@@ -1,5 +1,5 @@
-import { createClient } from "@clickhouse/client";
-import { describe, expect, test, afterAll } from "bun:test";
+import { createClient } from "../test/mocks/clickhouse-client";
+import { describe, expect, test, afterAll, mock } from "bun:test";
 
 // Build connection URL from environment variables (matching ClickLens config approach)
 const getConnectionUrl = () => {
@@ -24,6 +24,12 @@ describe("ClickHouse Integration", () => {
   test("should connect and return version", async () => {
     // Skip if no ClickHouse available (e.g. running unit tests in isolation w/o service)
     // But in CI this should run.
+  // Mock the query response
+  const mockQuery = client.query as unknown as ReturnType<typeof mock>;
+  mockQuery.mockResolvedValue({
+    json: async () => [{ "version()": "22.8.1.1" }],
+  });
+
     try {
       const result = await client.query({
         query: "SELECT version()",

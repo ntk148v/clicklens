@@ -1,0 +1,3 @@
+[test]
+# Run tests only in src/ - E2E tests use Playwright (run with: npx playwright test)
+# Using --src pattern to only match src directory

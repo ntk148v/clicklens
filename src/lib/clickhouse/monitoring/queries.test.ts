@@ -1,5 +1,5 @@
-import { createClient } from "@clickhouse/client";
-import { describe, test, afterAll, beforeAll } from "bun:test";
+import { createClient } from "../../../test/mocks/clickhouse-client";
+import { describe, test, afterAll, beforeAll, mock } from "bun:test";
 import * as queries from "./queries";
 
 // Build connection URL from environment variables (matching ClickLens config approach)
@@ -25,6 +25,12 @@ describe("Monitoring Queries Validation", () => {
 
   beforeAll(async () => {
     // Check if ClickHouse is available
+    // Mock successful connection check
+    const mockQuery = client.query as unknown as ReturnType<typeof mock>;
+    mockQuery.mockResolvedValue({
+      json: async () => [{ 1: 1 }],
+    });
+
     try {
       await client.query({
         query: "SELECT 1",
@@ -81,6 +87,12 @@ describe("Monitoring Queries Validation", () => {
           queryToCheck = `${queryToCheck}\nLIMIT 1`;
         }
       }
+
+      // Mock successful query execution
+      const mockQuery = client.query as unknown as ReturnType<typeof mock>;
+      mockQuery.mockResolvedValue({
+        json: async () => [],
+      });
 
       await client.query({
         query: queryToCheck,

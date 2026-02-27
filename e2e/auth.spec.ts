@@ -44,6 +44,12 @@ test.describe("Authentication", () => {
 
     // Should show error message or stay on login page
     await expect(page).toHaveURL(/login/);
+    
+    // Check for error message
+    const errorMessage = page.getByText(/invalid credentials|authentication failed|user not found|wrong password/i);
+    await expect(errorMessage).toBeVisible();
+
+    await expect(page).toHaveURL(/login/);
   });
 
   test("should persist session across page reloads", async ({ page }) => {
