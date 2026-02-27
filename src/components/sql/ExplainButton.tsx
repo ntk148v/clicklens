@@ -23,7 +23,6 @@ export function ExplainButton({ onExplain, disabled }: ExplainButtonProps) {
         onClick={() => onExplain("PLAN")}
         disabled={disabled}
         className="rounded-r-none"
-        title="Explain (Ctrl+E / Cmd+E)"
       >
         <Network className="w-4 h-4 mr-1" />
         Explain

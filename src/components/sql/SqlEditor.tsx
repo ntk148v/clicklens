@@ -850,13 +850,6 @@ export const SqlEditor = memo(function SqlEditor({
         return true;
       },
     },
-    {
-      key: "Mod-e",
-      run: () => {
-        onExplainRef.current?.();
-        return true;
-      },
-    },
   ]);
 
   // Create stable completion source with all refs
