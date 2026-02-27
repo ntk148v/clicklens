@@ -62,7 +62,15 @@ export async function POST(request: NextRequest) {
       const offset = body.page * pageSize;
       // Remove trailing semicolon
       const cleanSql = sql.trim().replace(/;$/, "");
-      sql = `SELECT * FROM (${cleanSql}) LIMIT ${pageSize} OFFSET ${offset}`;
+
+      // Only paginate SELECT or WITH queries. Other statements (e.g. OPTIMIZE, ALTER, EXPLAIN, SHOW)
+      // will fail if wrapped in a SELECT subquery.
+      const isPaginatedQuery =
+        /^(?:\/\*[\s\S]*?\*\/|--.*?\n|\s)*(?:WITH|SELECT)\b/i.test(cleanSql);
+
+      if (isPaginatedQuery) {
+        sql = `SELECT * FROM (${cleanSql}) LIMIT ${pageSize} OFFSET ${offset}`;
+      }
     }
 
     // Build ClickHouse settings with optional database context
