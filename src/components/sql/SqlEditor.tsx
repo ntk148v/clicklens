@@ -156,7 +156,7 @@ const lightEditorTheme = EditorView.theme(
       },
     },
   },
-  { dark: false }
+  { dark: false },
 );
 
 // Dark editor theme (non-syntax styles)
@@ -228,7 +228,7 @@ const darkEditorTheme = EditorView.theme(
       marginLeft: "8px",
     },
   },
-  { dark: true }
+  { dark: true },
 );
 
 interface TableInfo {
@@ -406,7 +406,7 @@ import type { AutocompleteColumnInfo } from "@/lib/store/sql-browser";
 // Column fetch function type (passed in via ref)
 type ColumnFetcher = (
   database: string,
-  table: string
+  table: string,
 ) => Promise<AutocompleteColumnInfo[]>;
 
 // Create enhanced schema completion source with context awareness
@@ -414,7 +414,7 @@ function createSchemaCompletionSource(
   tablesRef: React.RefObject<TableInfo[]>,
   databasesRef: React.RefObject<string[]>,
   selectedDatabaseRef: React.RefObject<string | null>,
-  getColumnsRef: React.RefObject<ColumnFetcher | null>
+  getColumnsRef: React.RefObject<ColumnFetcher | null>,
 ) {
   // Cache for pending column fetches to avoid duplicate requests
   const pendingFetches = new Map<string, Promise<AutocompleteColumnInfo[]>>();
@@ -474,8 +474,8 @@ function createSchemaCompletionSource(
               info: col.is_in_primary_key
                 ? "🔑 Primary Key"
                 : col.is_in_sorting_key
-                ? "📊 Sorting Key"
-                : undefined,
+                  ? "📊 Sorting Key"
+                  : undefined,
               boost: col.is_in_primary_key ? 2 : col.is_in_sorting_key ? 1 : 0,
             });
           });
@@ -486,13 +486,13 @@ function createSchemaCompletionSource(
 
       // Check if it's a database name -> show tables from THAT database
       const matchingDb = databases.find(
-        (d) => d.toLowerCase() === prefix.toLowerCase()
+        (d) => d.toLowerCase() === prefix.toLowerCase(),
       );
       if (matchingDb) {
         // Fetch tables for this specific database from API
         try {
           const res = await fetch(
-            `/api/clickhouse/tables?database=${encodeURIComponent(matchingDb)}`
+            `/api/clickhouse/tables?database=${encodeURIComponent(matchingDb)}`,
           );
           const data = await res.json();
           if (data.success && data.data) {
@@ -526,7 +526,7 @@ function createSchemaCompletionSource(
     if (sqlContext.type === "IN_FUNCTION" || lastWord.length >= 2) {
       const funcCompletions = getFunctionCompletions();
       const filtered = funcCompletions.filter((f) =>
-        f.label.toLowerCase().startsWith(lastWord.toLowerCase())
+        f.label.toLowerCase().startsWith(lastWord.toLowerCase()),
       );
 
       if (filtered.length > 0 && lastWord.length >= 2) {
@@ -558,7 +558,7 @@ function createSchemaCompletionSource(
 
       if (options.length > 0) {
         const filtered = options.filter((o) =>
-          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase()),
         );
         if (filtered.length > 0 || lastWord === "") {
           return { from, options: filtered.length > 0 ? filtered : options };
@@ -611,8 +611,8 @@ function createSchemaCompletionSource(
                 boost: col.is_in_primary_key
                   ? 2
                   : col.is_in_sorting_key
-                  ? 1
-                  : 0,
+                    ? 1
+                    : 0,
               });
             }
           });
@@ -623,7 +623,7 @@ function createSchemaCompletionSource(
 
       if (options.length > 0) {
         const filtered = options.filter((o) =>
-          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase()),
         );
         if (filtered.length > 0) {
           return { from, options: filtered };
@@ -639,10 +639,10 @@ function createSchemaCompletionSource(
             label: db,
             type: "namespace",
             detail: "database",
-          })
+          }),
         )
         .filter((o) =>
-          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase()),
         );
 
       if (filtered.length > 0) {
@@ -674,7 +674,7 @@ function createSchemaCompletionSource(
 
       if (options.length > 0) {
         const filtered = options.filter((o) =>
-          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase()),
         );
 
         if (filtered.length > 0) {
@@ -690,10 +690,10 @@ function createSchemaCompletionSource(
             label: db,
             type: "namespace",
             detail: "database",
-          })
+          }),
         )
         .filter((o) =>
-          o.label.toLowerCase().startsWith(lastWord.toLowerCase())
+          o.label.toLowerCase().startsWith(lastWord.toLowerCase()),
         );
 
       if (filtered.length > 0) {
@@ -851,8 +851,8 @@ export const SqlEditor = memo(function SqlEditor({
       },
     },
     {
-      key: "Ctrl-Shift-e",
-      mac: "Cmd-Shift-e",
+      key: "Ctrl-Shift-E",
+      mac: "Cmd-Shift-E",
       run: () => {
         onExplainRef.current?.();
         return true;
@@ -866,8 +866,8 @@ export const SqlEditor = memo(function SqlEditor({
       tablesRef,
       databasesRef,
       selectedDatabaseRef,
-      getColumnsRef
-    )
+      getColumnsRef,
+    ),
   );
 
   useEffect(() => {
@@ -904,10 +904,10 @@ export const SqlEditor = memo(function SqlEditor({
         sql({ dialect: clickhouseDialect }),
         // Use our custom highlight styles instead of defaultHighlightStyle
         highlightCompartment.current.of(
-          syntaxHighlighting(isDark ? darkHighlightStyle : lightHighlightStyle)
+          syntaxHighlighting(isDark ? darkHighlightStyle : lightHighlightStyle),
         ),
         themeCompartment.current.of(
-          isDark ? darkEditorTheme : lightEditorTheme
+          isDark ? darkEditorTheme : lightEditorTheme,
         ),
         executeKeymap,
         keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
@@ -945,10 +945,10 @@ export const SqlEditor = memo(function SqlEditor({
     editor.dispatch({
       effects: [
         themeCompartment.current.reconfigure(
-          isDark ? darkEditorTheme : lightEditorTheme
+          isDark ? darkEditorTheme : lightEditorTheme,
         ),
         highlightCompartment.current.reconfigure(
-          syntaxHighlighting(isDark ? darkHighlightStyle : lightHighlightStyle)
+          syntaxHighlighting(isDark ? darkHighlightStyle : lightHighlightStyle),
         ),
       ],
     });
@@ -981,7 +981,7 @@ export const SqlEditor = memo(function SqlEditor({
 
     editor.dispatch({
       effects: readOnlyCompartment.current.reconfigure(
-        EditorState.readOnly.of(readOnly)
+        EditorState.readOnly.of(readOnly),
       ),
     });
   }, [readOnly]);
