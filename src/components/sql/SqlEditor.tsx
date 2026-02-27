@@ -851,8 +851,7 @@ export const SqlEditor = memo(function SqlEditor({
       },
     },
     {
-      key: "Ctrl-e",
-      mac: "Cmd-e",
+      key: "Mod-e",
       run: () => {
         onExplainRef.current?.();
         return true;
