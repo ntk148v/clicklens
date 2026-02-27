@@ -4,7 +4,7 @@ export const mockClickHouseClient = {
   query: mock(async () => ({
     json: async () => [],
     stream: async () => ({
-      on: (event, callback) => {},
+      on: () => {},
     }),
   })),
   insert: mock(async () => {}),

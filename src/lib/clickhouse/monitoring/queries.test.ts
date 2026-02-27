@@ -1,5 +1,5 @@
-import { createClient } from "../../../test/mocks/clickhouse-client";
-import { describe, test, afterAll, beforeAll, mock } from "bun:test";
+import { createClient } from "@clickhouse/client";
+import { describe, test, afterAll, beforeAll } from "bun:test";
 import * as queries from "./queries";
 
 // Build connection URL from environment variables (matching ClickLens config approach)
@@ -25,12 +25,6 @@ describe("Monitoring Queries Validation", () => {
 
   beforeAll(async () => {
     // Check if ClickHouse is available
-    // Mock successful connection check
-    const mockQuery = client.query as unknown as ReturnType<typeof mock>;
-    mockQuery.mockResolvedValue({
-      json: async () => [{ 1: 1 }],
-    });
-
     try {
       await client.query({
         query: "SELECT 1",
@@ -38,22 +32,14 @@ describe("Monitoring Queries Validation", () => {
       });
       clickhouseAvailable = true;
     } catch (e) {
-      const msg = (e instanceof Error ? e.message : String(e)).toString();
-      if (
-        msg.includes("ECONNREFUSED") ||
-        msg.includes("ENOTFOUND") ||
-        msg.includes("fetch failed")
-      ) {
-        console.warn(
-          "⚠️  ClickHouse not available. Skipping monitoring queries validation tests.",
-        );
-        console.warn(
-          "   To run these tests, start ClickHouse: docker run -d -p 8123:8123 clickhouse/clickhouse-server:latest",
-        );
-        clickhouseAvailable = false;
-      } else {
-        throw e;
-      }
+      console.warn(
+        "⚠️  ClickHouse not available. Skipping monitoring queries validation tests.",
+        e instanceof Error ? e.message : e,
+      );
+      console.warn(
+        "   To run these tests, start ClickHouse: docker run -d -p 8123:8123 clickhouse/clickhouse-server:latest",
+      );
+      clickhouseAvailable = false;
     }
   });
 
@@ -87,12 +73,6 @@ describe("Monitoring Queries Validation", () => {
           queryToCheck = `${queryToCheck}\nLIMIT 1`;
         }
       }
-
-      // Mock successful query execution
-      const mockQuery = client.query as unknown as ReturnType<typeof mock>;
-      mockQuery.mockResolvedValue({
-        json: async () => [],
-      });
 
       await client.query({
         query: queryToCheck,

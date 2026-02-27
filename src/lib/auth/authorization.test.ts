@@ -1,5 +1,5 @@
 import { describe, expect, test, mock, beforeEach } from "bun:test";
-import { checkPermission, type Permission } from "./authorization";
+import { checkPermission } from "./authorization";
 import { NextResponse } from "next/server";
 
 // Mock dependencies
