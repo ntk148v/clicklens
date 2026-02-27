@@ -1244,24 +1244,6 @@ export default function SqlConsolePage() {
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-muted-foreground">
-                                Explain query
-                              </span>
-                              <div className="flex gap-1">
-                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
-                                  Ctrl
-                                </kbd>
-                                <span>+</span>
-                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
-                                  Shift
-                                </kbd>
-                                <span>+</span>
-                                <kbd className="px-1.5 py-0.5 rounded bg-background border font-mono">
-                                  E
-                                </kbd>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">
                                 Autocomplete
                               </span>
                               <div className="flex gap-1">
