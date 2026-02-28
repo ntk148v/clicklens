@@ -971,7 +971,7 @@ export default function SqlConsolePage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="SQL Console">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DatabaseSelector />
 
           <Separator orientation="vertical" className="h-6" />
@@ -996,21 +996,21 @@ export default function SqlConsolePage() {
             Saved
           </Button>
 
-          <Separator orientation="vertical" className="h-6" />
+          <Separator orientation="vertical" className="h-6 hidden sm:inline" />
 
           <ExplainButton
             onExplain={handleExplain}
             disabled={!activeQueryTab || activeQueryTab.isRunning}
           />
 
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          <Separator orientation="vertical" className="h-6 mx-2 hidden sm:inline" />
 
           <TimeRangeSelector
             onApply={handleApplyTimeRange}
             disabled={!activeQueryTab || activeQueryTab.isRunning}
           />
 
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          <Separator orientation="vertical" className="h-6 mx-2 hidden sm:inline" />
 
           <div className="flex items-center">
             <Button
@@ -1153,7 +1153,7 @@ export default function SqlConsolePage() {
             ) : activeQueryTab ? (
               <>
                 {/* Editor */}
-                <div className="h-[200px] p-4 border-b">
+                <div className="h-[150px] md:h-[200px] p-3 md:p-4 border-b">
                   <SqlEditor
                     value={activeQueryTab.sql}
                     onChange={handleSqlChange}
@@ -1264,7 +1264,7 @@ export default function SqlConsolePage() {
                           <h3 className="text-sm font-medium">
                             ClickHouse Documentation
                           </h3>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <a
                               href="https://clickhouse.com/docs/en/sql-reference"
                               target="_blank"
