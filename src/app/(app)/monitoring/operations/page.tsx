@@ -45,7 +45,7 @@ export default function MonitoringOperationsPage() {
         }
       />
 
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
         <OperationsTab
           key={`operations-${refreshKey}`}
           refreshInterval={interval * 1000}

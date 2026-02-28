@@ -36,16 +36,18 @@ export default function MonitoringDisksPage() {
       <Header
         title="Disk Usage"
         actions={
-          <RefreshControl
-            onRefresh={handleRefresh}
-            intervals={[10, 30, 60, 120]}
-            interval={interval}
-            onIntervalChange={setInterval}
-          />
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            <RefreshControl
+              onRefresh={handleRefresh}
+              intervals={[10, 30, 60, 120]}
+              interval={interval}
+              onIntervalChange={setInterval}
+            />
+          </div>
         }
       />
 
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
         <DisksTab
           key={`disks-${refreshKey}`}
           refreshInterval={interval * 1000}

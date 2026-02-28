@@ -40,17 +40,19 @@ export default function RunningQueriesPage() {
       <Header
         title="Running Queries"
         actions={
-          <RefreshControl
-            onRefresh={handleRefresh}
-            intervals={[5, 10, 30, 60]}
-            interval={refreshInterval}
-            onIntervalChange={setRefreshInterval}
-            defaultInterval={0}
-          />
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            <RefreshControl
+              onRefresh={handleRefresh}
+              intervals={[5, 10, 30, 60]}
+              interval={refreshInterval}
+              onIntervalChange={setRefreshInterval}
+              defaultInterval={0}
+            />
+          </div>
         }
       />
 
-      <div className="flex-1 p-4 overflow-hidden">
+      <div className="flex-1 p-4 md:p-6 overflow-hidden">
         <RunningTab
           key={`running-${refreshKey}`}
           refreshInterval={refreshIntervalMs}

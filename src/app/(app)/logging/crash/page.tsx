@@ -21,7 +21,7 @@ export default function CrashLogsPage() {
       <Header
         title="Crash Logs"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <TimeSelector value={flexibleRange} onChange={setFlexibleRange} />
             <RefreshControl
               onRefresh={() => setRefreshKey((k) => k + 1)}
@@ -31,7 +31,7 @@ export default function CrashLogsPage() {
           </div>
         }
       />
-      <div className="px-6 pt-6 flex-1 overflow-hidden">
+      <div className="p-4 md:p-6 flex-1 overflow-hidden">
         <LogsViewer
           source="crash_log"
           timeRange={flexibleRange}
