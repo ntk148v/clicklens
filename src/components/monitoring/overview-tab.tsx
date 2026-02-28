@@ -2,127 +2,30 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Server,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  Activity,
-  Cpu,
   Database,
-  HeartPulse,
+  Cpu,
   Network,
+  XCircle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MultiSeriesChart, MetricChart } from "@/components/monitoring";
-import { StatusBadge } from "@/components/monitoring";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
-import { formatUptime, useHealthChecks } from "@/lib/hooks/use-monitoring";
-import type {
-  MonitoringApiResponse,
-  HealthStatus,
-} from "@/lib/clickhouse/monitoring";
+import { useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type { FlexibleTimeRange } from "@/lib/types/discover";
 import { getMinTimeFromRange, type TimeRange } from "@/lib/types/discover";
-
-interface TimeSeriesPoint {
-  t: string;
-  node: string;
-  value: number;
-}
-
-interface ClusterNode {
-  hostName: string;
-  hostAddress: string;
-  port: number;
-  shardNum: number;
-  replicaNum: number;
-  isLocal: boolean;
-  isActive: boolean;
-  errorsCount: number;
-}
-
-interface DashboardData {
-  server: {
-    uptime: number;
-    version: string;
-    hostname: string;
-  };
-  cluster?: {
-    name: string;
-    totalNodes: number;
-    activeNodes: number;
-    inactiveNodes: number;
-    totalShards: number;
-    nodes: ClusterNode[];
-  };
-  clickhouse: {
-    queriesPerSec: TimeSeriesPoint[];
-    queriesRunning: TimeSeriesPoint[];
-    mergesRunning: TimeSeriesPoint[];
-    selectedRowsPerSec: TimeSeriesPoint[];
-    insertedRowsPerSec: TimeSeriesPoint[];
-    selectedBytesPerSec: TimeSeriesPoint[];
-    insertedBytesPerSec: TimeSeriesPoint[];
-    maxPartsPerPartition: TimeSeriesPoint[];
-  };
-  systemHealth: {
-    memoryTracked: TimeSeriesPoint[];
-    cpuUsage: TimeSeriesPoint[];
-    cpuKernel: TimeSeriesPoint[];
-    ioWait: TimeSeriesPoint[];
-    filesystemUsed: TimeSeriesPoint[];
-    networkReceived: TimeSeriesPoint[];
-    networkSent: TimeSeriesPoint[];
-    networkConnections: TimeSeriesPoint[];
-    diskRead: TimeSeriesPoint[];
-    diskWrite: TimeSeriesPoint[];
-  };
-  nodes: string[];
-}
+import type { DashboardResponse } from "@/services/monitoring";
+import { ClusterInfo, NodeInfo, HealthSummary, MetricsGrid } from "@/components/monitoring/dashboard";
 
 interface OverviewTabProps {
   refreshInterval?: number;
   timeRange: FlexibleTimeRange;
+  initialData?: DashboardResponse | null;
 }
 
-// Transform per-node data for charts
-function transformToChartData(data: TimeSeriesPoint[]) {
-  return data.map((p) => ({
-    timestamp: p.t,
-    node: p.node,
-    value: p.value,
-  }));
-}
-
-// For single line charts (when only 1 node)
-function transformToSingleSeries(data: TimeSeriesPoint[]) {
-  return data.map((p) => ({
-    timestamp: p.t,
-    value: p.value,
-  }));
-}
-
-export function OverviewTab({ timeRange }: OverviewTabProps) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
+  const [data, setData] = useState<DashboardResponse | null>(initialData || null);
+  const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
-  const [healthExpanded, setHealthExpanded] = useState(false);
 
   // Health checks
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({
@@ -154,17 +57,21 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
 
   const fetchData = useCallback(async () => {
     try {
-      setIsLoading(true);
+      // Only show loading state if we don't have data, to prevent flickering on refresh
+      if (!data) {
+        setIsLoading(true);
+      }
       setError(null);
 
       const response = await fetch(
         `/api/clickhouse/monitoring/dashboard?${apiParams}`,
       );
-      const result: MonitoringApiResponse<DashboardData> =
-        await response.json();
+      // We need to cast here because strict API response types might differ slightly in structure vs what frontend expects
+      // but we know it matches DashboardResponse
+      const result = await response.json();
 
       if (result.success && result.data) {
-        setData(result.data);
+        setData(result.data as DashboardResponse);
       } else if (result.error) {
         setError(result.error.userMessage || result.error.message);
       }
@@ -173,64 +80,11 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [apiParams]);
+  }, [apiParams, data]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const getHealthIcon = (status: HealthStatus) => {
-    switch (status) {
-      case "ok":
-        return <CheckCircle2 className="w-4 h-4 status-ok" />;
-      case "warning":
-        return <AlertTriangle className="w-4 h-4 status-warning" />;
-      case "critical":
-        return <XCircle className="w-4 h-4 status-critical" />;
-      default:
-        return <Activity className="w-4 h-4 text-muted-foreground" />;
-    }
-  };
-
-  // Determine if we should show multi-node charts
-  const isMultiNode = data && data.nodes.length > 1;
-
-  // Render chart - automatically handles single vs multi-node
-  const renderChart = (
-    title: string,
-    chartData: TimeSeriesPoint[],
-    options: { isBytes?: boolean; unit?: string } = {},
-  ) => {
-    const transformedData = transformToChartData(chartData);
-    const nodes = data?.nodes || [];
-
-    if (isMultiNode) {
-      return (
-        <MultiSeriesChart
-          title={title}
-          data={transformedData}
-          nodes={nodes}
-          isBytes={options.isBytes}
-          unit={options.unit}
-          height={140}
-          showAxis
-          loading={isLoading}
-        />
-      );
-    }
-
-    return (
-      <MetricChart
-        title={title}
-        data={transformToSingleSeries(chartData)}
-        isBytes={options.isBytes}
-        unit={options.unit}
-        height={140}
-        showAxis
-        loading={isLoading}
-      />
-    );
-  };
 
   if (error) {
     return (
@@ -246,276 +100,74 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
     );
   }
 
+  const nodes = data?.nodes || [];
+  const isMultiNode = nodes.length > 1;
+
+  const clickhouseCharts = data ? [
+    { title: "Queries/sec", data: data.clickhouse.queriesPerSec, options: { unit: "/s" } },
+    { title: "Queries Running", data: data.clickhouse.queriesRunning },
+    { title: "Selected Rows/sec", data: data.clickhouse.selectedRowsPerSec, options: { unit: "/s" } },
+    { title: "Inserted Rows/sec", data: data.clickhouse.insertedRowsPerSec, options: { unit: "/s" } },
+    { title: "Selected Bytes/sec", data: data.clickhouse.selectedBytesPerSec, options: { isBytes: true } },
+    { title: "Inserted Bytes/sec", data: data.clickhouse.insertedBytesPerSec, options: { isBytes: true } },
+    { title: "Merges Running", data: data.clickhouse.mergesRunning },
+    { title: "Max Parts/Partition", data: data.clickhouse.maxPartsPerPartition },
+  ] : [];
+
+  const systemCharts = data ? [
+    { title: "Memory (tracked)", data: data.systemHealth.memoryTracked, options: { isBytes: true } },
+    { title: "OS CPU Usage (Userspace)", data: data.systemHealth.cpuUsage },
+    { title: "OS CPU Usage (Kernel)", data: data.systemHealth.cpuKernel },
+    { title: "IO Wait", data: data.systemHealth.ioWait, options: { unit: "s" } },
+    { title: "Filesystem Used", data: data.systemHealth.filesystemUsed, options: { isBytes: true } },
+    { title: "Read from Disk", data: data.systemHealth.diskRead, options: { isBytes: true } },
+    { title: "Written to Disk", data: data.systemHealth.diskWrite, options: { isBytes: true } },
+  ] : [];
+
+  const networkCharts = data ? [
+    { title: "Network Received Bytes/sec", data: data.systemHealth.networkReceived, options: { isBytes: true } },
+    { title: "Network Send Bytes/sec", data: data.systemHealth.networkSent, options: { isBytes: true } },
+    { title: "Concurrent Network Connections", data: data.systemHealth.networkConnections },
+  ] : [];
+
   return (
     <div className="space-y-6">
       {/* Cluster Info + Nodes */}
-      {data?.cluster && (
-        <TooltipProvider>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Layers className="w-4 h-4" />
-                  Cluster: {data.cluster.name}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    {data.cluster.activeNodes}/{data.cluster.totalNodes} active
-                  </Badge>
-                  <Badge variant="outline">
-                    {data.cluster.totalShards} shard
-                    {data.cluster.totalShards > 1 ? "s" : ""}
-                  </Badge>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {data.cluster.nodes.map((node) => (
-                  <Tooltip key={`${node.hostName}-${node.port}`}>
-                    <TooltipTrigger asChild>
-                      <div
-                        className={`
-                          flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer
-                          transition-colors hover:bg-muted/50
-                          ${
-                            !node.isActive
-                              ? "border-red-500/50 bg-red-500/5"
-                              : node.errorsCount > 0
-                                ? "border-yellow-500/50 bg-yellow-500/5"
-                                : "border-green-500/50 bg-green-500/5"
-                          }
-                        `}
-                      >
-                        {node.isActive ? (
-                          node.errorsCount > 0 ? (
-                            <AlertTriangle className="w-4 h-4 status-warning" />
-                          ) : (
-                            <CheckCircle2 className="w-4 h-4 status-ok" />
-                          )
-                        ) : (
-                          <XCircle className="w-4 h-4 status-critical" />
-                        )}
-                        <span className="text-sm font-mono">
-                          {node.hostName}
-                        </span>
-                        {node.isLocal && (
-                          <Badge variant="secondary" className="text-xs">
-                            local
-                          </Badge>
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                        <span className="text-muted-foreground">Address:</span>
-                        <span className="font-mono">
-                          {node.hostAddress}:{node.port}
-                        </span>
-                        <span className="text-muted-foreground">Shard:</span>
-                        <span>{node.shardNum}</span>
-                        <span className="text-muted-foreground">Replica:</span>
-                        <span>{node.replicaNum}</span>
-                        <span className="text-muted-foreground">Errors:</span>
-                        <span
-                          className={
-                            node.errorsCount > 0 ? "text-yellow-500" : ""
-                          }
-                        >
-                          {node.errorsCount}
-                        </span>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TooltipProvider>
-      )}
+      {data?.cluster && <ClusterInfo cluster={data.cluster} />}
 
       {/* Single Node Info */}
-      {!data?.cluster && data && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Server className="w-4 h-4" />
-              {data.server.hostname}
-              <Badge variant="outline" className="ml-auto">
-                v{data.server.version}
-              </Badge>
-              <Badge variant="outline">
-                Uptime: {formatUptime(data.server.uptime)}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      )}
+      {!data?.cluster && data && <NodeInfo server={data.server} />}
 
-      {/* Health Summary - Collapsible */}
-      <Collapsible open={healthExpanded} onOpenChange={setHealthExpanded}>
-        <Card
-          className={
-            healthData?.overallStatus === "ok"
-              ? "border-green-500/50 bg-green-500/5"
-              : healthData?.overallStatus === "warning"
-                ? "border-yellow-500/50 bg-yellow-500/5"
-                : healthData?.overallStatus === "critical"
-                  ? "border-red-500/50 bg-red-500/5"
-                  : ""
-          }
-        >
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer transition-colors py-3">
-              <CardTitle className="flex items-center gap-2 justify-between">
-                <span className="flex items-center gap-2">
-                  <HeartPulse className="w-4 h-4" />
-                  Health Status
-                </span>
-                <div className="flex items-center gap-2">
-                  {healthLoading ? (
-                    <span className="text-muted-foreground text-xs">
-                      Loading...
-                    </span>
-                  ) : (
-                    <StatusBadge
-                      status={healthData?.overallStatus || "unknown"}
-                      size="lg"
-                    />
-                  )}
-                  {healthExpanded ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </div>
-              </CardTitle>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0">
-              {healthData?.checks && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {healthData.checks.map((check) => (
-                    <div
-                      key={check.name}
-                      className="flex items-center gap-2 text-sm p-2 rounded-md"
-                    >
-                      {getHealthIcon(check.status)}
-                      <span className="truncate">{check.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+      {/* Health Summary */}
+      <HealthSummary data={healthData} isLoading={healthLoading} />
 
       {/* ClickHouse Specific Metrics */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Database className="w-5 h-5" />
-          ClickHouse Metrics
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {renderChart("Queries/sec", data?.clickhouse.queriesPerSec || [], {
-            unit: "/s",
-          })}
-          {renderChart(
-            "Queries Running",
-            data?.clickhouse.queriesRunning || [],
-          )}
-          {renderChart(
-            "Selected Rows/sec",
-            data?.clickhouse.selectedRowsPerSec || [],
-            { unit: "/s" },
-          )}
-          {renderChart(
-            "Inserted Rows/sec",
-            data?.clickhouse.insertedRowsPerSec || [],
-            { unit: "/s" },
-          )}
-          {renderChart(
-            "Selected Bytes/sec",
-            data?.clickhouse.selectedBytesPerSec || [],
-            { isBytes: true },
-          )}
-          {renderChart(
-            "Inserted Bytes/sec",
-            data?.clickhouse.insertedBytesPerSec || [],
-            { isBytes: true },
-          )}
-          {renderChart("Merges Running", data?.clickhouse.mergesRunning || [])}
-          {renderChart(
-            "Max Parts/Partition",
-            data?.clickhouse.maxPartsPerPartition || [],
-          )}
-        </div>
-      </section>
+      <MetricsGrid 
+        title="ClickHouse Metrics" 
+        icon={<Database className="w-5 h-5" />} 
+        charts={clickhouseCharts} 
+        nodes={nodes} 
+        isLoading={isLoading} 
+      />
 
       {/* System Health Specific Metrics */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Cpu className="w-5 h-5" />
-          System Health
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {renderChart(
-            "Memory (tracked)",
-            data?.systemHealth.memoryTracked || [],
-            { isBytes: true },
-          )}
-          {renderChart(
-            "OS CPU Usage (Userspace)",
-            data?.systemHealth.cpuUsage || [],
-          )}
-          {renderChart(
-            "OS CPU Usage (Kernel)",
-            data?.systemHealth.cpuKernel || [],
-          )}
-          {renderChart("IO Wait", data?.systemHealth.ioWait || [], {
-            unit: "s",
-          })}
-          {renderChart(
-            "Filesystem Used",
-            data?.systemHealth.filesystemUsed || [],
-            { isBytes: true },
-          )}
-          {renderChart("Read from Disk", data?.systemHealth.diskRead || [], {
-            isBytes: true,
-          })}
-          {renderChart("Written to Disk", data?.systemHealth.diskWrite || [], {
-            isBytes: true,
-          })}
-        </div>
-      </section>
+      <MetricsGrid 
+        title="System Health" 
+        icon={<Cpu className="w-5 h-5" />} 
+        charts={systemCharts} 
+        nodes={nodes} 
+        isLoading={isLoading} 
+      />
 
       {/* Network Metrics */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Network className="w-5 h-5" />
-          Network
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {renderChart(
-            "Network Received Bytes/sec",
-            data?.systemHealth.networkReceived || [],
-            { isBytes: true },
-          )}
-          {renderChart(
-            "Network Send Bytes/sec",
-            data?.systemHealth.networkSent || [],
-            { isBytes: true },
-          )}
-          {renderChart(
-            "Concurrent Network Connections",
-            data?.systemHealth.networkConnections || [],
-          )}
-        </div>
-      </section>
+      <MetricsGrid 
+        title="Network" 
+        icon={<Network className="w-5 h-5" />} 
+        charts={networkCharts} 
+        nodes={nodes} 
+        isLoading={isLoading} 
+      />
 
-      {/* Info footer */}
       {/* Info footer */}
       <DataSourceBadge
         sources={[
@@ -528,3 +180,4 @@ export function OverviewTab({ timeRange }: OverviewTabProps) {
     </div>
   );
 }
+
