@@ -22,9 +22,11 @@ export interface RefreshControlProps {
   className?: string;
 }
 
+const DEFAULT_INTERVALS = [10, 30, 60, 120, 300];
+
 export function RefreshControl({
   onRefresh,
-  intervals = [5, 10, 30, 60],
+  intervals = DEFAULT_INTERVALS,
   interval,
   onIntervalChange,
   defaultInterval = 0,
@@ -39,22 +41,35 @@ export function RefreshControl({
   const [isPaused, setIsPaused] = useState(false);
   const [countdown, setCountdown] = useState(currentInterval);
 
+  // Sync internal state if interval changes from parent
+  useEffect(() => {
+    if (interval !== undefined) {
+      setInternalInterval(interval);
+    }
+  }, [interval]);
+
   const handleRefresh = useCallback(() => {
     onRefresh();
-    setCountdown(currentInterval);
+    // Reset countdown to current interval
+    setCountdown(currentInterval > 0 ? currentInterval : 0);
   }, [onRefresh, currentInterval]);
 
-  const handleIntervalChange = (newInterval: number) => {
+  const handleIntervalChange = (value: string) => {
+    const newInterval = Number(value);
+    setInternalInterval(newInterval);
     if (onIntervalChange) {
       onIntervalChange(newInterval);
-    } else {
-      setInternalInterval(newInterval);
     }
+    setCountdown(newInterval);
+    setIsPaused(false); // Resume if interval changes
   };
 
   // Auto-refresh timer
   useEffect(() => {
-    if (isPaused || currentInterval === 0) return;
+    // If paused or off, do nothing (and stop any existing timer)
+    if (isPaused || currentInterval <= 0) {
+      return;
+    }
 
     const timer = window.setInterval(() => {
       setCountdown((prev) => {
@@ -84,25 +99,27 @@ export function RefreshControl({
     <div className={cn("flex items-center gap-2", className)}>
       {/* Countdown indicator */}
       {!isPaused && currentInterval > 0 && (
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {countdown}s
+        <span className="text-xs text-muted-foreground tabular-nums w-[24px] text-right">
+          {countdown > 0 ? `${countdown}s` : ""}
         </span>
       )}
 
-      {/* Pause/Play button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => setIsPaused(!isPaused)}
-        title={isPaused ? "Resume auto-refresh" : "Pause auto-refresh"}
-      >
-        {isPaused ? (
-          <Play className="h-4 w-4" />
-        ) : (
-          <Pause className="h-4 w-4" />
-        )}
-      </Button>
+      {/* Pause/Play button - only show if interval > 0 */}
+      {currentInterval > 0 && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setIsPaused(!isPaused)}
+          title={isPaused ? "Resume auto-refresh" : "Pause auto-refresh"}
+        >
+          {isPaused ? (
+            <Play className="h-4 w-4" />
+          ) : (
+            <Pause className="h-4 w-4" />
+          )}
+        </Button>
+      )}
 
       {/* Manual refresh button */}
       <Button
@@ -119,10 +136,10 @@ export function RefreshControl({
       {/* Interval selector */}
       <Select
         value={String(currentInterval)}
-        onValueChange={(value) => handleIntervalChange(Number(value))}
+        onValueChange={handleIntervalChange}
       >
         <SelectTrigger className="h-8 w-[80px] text-xs">
-          <SelectValue />
+          <SelectValue placeholder="Off" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="0">Off</SelectItem>
