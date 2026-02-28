@@ -49,11 +49,10 @@ export function MonitoringOverviewClient({ initialData }: MonitoringOverviewClie
       <Header
         title="Cluster Overview"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 justify-end">
             <TimeSelector value={flexibleRange} onChange={setFlexibleRange} />
             <RefreshControl
               onRefresh={handleRefresh}
-              intervals={[10, 30, 60, 120]}
               interval={interval}
               onIntervalChange={setInterval}
             />
@@ -61,7 +60,7 @@ export function MonitoringOverviewClient({ initialData }: MonitoringOverviewClie
         }
       />
 
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
         <OverviewTab
           key={`overview-${refreshKey}`}
           refreshInterval={interval * 1000}

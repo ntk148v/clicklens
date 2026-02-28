@@ -25,16 +25,16 @@ export function ClusterInfo({ cluster }: ClusterInfoProps) {
     <TooltipProvider>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="flex items-center gap-2">
-              <Layers className="w-4 h-4" />
-              Cluster: {cluster.name}
+              <Layers className="w-4 h-4 shrink-0" />
+              <span className="truncate max-w-[200px] sm:max-w-none">Cluster: {cluster.name}</span>
             </span>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant="outline" className="whitespace-nowrap">
                 {cluster.activeNodes}/{cluster.totalNodes} active
               </Badge>
-              <Badge variant="outline">
+              <Badge variant="outline" className="whitespace-nowrap">
                 {cluster.totalShards} shard
                 {cluster.totalShards > 1 ? "s" : ""}
               </Badge>
