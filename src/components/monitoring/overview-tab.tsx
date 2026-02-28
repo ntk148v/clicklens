@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Database,
   Cpu,
@@ -26,6 +26,8 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
   const [data, setData] = useState<DashboardResponse | null>(initialData || null);
   const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
+  
+  const hasDataRef = useRef(!!initialData);
 
   // Health checks
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({
@@ -57,21 +59,19 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
 
   const fetchData = useCallback(async () => {
     try {
-      // Only show loading state if we don't have data, to prevent flickering on refresh
-      if (!data) {
-        setIsLoading(true);
+      if (!hasDataRef.current) {
+         setIsLoading(true);
       }
       setError(null);
 
       const response = await fetch(
         `/api/clickhouse/monitoring/dashboard?${apiParams}`,
       );
-      // We need to cast here because strict API response types might differ slightly in structure vs what frontend expects
-      // but we know it matches DashboardResponse
       const result = await response.json();
 
       if (result.success && result.data) {
         setData(result.data as DashboardResponse);
+        hasDataRef.current = true;
       } else if (result.error) {
         setError(result.error.userMessage || result.error.message);
       }
@@ -80,7 +80,7 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [apiParams, data]);
+  }, [apiParams]);
 
   useEffect(() => {
     fetchData();
@@ -180,4 +180,3 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
     </div>
   );
 }
-
