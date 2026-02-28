@@ -122,39 +122,106 @@ export interface DashboardOptions {
   from?: string;
   to?: string;
   timeRange?: number; // minutes
+  minTime?: string; // For incremental updates: fetch only data newer than this
 }
 
 export class MonitoringService {
   constructor(private client: ClickHouseClient) {}
 
   private parseTimeRange(options: DashboardOptions) {
-    const { from, to, timeRange = 60 } = options;
+    const { from, to, timeRange = 60, minTime } = options;
 
     let fromDate: Date;
     let toDate: Date;
 
+    // 1. Determine the "Global Window" to calculate proper rounding
+    // We need the rounding to be consistent regardless of whether we are fetching 1 hour or 1 minute
+    let windowDurationMs: number;
+
     if (from && to) {
+      const f = new Date(from);
+      const t = to === "now" ? new Date() : new Date(to);
+      windowDurationMs = t.getTime() - f.getTime();
+    } else {
+      windowDurationMs = timeRange * 60 * 1000;
+    }
+    
+    const rounding = computeRounding(windowDurationMs);
+
+    // 2. Determine the "Fetch Window" (what we actually query)
+    if (minTime) {
+      // Incremental mode: Fetch from minTime to Now
+      fromDate = new Date(minTime);
+      toDate = new Date();
+    } else if (from && to) {
+      // Absolute mode
       fromDate = new Date(from);
       toDate = to === "now" ? new Date() : new Date(to);
-
       if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
         const now = new Date();
         toDate = now;
         fromDate = new Date(now.getTime() - timeRange * 60 * 1000);
       }
     } else {
+      // Relative mode (default)
       const now = new Date();
       toDate = now;
       fromDate = new Date(now.getTime() - timeRange * 60 * 1000);
     }
 
-    const durationMs = toDate.getTime() - fromDate.getTime();
-    const rounding = computeRounding(durationMs);
-
     return {
       from: fromDate.toISOString(),
       to: toDate.toISOString(),
       rounding,
+    };
+  }
+
+  /**
+   * Helper to merge new incremental data into existing dashboard data
+   */
+  static mergeDashboardData(current: DashboardResponse, incoming: DashboardResponse): DashboardResponse {
+    // Helper to merge a specific time series array
+    const mergeSeries = (curr: TimeSeriesPoint[], inc: TimeSeriesPoint[]): TimeSeriesPoint[] => {
+      if (!inc || inc.length === 0) return curr;
+      
+      // Create a map of existing points for O(1) lookup
+      // Key: timestamp + node
+      const map = new Map<string, TimeSeriesPoint>();
+      curr.forEach(p => map.set(`${p.t}-${p.node}`, p));
+      
+      // Add/Update with incoming points
+      inc.forEach(p => map.set(`${p.t}-${p.node}`, p));
+      
+      // Convert back to array and sort
+      return Array.from(map.values()).sort((a, b) => 
+        new Date(a.t).getTime() - new Date(b.t).getTime()
+      );
+    };
+
+    return {
+      ...incoming, // Take latest server info, cluster info, etc.
+      clickhouse: {
+        queriesPerSec: mergeSeries(current.clickhouse.queriesPerSec, incoming.clickhouse.queriesPerSec),
+        queriesRunning: mergeSeries(current.clickhouse.queriesRunning, incoming.clickhouse.queriesRunning),
+        mergesRunning: mergeSeries(current.clickhouse.mergesRunning, incoming.clickhouse.mergesRunning),
+        selectedRowsPerSec: mergeSeries(current.clickhouse.selectedRowsPerSec, incoming.clickhouse.selectedRowsPerSec),
+        insertedRowsPerSec: mergeSeries(current.clickhouse.insertedRowsPerSec, incoming.clickhouse.insertedRowsPerSec),
+        selectedBytesPerSec: mergeSeries(current.clickhouse.selectedBytesPerSec, incoming.clickhouse.selectedBytesPerSec),
+        insertedBytesPerSec: mergeSeries(current.clickhouse.insertedBytesPerSec, incoming.clickhouse.insertedBytesPerSec),
+        maxPartsPerPartition: mergeSeries(current.clickhouse.maxPartsPerPartition, incoming.clickhouse.maxPartsPerPartition),
+      },
+      systemHealth: {
+        memoryTracked: mergeSeries(current.systemHealth.memoryTracked, incoming.systemHealth.memoryTracked),
+        cpuUsage: mergeSeries(current.systemHealth.cpuUsage, incoming.systemHealth.cpuUsage),
+        cpuKernel: mergeSeries(current.systemHealth.cpuKernel, incoming.systemHealth.cpuKernel),
+        ioWait: mergeSeries(current.systemHealth.ioWait, incoming.systemHealth.ioWait),
+        filesystemUsed: mergeSeries(current.systemHealth.filesystemUsed, incoming.systemHealth.filesystemUsed),
+        networkReceived: mergeSeries(current.systemHealth.networkReceived, incoming.systemHealth.networkReceived),
+        networkSent: mergeSeries(current.systemHealth.networkSent, incoming.systemHealth.networkSent),
+        networkConnections: mergeSeries(current.systemHealth.networkConnections, incoming.systemHealth.networkConnections),
+        diskRead: mergeSeries(current.systemHealth.diskRead, incoming.systemHealth.diskRead),
+        diskWrite: mergeSeries(current.systemHealth.diskWrite, incoming.systemHealth.diskWrite),
+      }
     };
   }
 

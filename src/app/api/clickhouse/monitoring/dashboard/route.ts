@@ -20,13 +20,15 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
+    const minTime = searchParams.get("minTime") || undefined;
     const timeRangeParam = searchParams.get("timeRange");
     const timeRange = timeRangeParam ? parseInt(timeRangeParam, 10) : 60;
 
     const data = await service.getDashboardData({
       from,
       to,
-      timeRange
+      timeRange,
+      minTime
     });
 
     return successResponse(data);

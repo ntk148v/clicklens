@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Database,
   Cpu,
@@ -13,7 +13,7 @@ import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type { FlexibleTimeRange } from "@/lib/types/discover";
 import { getMinTimeFromRange, type TimeRange } from "@/lib/types/discover";
-import type { DashboardResponse } from "@/services/monitoring";
+import { MonitoringService, type DashboardResponse } from "@/services/monitoring";
 import { ClusterInfo, NodeInfo, HealthSummary, MetricsGrid } from "@/components/monitoring/dashboard";
 
 interface OverviewTabProps {
@@ -28,6 +28,15 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
   const [error, setError] = useState<string | null>(null);
   
   const hasDataRef = useRef(!!initialData);
+  // Track the latest timestamp we have successfully fetched/merged
+  const lastFetchTimeRef = useRef<string | null>(null);
+
+  // When initialData is provided, seed the lastFetchTime
+  useEffect(() => {
+    if (initialData?.server?.uptime) { 
+        lastFetchTimeRef.current = new Date().toISOString();
+    }
+  }, [initialData]);
 
   // Health checks
   const { data: healthData, isLoading: healthLoading } = useHealthChecks({
@@ -35,7 +44,7 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
   });
 
   // Build API URL params from FlexibleTimeRange
-  const apiParams = useMemo(() => {
+  const getApiParams = useCallback(() => {
     const params = new URLSearchParams();
 
     if (timeRange.type === "absolute") {
@@ -54,7 +63,7 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
       }
     }
 
-    return params.toString();
+    return params;
   }, [timeRange]);
 
   const fetchData = useCallback(async () => {
@@ -64,14 +73,30 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
       }
       setError(null);
 
+      const params = getApiParams();
+      
+      // Use incremental fetch if available
+      if (hasDataRef.current && lastFetchTimeRef.current) {
+          params.set("minTime", lastFetchTimeRef.current);
+      }
+
       const response = await fetch(
-        `/api/clickhouse/monitoring/dashboard?${apiParams}`,
+        `/api/clickhouse/monitoring/dashboard?${params.toString()}`,
       );
       const result = await response.json();
 
       if (result.success && result.data) {
-        setData(result.data as DashboardResponse);
+        const newData = result.data as DashboardResponse;
+        
+        setData((prevData) => {
+            if (!prevData || !hasDataRef.current || !lastFetchTimeRef.current) return newData;
+            return MonitoringService.mergeDashboardData(prevData, newData);
+        });
+
         hasDataRef.current = true;
+        // Use the current time (minus a small buffer to be safe, or just now)
+        // Ideally we'd use the max timestamp from the response, but "now" is decent for simple polling.
+        lastFetchTimeRef.current = new Date().toISOString();
       } else if (result.error) {
         setError(result.error.userMessage || result.error.message);
       }
@@ -80,11 +105,15 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [apiParams]);
+  }, [getApiParams]);
 
   useEffect(() => {
+    // When apiParams changes (e.g. time range change), we want a full refresh, not incremental.
+    // getApiParams dependency ensures this runs on change.
+    lastFetchTimeRef.current = null;
     fetchData();
   }, [fetchData]);
+
 
   if (error) {
     return (
