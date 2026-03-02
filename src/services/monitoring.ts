@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import {
   CLUSTERS_LIST_QUERY,
   CLUSTER_SUMMARY_QUERY,
@@ -145,7 +146,7 @@ export class MonitoringService {
     } else {
       windowDurationMs = timeRange * 60 * 1000;
     }
-    
+
     const rounding = computeRounding(windowDurationMs);
 
     // 2. Determine the "Fetch Window" (what we actually query)
@@ -179,53 +180,115 @@ export class MonitoringService {
   /**
    * Helper to merge new incremental data into existing dashboard data
    */
-  static mergeDashboardData(current: DashboardResponse, incoming: DashboardResponse): DashboardResponse {
+  static mergeDashboardData(
+    current: DashboardResponse,
+    incoming: DashboardResponse,
+  ): DashboardResponse {
     // Helper to merge a specific time series array
-    const mergeSeries = (curr: TimeSeriesPoint[], inc: TimeSeriesPoint[]): TimeSeriesPoint[] => {
+    const mergeSeries = (
+      curr: TimeSeriesPoint[],
+      inc: TimeSeriesPoint[],
+    ): TimeSeriesPoint[] => {
       if (!inc || inc.length === 0) return curr;
-      
+
       // Create a map of existing points for O(1) lookup
       // Key: timestamp + node
       const map = new Map<string, TimeSeriesPoint>();
-      curr.forEach(p => map.set(`${p.t}-${p.node}`, p));
-      
+      curr.forEach((p) => map.set(`${p.t}-${p.node}`, p));
+
       // Add/Update with incoming points
-      inc.forEach(p => map.set(`${p.t}-${p.node}`, p));
-      
+      inc.forEach((p) => map.set(`${p.t}-${p.node}`, p));
+
       // Convert back to array and sort
-      return Array.from(map.values()).sort((a, b) => 
-        new Date(a.t).getTime() - new Date(b.t).getTime()
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(a.t).getTime() - new Date(b.t).getTime(),
       );
     };
 
     return {
       ...incoming, // Take latest server info, cluster info, etc.
       clickhouse: {
-        queriesPerSec: mergeSeries(current.clickhouse.queriesPerSec, incoming.clickhouse.queriesPerSec),
-        queriesRunning: mergeSeries(current.clickhouse.queriesRunning, incoming.clickhouse.queriesRunning),
-        mergesRunning: mergeSeries(current.clickhouse.mergesRunning, incoming.clickhouse.mergesRunning),
-        selectedRowsPerSec: mergeSeries(current.clickhouse.selectedRowsPerSec, incoming.clickhouse.selectedRowsPerSec),
-        insertedRowsPerSec: mergeSeries(current.clickhouse.insertedRowsPerSec, incoming.clickhouse.insertedRowsPerSec),
-        selectedBytesPerSec: mergeSeries(current.clickhouse.selectedBytesPerSec, incoming.clickhouse.selectedBytesPerSec),
-        insertedBytesPerSec: mergeSeries(current.clickhouse.insertedBytesPerSec, incoming.clickhouse.insertedBytesPerSec),
-        maxPartsPerPartition: mergeSeries(current.clickhouse.maxPartsPerPartition, incoming.clickhouse.maxPartsPerPartition),
+        queriesPerSec: mergeSeries(
+          current.clickhouse.queriesPerSec,
+          incoming.clickhouse.queriesPerSec,
+        ),
+        queriesRunning: mergeSeries(
+          current.clickhouse.queriesRunning,
+          incoming.clickhouse.queriesRunning,
+        ),
+        mergesRunning: mergeSeries(
+          current.clickhouse.mergesRunning,
+          incoming.clickhouse.mergesRunning,
+        ),
+        selectedRowsPerSec: mergeSeries(
+          current.clickhouse.selectedRowsPerSec,
+          incoming.clickhouse.selectedRowsPerSec,
+        ),
+        insertedRowsPerSec: mergeSeries(
+          current.clickhouse.insertedRowsPerSec,
+          incoming.clickhouse.insertedRowsPerSec,
+        ),
+        selectedBytesPerSec: mergeSeries(
+          current.clickhouse.selectedBytesPerSec,
+          incoming.clickhouse.selectedBytesPerSec,
+        ),
+        insertedBytesPerSec: mergeSeries(
+          current.clickhouse.insertedBytesPerSec,
+          incoming.clickhouse.insertedBytesPerSec,
+        ),
+        maxPartsPerPartition: mergeSeries(
+          current.clickhouse.maxPartsPerPartition,
+          incoming.clickhouse.maxPartsPerPartition,
+        ),
       },
       systemHealth: {
-        memoryTracked: mergeSeries(current.systemHealth.memoryTracked, incoming.systemHealth.memoryTracked),
-        cpuUsage: mergeSeries(current.systemHealth.cpuUsage, incoming.systemHealth.cpuUsage),
-        cpuKernel: mergeSeries(current.systemHealth.cpuKernel, incoming.systemHealth.cpuKernel),
-        ioWait: mergeSeries(current.systemHealth.ioWait, incoming.systemHealth.ioWait),
-        filesystemUsed: mergeSeries(current.systemHealth.filesystemUsed, incoming.systemHealth.filesystemUsed),
-        networkReceived: mergeSeries(current.systemHealth.networkReceived, incoming.systemHealth.networkReceived),
-        networkSent: mergeSeries(current.systemHealth.networkSent, incoming.systemHealth.networkSent),
-        networkConnections: mergeSeries(current.systemHealth.networkConnections, incoming.systemHealth.networkConnections),
-        diskRead: mergeSeries(current.systemHealth.diskRead, incoming.systemHealth.diskRead),
-        diskWrite: mergeSeries(current.systemHealth.diskWrite, incoming.systemHealth.diskWrite),
-      }
+        memoryTracked: mergeSeries(
+          current.systemHealth.memoryTracked,
+          incoming.systemHealth.memoryTracked,
+        ),
+        cpuUsage: mergeSeries(
+          current.systemHealth.cpuUsage,
+          incoming.systemHealth.cpuUsage,
+        ),
+        cpuKernel: mergeSeries(
+          current.systemHealth.cpuKernel,
+          incoming.systemHealth.cpuKernel,
+        ),
+        ioWait: mergeSeries(
+          current.systemHealth.ioWait,
+          incoming.systemHealth.ioWait,
+        ),
+        filesystemUsed: mergeSeries(
+          current.systemHealth.filesystemUsed,
+          incoming.systemHealth.filesystemUsed,
+        ),
+        networkReceived: mergeSeries(
+          current.systemHealth.networkReceived,
+          incoming.systemHealth.networkReceived,
+        ),
+        networkSent: mergeSeries(
+          current.systemHealth.networkSent,
+          incoming.systemHealth.networkSent,
+        ),
+        networkConnections: mergeSeries(
+          current.systemHealth.networkConnections,
+          incoming.systemHealth.networkConnections,
+        ),
+        diskRead: mergeSeries(
+          current.systemHealth.diskRead,
+          incoming.systemHealth.diskRead,
+        ),
+        diskWrite: mergeSeries(
+          current.systemHealth.diskWrite,
+          incoming.systemHealth.diskWrite,
+        ),
+      },
     };
   }
 
-  async getDashboardData(options: DashboardOptions): Promise<DashboardResponse> {
+  async getDashboardData(
+    options: DashboardOptions,
+  ): Promise<DashboardResponse> {
     const { from, to, rounding } = this.parseTimeRange(options);
 
     // Detect cluster
@@ -233,13 +296,10 @@ export class MonitoringService {
     let clusterNodes: NodeRow[] = [];
 
     try {
-      const clustersResult = await this.client.query<ClusterRow>(CLUSTERS_LIST_QUERY);
-      const clusters = clustersResult.data
-        .map((r) => r.cluster)
-        .filter((c) => !c.startsWith("_") && !c.startsWith("all_groups."));
+      const detectedCluster = await getClusterName(this.client);
 
-      if (clusters.length > 0) {
-        clusterName = clusters.includes("default") ? "default" : clusters[0];
+      if (detectedCluster) {
+        clusterName = detectedCluster;
 
         const [, nodesResult] = await Promise.all([
           this.client.query<ClusterSummaryRow>(CLUSTER_SUMMARY_QUERY),
@@ -285,24 +345,58 @@ export class MonitoringService {
       diskReadResult,
       diskWriteResult,
     ] = await Promise.all([
-      execDashboardQuery(getDashboardQueriesPerSecQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardQueriesRunningQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardMergesRunningQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardSelectedRowsQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardInsertedRowsQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardSelectedBytesQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardInsertedBytesQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardMaxPartsQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardMemoryQuery(from, to, rounding, clusterName)),
+      execDashboardQuery(
+        getDashboardQueriesPerSecQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardQueriesRunningQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardMergesRunningQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardSelectedRowsQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardInsertedRowsQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardSelectedBytesQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardInsertedBytesQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardMaxPartsQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardMemoryQuery(from, to, rounding, clusterName),
+      ),
       execDashboardQuery(getDashboardCPUQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardCPUKernelQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardIOWaitQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardFilesystemQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardNetworkQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardNetworkSendQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardNetworkConnectionsQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardDiskReadQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(getDashboardDiskWriteQuery(from, to, rounding, clusterName)),
+      execDashboardQuery(
+        getDashboardCPUKernelQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardIOWaitQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardFilesystemQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardNetworkQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardNetworkSendQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardNetworkConnectionsQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardDiskReadQuery(from, to, rounding, clusterName),
+      ),
+      execDashboardQuery(
+        getDashboardDiskWriteQuery(from, to, rounding, clusterName),
+      ),
     ]);
 
     // Extract unique node names

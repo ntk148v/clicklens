@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface MutationInfo {
@@ -22,6 +23,7 @@ export interface MutationInfo {
   latest_failed_part: string;
   latest_fail_time: string;
   latest_fail_reason: string;
+  node?: string;
 }
 
 interface MutationsResponse {
@@ -114,8 +116,17 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
+    // Auto-detect cluster
+    const clusterName = await getClusterName(client);
+    const tableQuery = clusterName
+      ? `clusterAllReplicas('${clusterName}', system.mutations)`
+      : "system.mutations";
+    const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
+    const nodeField = clusterName ? "hostname() as node," : "";
+
     const result = await client.query<MutationInfo>(`
       SELECT
+        ${nodeField}
         mutation_id,
         command,
         toString(create_time) as create_time,
@@ -124,10 +135,11 @@ export async function GET(
         latest_failed_part,
         toString(latest_fail_time) as latest_fail_time,
         latest_fail_reason
-      FROM system.mutations
+      FROM ${tableQuery}
       WHERE database = '${safeDatabase}' AND table = '${safeTable}'
       ORDER BY create_time DESC
       LIMIT 100
+      ${settings}
     `);
 
     const mutations = result.data as unknown as MutationInfo[];

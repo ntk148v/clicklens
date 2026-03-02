@@ -13,7 +13,7 @@ let cachedClusterName: string | undefined | null = null;
  * Returns undefined if no cluster is found (single node setup)
  */
 export async function getClusterName(
-  client: ClickHouseClient
+  client: ClickHouseClient,
 ): Promise<string | undefined> {
   if (cachedClusterName !== null) {
     return cachedClusterName || undefined;
@@ -21,7 +21,10 @@ export async function getClusterName(
 
   try {
     const response = await client.query<{ cluster: string }>(`
-      SELECT cluster FROM system.clusters LIMIT 1
+      SELECT cluster FROM system.clusters
+      WHERE cluster NOT IN ('test')
+      ORDER BY cluster != 'default' DESC, cluster ASC
+      LIMIT 1
     `);
 
     if (response.data && response.data.length > 0) {

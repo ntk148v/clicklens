@@ -141,19 +141,9 @@ describe("Monitoring Queries Validation", () => {
       });
     } else if (typeof value === "function") {
       test(`Function Query: ${key}`, async () => {
-        // Handle different signatures
-        // PerNode queries REQUIRE a cluster name, so we provide a dummy one
-        // and expect the "Cluster not found" handler to catch it.
-        if (key.includes("PerNode")) {
-          const sql = (value as (...args: unknown[]) => string)(
-            60,
-            "dummy_cluster",
-          );
-          await checkQuery(sql, key);
-        }
         // Dashboard time-series queries return DashboardQuery { query, query_params }
         // (they take 3+ args: from, to, rounding, clusterName?)
-        else if (key.startsWith("getDashboard") && value.length >= 3) {
+        if (key.startsWith("getDashboard") && value.length >= 3) {
           const dq = (
             value as (...args: unknown[]) => {
               query: string;

@@ -88,8 +88,12 @@ export class ClickHouseClientImpl implements ClickHouseClient {
   }
 
   async ping(): Promise<boolean> {
-    const result = await this.client.ping();
-    return result.success;
+    try {
+      await this.query("SELECT 1");
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async version(): Promise<string> {

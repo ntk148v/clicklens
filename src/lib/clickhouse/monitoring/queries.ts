@@ -248,8 +248,10 @@ ORDER BY timestamp
 // Per-node queries per minute
 export const getPerNodeQueriesQuery = (
   intervalMinutes: number = 60,
-  clusterName: string,
-) => `
+  clusterName?: string,
+) => {
+  if (clusterName) {
+    return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -262,12 +264,28 @@ GROUP BY timestamp, node
 ORDER BY timestamp, node
 SETTINGS skip_unavailable_shards = 1
 `;
+  }
+  return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostName() AS node,
+  count() AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+`;
+};
 
 // Per-node memory usage
 export const getPerNodeMemoryQuery = (
   intervalMinutes: number = 60,
-  clusterName: string,
-) => `
+  clusterName?: string,
+) => {
+  if (clusterName) {
+    return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -280,12 +298,28 @@ GROUP BY timestamp, node
 ORDER BY timestamp, node
 SETTINGS skip_unavailable_shards = 1
 `;
+  }
+  return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostName() AS node,
+  max(memory_usage) AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+`;
+};
 
 // Per-node inserted rows
 export const getPerNodeInsertedRowsQuery = (
   intervalMinutes: number = 60,
-  clusterName: string,
-) => `
+  clusterName?: string,
+) => {
+  if (clusterName) {
+    return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -298,12 +332,28 @@ GROUP BY timestamp, node
 ORDER BY timestamp, node
 SETTINGS skip_unavailable_shards = 1
 `;
+  }
+  return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostName() AS node,
+  sum(written_rows) AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+`;
+};
 
 // Per-node selected bytes
 export const getPerNodeSelectedBytesQuery = (
   intervalMinutes: number = 60,
-  clusterName: string,
-) => `
+  clusterName?: string,
+) => {
+  if (clusterName) {
+    return `
 SELECT
   toStartOfMinute(event_time) AS timestamp,
   hostname() AS node,
@@ -316,6 +366,20 @@ GROUP BY timestamp, node
 ORDER BY timestamp, node
 SETTINGS skip_unavailable_shards = 1
 `;
+  }
+  return `
+SELECT
+  toStartOfMinute(event_time) AS timestamp,
+  hostName() AS node,
+  sum(read_bytes) AS value
+FROM system.query_log
+WHERE
+  event_time > now() - INTERVAL ${intervalMinutes} MINUTE
+  AND type = 'QueryFinish'
+GROUP BY timestamp, node
+ORDER BY timestamp, node
+`;
+};
 
 // Query duration percentiles over time - cluster-aware
 export const getQueryDurationHistoryQuery = (

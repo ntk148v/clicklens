@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface QueryHistoryEntry {
@@ -30,6 +31,7 @@ export interface QueryHistoryEntry {
   type: string;
   exception_code: number;
   exception: string;
+  node?: string; // Optional for single node, populated for cluster queries
 }
 
 interface QueryHistoryResponse {
@@ -144,17 +146,26 @@ export async function GET(
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+    // Auto-detect cluster
+    const clusterName = await getClusterName(client);
+    const table = clusterName
+      ? `clusterAllReplicas('${clusterName}', system.query_log)`
+      : "system.query_log";
+    const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
+
     // Get total count
     const countResult = await client.query<{ count: number }>(`
-      SELECT count() as count FROM system.query_log ${whereClause}
+      SELECT count() as count FROM ${table} ${whereClause} ${settings}
     `);
     const total =
       (countResult.data as unknown as Array<{ count: number }>)[0]?.count || 0;
 
     // Get paginated results
+    const nodeField = clusterName ? "hostname() as node," : "";
     const result = await client.query<QueryHistoryEntry>(`
       SELECT
         toString(event_time) as event_time,
+        ${nodeField}
         query_id,
         query,
         query_kind,
@@ -170,10 +181,12 @@ export async function GET(
         type,
         exception_code,
         exception
-      FROM system.query_log
+        exception
+      FROM ${table}
       ${whereClause}
       ORDER BY event_time DESC
       LIMIT ${limit} OFFSET ${offset}
+      ${settings}
     `);
 
     return NextResponse.json({

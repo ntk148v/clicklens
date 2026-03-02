@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 
 export interface ReplicaInfo {
@@ -30,12 +31,13 @@ export interface ReplicaInfo {
   zookeeper_path: string;
   replica_path: string;
   replica_name: string;
+  node?: string;
 }
 
 interface ReplicasResponse {
   success: boolean;
   data?: {
-    replica: ReplicaInfo | null;
+    replicas: ReplicaInfo[];
     is_replicated: boolean;
   };
   error?: {
@@ -117,8 +119,17 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
+    // Auto-detect cluster
+    const clusterName = await getClusterName(client);
+    const tableQuery = clusterName
+      ? `clusterAllReplicas('${clusterName}', system.replicas)`
+      : "system.replicas";
+    const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
+    const nodeField = clusterName ? "hostname() as node," : "";
+
     const result = await client.query<ReplicaInfo>(`
       SELECT
+        ${nodeField}
         is_leader,
         is_readonly,
         is_session_expired,
@@ -135,8 +146,9 @@ export async function GET(
         zookeeper_path,
         replica_path,
         replica_name
-      FROM system.replicas
+      FROM ${tableQuery}
       WHERE database = '${safeDatabase}' AND table = '${safeTable}'
+      ${settings}
     `);
 
     const replicas = result.data as unknown as ReplicaInfo[];
@@ -144,7 +156,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        replica: replicas.length > 0 ? replicas[0] : null,
+        replicas: replicas,
         is_replicated: replicas.length > 0,
       },
     });

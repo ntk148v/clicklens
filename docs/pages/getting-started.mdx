@@ -4,7 +4,10 @@ This guide will help you get ClickLens up and running with your ClickHouse datab
 
 import { Callout } from "nextra/components";
 
-<video src="https://github.com/user-attachments/assets/63685b9b-29f1-4fe1-b650-7f29bb7ff2be" controls></video>
+<video
+  src="https://github.com/user-attachments/assets/63685b9b-29f1-4fe1-b650-7f29bb7ff2be"
+  controls
+></video>
 
 ## 1. Prerequisites
 
@@ -100,14 +103,20 @@ Configured via `LENS_USER` and `LENS_PASSWORD` environment variables. This servi
 - System table access for monitoring features
 - Background operations that don't require user context
 
-**Recommended minimal grants:**
+**Required grants:**
 
 ```sql
-CREATE USER lensuser IDENTIFIED BY 'your-password';
-GRANT SELECT ON system.* TO lensuser;
-GRANT SHOW DATABASES ON *.* TO lensuser;
-GRANT SHOW TABLES ON *.* TO lensuser;
-GRANT SHOW COLUMNS ON *.* TO lensuser;
+-- Single node
+CREATE USER lensuser IDENTIFIED BY 'password';
+GRANT ACCESS MANAGEMENT ON *.* TO lensuser;
+GRANT SELECT ON *.* TO lensuser;
+GRANT REMOTE ON *.* TO lensuser;
+
+-- Cluster
+CREATE USER lensuser ON CLUSTER cluster-name IDENTIFIED BY 'password';
+GRANT ACCESS MANAGEMENT ON *.* ON CLUSTER cluster-name TO lensuser;
+GRANT SELECT ON *.* ON CLUSTER cluster-name TO lensuser;
+GRANT REMOTE ON *.* ON CLUSTER cluster-name TO lensuser;
 ```
 
 ### 3.2. User Client (Session Credentials)

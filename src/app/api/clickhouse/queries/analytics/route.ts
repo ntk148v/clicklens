@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export interface ExpensiveQuery {
   query: string;
@@ -50,7 +51,7 @@ interface AnalyticsResponse {
 }
 
 export async function GET(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<NextResponse<AnalyticsResponse>> {
   try {
     const session = await getSession();
@@ -65,7 +66,7 @@ export async function GET(
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -80,7 +81,7 @@ export async function GET(
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -111,6 +112,13 @@ export async function GET(
       orderBy = "total_read_bytes DESC";
     }
 
+    // Auto-detect cluster
+    const clusterName = await getClusterName(client);
+    const table = clusterName
+      ? `clusterAllReplicas('${clusterName}', system.query_log)`
+      : "system.query_log";
+    const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
+
     // Get aggregated expensive queries grouped by normalized_query_hash
     const result = await client.query<ExpensiveQuery>(`
       SELECT
@@ -128,12 +136,13 @@ export async function GET(
         sum(read_bytes) as total_read_bytes,
         avg(read_bytes) as avg_read_bytes,
         toString(max(event_time)) as last_event_time
-      FROM system.query_log
+      FROM ${table}
       WHERE type = 'QueryFinish'
         AND event_date >= today() - 7
       GROUP BY normalized_query_hash
       ORDER BY ${orderBy}
       LIMIT ${limit}
+      ${settings}
     `);
 
     // Get summary stats
@@ -150,8 +159,9 @@ export async function GET(
         sum(memory_usage) as total_memory,
         sum(read_bytes) as total_read_bytes,
         countIf(exception_code != 0) as failed_queries
-      FROM system.query_log
+      FROM ${table}
       WHERE event_date >= today() - 7
+      ${settings}
     `);
 
     const summary = (

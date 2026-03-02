@@ -11,6 +11,7 @@ import {
   isLensUserConfigured,
   isClickHouseError,
 } from "@/lib/clickhouse";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export interface QueryCacheEntry {
   query: string;
@@ -21,6 +22,7 @@ export interface QueryCacheEntry {
   compressed: number;
   expires_at: string;
   key_hash: string;
+  node?: string;
 }
 
 interface QueryCacheResponse {
@@ -56,7 +58,7 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
             userMessage: "Please log in first",
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -71,7 +73,7 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
             userMessage: "Server not properly configured",
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -91,10 +93,21 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
     const client = createClient(lensConfig);
 
     try {
+      // Auto-detect cluster
+      const clusterName = await getClusterName(client);
+      const table = clusterName
+        ? `clusterAllReplicas('${clusterName}', system.query_cache)`
+        : "system.query_cache";
+      const settings = clusterName
+        ? "SETTINGS skip_unavailable_shards = 1"
+        : "";
+      const nodeField = clusterName ? "hostname() as node," : "";
+
       // Check if query_cache table exists (requires ClickHouse 23.4+)
       const result = await client.query<QueryCacheEntry>(`
         SELECT
           query,
+          ${nodeField}
           query_id,
           result_size,
           stale,
@@ -102,9 +115,10 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
           compressed,
           toString(expires_at) as expires_at,
           toString(key_hash) as key_hash
-        FROM system.query_cache
+        FROM ${table}
         ORDER BY result_size DESC
         LIMIT 100
+        ${settings}
       `);
 
       const entries = result.data as unknown as QueryCacheEntry[];
