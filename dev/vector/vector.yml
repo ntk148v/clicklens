@@ -1,0 +1,96 @@
+# ========================================================================= Sources
+#
+# A source defines where Vector collects log data.
+# The 'files' source type tails log files from the host machine.
+# =========================================================================
+sources:
+  syslog:
+    type: demo_logs
+    format: syslog
+    interval: 0.001
+    count: 1000000
+  httplog:
+    type: demo_logs
+    format: json
+    decoding:
+      codec: json
+    interval: 0.001
+    count: 1000000
+  internal_logs:
+    type: internal_logs
+# Parse Syslog logs
+# See the Vector Remap Language reference for more info: https://vrl.dev
+transforms:
+  parsed_syslog:
+    type: "remap"
+    inputs: ["syslog"]
+    source: |
+      . = parse_syslog!(string!(.message))
+      .timestamp = format_timestamp!(.timestamp, "%Y-%m-%d %H:%M:%S")
+      # Add logging for debugging
+      if . == null {
+        log("Parse error: " + .message)
+      }
+  parsed_httplog:
+    type: "remap"
+    inputs: ["httplog"]
+    source: |
+      .timestamp = format_timestamp!(parse_timestamp!(.timestamp, "%+"), "%Y-%m-%d %H:%M:%S")
+
+# =========================================================================
+# Sinks
+#
+# A sink defines the destination for collected log data.
+# =========================================================================
+sinks:
+  # debug_sink:
+  #   type: console
+  #   inputs: ["httplog"]
+  #   encoding:
+  #     codec: json
+  #     json:
+  #       pretty: true
+  clickhouse_sink1:
+    type: clickhouse
+    compression: none
+    inputs:
+      - parsed_syslog
+    endpoint: http://ch-proxy:8080
+    database: logs
+    table: syslog
+    auth:
+      strategy: basic
+      user: admin
+      password: password
+    skip_unknown_fields: true
+    buffer:
+      when_full: drop_newest
+    query_settings:
+      async_insert_settings:
+        enabled: true
+        max_data_size: 100000000
+        max_query_number: 450000
+        wait_for_processing: false
+        wait_for_processing_timeout: 5000
+
+  clickhouse_sink2:
+    type: clickhouse
+    compression: none
+    inputs:
+      - parsed_httplog
+    endpoint: http://ch-proxy:8080
+    database: logs
+    table: http
+    auth:
+      strategy: basic
+      user: admin
+      password: password
+    buffer:
+      when_full: drop_newest
+    query_settings:
+      async_insert_settings:
+        enabled: true
+        max_data_size: 100000000
+        max_query_number: 450000
+        wait_for_processing: false
+        wait_for_processing_timeout: 5000

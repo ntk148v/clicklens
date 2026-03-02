@@ -1,9 +1,13 @@
 services:
-  app:
+  clicklens:
     build:
       context: .
       dockerfile: Dockerfile
-    image: kiennt26/clicklens:latest
+    image: ghcr.io/ntk148v/clicklens:latest
+    container_name: clicklens
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.11
     ports:
       - "3000:3000"
     volumes:
@@ -12,3 +16,123 @@ services:
       - NODE_ENV=production
       - DISABLE_SECURE_COOKIES=true
     restart: unless-stopped
+    depends_on:
+      - ch-proxy
+
+  clickhouse-01:
+    image: "clickhouse/clickhouse-server:${CHVER:-latest}"
+    user: "101:101"
+    container_name: clickhouse-01
+    hostname: clickhouse-01
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.1
+    volumes:
+      - ${PWD}/dev/clickhouse-01/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ${PWD}/dev/clickhouse-01/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+      - ${PWD}/dev/clickhouse-01/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      - clickhouse-keeper-01
+      - clickhouse-keeper-02
+      - clickhouse-keeper-03
+
+  clickhouse-02:
+    image: "clickhouse/clickhouse-server:${CHVER:-latest}"
+    user: "101:101"
+    container_name: clickhouse-02
+    hostname: clickhouse-02
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.2
+    volumes:
+      - ${PWD}/dev/clickhouse-02/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ${PWD}/dev/clickhouse-02/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+      - "127.0.0.1:8124:8123"
+      - "127.0.0.1:9001:9000"
+    depends_on:
+      - clickhouse-keeper-01
+      - clickhouse-keeper-02
+      - clickhouse-keeper-03
+
+  clickhouse-keeper-01:
+    image: "clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}"
+    user: "101:101"
+    container_name: clickhouse-keeper-01
+    hostname: clickhouse-keeper-01
+    volumes:
+      - ${PWD}/dev/clickhouse-keeper-01/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.5
+    ports:
+      - "127.0.0.1:9181:9181"
+
+  clickhouse-keeper-02:
+    image: "clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}"
+    user: "101:101"
+    container_name: clickhouse-keeper-02
+    hostname: clickhouse-keeper-02
+    volumes:
+      - ${PWD}/dev/clickhouse-keeper-02/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.6
+    ports:
+      - "127.0.0.1:9182:9181"
+
+  clickhouse-keeper-03:
+    image: "clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}"
+    user: "101:101"
+    container_name: clickhouse-keeper-03
+    hostname: clickhouse-keeper-03
+    volumes:
+      - ${PWD}/dev/clickhouse-keeper-03/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.7
+    ports:
+      - "127.0.0.1:9183:9181"
+
+  ch-proxy:
+    image: contentsquareplatform/chproxy:v1.26.4
+    platform: linux/amd64
+    container_name: ch-proxy
+    hostname: ch-proxy
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.10
+    ports:
+      - "8443:443"
+      - "8080:80"
+    volumes:
+      - ${PWD}/dev/ch-proxy/config/config.yml:/opt/config.yml
+    depends_on:
+      - clickhouse-01
+      - clickhouse-02
+    command: [-config, /opt/config.yml]
+
+  vector:
+    image: timberio/vector:nightly-alpine
+    container_name: vector
+    restart: unless-stopped
+    networks:
+      cluster_1S_2R_ch_proxy:
+        ipv4_address: 192.168.5.12
+    volumes:
+      - ${PWD}/dev/vector/vector.yml:/etc/vector/vector.yml
+    ports:
+      - "8686:8686"
+    depends_on:
+      - ch-proxy
+
+networks:
+  cluster_1S_2R_ch_proxy:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.5.0/24
+          gateway: 192.168.5.254
