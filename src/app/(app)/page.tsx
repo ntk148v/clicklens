@@ -47,7 +47,7 @@ const features = [
     title: "Query Monitoring",
     description:
       "Monitor running queries, view query history, and analyze top resource consumers.",
-    href: "/monitoring/queries",
+    href: "/queries/running",
     icon: Activity,
   },
   {
