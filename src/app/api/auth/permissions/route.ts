@@ -278,7 +278,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         : { databases: [], hasGlobalAccess: false };
 
     let accessibleDatabases = accessInfo.databases;
-    let hasGlobalAccess = accessInfo.hasGlobalAccess;
+    const hasGlobalAccess = accessInfo.hasGlobalAccess;
 
     // Process Probes
     let canManageUsers = false;
@@ -371,16 +371,10 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       if (probeResult.hasAccess) {
         canExecuteQueries = true;
         canDiscover = true;
-        hasGlobalAccess = true;
 
         // Use probed databases if we have none from system.grants
         if (accessibleDatabases.length === 0) {
           accessibleDatabases = probeResult.databases;
-        }
-
-        // Enable settings if not already enabled
-        if (!canViewSettings) {
-          canViewSettings = true;
         }
       }
 
