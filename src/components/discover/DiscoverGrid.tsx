@@ -34,6 +34,7 @@ import type { ColumnMetadata } from "@/lib/types/discover";
 import { cn, formatDateTime, formatDate } from "@/lib/utils";
 import { TruncatedCell } from "@/components/monitoring";
 import { PaginationControls } from "@/components/monitoring";
+import { DiscoverGridSkeleton } from "./DiscoverGridSkeleton";
 
 interface DiscoverGridProps {
   rows: DiscoverRow[];
@@ -245,6 +246,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     manualPagination: true,
     pageCount: Math.ceil(totalHits / pageSize),
     onSortingChange: setSorting,
+    columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
@@ -256,14 +258,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   };
 
   if (isLoading && rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          Loading...
-        </div>
-      </div>
-    );
+    return <DiscoverGridSkeleton />;
   }
 
   if (!isLoading && rows.length === 0) {
@@ -289,13 +284,30 @@ export const DiscoverGrid = memo(function DiscoverGrid({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="whitespace-nowrap">
+                    <TableHead
+                      key={header.id}
+                      className="whitespace-nowrap relative group"
+                      style={{
+                        width: header.getSize(),
+                      }}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext(),
                           )}
+                      {header.column.getCanResize() && (
+                        <div
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          className={cn(
+                            "absolute right-0 top-0 h-full w-1 bg-border cursor-col-resize select-none touch-none opacity-0 group-hover:opacity-100 transition-opacity",
+                            header.column.getIsResizing() &&
+                              "bg-primary opacity-100",
+                          )}
+                        />
+                      )}
                     </TableHead>
                   ))}
                   <TableHead className="w-8" />

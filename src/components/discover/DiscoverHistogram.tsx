@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import {
   BarChart,
   Bar,
@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceArea,
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { useTheme } from "next-themes";
@@ -26,13 +27,9 @@ interface DiscoverHistogramProps {
   activeTime?: string | null;
 }
 
-// Type for Recharts click event data
-interface ChartClickData {
-  activeLabel?: string;
-  activePayload?: Array<{
-    payload: HistogramData;
-  }>;
-}
+// Type for Recharts events
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartEvent = any;
 
 export const DiscoverHistogram = memo(function DiscoverHistogram({
   data,
@@ -40,11 +37,13 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
   onBarClick,
 }: DiscoverHistogramProps) {
   const { theme } = useTheme();
+  const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
+  const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const formattedData = useMemo(() => {
     return data.map((item) => ({
       ...item,
-      // Ensure date object for formatting if needed, but string is fine for XAxis usually
       timeObj: new Date(item.time),
     }));
   }, [data]);
@@ -57,54 +56,100 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
     return Math.abs(t2 - t1);
   }, [data]);
 
-  const formatDate = (time: string) => {
-    try {
-      const date = new Date(time);
-      // If invalid date, return original string
-      if (isNaN(date.getTime())) return time;
+  const formatDate = useCallback(
+    (time: string) => {
+      try {
+        const date = new Date(time);
+        if (isNaN(date.getTime())) return time;
 
-      // For X-axis, we want to be concise but informative
-      // If data spans more than 24h, show date + time
-      // Otherwise just time
-      const timeStr = date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+        const timeStr = date.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
 
-      if (data.length > 0) {
-        const start = new Date(data[0].time);
-        const end = new Date(data[data.length - 1].time);
-        const diffHours =
-          Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        if (data.length > 0) {
+          const start = new Date(data[0].time);
+          const end = new Date(data[data.length - 1].time);
+          const diffHours =
+            Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-        if (diffHours > 24) {
-          return `${date.getMonth() + 1}/${date.getDate()} ${timeStr}`;
+          if (diffHours > 24) {
+            return `${date.getMonth() + 1}/${date.getDate()} ${timeStr}`;
+          }
         }
+
+        return timeStr;
+      } catch {
+        return time;
+      }
+    },
+    [data],
+  );
+
+  const handleBarClick = useCallback(
+    (time: string) => {
+      if (!onBarClick) return;
+
+      if (intervalMs > 0) {
+        const startTime = new Date(time);
+        const endTime = new Date(startTime.getTime() + intervalMs);
+        onBarClick(startTime.toISOString(), endTime.toISOString());
+      } else {
+        // Fallback for single bar or unknown interval
+        const startTime = new Date(time);
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        onBarClick(startTime.toISOString(), endTime.toISOString());
+      }
+    },
+    [onBarClick, intervalMs],
+  );
+
+  const handleMouseDown = useCallback((e: ChartEvent) => {
+    if (e && e.activeLabel) {
+      setRefAreaLeft(e.activeLabel);
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: ChartEvent) => {
+      if (isDragging && e && e.activeLabel) {
+        setRefAreaRight(e.activeLabel);
+      }
+    },
+    [isDragging],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+
+    if (refAreaLeft && refAreaRight && onBarClick) {
+      const leftTime = new Date(refAreaLeft).getTime();
+      const rightTime = new Date(refAreaRight).getTime();
+
+      let start = refAreaLeft;
+      let end = refAreaRight;
+
+      if (leftTime > rightTime) {
+        start = refAreaRight;
+        end = refAreaLeft;
       }
 
-      return timeStr;
-    } catch {
-      return time;
+      if (start === end) {
+        handleBarClick(start);
+      } else {
+        // Range selection via brush
+        onBarClick(start, end);
+      }
+    } else if (refAreaLeft && !refAreaRight && onBarClick) {
+      // Single click without drag
+      handleBarClick(refAreaLeft);
     }
-  };
 
-  const handleBarClick = (time: string) => {
-    if (!onBarClick) return;
-
-    // If we have an interval, calculate the end time
-    if (intervalMs > 0) {
-      const startTime = new Date(time);
-      const endTime = new Date(startTime.getTime() + intervalMs);
-      onBarClick(startTime.toISOString(), endTime.toISOString());
-    } else {
-      // Fallback for single bar or unknown interval - try to guess based on common bucketing
-      // Default to 1 hour if we can't determine
-      const startTime = new Date(time);
-      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
-      onBarClick(startTime.toISOString(), endTime.toISOString());
-    }
-  };
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  }, [refAreaLeft, refAreaRight, onBarClick, handleBarClick]);
 
   if (isLoading && data.length === 0) {
     return (
@@ -117,11 +162,11 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
   }
 
   if (data.length === 0) {
-    return null; // Or show empty state
+    return null;
   }
 
   return (
-    <div className="w-full h-[150px] transition-all duration-300">
+    <div className="w-full h-[150px] transition-all duration-300 select-none">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={formattedData}
@@ -131,12 +176,14 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
             left: 0,
             bottom: 0,
           }}
-          onClick={(data) => {
-            const chartData = data as ChartClickData | null;
-            if (chartData?.activeLabel) {
-              handleBarClick(String(chartData.activeLabel));
-            } else if (chartData?.activePayload && chartData.activePayload.length > 0) {
-              handleBarClick(chartData.activePayload[0].payload.time);
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            if (isDragging) {
+              setIsDragging(false);
+              setRefAreaLeft(null);
+              setRefAreaRight(null);
             }
           }}
         >
@@ -176,18 +223,28 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
           />
           <Bar
             dataKey="count"
-            fill="#3b82f6"
+            fill={theme === "dark" ? "#60a5fa" : "#3b82f6"}
             radius={[2, 2, 0, 0]}
             maxBarSize={50}
             className="cursor-pointer hover:opacity-80 transition-opacity"
           >
-            {formattedData.map((entry, index) => (
+            {formattedData.map((_, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={theme === "dark" ? "#60a5fa" : "#3b82f6"}
               />
             ))}
           </Bar>
+
+          {refAreaLeft && refAreaRight ? (
+            <ReferenceArea
+              x1={refAreaLeft}
+              x2={refAreaRight}
+              strokeOpacity={0.3}
+              fill={theme === "dark" ? "#fff" : "#000"}
+              fillOpacity={0.1}
+            />
+          ) : null}
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -125,15 +125,29 @@ export async function GET(request: Request) {
       if (isDateOnly) {
         histogramQuery = `SELECT ${quotedTimeCol} as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
       } else {
-        let interval = "1 hour";
+        // Target roughly 30-100 buckets to prevent frontend freeze
+        let interval = "1 week";
         if (minTime) {
-          const diffHours =
-            (new Date().getTime() - new Date(minTime).getTime()) / 36e5;
-          if (diffHours <= 1) interval = "1 minute";
-          else if (diffHours <= 6) interval = "5 minute";
-          else if (diffHours <= 24) interval = "15 minute";
-          else if (diffHours <= 72) interval = "1 hour";
-          else interval = "6 hour";
+          const diffMs =
+            (maxTime ? new Date(maxTime).getTime() : Date.now()) -
+            new Date(minTime).getTime();
+          const diffHours = diffMs / 36e5;
+
+          if (diffHours <= 1)
+            interval = "1 minute"; // ~60 buckets
+          else if (diffHours <= 6)
+            interval = "5 minute"; // ~72 buckets
+          else if (diffHours <= 24)
+            interval = "15 minute"; // ~96 buckets
+          else if (diffHours <= 72)
+            interval = "1 hour"; // ~72 buckets
+          else if (diffHours <= 24 * 7)
+            interval = "4 hour"; // ~42 buckets
+          else if (diffHours <= 24 * 30)
+            interval = "1 day"; // ~30 buckets
+          else if (diffHours <= 24 * 365)
+            interval = "1 week"; // ~52 buckets
+          else interval = "1 month";
         }
         histogramQuery = `SELECT toStartOfInterval(${quotedTimeCol}, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
       }
