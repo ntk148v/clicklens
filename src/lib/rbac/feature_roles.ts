@@ -201,6 +201,11 @@ export function checkConfiguredFeature(
     table?: string;
   }[],
 ): boolean {
+  // GRANT ALL at global level covers every known feature role
+  const hasGlobalAll = grants.some(
+    (g) => g.access_type === "ALL" && (!g.database || g.database === "*"),
+  );
+
   // Define criteria for each feature role
   const criteria: Record<
     string,
@@ -244,6 +249,9 @@ export function checkConfiguredFeature(
 
   const check = criteria[featureId];
   if (!check) return false;
+
+  // Global ALL covers all known feature roles
+  if (hasGlobalAll) return true;
 
   return grants.some(check);
 }

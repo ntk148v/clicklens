@@ -124,14 +124,14 @@ describe("rbac/feature_roles", () => {
       test("returns true for SHOW grant on global", () => {
         const grants = [{ access_type: "SHOW", database: "*", table: "*" }];
         expect(checkConfiguredFeature("clicklens_table_explorer", grants)).toBe(
-          true
+          true,
         );
       });
 
       test("returns true for SHOW grant without database", () => {
         const grants = [{ access_type: "SHOW" }];
         expect(checkConfiguredFeature("clicklens_table_explorer", grants)).toBe(
-          true
+          true,
         );
       });
 
@@ -140,7 +140,7 @@ describe("rbac/feature_roles", () => {
           { access_type: "SELECT", database: "system", table: "tables" },
         ];
         expect(checkConfiguredFeature("clicklens_table_explorer", grants)).toBe(
-          true
+          true,
         );
       });
 
@@ -149,7 +149,7 @@ describe("rbac/feature_roles", () => {
           { access_type: "SELECT", database: "mydb", table: "users" },
         ];
         expect(checkConfiguredFeature("clicklens_table_explorer", grants)).toBe(
-          false
+          false,
         );
       });
     });
@@ -158,7 +158,7 @@ describe("rbac/feature_roles", () => {
       test("returns true for KILL QUERY grant", () => {
         const grants = [{ access_type: "KILL QUERY", database: "*" }];
         expect(checkConfiguredFeature("clicklens_query_monitor", grants)).toBe(
-          true
+          true,
         );
       });
 
@@ -167,7 +167,7 @@ describe("rbac/feature_roles", () => {
           { access_type: "SELECT", database: "system", table: "processes" },
         ];
         expect(checkConfiguredFeature("clicklens_query_monitor", grants)).toBe(
-          true
+          true,
         );
       });
 
@@ -176,7 +176,7 @@ describe("rbac/feature_roles", () => {
           { access_type: "SELECT", database: "mydb", table: "users" },
         ];
         expect(checkConfiguredFeature("clicklens_query_monitor", grants)).toBe(
-          false
+          false,
         );
       });
     });
@@ -186,36 +186,36 @@ describe("rbac/feature_roles", () => {
         const grants = [
           { access_type: "SELECT", database: "system", table: "clusters" },
         ];
-        expect(checkConfiguredFeature("clicklens_cluster_monitor", grants)).toBe(
-          true
-        );
+        expect(
+          checkConfiguredFeature("clicklens_cluster_monitor", grants),
+        ).toBe(true);
       });
 
       test("returns true for SELECT on system.replicas", () => {
         const grants = [
           { access_type: "SELECT", database: "system", table: "replicas" },
         ];
-        expect(checkConfiguredFeature("clicklens_cluster_monitor", grants)).toBe(
-          true
-        );
+        expect(
+          checkConfiguredFeature("clicklens_cluster_monitor", grants),
+        ).toBe(true);
       });
 
       test("returns true for SELECT on system.disks", () => {
         const grants = [
           { access_type: "SELECT", database: "system", table: "disks" },
         ];
-        expect(checkConfiguredFeature("clicklens_cluster_monitor", grants)).toBe(
-          true
-        );
+        expect(
+          checkConfiguredFeature("clicklens_cluster_monitor", grants),
+        ).toBe(true);
       });
 
       test("returns false for SELECT on other system tables", () => {
         const grants = [
           { access_type: "SELECT", database: "system", table: "tables" },
         ];
-        expect(checkConfiguredFeature("clicklens_cluster_monitor", grants)).toBe(
-          false
-        );
+        expect(
+          checkConfiguredFeature("clicklens_cluster_monitor", grants),
+        ).toBe(false);
       });
     });
 
@@ -223,14 +223,14 @@ describe("rbac/feature_roles", () => {
       test("returns true for ACCESS MANAGEMENT grant", () => {
         const grants = [{ access_type: "ACCESS MANAGEMENT" }];
         expect(checkConfiguredFeature("clicklens_user_admin", grants)).toBe(
-          true
+          true,
         );
       });
 
       test("returns false for other grants", () => {
         const grants = [{ access_type: "SELECT", database: "system" }];
         expect(checkConfiguredFeature("clicklens_user_admin", grants)).toBe(
-          false
+          false,
         );
       });
     });
@@ -239,28 +239,28 @@ describe("rbac/feature_roles", () => {
       test("returns true for CREATE TABLE grant", () => {
         const grants = [{ access_type: "CREATE TABLE", database: "*" }];
         expect(checkConfiguredFeature("clicklens_table_admin", grants)).toBe(
-          true
+          true,
         );
       });
 
       test("returns true for DROP TABLE grant", () => {
         const grants = [{ access_type: "DROP TABLE" }];
         expect(checkConfiguredFeature("clicklens_table_admin", grants)).toBe(
-          true
+          true,
         );
       });
 
       test("returns true for ALTER TABLE grant", () => {
         const grants = [{ access_type: "ALTER TABLE", database: "*" }];
         expect(checkConfiguredFeature("clicklens_table_admin", grants)).toBe(
-          true
+          true,
         );
       });
 
       test("returns false for SELECT grant", () => {
         const grants = [{ access_type: "SELECT", database: "*" }];
         expect(checkConfiguredFeature("clicklens_table_admin", grants)).toBe(
-          false
+          false,
         );
       });
     });
@@ -271,7 +271,7 @@ describe("rbac/feature_roles", () => {
           { access_type: "SELECT", database: "system", table: "settings" },
         ];
         expect(checkConfiguredFeature("clicklens_settings_admin", grants)).toBe(
-          true
+          true,
         );
       });
 
@@ -280,7 +280,7 @@ describe("rbac/feature_roles", () => {
           { access_type: "SELECT", database: "system", table: "users" },
         ];
         expect(checkConfiguredFeature("clicklens_settings_admin", grants)).toBe(
-          false
+          false,
         );
       });
     });
@@ -293,7 +293,7 @@ describe("rbac/feature_roles", () => {
 
       test("returns false for empty grants array", () => {
         expect(checkConfiguredFeature("clicklens_table_explorer", [])).toBe(
-          false
+          false,
         );
       });
 
@@ -303,8 +303,39 @@ describe("rbac/feature_roles", () => {
           { access_type: "SHOW", database: "*" },
         ];
         expect(checkConfiguredFeature("clicklens_table_explorer", grants)).toBe(
-          true
+          true,
         );
+      });
+    });
+
+    describe("ALL access type", () => {
+      test("global ALL satisfies every feature role", () => {
+        const grants = [{ access_type: "ALL", database: "*" }];
+        for (const role of FEATURE_ROLES) {
+          expect(checkConfiguredFeature(role.id, grants)).toBe(true);
+        }
+      });
+
+      test("ALL without database (NULL) satisfies every feature role", () => {
+        const grants = [{ access_type: "ALL" }];
+        for (const role of FEATURE_ROLES) {
+          expect(checkConfiguredFeature(role.id, grants)).toBe(true);
+        }
+      });
+
+      test("ALL on specific database does NOT satisfy feature roles", () => {
+        const grants = [{ access_type: "ALL", database: "mydb" }];
+        expect(checkConfiguredFeature("clicklens_table_explorer", grants)).toBe(
+          false,
+        );
+        expect(checkConfiguredFeature("clicklens_query_monitor", grants)).toBe(
+          false,
+        );
+      });
+
+      test("ALL does not satisfy unknown feature id", () => {
+        const grants = [{ access_type: "ALL", database: "*" }];
+        expect(checkConfiguredFeature("unknown_feature", grants)).toBe(false);
       });
     });
   });
