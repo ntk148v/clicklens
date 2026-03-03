@@ -410,7 +410,7 @@ export function MultiSeriesChart({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pb-4">
+      <CardContent>
         {loading ? (
           <div
             className="animate-pulse bg-muted rounded"
