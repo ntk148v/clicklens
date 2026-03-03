@@ -17,7 +17,7 @@ services:
       - DISABLE_SECURE_COOKIES=true
     restart: unless-stopped
     depends_on:
-      - ch-proxy
+      - nginx
 
   clickhouse-01:
     image: "clickhouse/clickhouse-server:${CHVER:-latest}"
@@ -97,23 +97,20 @@ services:
     ports:
       - "127.0.0.1:9183:9181"
 
-  ch-proxy:
-    image: contentsquareplatform/chproxy:v1.26.4
-    platform: linux/amd64
-    container_name: ch-proxy
-    hostname: ch-proxy
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    hostname: nginx
     networks:
       cluster_1S_2R_ch_proxy:
         ipv4_address: 192.168.5.10
     ports:
-      - "8443:443"
       - "8080:80"
     volumes:
-      - ${PWD}/dev/ch-proxy/config/config.yml:/opt/config.yml
+      - ${PWD}/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - clickhouse-01
       - clickhouse-02
-    command: [-config, /opt/config.yml]
 
   vector:
     image: timberio/vector:nightly-alpine
@@ -127,7 +124,7 @@ services:
     ports:
       - "8686:8686"
     depends_on:
-      - ch-proxy
+      - nginx
 
 networks:
   cluster_1S_2R_ch_proxy:

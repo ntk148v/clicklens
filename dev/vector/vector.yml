@@ -55,12 +55,12 @@ sinks:
     compression: none
     inputs:
       - parsed_syslog
-    endpoint: http://ch-proxy:8080
+    endpoint: http://nginx:8080
     database: logs
     table: syslog
     auth:
       strategy: basic
-      user: admin
+      user: default
       password: password
     skip_unknown_fields: true
     buffer:
@@ -78,12 +78,12 @@ sinks:
     compression: none
     inputs:
       - parsed_httplog
-    endpoint: http://ch-proxy:8080
+    endpoint: http://nginx:8080
     database: logs
     table: http
     auth:
       strategy: basic
-      user: admin
+      user: default
       password: password
     buffer:
       when_full: drop_newest
