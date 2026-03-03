@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, beforeEach } from "bun:test";
+import { describe, expect, it, mock, beforeEach, spyOn } from "bun:test";
 import { GET } from "./route";
 import { NextRequest } from "next/server";
 
@@ -25,7 +25,7 @@ mock.module("@/lib/clickhouse", () => ({
 // Helper to create GET request with query params
 const createRequest = (params: Record<string, string>) => {
   const url = new URL(
-    "http://localhost/api/clickhouse/tables/explorer/dependencies"
+    "http://localhost/api/clickhouse/tables/explorer/dependencies",
   );
   Object.entries(params).forEach(([key, value]) => {
     url.searchParams.set(key, value);
@@ -39,7 +39,7 @@ const createRequest = (params: Record<string, string>) => {
 // First call is for database tables, second call is for all tables (validation)
 const setupMockQueries = (
   databaseTables: object[],
-  allTables?: { database: string; name: string; engine: string }[]
+  allTables?: { database: string; name: string; engine: string }[],
 ) => {
   let callCount = 0;
   mockQuery.mockImplementation(() => {
@@ -200,7 +200,7 @@ describe("Table Dependencies API Route", () => {
       expect(json.data.edges.length).toBeGreaterThanOrEqual(1);
 
       const sourceEdge = json.data.edges.find(
-        (e: { type: string }) => e.type === "source"
+        (e: { type: string }) => e.type === "source",
       );
       expect(sourceEdge).toBeDefined();
       expect(sourceEdge.source).toBe("test_db.events");
@@ -242,7 +242,7 @@ describe("Table Dependencies API Route", () => {
 
       const sourceEdge = json.data.edges.find(
         (e: { type: string; target: string }) =>
-          e.type === "source" && e.target === "test_db.events_view"
+          e.type === "source" && e.target === "test_db.events_view",
       );
       expect(sourceEdge).toBeDefined();
       expect(sourceEdge.source).toBe("test_db.events");
@@ -294,13 +294,13 @@ describe("Table Dependencies API Route", () => {
         (e: { type: string; source: string; target: string }) =>
           e.type === "source" &&
           e.source === "test_db.events" &&
-          e.target === "test_db.mv_hourly"
+          e.target === "test_db.mv_hourly",
       );
       expect(sourceEdge).toBeDefined();
 
       // Should have target edge from mv_hourly to hourly_stats
       const targetEdge = json.data.edges.find(
-        (e: { type: string }) => e.type === "target"
+        (e: { type: string }) => e.type === "target",
       );
       expect(targetEdge).toBeDefined();
       expect(targetEdge.source).toBe("test_db.mv_hourly");
@@ -340,7 +340,7 @@ describe("Table Dependencies API Route", () => {
 
       const sourceEdge = json.data.edges.find(
         (e: { type: string; target: string }) =>
-          e.type === "source" && e.target === "test_db.events_view"
+          e.type === "source" && e.target === "test_db.events_view",
       );
       expect(sourceEdge).toBeDefined();
       expect(sourceEdge.source).toBe("test_db.events");
@@ -376,7 +376,7 @@ describe("Table Dependencies API Route", () => {
         [
           { database: "test_db", name: "real_table", engine: "MergeTree" },
           { database: "test_db", name: "my_view", engine: "View" },
-        ]
+        ],
       );
 
       const req = createRequest({ database: "test_db" });
@@ -387,7 +387,7 @@ describe("Table Dependencies API Route", () => {
 
       // Should NOT have a join edge to fake_table
       const joinEdges = json.data.edges.filter(
-        (e: { type: string }) => e.type === "join"
+        (e: { type: string }) => e.type === "join",
       );
       expect(joinEdges).toHaveLength(0);
     });
@@ -420,7 +420,7 @@ describe("Table Dependencies API Route", () => {
         [
           { database: "test_db", name: "real_table", engine: "MergeTree" },
           { database: "test_db", name: "my_view", engine: "View" },
-        ]
+        ],
       );
 
       const req = createRequest({ database: "test_db" });
@@ -431,7 +431,7 @@ describe("Table Dependencies API Route", () => {
 
       // Should NOT have a join edge to fake_table
       const joinEdges = json.data.edges.filter(
-        (e: { type: string }) => e.type === "join"
+        (e: { type: string }) => e.type === "join",
       );
       expect(joinEdges).toHaveLength(0);
     });
@@ -453,7 +453,7 @@ describe("Table Dependencies API Route", () => {
               "CREATE VIEW test_db.my_view AS SELECT * FROM test_db.non_existent_table",
           },
         ],
-        [{ database: "test_db", name: "my_view", engine: "View" }]
+        [{ database: "test_db", name: "my_view", engine: "View" }],
       );
 
       const req = createRequest({ database: "test_db" });
@@ -488,7 +488,7 @@ describe("Table Dependencies API Route", () => {
         [
           { database: "test_db", name: "my_view", engine: "View" },
           { database: "other_db", name: "external_table", engine: "MergeTree" },
-        ]
+        ],
       );
 
       const req = createRequest({ database: "test_db" });
@@ -501,7 +501,7 @@ describe("Table Dependencies API Route", () => {
       expect(json.data.nodes).toHaveLength(2);
 
       const externalNode = json.data.nodes.find(
-        (n: { id: string }) => n.id === "other_db.external_table"
+        (n: { id: string }) => n.id === "other_db.external_table",
       );
       expect(externalNode).toBeDefined();
       expect(externalNode.engine).toBe("MergeTree");
@@ -556,7 +556,7 @@ describe("Table Dependencies API Route", () => {
 
       // Should have target edge
       const targetEdge = json.data.edges.find(
-        (e: { type: string }) => e.type === "target"
+        (e: { type: string }) => e.type === "target",
       );
       expect(targetEdge).toBeDefined();
       expect(targetEdge.source).toBe("test_db.my_mv");
@@ -606,7 +606,7 @@ describe("Table Dependencies API Route", () => {
 
       // Should have join edge
       const joinEdge = json.data.edges.find(
-        (e: { type: string }) => e.type === "join"
+        (e: { type: string }) => e.type === "join",
       );
       expect(joinEdge).toBeDefined();
       expect(joinEdge.source).toBe("test_db.users");
@@ -646,7 +646,7 @@ describe("Table Dependencies API Route", () => {
 
       // Should have distributed edge
       const distEdge = json.data.edges.find(
-        (e: { type: string }) => e.type === "distributed"
+        (e: { type: string }) => e.type === "distributed",
       );
       expect(distEdge).toBeDefined();
       expect(distEdge.source).toBe("test_db.events_distributed");
@@ -696,7 +696,7 @@ describe("Table Dependencies API Route", () => {
 
       // Should have dictionary edge
       const dictEdge = json.data.edges.find(
-        (e: { type: string }) => e.type === "dictionary"
+        (e: { type: string }) => e.type === "dictionary",
       );
       expect(dictEdge).toBeDefined();
       expect(dictEdge.source).toBe("test_db.my_dict");
@@ -756,14 +756,14 @@ describe("Table Dependencies API Route", () => {
 
       // Should have join edges for b and c
       const joinEdges = json.data.edges.filter(
-        (e: { type: string }) => e.type === "join"
+        (e: { type: string }) => e.type === "join",
       );
       expect(joinEdges.length).toBe(2);
       expect(
-        joinEdges.some((e: { source: string }) => e.source === "test_db.b")
+        joinEdges.some((e: { source: string }) => e.source === "test_db.b"),
       ).toBe(true);
       expect(
-        joinEdges.some((e: { source: string }) => e.source === "test_db.c")
+        joinEdges.some((e: { source: string }) => e.source === "test_db.c"),
       ).toBe(true);
     });
   });
@@ -821,21 +821,25 @@ describe("Table Dependencies API Route", () => {
 
       const nodes = json.data.nodes;
       expect(
-        nodes.find((n: { name: string }) => n.name === "table1").type
+        nodes.find((n: { name: string }) => n.name === "table1").type,
       ).toBe("table");
       expect(nodes.find((n: { name: string }) => n.name === "view1").type).toBe(
-        "view"
+        "view",
       );
       expect(nodes.find((n: { name: string }) => n.name === "mv1").type).toBe(
-        "materialized_view"
+        "materialized_view",
       );
       expect(nodes.find((n: { name: string }) => n.name === "dist1").type).toBe(
-        "distributed"
+        "distributed",
       );
     });
   });
 
   describe("Error Handling", () => {
+    beforeEach(() => {
+      spyOn(console, "error").mockImplementation(() => {});
+    });
+
     it("should handle ClickHouse errors gracefully", async () => {
       const clickhouseError = {
         code: 60,
