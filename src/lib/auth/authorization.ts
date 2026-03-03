@@ -13,6 +13,11 @@ import {
   getLensConfig,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import {
+  hasGlobalAccessViaShowGrants,
+  probeUserDatabaseAccess,
+  probeUserTableAccess,
+} from "@/lib/clickhouse/grants";
 
 /**
  * Available permission types
@@ -76,6 +81,7 @@ export async function checkPermission(
     // Check the specific permission
     const hasPermission = await checkSpecificPermission(
       client,
+      config,
       permission,
       effectiveRoles,
       hasGlobalAccess,
@@ -208,7 +214,12 @@ async function checkGlobalAccess(username: string): Promise<boolean> {
       cnt: string | number;
     }>;
     const cnt = globalData[0]?.cnt;
-    return cnt !== 0 && cnt !== "0" && cnt !== undefined;
+    const viaSystemGrants = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+    if (viaSystemGrants) return true;
+
+    // Fallback: SHOW GRANTS catches XML-configured users and GRANT ALL
+    // that may not appear in system.grants
+    return await hasGlobalAccessViaShowGrants(lensConfig, username);
   } catch {
     return false;
   }
@@ -270,6 +281,7 @@ async function hasAccessibleDatabases(username: string): Promise<boolean> {
  */
 async function checkSpecificPermission(
   client: ReturnType<typeof createClient>,
+  config: import("@/lib/clickhouse").ClickHouseConfig,
   permission: Permission,
   effectiveRoles: Set<string>,
   hasGlobalAccess: boolean,
@@ -279,6 +291,7 @@ async function checkSpecificPermission(
     case "canManageUsers":
       // Check via probe or role
       if (effectiveRoles.has("clicklens_user_admin")) return true;
+      if (hasGlobalAccess) return true;
       try {
         await client.query("SHOW CREATE USER CURRENT_USER");
         return true;
@@ -288,6 +301,7 @@ async function checkSpecificPermission(
 
     case "canViewProcesses":
       if (effectiveRoles.has("clicklens_query_monitor")) return true;
+      if (hasGlobalAccess) return true;
       try {
         await client.query("SELECT 1 FROM system.processes LIMIT 1");
         return true;
@@ -299,6 +313,7 @@ async function checkSpecificPermission(
       // Same as canManageUsers or query monitor role
       if (effectiveRoles.has("clicklens_user_admin")) return true;
       if (effectiveRoles.has("clicklens_query_monitor")) return true;
+      if (hasGlobalAccess) return true;
       try {
         await client.query("SHOW CREATE USER CURRENT_USER");
         return true;
@@ -308,6 +323,7 @@ async function checkSpecificPermission(
 
     case "canViewCluster":
       if (effectiveRoles.has("clicklens_cluster_monitor")) return true;
+      if (hasGlobalAccess) return true;
       try {
         await client.query("SELECT 1 FROM system.metrics LIMIT 1");
         return true;
@@ -317,14 +333,21 @@ async function checkSpecificPermission(
 
     case "canBrowseTables":
       if (effectiveRoles.has("clicklens_table_explorer")) return true;
-      return hasGlobalAccess;
+      if (hasGlobalAccess) return true;
+      // Probe: check if user can access system.tables
+      return await probeUserTableAccess(config);
 
     case "canExecuteQueries":
     case "canDiscover":
       // Anyone with database access can execute queries/discover
       if (hasGlobalAccess) return true;
-      // Check for accessible databases (aligns with permissions/route.ts logic)
-      return await hasAccessibleDatabases(username);
+      // Check via system.grants
+      if (await hasAccessibleDatabases(username)) return true;
+      // Probe: check if user can list databases with their own creds
+      {
+        const probeResult = await probeUserDatabaseAccess(config);
+        return probeResult.hasAccess;
+      }
 
     case "canViewSettings":
       if (effectiveRoles.has("clicklens_settings_admin")) return true;
