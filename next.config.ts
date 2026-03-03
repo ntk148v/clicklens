@@ -1,11 +1,28 @@
 import type { NextConfig } from "next";
 import packageJson from "./package.json";
+import { execSync } from "child_process";
+
+let gitCommit = "";
+let gitTag = "";
+
+try {
+  gitCommit = execSync("git rev-parse --short HEAD", { stdio: "pipe" })
+    .toString()
+    .trim();
+  gitTag = execSync("git describe --tags --abbrev=0", { stdio: "pipe" })
+    .toString()
+    .trim();
+} catch (e) {
+  // Ignore errors if not in a git repository or git is not installed
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION:
       process.env.NEXT_PUBLIC_APP_VERSION || packageJson.version,
+    NEXT_PUBLIC_GIT_COMMIT: process.env.NEXT_PUBLIC_GIT_COMMIT || gitCommit,
+    NEXT_PUBLIC_GIT_TAG: process.env.NEXT_PUBLIC_GIT_TAG || gitTag,
   },
   async headers() {
     return [

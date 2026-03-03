@@ -255,10 +255,12 @@ const resourcesItems = [
     external: true,
   },
   {
-    name: "v" + process.env.NEXT_PUBLIC_APP_VERSION,
-    href:
-      "https://github.com/ntk148v/clicklens/releases/tag/v" +
-      process.env.NEXT_PUBLIC_APP_VERSION,
+    name: process.env.NEXT_PUBLIC_GIT_COMMIT
+      ? `${process.env.NEXT_PUBLIC_GIT_TAG || "v" + process.env.NEXT_PUBLIC_APP_VERSION} (${process.env.NEXT_PUBLIC_GIT_COMMIT})`
+      : "v" + process.env.NEXT_PUBLIC_APP_VERSION,
+    href: process.env.NEXT_PUBLIC_GIT_COMMIT
+      ? `https://github.com/ntk148v/clicklens/commit/${process.env.NEXT_PUBLIC_GIT_COMMIT}`
+      : `https://github.com/ntk148v/clicklens/releases/tag/v${process.env.NEXT_PUBLIC_APP_VERSION}`,
     icon: ScrollText,
     description: "View version",
     requiresPermission: "canViewVersion" as const,
@@ -275,7 +277,7 @@ export function Sidebar() {
       Access: pathname.startsWith("/access"),
       Settings: pathname.startsWith("/settings"),
       Logging: pathname.startsWith("/logging"),
-    })
+    }),
   );
   const { user, permissions, logout, isLoading } = useAuth();
 
@@ -298,7 +300,7 @@ export function Sidebar() {
       <aside
         className={cn(
           "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-200",
-          collapsed ? "w-16" : "w-56"
+          collapsed ? "w-16" : "w-56",
         )}
       >
         {/* Logo */}
@@ -348,7 +350,7 @@ export function Sidebar() {
                               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full",
                               isActive
                                 ? "bg-sidebar-accent text-primary"
-                                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
                             )}
                           >
                             <Icon className="w-5 h-5 flex-shrink-0" />
@@ -378,7 +380,7 @@ export function Sidebar() {
                             href={subItem.href}
                             className={cn(
                               "cursor-pointer",
-                              pathname === subItem.href && "bg-accent"
+                              pathname === subItem.href && "bg-accent",
                             )}
                           >
                             <subItem.icon className="w-4 h-4 mr-2" />
@@ -400,7 +402,7 @@ export function Sidebar() {
                       "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full",
                       isActive
                         ? "bg-sidebar-accent text-primary"
-                        : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                        : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
                     )}
                   >
                     <Icon className="w-5 h-5 flex-shrink-0" />
@@ -408,7 +410,7 @@ export function Sidebar() {
                     <ChevronDown
                       className={cn(
                         "w-4 h-4 transition-transform",
-                        isExpanded && "rotate-180"
+                        isExpanded && "rotate-180",
                       )}
                     />
                   </button>
@@ -427,7 +429,7 @@ export function Sidebar() {
                               "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                               isSubActive
                                 ? "bg-sidebar-accent text-primary"
-                                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
                             )}
                           >
                             <SubIcon className="w-4 h-4 flex-shrink-0" />
@@ -449,7 +451,7 @@ export function Sidebar() {
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive
                     ? "bg-sidebar-accent text-primary"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
@@ -488,7 +490,7 @@ export function Sidebar() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
@@ -526,7 +528,7 @@ export function Sidebar() {
                   variant="ghost"
                   className={cn(
                     "w-full justify-start text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                    collapsed && "justify-center px-2"
+                    collapsed && "justify-center px-2",
                   )}
                 >
                   <User className="w-4 h-4 flex-shrink-0" />
