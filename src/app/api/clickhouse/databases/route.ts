@@ -8,13 +8,17 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
 import {
   createClient,
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import {
+  hasGlobalAccessViaShowGrants,
+  probeUserDatabaseAccess,
+} from "@/lib/clickhouse/grants";
 
 interface DatabasesResponse {
   success: boolean;
@@ -76,8 +80,8 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
     try {
       // Get roles assigned to the user
       const rolesResult = await client.query(`
-        SELECT granted_role_name as role 
-        FROM system.role_grants 
+        SELECT granted_role_name as role
+        FROM system.role_grants
         WHERE user_name = '${safeUser}'
       `);
       const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
@@ -89,7 +93,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       // Check global access (direct or through roles)
       const globalCheckQuery = userRoles
         ? `
-          SELECT count() as cnt FROM system.grants 
+          SELECT count() as cnt FROM system.grants
           WHERE (
             user_name = '${safeUser}'
             OR role_name IN (${userRoles})
@@ -98,7 +102,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
           AND access_type IN ('SELECT', 'ALL')
         `
         : `
-          SELECT count() as cnt FROM system.grants 
+          SELECT count() as cnt FROM system.grants
           WHERE user_name = '${safeUser}'
           AND (database IS NULL OR database = '*')
           AND access_type IN ('SELECT', 'ALL')
@@ -110,7 +114,16 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       }>;
       // Handle both string and number comparison
       const cnt = globalData[0]?.cnt;
-      const hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+      let hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+
+      // Fallback: SHOW GRANTS catches XML-configured users and GRANT ALL
+      // that may not appear in system.grants
+      if (!hasGlobalAccess) {
+        hasGlobalAccess = await hasGlobalAccessViaShowGrants(
+          lensConfig,
+          session.user.username,
+        );
+      }
 
       let result;
       if (hasGlobalAccess) {
@@ -122,19 +135,19 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
         // Get databases from direct grants and role grants
         const dbQuery = userRoles
           ? `
-            SELECT DISTINCT database as name FROM system.grants 
+            SELECT DISTINCT database as name FROM system.grants
             WHERE (
               user_name = '${safeUser}'
               OR role_name IN (${userRoles})
             )
-            AND database IS NOT NULL 
+            AND database IS NOT NULL
             AND database != '*'
             AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
           `
           : `
-            SELECT DISTINCT database as name FROM system.grants 
+            SELECT DISTINCT database as name FROM system.grants
             WHERE user_name = '${safeUser}'
-            AND database IS NOT NULL 
+            AND database IS NOT NULL
             AND database != '*'
             AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
           `;
@@ -144,18 +157,61 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
             ${dbQuery}
             UNION ALL
             SELECT 'default' as name
-          ) 
+          )
           WHERE name IN (SELECT name FROM system.databases)
           ORDER BY name
         `);
       }
 
+      const resultData = result.data as unknown as Array<{ name: string }>;
+
+      // If no databases found via system.grants, probe with user's own credentials
+      if (
+        resultData.length === 0 ||
+        (resultData.length === 1 && resultData[0]?.name === "default")
+      ) {
+        const userConfig = await getSessionClickHouseConfig();
+        if (userConfig) {
+          const probeResult = await probeUserDatabaseAccess(userConfig);
+          if (probeResult.hasAccess) {
+            // User has access — list all databases via LENS_USER
+            const allDbsResult = await client.query(
+              `SELECT name FROM system.databases ORDER BY name`,
+            );
+            return NextResponse.json({
+              success: true,
+              data: allDbsResult.data as unknown as Array<{ name: string }>,
+            });
+          }
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        data: result.data as unknown as Array<{ name: string }>,
+        data: resultData,
       });
     } catch (error) {
       console.error("Grants query failed:", error);
+
+      // Fallback: try user's own credentials
+      try {
+        const userConfig = await getSessionClickHouseConfig();
+        if (userConfig) {
+          const probeResult = await probeUserDatabaseAccess(userConfig);
+          if (probeResult.hasAccess) {
+            const allDbsResult = await client.query(
+              `SELECT name FROM system.databases ORDER BY name`,
+            );
+            return NextResponse.json({
+              success: true,
+              data: allDbsResult.data as unknown as Array<{ name: string }>,
+            });
+          }
+        }
+      } catch {
+        /* ignore probe failure */
+      }
+
       // If grants query fails, return just default database
       return NextResponse.json({
         success: true,

@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
 import {
   createClient,
   getLensConfig,
@@ -15,6 +15,10 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import {
+  hasGlobalAccessViaShowGrants,
+  probeUserDatabaseAccess,
+} from "@/lib/clickhouse/grants";
 
 interface TableInfo {
   database?: string;
@@ -119,7 +123,16 @@ export async function GET(
         cnt: string | number;
       }>;
       const cnt = globalData[0]?.cnt;
-      const hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+      let hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+
+      // Fallback: SHOW GRANTS catches XML-configured users and GRANT ALL
+      // that may not appear in system.grants
+      if (!hasGlobalAccess) {
+        hasGlobalAccess = await hasGlobalAccessViaShowGrants(
+          lensConfig,
+          session.user.username,
+        );
+      }
 
       // 2. Check for database level access (db.*) - ONLY if database is specified
       let hasDbAccess = false;
@@ -224,12 +237,62 @@ export async function GET(
         }
       }
 
+      const resultData = result.data as unknown as TableInfo[];
+
+      // If no tables found, probe with user's own credentials
+      if (resultData.length === 0) {
+        const userConfig = await getSessionClickHouseConfig();
+        if (userConfig) {
+          const probeResult = await probeUserDatabaseAccess(userConfig);
+          if (probeResult.hasAccess) {
+            // User has access — list tables via LENS_USER
+            const dbFilter = safeDatabase
+              ? `WHERE database = '${safeDatabase}'`
+              : "";
+            const allTablesResult = await client.query(`
+              SELECT database, name, engine, total_rows, total_bytes
+              FROM system.tables ${dbFilter}
+              ORDER BY database, name
+            `);
+            return NextResponse.json({
+              success: true,
+              data: allTablesResult.data as unknown as TableInfo[],
+            });
+          }
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        data: result.data as unknown as TableInfo[],
+        data: resultData,
       });
     } catch (error) {
       console.error("Table permission check failed:", error);
+
+      // Fallback: try user's own credentials
+      try {
+        const userConfig = await getSessionClickHouseConfig();
+        if (userConfig) {
+          const probeResult = await probeUserDatabaseAccess(userConfig);
+          if (probeResult.hasAccess) {
+            const dbFilter = safeDatabase
+              ? `WHERE database = '${safeDatabase}'`
+              : "";
+            const allTablesResult = await client.query(`
+              SELECT database, name, engine, total_rows, total_bytes
+              FROM system.tables ${dbFilter}
+              ORDER BY database, name
+            `);
+            return NextResponse.json({
+              success: true,
+              data: allTablesResult.data as unknown as TableInfo[],
+            });
+          }
+        }
+      } catch {
+        /* ignore probe failure */
+      }
+
       // If permission check fails, return empty list (safe default)
       return NextResponse.json({
         success: true,

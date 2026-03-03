@@ -15,6 +15,11 @@ import {
   isLensUserConfigured,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import {
+  hasGlobalAccessViaShowGrants,
+  probeUserDatabaseAccess,
+  probeUserTableAccess,
+} from "@/lib/clickhouse/grants";
 
 interface PermissionsResponse {
   success: boolean;
@@ -154,7 +159,16 @@ async function getAccessInfo(username: string): Promise<{
       cnt: string | number;
     }>;
     const cnt = globalData[0]?.cnt;
-    const hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+    let hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+
+    // Fallback: SHOW GRANTS catches XML-configured users and GRANT ALL
+    // that may not appear in system.grants
+    if (!hasGlobalAccess) {
+      hasGlobalAccess = await hasGlobalAccessViaShowGrants(
+        lensConfig,
+        username,
+      );
+    }
 
     let databases: string[] = [];
 
@@ -263,8 +277,8 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
         ? accessInfoResult.value
         : { databases: [], hasGlobalAccess: false };
 
-    const accessibleDatabases = accessInfo.databases;
-    const hasGlobalAccess = accessInfo.hasGlobalAccess;
+    let accessibleDatabases = accessInfo.databases;
+    let hasGlobalAccess = accessInfo.hasGlobalAccess;
 
     // Process Probes
     let canManageUsers = false;
@@ -315,9 +329,6 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     }
 
     // 4. Settings Viewer: via clicklens_settings_admin role OR global access
-    // STRICT CHECK: The probe might succeed for limited users if system.settings is public,
-    // but the UI should only be shown for Global Admins or Role Holders.
-    // We overwrite whatever the probe returned to enforce strict UI visibility.
     canViewSettings = effectiveRoles.has("clicklens_settings_admin");
 
     // If user has global access (*.*), they imply settings access
@@ -325,18 +336,11 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
       canViewSettings = true;
     }
 
-    // Fallback: If the strict probe succeeds AND they have at least *some* database access beyond default?
-    // Actually, user requested strictness. "no settings" for dungbh5.
-    // So we invoke STRICT mode: Only Role OR Global Access allows Settings UI.
-    // We IGNORE hasSettingsAccessProbe for the UI boolean, to be safe.
-    // (Note: They can still query system.settings in SQL Console if ClickHouse allows it,
-    // but the UI tab will be hidden).
-
     // Check Kill Query
     const canKillQueries =
       canManageUsers || effectiveRoles.has("clicklens_query_monitor");
 
-    // 5. Logging: via clicklens_cluster_monitor role OR global access
+    // 5. Logging: via clicklens_cluster_monitor role OR global access OR probes
     const hasMonitorRole = effectiveRoles.has("clicklens_cluster_monitor");
     const hasLogAccess = hasMonitorRole || hasGlobalAccess;
 
@@ -347,18 +351,43 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     const canViewSystemLogs =
       canViewServerLogs || canViewCrashLogs || canViewSessionLogs;
 
-    // NEW STRICT LOGIC for Tables and Queries
+    // SQL Console and Discover: check accessInfo first, then probe fallback
+    let canExecuteQueries = accessibleDatabases.length > 0 || hasGlobalAccess;
+    let canDiscover = accessibleDatabases.length > 0 || hasGlobalAccess;
 
-    // SQL Console: open to anyone who can query at least ONE database (user or system)
-    // accessInfo.databases has user DBs. If they have global access, they have databases.
-    const canExecuteQueries = accessibleDatabases.length > 0 || hasGlobalAccess;
-    const canDiscover = accessibleDatabases.length > 0 || hasGlobalAccess;
-
-    // Table Explorer: STRICTER.
-    // Requires explicitly finding roles OR Global Access.
-    // Mere access to 'logs' database is NOT enough to enable the full Table Explorer UI.
+    // Table Explorer
     const hasTableExplorerRole = effectiveRoles.has("clicklens_table_explorer");
-    const canBrowseTables = hasTableExplorerRole || hasGlobalAccess;
+    let canBrowseTables = hasTableExplorerRole || hasGlobalAccess;
+
+    // FALLBACK: If system.grants-based checks failed (e.g., XML-configured user),
+    // probe with the user's own credentials to detect actual access
+    if (
+      !canExecuteQueries ||
+      !canBrowseTables ||
+      accessibleDatabases.length === 0
+    ) {
+      const probeResult = await probeUserDatabaseAccess(config);
+
+      if (probeResult.hasAccess) {
+        canExecuteQueries = true;
+        canDiscover = true;
+        hasGlobalAccess = true;
+
+        // Use probed databases if we have none from system.grants
+        if (accessibleDatabases.length === 0) {
+          accessibleDatabases = probeResult.databases;
+        }
+
+        // Enable settings if not already enabled
+        if (!canViewSettings) {
+          canViewSettings = true;
+        }
+      }
+
+      if (!canBrowseTables && probeResult.hasAccess) {
+        canBrowseTables = await probeUserTableAccess(config);
+      }
+    }
 
     return NextResponse.json({
       success: true,
