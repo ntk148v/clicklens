@@ -408,6 +408,14 @@ flowchart LR
     SETTINGS --> ROLES
 ```
 
+<Callout type="info">
+  **XML-Configured Users (e.g., default user):** Some users receive access via
+  `users.xml` instead of SQL grants. Since these privileges don't appear in
+  `system.grants`, ClickLens intelligently falls back to user-credential probes
+  (running `SHOW GRANTS` and probing `system.tables` with the user's
+  credentials) to accurately determine access.
+</Callout>
+
 **Available views**
 
 | View      | Route           | Description                    |

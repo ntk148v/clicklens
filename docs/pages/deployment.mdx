@@ -26,7 +26,7 @@ ClickLens is configured entirely through environment variables. Here's the compl
 | `CLICKHOUSE_VERIFY`       | `true`                          | Set to `false` to skip SSL certificate verification (for self-signed certs) |
 | `NODE_ENV`                | `development`                   | Set to `production` for production deployments                              |
 | `DISABLE_SECURE_COOKIES`  | `false`                         | Set to `true` if running behind a non-HTTPS proxy                           |
-| `NEXT_PUBLIC_APP_VERSION` | From `package.json`             | Override the displayed app version                                          |
+| `NEXT_PUBLIC_APP_VERSION` | From Git (tag + commit hash)    | Override the displayed app version. By default, falls back to Git metadata. |
 
 <Callout type="warning">
   **Security:** The `SESSION_SECRET` must be at least 32 characters. In

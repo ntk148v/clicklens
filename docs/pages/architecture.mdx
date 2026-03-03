@@ -198,9 +198,9 @@ interface SessionData {
 ```
 
 <Callout type="warning">
-  User credentials are stored in the encrypted session cookie. The
-  `SESSION_SECRET` environment variable MUST be at least 32 characters for
-  security.
+  User credentials are encrypted server-side and stored in the session cookie.
+  They are **never** exposed to the client browser. The `SESSION_SECRET`
+  environment variable MUST be at least 32 characters for secure encryption.
 </Callout>
 
 ### 5.2. Permission Derivation
@@ -226,6 +226,13 @@ Permissions are **not stored**—they're derived from ClickHouse grants at login
 | `SELECT ON system.text_log`    | `canViewSystemLogs`  |
 | `SELECT ON system.session_log` | `canViewSessionLogs` |
 | `SELECT ON system.crash_log`   | `canViewCrashLogs`   |
+
+**Fallback Probes for XML Users:**
+
+If `system.grants` returns no privileges (which occurs for users configured via `users.xml`), ClickLens falls back to user-credential probes:
+
+- Uses `SHOW GRANTS FOR [user]` to scrape actual access
+- Probes tables like `system.tables` or `system.databases` using the credentials directly to verify access
 
 4. Permissions are cached in client-side AuthContext
 5. UI components use `useAuth()` hook to check permissions
@@ -306,5 +313,14 @@ ClickLens uses shadcn/ui patterns with Radix UI primitives:
 
 - `TruncatedCell` - Text truncation with tooltip
 - `JsonViewer` - Collapsible JSON display
-- `RecordDetailSheet` - Side panel for row details
 - `AccessDenied` - Permission error display
+
+## 9. Security Posture
+
+ClickLens implements several robust security measures at the architectural level:
+
+- **Global Authentication Middleware**: Next.js middleware enforces strict authentication checks across all internal and API routes.
+- **Advanced Rate Limiting**: Built-in rate limiting with sliding window tracking to prevent brute force attacks, utilizing `x-forwarded-for` to mitigate IP spoofing via proxies.
+- **Encrypted Server-Side Sessions**: Using `iron-session` with AES-256-GCM encryption ensures database credentials stay securely on the backend, shielded from Cross-Site Scripting (XSS).
+- **SQL Injection Defenses**: The ClickHouse client handles comprehensive escaping and null-byte stripping to neutralize malformed SQL injection vectors.
+- **Content Security Policy (CSP)**: ClickLens applies modern CSP HTTP headers to prevent XSS attacks and frame injections natively in browsers.
