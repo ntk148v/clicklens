@@ -62,7 +62,7 @@ function getSessionSecret(): string {
       "Set SESSION_SECRET in production!",
   );
 
-  return "complex_password_at_least_32_characters_long_for_security";
+  return "development_fallback_secret_at_least_32_characters_long";
 }
 
 export const sessionOptions: SessionOptions = {

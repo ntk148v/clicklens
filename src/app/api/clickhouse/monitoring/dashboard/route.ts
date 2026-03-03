@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
-import { MonitoringService, type DashboardResponse } from "@/services/monitoring";
-import { successResponse, errorResponse, unauthorizedResponse, type ApiResponse } from "@/lib/api-response";
+import {
+  MonitoringService,
+  type DashboardResponse,
+} from "@/services/monitoring";
+import {
+  successResponse,
+  errorResponse,
+  unauthorizedResponse,
+  type ApiResponse,
+} from "@/lib/api-response";
 
-export async function GET(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse<DashboardResponse>>> {
+export async function GET(request: NextRequest) {
   try {
     const config = await getSessionClickHouseConfig();
 
@@ -16,7 +22,7 @@ export async function GET(
 
     const client = createClient(config);
     const service = new MonitoringService(client);
-    
+
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
@@ -28,7 +34,7 @@ export async function GET(
       from,
       to,
       timeRange,
-      minTime
+      minTime,
     });
 
     return successResponse(data);

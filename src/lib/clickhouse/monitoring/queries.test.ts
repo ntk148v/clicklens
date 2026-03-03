@@ -36,7 +36,8 @@ describe("Monitoring Queries Validation", () => {
       if (
         msg.includes("ECONNREFUSED") ||
         msg.includes("ENOTFOUND") ||
-        msg.includes("fetch failed")
+        msg.includes("fetch failed") ||
+        msg.includes("Authentication failed")
       ) {
         console.warn(
           "⚠️  ClickHouse not available. Skipping monitoring queries validation tests.",

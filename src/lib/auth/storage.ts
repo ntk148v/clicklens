@@ -8,6 +8,8 @@
  * For multi-instance deployments, this should be replaced with Redis.
  */
 
+import crypto from "crypto";
+
 export interface UserSession {
   username: string;
   password: string;
@@ -15,9 +17,46 @@ export interface UserSession {
   database?: string;
 }
 
+interface EncryptedPassword {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
+}
+
 interface SessionEntry {
-  user: UserSession;
+  user: Omit<UserSession, "password">;
+  encryptedPassword: EncryptedPassword;
   expiresAt: number;
+}
+
+const ALGORITHM = "aes-256-gcm";
+
+function getSecretKey(): Buffer {
+  const secret =
+    process.env.SESSION_SECRET ||
+    "development_fallback_secret_at_least_32_characters_long";
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+function encryptPassword(password: string): EncryptedPassword {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(ALGORITHM, getSecretKey(), iv);
+  let ciphertext = cipher.update(password, "utf8", "base64");
+  ciphertext += cipher.final("base64");
+  const authTag = cipher.getAuthTag().toString("base64");
+  return { ciphertext, iv: iv.toString("base64"), authTag };
+}
+
+function decryptPassword(encrypted: EncryptedPassword): string {
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    getSecretKey(),
+    Buffer.from(encrypted.iv, "base64"),
+  );
+  decipher.setAuthTag(Buffer.from(encrypted.authTag, "base64"));
+  let decrypted = decipher.update(encrypted.ciphertext, "base64", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
 }
 
 // In-memory store: SessionID -> SessionEntry
@@ -58,7 +97,12 @@ export function createSession(user: UserSession): string {
   const sessionId = crypto.randomUUID();
   const expiresAt = Date.now() + SESSION_TTL_MS;
 
-  sessionStore.set(sessionId, { user, expiresAt });
+  const { password, ...userWithoutPassword } = user;
+  sessionStore.set(sessionId, {
+    user: userWithoutPassword,
+    encryptedPassword: encryptPassword(password),
+    expiresAt,
+  });
   return sessionId;
 }
 
@@ -80,7 +124,14 @@ export function getSessionUser(sessionId?: string): UserSession | null {
   // Extend session on activity? Optional.
   // For now, fixed TTL from login seems safer/simpler.
 
-  return entry.user;
+  try {
+    const password = decryptPassword(entry.encryptedPassword);
+    return { ...entry.user, password };
+  } catch (err) {
+    console.error("Failed to decrypt session password:", err);
+    sessionStore.delete(sessionId);
+    return null;
+  }
 }
 
 /**
@@ -100,7 +151,7 @@ export function updateSessionPassword(
     return false;
   }
 
-  entry.user.password = newPassword;
+  entry.encryptedPassword = encryptPassword(newPassword);
   return true;
 }
 

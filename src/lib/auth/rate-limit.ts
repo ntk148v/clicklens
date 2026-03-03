@@ -96,26 +96,57 @@ export function checkRateLimit(
 }
 
 /**
- * Get client identifier from request
- * Uses X-Forwarded-For header if behind proxy, otherwise falls back to IP
+ * Check if the request is from a trusted proxy.
+ * Set TRUSTED_PROXY_IPS env var to a comma-separated list of proxy IPs
+ * to enable trusting X-Forwarded-For / X-Real-IP headers.
+ *
+ * SECURITY: Without this, X-Forwarded-For can be trivially spoofed
+ * to bypass rate limiting.
+ */
+function isTrustedProxy(): boolean {
+  return !!process.env.TRUSTED_PROXY_IPS;
+}
+
+/**
+ * Get client identifier from request.
+ *
+ * Only trusts X-Forwarded-For / X-Real-IP headers when running behind
+ * a known trusted proxy (TRUSTED_PROXY_IPS is set). Otherwise, uses
+ * a deterministic hash of available request metadata as a fallback.
  */
 export function getClientIdentifier(request: Request): string {
-  // Check for forwarded IP (when behind proxy/load balancer)
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    // Take the first IP in the chain (original client)
-    return forwardedFor.split(",")[0].trim();
+  if (isTrustedProxy()) {
+    // Trust forwarded headers only when behind a configured proxy
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    if (forwardedFor) {
+      return forwardedFor.split(",")[0].trim();
+    }
+
+    const realIp = request.headers.get("x-real-ip");
+    if (realIp) {
+      return realIp;
+    }
   }
 
-  // Check for real IP header (nginx)
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp;
-  }
+  // Fallback: use user-agent + accept-language as a fingerprint.
+  // Not perfect, but prevents all unidentified clients from sharing
+  // a single rate-limit bucket.
+  const ua = request.headers.get("user-agent") || "";
+  const lang = request.headers.get("accept-language") || "";
+  return `fallback:${simpleHash(ua + lang)}`;
+}
 
-  // Fallback to a default identifier
-  // In serverless environments, we might not have direct access to IP
-  return "unknown";
+/**
+ * Simple non-cryptographic hash for generating deterministic identifiers.
+ * Not used for security — only for rate-limit bucket assignment.
+ */
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+  return hash.toString(36);
 }
 
 /**

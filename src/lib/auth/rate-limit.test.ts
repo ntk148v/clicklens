@@ -103,26 +103,52 @@ describe("Rate Limiter", () => {
   });
 
   describe("getClientIdentifier", () => {
-    test("extracts IP from x-forwarded-for header", () => {
+    let originalProxyEnv: string | undefined;
+
+    beforeEach(() => {
+      originalProxyEnv = process.env.TRUSTED_PROXY_IPS;
+    });
+
+    afterEach(() => {
+      if (originalProxyEnv !== undefined) {
+        process.env.TRUSTED_PROXY_IPS = originalProxyEnv;
+      } else {
+        delete process.env.TRUSTED_PROXY_IPS;
+      }
+    });
+
+    test("extracts IP from x-forwarded-for header when trusted proxy", () => {
+      process.env.TRUSTED_PROXY_IPS = "true";
       const request = new Request("http://localhost", {
         headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
       });
       expect(getClientIdentifier(request)).toBe("1.2.3.4");
     });
 
-    test("extracts IP from x-real-ip header", () => {
+    test("extracts IP from x-real-ip header when trusted proxy", () => {
+      process.env.TRUSTED_PROXY_IPS = "true";
       const request = new Request("http://localhost", {
         headers: { "x-real-ip": "9.8.7.6" },
       });
       expect(getClientIdentifier(request)).toBe("9.8.7.6");
     });
 
-    test("returns unknown when no IP headers present", () => {
+    test("returns fallback when no IP headers present and trusted", () => {
+      process.env.TRUSTED_PROXY_IPS = "true";
       const request = new Request("http://localhost");
-      expect(getClientIdentifier(request)).toBe("unknown");
+      expect(getClientIdentifier(request)).toContain("fallback:");
     });
 
-    test("prefers x-forwarded-for over x-real-ip", () => {
+    test("returns fallback when NOT trusted proxy even with headers", () => {
+      delete process.env.TRUSTED_PROXY_IPS;
+      const request = new Request("http://localhost", {
+        headers: { "x-forwarded-for": "1.1.1.1" },
+      });
+      expect(getClientIdentifier(request)).toContain("fallback:");
+    });
+
+    test("prefers x-forwarded-for over x-real-ip when trusted", () => {
+      process.env.TRUSTED_PROXY_IPS = "true";
       const request = new Request("http://localhost", {
         headers: {
           "x-forwarded-for": "1.1.1.1",

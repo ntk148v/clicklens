@@ -18,7 +18,7 @@ export function quoteIdentifier(name: string): string {
  * Use this only when dynamic SQL construction is absolutely necessary.
  */
 export function escapeSqlString(str: string): string {
-  return str.replace(/\\/g, "\\\\").replace(/'/g, "''");
+  return str.replace(/\0/g, "").replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
 
 /**

@@ -5,36 +5,57 @@ import { sessionOptions, type SessionData } from "@/lib/auth/session";
 import { getUserConfig, getLensConfig, createClient } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 import { updateSessionPassword } from "@/lib/auth/storage";
+import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting check - 5 attempts per minute per IP
+    const clientIp = getClientIdentifier(request);
+    const rateLimit = checkRateLimit(clientIp, 5, 60000);
+
+    if (!rateLimit.success) {
+      const retryAfterSeconds = Math.ceil(rateLimit.resetIn / 1000);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many password change attempts. Please try again in ${retryAfterSeconds} seconds.`,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSeconds),
+          },
+        },
+      );
+    }
+
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
     if (!newPassword) {
       return NextResponse.json(
         { success: false, error: "New password is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!currentPassword) {
       return NextResponse.json(
         { success: false, error: "Current password is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const cookieStore = await cookies();
     const session = await getIronSession<SessionData>(
       cookieStore,
-      sessionOptions
+      sessionOptions,
     );
 
     if (!session.isLoggedIn || !session.user) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -49,7 +70,7 @@ export async function POST(request: NextRequest) {
     if (!userUserConfig) {
       return NextResponse.json(
         { success: false, error: "Configuration error" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -61,11 +82,11 @@ export async function POST(request: NextRequest) {
       console.warn(
         "Password verification failed for user",
         session.user.username,
-        e
+        e,
       );
       return NextResponse.json(
         { success: false, error: "Current password incorrect" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -74,7 +95,7 @@ export async function POST(request: NextRequest) {
     if (!adminConfig) {
       return NextResponse.json(
         { success: false, error: "Server admin configuration missing" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -116,7 +137,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Internal server error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
