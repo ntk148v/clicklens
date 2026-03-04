@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
+import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
 
 interface KillRequest {
   queryId: string;
@@ -18,11 +19,22 @@ interface KillResponse {
   error?: string;
 }
 
+const KILL_RATE_LIMIT = 20;
+const KILL_RATE_WINDOW_MS = 60000;
+
 export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<KillResponse>> {
   try {
-    // Check authorization - requires canKillQueries permission
+    const clientId = getClientIdentifier(request);
+    const rateLimit = checkRateLimit(`kill:${clientId}`, KILL_RATE_LIMIT, KILL_RATE_WINDOW_MS);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { success: false, error: "Too many kill requests. Please slow down." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)) } },
+      );
+    }
+
     const authError = await checkPermission("canKillQueries");
     if (authError) return authError;
 
@@ -56,11 +68,9 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: isClickHouseError(error)
-          ? error.userMessage || error.message
-          : error instanceof Error
-            ? error.message
-            : "Unknown error",
+        error: isClickHouseError(error) && error.userMessage
+          ? error.userMessage
+          : "Failed to kill query",
       },
       { status: 500 },
     );

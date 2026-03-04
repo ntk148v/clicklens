@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getIronSession } from "iron-session";
-import { sessionOptions, type SessionData } from "@/lib/auth/session";
+import { getSession } from "@/lib/auth";
 import { getUserConfig, getLensConfig, createClient } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 import { updateSessionPassword } from "@/lib/auth/storage";
@@ -46,11 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cookieStore = await cookies();
-    const session = await getIronSession<SessionData>(
-      cookieStore,
-      sessionOptions,
-    );
+    const session = await getSession();
 
     if (!session.isLoggedIn || !session.user) {
       return NextResponse.json(
@@ -79,11 +73,7 @@ export async function POST(request: NextRequest) {
       // Simple probe to verify credentials
       await userClient.query("SELECT 1");
     } catch (e) {
-      console.warn(
-        "Password verification failed for user",
-        session.user.username,
-        e,
-      );
+      console.warn("Password verification failed for session:", session.sessionId, e);
       return NextResponse.json(
         { success: false, error: "Current password incorrect" },
         { status: 401 },
@@ -120,14 +110,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Update both session stores to keep credentials in sync
-    // Update server-side session store
+    // Update server-side session store only (password stays out of the cookie)
     if (session.sessionId) {
       updateSessionPassword(session.sessionId, newPassword);
     }
-    // Update iron-session cookie (for hydration on next request)
-    session.user.password = newPassword;
-    await session.save();
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -135,7 +121,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Internal server error",
+        error: "An unexpected error occurred. Please try again.",
       },
       { status: 500 },
     );

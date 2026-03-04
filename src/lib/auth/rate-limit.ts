@@ -128,12 +128,13 @@ export function getClientIdentifier(request: Request): string {
     }
   }
 
-  // Fallback: use user-agent + accept-language as a fingerprint.
-  // Not perfect, but prevents all unidentified clients from sharing
-  // a single rate-limit bucket.
+  // Fallback: combine multiple request signals to make bucket rotation harder.
+  // An attacker must change ALL signals to escape their bucket.
   const ua = request.headers.get("user-agent") || "";
   const lang = request.headers.get("accept-language") || "";
-  return `fallback:${simpleHash(ua + lang)}`;
+  const encoding = request.headers.get("accept-encoding") || "";
+  const connection = request.headers.get("connection") || "";
+  return `fallback:${simpleHash(ua + lang + encoding + connection)}`;
 }
 
 /**

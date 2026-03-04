@@ -10,7 +10,6 @@ import { NextResponse } from "next/server";
 import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
 import {
   createClient,
-  isClickHouseError,
   getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
@@ -408,11 +407,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     return NextResponse.json(
       {
         success: false,
-        error: isClickHouseError(error)
-          ? error.userMessage || error.message
-          : error instanceof Error
-            ? error.message
-            : "Unknown error",
+        error: "Failed to check permissions. Please try again.",
       },
       { status: 500 },
     );

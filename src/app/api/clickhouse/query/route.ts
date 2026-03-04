@@ -3,15 +3,27 @@ import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
 import { formatQueryError } from "@/lib/errors";
 import { validateSqlStatement } from "@/lib/sql/validator";
+import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
 
 export const runtime = "nodejs";
 
 const MAX_ROWS = 500000;
-const MAX_QUERY_TIMEOUT_MS = 300000; // 5 minutes max timeout
+const MAX_QUERY_TIMEOUT_MS = 300000;
 const QUERY_ID_PREFIX = "clicklens-";
+const QUERY_RATE_LIMIT = 60;
+const QUERY_RATE_WINDOW_MS = 60000;
 
 export async function POST(request: NextRequest) {
   try {
+    const clientId = getClientIdentifier(request);
+    const rateLimit = checkRateLimit(`query:${clientId}`, QUERY_RATE_LIMIT, QUERY_RATE_WINDOW_MS);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { success: false, error: { code: 429, message: "Too many queries", type: "RATE_LIMITED", userMessage: "Too many queries. Please slow down." } },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)) } },
+      );
+    }
+
     const authError = await checkPermission("canExecuteQueries");
     if (authError) return authError;
 
