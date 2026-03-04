@@ -93,92 +93,88 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
     const safeUser = escapeSqlString(session.user.username);
 
     try {
-      // Get roles assigned to the user
-      const rolesResult = await client.query(`
-        SELECT granted_role_name as role
-        FROM system.role_grants
-        WHERE user_name = '${safeUser}'
-      `);
-      const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
+      // Single complex query to evaluate RBAC and fetch allowed databases
+      // 1. Get user's roles
+      // 2. Check if user or their roles have global access (*.*)
+      // 3. If global access, return all databases
+      // 4. Otherwise, return only databases they have explicit access to (plus 'default')
+      const mergedQuery = `
+        WITH (
+            SELECT groupArray(granted_role_name)
+            FROM system.role_grants
+            WHERE user_name = '${safeUser}'
+        ) AS user_roles,
+        (
+            SELECT count() > 0
+            FROM system.grants
+            WHERE (user_name = '${safeUser}' OR has(user_roles, role_name))
+              AND (database IS NULL OR database = '*')
+              AND access_type IN ('SELECT', 'ALL')
+        ) AS has_global_access
+        SELECT DISTINCT name
+        FROM (
+            -- If they have global access, return all databases
+            SELECT name
+            FROM system.databases
+            WHERE has_global_access
 
-      const userRoles = rolesData
-        .map((r) => `'${escapeSqlString(r.role)}'`)
-        .join(",");
+            UNION ALL
 
-      // Check global access (direct or through roles)
-      const globalCheckQuery = userRoles
-        ? `
-          SELECT count() as cnt FROM system.grants
-          WHERE (
-            user_name = '${safeUser}'
-            OR role_name IN (${userRoles})
-          )
-          AND (database IS NULL OR database = '*')
-          AND access_type IN ('SELECT', 'ALL')
-        `
-        : `
-          SELECT count() as cnt FROM system.grants
-          WHERE user_name = '${safeUser}'
-          AND (database IS NULL OR database = '*')
-          AND access_type IN ('SELECT', 'ALL')
-        `;
+            -- Otherwise, return specific databases they have access to
+            SELECT database AS name
+            FROM system.grants
+            WHERE (user_name = '${safeUser}' OR has(user_roles, role_name))
+              AND database IS NOT NULL
+              AND database != '*'
+              AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
+              AND NOT has_global_access
 
-      const globalCheck = await client.query(globalCheckQuery);
-      const globalData = globalCheck.data as unknown as Array<{
-        cnt: string | number;
-      }>;
-      // Handle both string and number comparison
-      const cnt = globalData[0]?.cnt;
-      let hasGlobalAccess = cnt !== 0 && cnt !== "0" && cnt !== undefined;
+            UNION ALL
 
-      // Fallback: SHOW GRANTS catches XML-configured users and GRANT ALL
-      // that may not appear in system.grants
-      if (!hasGlobalAccess) {
-        hasGlobalAccess = await hasGlobalAccessViaShowGrants(
+            -- Always include default if it exists
+            SELECT 'default' AS name
+        )
+        WHERE name IN (SELECT name FROM system.databases)
+        ORDER BY name
+      `;
+
+      let result;
+      let resultData: Array<{ name: string }> = [];
+      let queryFailed = false;
+
+      try {
+        result = await client.query(mergedQuery);
+        resultData = result.data as unknown as Array<{ name: string }>;
+      } catch (err) {
+        // Some older ClickHouse versions might struggle with the complex CTE
+        // Keep track to fallback to probing
+        queryFailed = true;
+        console.warn(
+          "Unified CTE grant query failed, falling back to probing:",
+          err,
+        );
+      }
+
+      // If the CTE query failed or returned empty (except maybe just 'default'),
+      // try probing via SHOW GRANTS or user credentials as a fallback
+      if (
+        queryFailed ||
+        resultData.length === 0 ||
+        (resultData.length === 1 && resultData[0]?.name === "default")
+      ) {
+        // Let's at least check SHOW GRANTS logic for global access
+        const hasGlobalFallback = await hasGlobalAccessViaShowGrants(
           lensConfig,
           session.user.username,
         );
+
+        if (hasGlobalFallback) {
+          const allDbsResult = await client.query(
+            `SELECT name FROM system.databases ORDER BY name`,
+          );
+          resultData = allDbsResult.data as unknown as Array<{ name: string }>;
+        }
       }
-
-      let result;
-      if (hasGlobalAccess) {
-        // User has global access, show all databases
-        result = await client.query(
-          `SELECT name FROM system.databases ORDER BY name`,
-        );
-      } else {
-        // Get databases from direct grants and role grants
-        const dbQuery = userRoles
-          ? `
-            SELECT DISTINCT database as name FROM system.grants
-            WHERE (
-              user_name = '${safeUser}'
-              OR role_name IN (${userRoles})
-            )
-            AND database IS NOT NULL
-            AND database != '*'
-            AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-          `
-          : `
-            SELECT DISTINCT database as name FROM system.grants
-            WHERE user_name = '${safeUser}'
-            AND database IS NOT NULL
-            AND database != '*'
-            AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-          `;
-
-        result = await client.query(`
-          SELECT DISTINCT name FROM (
-            ${dbQuery}
-            UNION ALL
-            SELECT 'default' as name
-          )
-          WHERE name IN (SELECT name FROM system.databases)
-          ORDER BY name
-        `);
-      }
-
-      const resultData = result.data as unknown as Array<{ name: string }>;
 
       // If no databases found via system.grants, probe with user's own credentials
       if (
