@@ -119,10 +119,11 @@ export async function POST(
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("ClickHouse authentication failed:", errorText);
       return NextResponse.json(
         {
           success: false,
-          error: errorText || "Invalid credentials",
+          error: "Invalid credentials",
         },
         { status: 401 },
       );
@@ -163,7 +164,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Connection failed",
+        error: "Connection failed. Please verify the server is reachable.",
       },
       { status: 500 },
     );

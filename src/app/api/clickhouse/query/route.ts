@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
 import { formatQueryError } from "@/lib/errors";
+import { validateSqlStatement } from "@/lib/sql/validator";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,22 @@ export async function POST(request: NextRequest) {
     }
 
     const client = createClient({ ...config, settings });
+
+    const validation = validateSqlStatement(body.sql);
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 403,
+            message: validation.reason,
+            type: "FORBIDDEN_STATEMENT",
+            userMessage: validation.reason,
+          },
+        },
+        { status: 403 },
+      );
+    }
 
     let sql = body.sql;
     if (typeof body.page === "number") {
