@@ -812,32 +812,41 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     };
   }, []);
 
-  // Sync state → URL (P1): update URL when key state changes
+  // Sync state → URL (P1): debounced update to prevent rapid URL changes
+  const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!hydratedRef.current) return;
 
-    const params = new URLSearchParams();
-    if (selectedDatabase) params.set("db", selectedDatabase);
-    if (selectedTable) params.set("table", selectedTable);
-    if (appliedFilter) params.set("filter", appliedFilter);
+    if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+    urlSyncTimerRef.current = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (selectedDatabase) params.set("db", selectedDatabase);
+      if (selectedTable) params.set("table", selectedTable);
+      if (appliedFilter) params.set("filter", appliedFilter);
 
-    if (flexibleRange.type === "relative") {
-      const rangeKey = flexibleRange.from.replace("now-", "");
-      params.set("t", rangeKey);
-    } else {
-      params.set("start", flexibleRange.from);
-      if (flexibleRange.to !== "now") {
-        params.set("end", flexibleRange.to);
+      if (flexibleRange.type === "relative") {
+        const rangeKey = flexibleRange.from.replace("now-", "");
+        params.set("t", rangeKey);
+      } else {
+        params.set("start", flexibleRange.from);
+        if (flexibleRange.to !== "now") {
+          params.set("end", flexibleRange.to);
+        }
       }
-    }
 
-    if (page > 1) params.set("page", String(page));
+      if (page > 1) params.set("page", String(page));
 
-    const newSearch = params.toString();
-    const currentSearch = searchParams.toString();
-    if (newSearch !== currentSearch) {
-      router.replace(`${pathname}?${newSearch}`, { scroll: false });
-    }
+      const newSearch = params.toString();
+      const currentSearch = searchParams.toString();
+      if (newSearch !== currentSearch) {
+        router.replace(`${pathname}?${newSearch}`, { scroll: false });
+      }
+    }, 300);
+
+    return () => {
+      if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+    };
   }, [
     selectedDatabase,
     selectedTable,

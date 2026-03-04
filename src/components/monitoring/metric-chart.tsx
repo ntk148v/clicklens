@@ -132,8 +132,7 @@ export function MetricChart({
   const id = useId();
   const gradientId = `gradient-${id}`;
 
-  // Format value - use bytes formatting if isBytes is true
-  const formatValue = (value: number): string => {
+  const formatValue = useCallback((value: number): string => {
     if (value == null || !isFinite(value)) return "0";
 
     if (isBytes) {
@@ -144,13 +143,12 @@ export function MetricChart({
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
     if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
 
-    // For small numbers that are not integers (like 0.5), show decimal places
     if (!Number.isInteger(value) && value < 10) {
       return value.toFixed(2);
     }
 
     return value.toFixed(0);
-  };
+  }, [isBytes]);
 
   // Precompute which datapoint indices should show a date label
   const dateIndices = useMemo(() => buildDateIndices(data), [data]);

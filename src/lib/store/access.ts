@@ -45,30 +45,28 @@ export const useAccessStore = create<AccessState>()((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [usersRes, rolesRes, grantsRes, roleGrantsRes] = await Promise.all([
-        fetch("/api/clickhouse/access/users"),
-        fetch("/api/clickhouse/access/roles"),
-        fetch("/api/clickhouse/access/grants"),
-        fetch("/api/clickhouse/access/role-grants"),
+      const results = await Promise.allSettled([
+        fetch("/api/clickhouse/access/users").then((r) => r.json()),
+        fetch("/api/clickhouse/access/roles").then((r) => r.json()),
+        fetch("/api/clickhouse/access/grants").then((r) => r.json()),
+        fetch("/api/clickhouse/access/role-grants").then((r) => r.json()),
       ]);
 
-      const [usersData, rolesData, grantsData, roleGrantsData] =
-        await Promise.all([
-          usersRes.json(),
-          rolesRes.json(),
-          grantsRes.json(),
-          roleGrantsRes.json(),
-        ]);
+      const [usersResult, rolesResult, grantsResult, roleGrantsResult] = results;
+      const usersData = usersResult.status === "fulfilled" ? usersResult.value : null;
+      const rolesData = rolesResult.status === "fulfilled" ? rolesResult.value : null;
+      const grantsData = grantsResult.status === "fulfilled" ? grantsResult.value : null;
+      const roleGrantsData = roleGrantsResult.status === "fulfilled" ? roleGrantsResult.value : null;
 
-      if (!usersData.success) {
-        throw new Error(usersData.error || "Failed to fetch users");
+      if (!usersData?.success) {
+        throw new Error(usersData?.error || "Failed to fetch users");
       }
 
       set({
         users: usersData.data || [],
-        roles: rolesData.success ? rolesData.data || [] : [],
-        grants: grantsData.success ? grantsData.data || [] : [],
-        roleGrants: roleGrantsData.success ? roleGrantsData.data || [] : [],
+        roles: rolesData?.success ? rolesData.data || [] : [],
+        grants: grantsData?.success ? grantsData.data || [] : [],
+        roleGrants: roleGrantsData?.success ? roleGrantsData.data || [] : [],
         loading: false,
         error: null,
         lastFetched: Date.now(),

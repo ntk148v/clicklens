@@ -3,19 +3,15 @@
  */
 import { ClickHouseClient } from "./clients/types";
 
-// Cache the cluster name to avoid repeated queries
-// Global cache is safe as we're in a server-side context where
-// the application instance is long-lived or per-request
-let cachedClusterName: string | undefined | null = null;
+const CLUSTER_CACHE_TTL_MS = 5 * 60 * 1000;
 
-/**
- * Get the name of the first available cluster
- * Returns undefined if no cluster is found (single node setup)
- */
+let cachedClusterName: string | undefined | null = null;
+let cachedAt = 0;
+
 export async function getClusterName(
   client: ClickHouseClient,
 ): Promise<string | undefined> {
-  if (cachedClusterName !== null) {
+  if (cachedClusterName !== null && Date.now() - cachedAt < CLUSTER_CACHE_TTL_MS) {
     return cachedClusterName || undefined;
   }
 
@@ -30,11 +26,13 @@ export async function getClusterName(
     if (response.data && response.data.length > 0) {
       cachedClusterName = response.data[0].cluster;
     } else {
-      cachedClusterName = undefined; // No cluster found (single node)
+      cachedClusterName = undefined;
     }
+    cachedAt = Date.now();
   } catch (error) {
     console.warn("Failed to detect cluster name:", error);
     cachedClusterName = undefined;
+    cachedAt = Date.now();
   }
 
   return cachedClusterName || undefined;
@@ -46,4 +44,5 @@ export async function getClusterName(
  */
 export function resetClusterCache() {
   cachedClusterName = null;
+  cachedAt = 0;
 }
