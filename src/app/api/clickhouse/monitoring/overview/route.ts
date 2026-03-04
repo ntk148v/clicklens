@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { monitoringCache } from "@/lib/cache";
+
 import {
   OVERVIEW_QUERY,
   QUERY_METRICS_QUERY,
@@ -189,6 +191,21 @@ export async function GET(
       clusterName = await getClusterName(client);
     }
 
+    // Cache check: key includes timeRange and cluster for overview data
+    const cacheKey = `overview:${timeRange}:${clusterName ?? "_single"}`;
+    const cached = monitoringCache.get(cacheKey);
+    if (cached) {
+      const resp = NextResponse.json({
+        success: true,
+        data: cached,
+      } as MonitoringApiResponse<DashboardOverview>);
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=10, stale-while-revalidate=30",
+      );
+      return resp;
+    }
+
     // Fetch cluster summary if we have a cluster
     let clusterSummary: ClusterSummaryRow | null = null;
     if (clusterName) {
@@ -341,10 +358,16 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({
+    monitoringCache.set(cacheKey, dashboard);
+    const resp = NextResponse.json({
       success: true,
       data: dashboard,
     });
+    resp.headers.set(
+      "Cache-Control",
+      "public, s-maxage=10, stale-while-revalidate=30",
+    );
+    return resp;
   } catch (error) {
     console.error("Monitoring overview error:", error);
 

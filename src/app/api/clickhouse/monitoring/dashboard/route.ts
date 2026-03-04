@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
+import { monitoringCache } from "@/lib/cache";
 import {
   MonitoringService,
   type DashboardResponse,
@@ -9,7 +10,6 @@ import {
   successResponse,
   errorResponse,
   unauthorizedResponse,
-  type ApiResponse,
 } from "@/lib/api-response";
 
 export async function GET(request: NextRequest) {
@@ -30,12 +30,28 @@ export async function GET(request: NextRequest) {
     const timeRangeParam = searchParams.get("timeRange");
     const timeRange = timeRangeParam ? parseInt(timeRangeParam, 10) : 60;
 
+    // Only cache non-incremental (full) requests.
+    // Incremental updates (minTime present) must always be fresh.
+    const isIncremental = !!minTime;
+    const cacheKey = `dashboard:${timeRange}:${from ?? "_"}:${to ?? "_"}`;
+
+    if (!isIncremental) {
+      const cached = monitoringCache.get(cacheKey);
+      if (cached) {
+        return successResponse(cached as DashboardResponse);
+      }
+    }
+
     const data = await service.getDashboardData({
       from,
       to,
       timeRange,
       minTime,
     });
+
+    if (!isIncremental) {
+      monitoringCache.set(cacheKey, data);
+    }
 
     return successResponse(data);
   } catch (error) {

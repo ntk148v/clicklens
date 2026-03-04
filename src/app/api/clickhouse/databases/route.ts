@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
+import { metadataCache } from "@/lib/cache";
 import {
   createClient,
   getLensConfig,
@@ -72,6 +73,20 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
         success: true,
         data: [{ name: "default" }],
       });
+    }
+
+    // Cache key includes username for per-user RBAC filtering
+    const cacheKey = `databases:${session.user.username}`;
+    const cachedData = metadataCache.get(cacheKey) as
+      | Array<{ name: string }>
+      | undefined;
+    if (cachedData) {
+      const resp = NextResponse.json({ success: true, data: cachedData });
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=30, stale-while-revalidate=60",
+      );
+      return resp;
     }
 
     const client = createClient(lensConfig);
@@ -186,10 +201,16 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
         }
       }
 
-      return NextResponse.json({
+      metadataCache.set(cacheKey, resultData);
+      const resp = NextResponse.json({
         success: true,
         data: resultData,
       });
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=30, stale-while-revalidate=60",
+      );
+      return resp;
     } catch (error) {
       console.error("Grants query failed:", error);
 

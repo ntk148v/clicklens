@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { metadataCache } from "@/lib/cache";
 import {
   createClient,
   getLensConfig,
@@ -114,6 +115,21 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
+    // Cache key includes database and table
+    const cacheKey = `columns:${database}:${table}`;
+    const cachedData = metadataCache.get(cacheKey);
+    if (cachedData) {
+      const resp = NextResponse.json({
+        success: true,
+        data: cachedData,
+      } as ColumnsResponse);
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=30, stale-while-revalidate=60",
+      );
+      return resp;
+    }
+
     const result = await client.query<ColumnStats>(`
       SELECT
         column,
@@ -172,13 +188,21 @@ export async function GET(
         summary.total_compressed / summary.total_uncompressed;
     }
 
-    return NextResponse.json({
+    const responseData = {
+      columns,
+      summary,
+    };
+
+    metadataCache.set(cacheKey, responseData);
+    const resp = NextResponse.json({
       success: true,
-      data: {
-        columns,
-        summary,
-      },
+      data: responseData,
     });
+    resp.headers.set(
+      "Cache-Control",
+      "public, s-maxage=30, stale-while-revalidate=60",
+    );
+    return resp;
   } catch (error) {
     console.error("Table columns error:", error);
 

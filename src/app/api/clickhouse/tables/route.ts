@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
+import { metadataCache } from "@/lib/cache";
 import {
   createClient,
   getLensConfig,
@@ -88,6 +89,18 @@ export async function GET(
         success: true,
         data: [],
       });
+    }
+
+    // Cache key includes username + database for per-user RBAC filtering
+    const cacheKey = `tables:${session.user.username}:${database ?? "_all"}`;
+    const cachedData = metadataCache.get(cacheKey) as TableInfo[] | undefined;
+    if (cachedData) {
+      const resp = NextResponse.json({ success: true, data: cachedData });
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=30, stale-while-revalidate=60",
+      );
+      return resp;
     }
 
     const client = createClient(lensConfig);
@@ -262,10 +275,16 @@ export async function GET(
         }
       }
 
-      return NextResponse.json({
+      metadataCache.set(cacheKey, resultData);
+      const resp = NextResponse.json({
         success: true,
         data: resultData,
       });
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=30, stale-while-revalidate=60",
+      );
+      return resp;
     } catch (error) {
       console.error("Table permission check failed:", error);
 
