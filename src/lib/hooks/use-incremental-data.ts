@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 
 /**
  * Configuration for incremental data fetching
@@ -81,21 +81,22 @@ export function useIncrementalData<
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track the newest timestamp for incremental fetching
+  // Stabilize params: use a serialized key for dependency arrays, ref for actual value
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const paramsKey = useMemo(() => JSON.stringify(params), [JSON.stringify(params)]);
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   const newestTimestampRef = useRef<string | null>(null);
 
-  /**
-   * Full reload - clears existing data and fetches fresh
-   */
   const reload = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const items = await fetchFn(params);
+      const items = await fetchFn(paramsRef.current);
       setData(items);
 
-      // Update newest timestamp
       if (items.length > 0) {
         newestTimestampRef.current = getTimestamp(items[0]);
       } else {
@@ -106,13 +107,10 @@ export function useIncrementalData<
     } finally {
       setIsLoading(false);
     }
-  }, [fetchFn, params, getTimestamp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchFn, paramsKey, getTimestamp]);
 
-  /**
-   * Incremental fetch - only gets new data and prepends
-   */
   const fetchNew = useCallback(async () => {
-    // If no existing data, do a full reload
     if (!newestTimestampRef.current) {
       return reload();
     }
@@ -121,12 +119,11 @@ export function useIncrementalData<
 
     try {
       const items = await fetchFn({
-        ...params,
+        ...paramsRef.current,
         sinceTimestamp: newestTimestampRef.current,
       });
 
       if (items.length > 0) {
-        // Deduplicate and prepend, respecting the limit
         setData((prev) => {
           const existingKeys = new Set(prev.map(getKey));
           const uniqueNew = items.filter(
@@ -136,16 +133,15 @@ export function useIncrementalData<
           return merged.slice(0, limit);
         });
 
-        // Update newest timestamp
         newestTimestampRef.current = getTimestamp(items[0]);
       }
     } catch (err) {
       console.error("Failed to fetch new data:", err);
-      // Don't set error for incremental fetch - keep showing existing data
     } finally {
       setIsLoading(false);
     }
-  }, [fetchFn, params, getTimestamp, getKey, reload, limit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchFn, paramsKey, getTimestamp, getKey, reload, limit]);
 
   /**
    * Clear all data

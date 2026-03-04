@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export interface ClickHouseSetting {
   name: string;
@@ -23,6 +23,8 @@ interface UseSettingsResponse {
 
 export type SettingsScope = "session" | "server";
 
+const SEARCH_DEBOUNCE_MS = 350;
+
 export function useSettings(
   search: string = "",
   scope: SettingsScope = "session"
@@ -30,6 +32,18 @@ export function useSettings(
   const [settings, setSettings] = useState<ClickHouseSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -37,7 +51,7 @@ export function useSettings(
     try {
       const response = await fetch(
         `/api/clickhouse/settings?search=${encodeURIComponent(
-          search
+          debouncedSearch
         )}&scope=${scope}`
       );
       const data = await response.json();
@@ -52,7 +66,7 @@ export function useSettings(
     } finally {
       setIsLoading(false);
     }
-  }, [search, scope]);
+  }, [debouncedSearch, scope]);
 
   useEffect(() => {
     fetchData();
