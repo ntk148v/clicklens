@@ -85,7 +85,52 @@ describe("MonitoringService", () => {
       if (query.includes("(SELECT version()) AS version"))
         return Promise.resolve({ data: mockOverview });
 
-      // Default time series data
+      if (query.includes("asynchronous_metric_log")) {
+        return Promise.resolve({
+          data: [
+            {
+              t: "2023-01-01T00:00:00Z",
+              node: "node1",
+              metric_name: "cpu_user",
+              value: 45,
+            },
+            {
+              t: "2023-01-01T00:00:00Z",
+              node: "node1",
+              metric_name: "max_parts",
+              value: 10,
+            },
+          ],
+        });
+      }
+
+      if (
+        query.includes("system', '^metric_log'") ||
+        query.includes("FROM merge('system', '^metric_log')")
+      ) {
+        return Promise.resolve({
+          data: [
+            {
+              t: "2023-01-01T00:00:00Z",
+              node: "node1",
+              queries_per_sec: 100,
+              queries_running: 10,
+              merges_running: 2,
+              selected_rows: 1000,
+              inserted_rows: 500,
+              selected_bytes: 10240,
+              inserted_bytes: 5120,
+              memory_tracking: 2048,
+              io_wait: 5,
+              network_connections: 50,
+              disk_read: 100,
+              disk_write: 200,
+            },
+          ],
+        });
+      }
+
+      // Default time series data (just in case)
       return Promise.resolve({ data: mockTimeSeries });
     });
 

@@ -175,19 +175,30 @@ export class MonitoringService {
       curr: TimeSeriesPoint[],
       inc: TimeSeriesPoint[],
     ): TimeSeriesPoint[] => {
-      if (!inc || inc.length === 0) return curr;
+      if (!curr?.length) return inc || [];
+      if (!inc?.length) return curr || [];
 
-      // Create a map of existing points for O(1) lookup
-      // Key: timestamp + node
-      const map = new Map<string, TimeSeriesPoint>();
-      curr.forEach((p) => map.set(`${p.t}-${p.node}`, p));
+      // Fast path: If incoming is completely newer, just concat
+      // (Assumes data from ClickHouse is already sorted by time)
+      if (curr[curr.length - 1].t < inc[0].t) {
+        return curr.concat(inc);
+      }
 
-      // Add/Update with incoming points
-      inc.forEach((p) => map.set(`${p.t}-${p.node}`, p));
+      // Merge with dictionary (faster allocation than Map for strings)
+      const dict: Record<string, TimeSeriesPoint> = {};
 
-      // Convert back to array and sort
-      return Array.from(map.values()).sort(
-        (a, b) => new Date(a.t).getTime() - new Date(b.t).getTime(),
+      for (let i = 0; i < curr.length; i++) {
+        const p = curr[i];
+        dict[`${p.t}-${p.node}`] = p;
+      }
+      for (let i = 0; i < inc.length; i++) {
+        const p = inc[i];
+        dict[`${p.t}-${p.node}`] = p;
+      }
+
+      // Sort by ISO string lexicographically instead of expensive new Date()
+      return Object.values(dict).sort((a, b) =>
+        a.t < b.t ? -1 : a.t > b.t ? 1 : 0,
       );
     };
 
