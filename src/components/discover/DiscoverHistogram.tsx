@@ -68,15 +68,25 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
           hour12: false,
         });
 
-        if (data.length > 0) {
-          const start = new Date(data[0].time);
-          const end = new Date(data[data.length - 1].time);
-          const diffHours =
-            Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
 
-          if (diffHours > 24) {
-            return `${date.getMonth() + 1}/${date.getDate()} ${timeStr}`;
+        if (data.length <= 1) {
+          return `${dateStr} ${timeStr}`;
+        }
+
+        const start = new Date(data[0].time);
+        const end = new Date(data[data.length - 1].time);
+
+        if (
+          start.getFullYear() !== end.getFullYear() ||
+          start.getMonth() !== end.getMonth() ||
+          start.getDate() !== end.getDate() ||
+          end.getTime() - start.getTime() >= 24 * 60 * 60 * 1000
+        ) {
+          if (intervalMs >= 23 * 60 * 60 * 1000) {
+            return dateStr;
           }
+          return `${dateStr} ${timeStr}`;
         }
 
         return timeStr;
@@ -84,7 +94,7 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
         return time;
       }
     },
-    [data],
+    [data, intervalMs],
   );
 
   const handleBarClick = useCallback(
@@ -218,7 +228,20 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
               fontSize: "12px",
               borderRadius: "6px",
             }}
-            labelFormatter={(label) => formatDate(String(label))}
+            labelFormatter={(label) => {
+              const d = new Date(String(label));
+              if (!isNaN(d.getTime())) {
+                return d.toLocaleString([], {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                });
+              }
+              return String(label);
+            }}
             cursor={{ fill: "transparent" }}
           />
           <Bar

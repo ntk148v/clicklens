@@ -219,7 +219,13 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       JSON.stringify(last.columns) !== JSON.stringify(selectedColumns) ||
       last.timeColumn !== selectedTimeColumn
     );
-  }, [customFilter, flexibleRange, selectedColumns, selectedTimeColumn, schema]);
+  }, [
+    customFilter,
+    flexibleRange,
+    selectedColumns,
+    selectedTimeColumn,
+    schema,
+  ]);
 
   // Derived min/max times
   const { activeMinTime, activeMaxTime } = useMemo(() => {
@@ -243,7 +249,12 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     (cols: string[]) => {
       setSelectedColumnsRaw(cols);
       if (selectedDatabase && selectedTable) {
-        saveColumnPrefs(selectedDatabase, selectedTable, cols, selectedTimeColumn);
+        saveColumnPrefs(
+          selectedDatabase,
+          selectedTable,
+          cols,
+          selectedTimeColumn,
+        );
       }
     },
     [selectedDatabase, selectedTable, selectedTimeColumn],
@@ -511,9 +522,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
   const buildFilterClause = useCallback(
     (column: string, value: unknown, operator: "=" | "!="): string => {
       if (value === null || value === undefined) {
-        return operator === "="
-          ? `${column} IS NULL`
-          : `${column} IS NOT NULL`;
+        return operator === "=" ? `${column} IS NULL` : `${column} IS NOT NULL`;
       }
       if (typeof value === "number" || typeof value === "boolean") {
         return `${column} ${operator} ${value}`;
@@ -748,18 +757,41 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     }
 
     function setDefaultTimeColumn(tableSchema: TableSchema) {
+      // Prioritize DateTime/DateTime64 over Date/Date32 for the default time column
+      // if multiple primary time columns exist, to enable granular histograms.
+      const primaryDateTime = tableSchema.timeColumns.find(
+        (tc: TimeColumnCandidate) =>
+          tc.isPrimary &&
+          (tc.type.startsWith("DateTime") || tc.type.startsWith("DateTime64")),
+      );
+      if (primaryDateTime) {
+        setSelectedTimeColumnRaw(primaryDateTime.name);
+        return;
+      }
+
       const primary = tableSchema.timeColumns.find(
         (tc: TimeColumnCandidate) => tc.isPrimary,
       );
       if (primary) {
         setSelectedTimeColumnRaw(primary.name);
-      } else if (tableSchema.timeColumns.length > 0) {
+        return;
+      }
+
+      const anyDateTime = tableSchema.timeColumns.find(
+        (tc: TimeColumnCandidate) =>
+          tc.type.startsWith("DateTime") || tc.type.startsWith("DateTime64"),
+      );
+      if (anyDateTime) {
+        setSelectedTimeColumnRaw(anyDateTime.name);
+        return;
+      }
+
+      if (tableSchema.timeColumns.length > 0) {
         setSelectedTimeColumnRaw(tableSchema.timeColumns[0].name);
       } else {
         setSelectedTimeColumnRaw("");
       }
     }
-     
   }, [selectedDatabase, selectedTable]);
 
   // Fetch data when deps change
