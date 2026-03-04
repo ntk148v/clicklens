@@ -72,10 +72,26 @@ export async function POST(
 
     const body: LoginRequest = await request.json();
 
-    // Validate required fields
     if (!body.username) {
       return NextResponse.json(
         { success: false, error: "Username is required" },
+        { status: 400 },
+      );
+    }
+
+    const MAX_USERNAME_LENGTH = 256;
+    const MAX_PASSWORD_LENGTH = 1024;
+
+    if (body.username.length > MAX_USERNAME_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "Username is too long" },
+        { status: 400 },
+      );
+    }
+
+    if (body.password && body.password.length > MAX_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "Password is too long" },
         { status: 400 },
       );
     }

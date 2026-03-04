@@ -30,9 +30,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
+    const MIN_PASSWORD_LENGTH = 8;
+
     if (!newPassword) {
       return NextResponse.json(
         { success: false, error: "New password is required" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
         { status: 400 },
       );
     }

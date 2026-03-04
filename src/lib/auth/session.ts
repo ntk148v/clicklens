@@ -69,17 +69,7 @@ export const sessionOptions: SessionOptions = {
   password: getSessionSecret(),
   cookieName: "clicklens-session",
   cookieOptions: {
-    // secure: true in production, unless disabled explicitly (e.g. for non-https deployments)
-    secure:
-      process.env.NODE_ENV === "production" &&
-      process.env.DISABLE_SECURE_COOKIES !== "true"
-        ? true
-        : (process.env.NODE_ENV === "production" &&
-            console.warn(
-              "\x1b[33m%s\x1b[0m",
-              "[Security Warning] Secure cookies disabled in production (DISABLE_SECURE_COOKIES=true)",
-            ),
-          false),
+    secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     sameSite: "lax",
     // Align with server-side session store TTL (24 hours in storage.ts)

@@ -111,6 +111,12 @@ export class ClickHouseClientImpl implements ClickHouseClient {
   }
 
   async explain(sql: string): Promise<string[]> {
+    // Only allow EXPLAIN on read-only statements to prevent injection
+    const stripped = sql.replace(/(?:\/\*[\s\S]*?\*\/|--[^\n]*\n?|\s+)/g, " ").trim();
+    const firstWord = stripped.split(/\s/)[0]?.toUpperCase();
+    if (!["SELECT", "WITH", "SHOW", "DESCRIBE", "DESC"].includes(firstWord || "")) {
+      throw new Error(`EXPLAIN is only supported for read-only statements, got: ${firstWord}`);
+    }
     const result = await this.query<{ explain: string }>(`EXPLAIN ${sql}`);
     return result.data.map((row) => row.explain);
   }

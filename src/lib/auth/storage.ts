@@ -32,10 +32,16 @@ interface SessionEntry {
 const ALGORITHM = "aes-256-gcm";
 
 function getSecretKey(): Buffer {
-  const secret =
-    process.env.SESSION_SECRET ||
-    "development_fallback_secret_at_least_32_characters_long";
-  return crypto.createHash("sha256").update(secret).digest();
+  const secret = process.env.SESSION_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET is required in production for server-side session encryption.",
+    );
+  }
+  return crypto
+    .createHash("sha256")
+    .update(secret || "development_fallback_secret_at_least_32_characters_long")
+    .digest();
 }
 
 function encryptPassword(password: string): EncryptedPassword {
@@ -127,8 +133,8 @@ export function getSessionUser(sessionId?: string): UserSession | null {
   try {
     const password = decryptPassword(entry.encryptedPassword);
     return { ...entry.user, password };
-  } catch (err) {
-    console.error("Failed to decrypt session password:", err);
+  } catch {
+    console.error("Failed to decrypt session password for session:", sessionId);
     sessionStore.delete(sessionId);
     return null;
   }
