@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { getTableEngine } from "@/lib/clickhouse/schema";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 
 const MAX_VALUES = 10;
@@ -48,9 +49,13 @@ export async function GET(request: Request) {
     const quotedTable = quoteIdentifier(table);
     const quotedCol = quoteIdentifier(column);
 
-    const tableSource = clusterName
-      ? `clusterAllReplicas('${escapeSqlString(clusterName)}', ${quotedDb}.${quotedTable})`
-      : `${quotedDb}.${quotedTable}`;
+    const engine = await getTableEngine(client, database, table);
+    const isDistributed = engine === "Distributed" || engine === "Dictionary";
+
+    const tableSource =
+      clusterName && !isDistributed
+        ? `clusterAllReplicas('${escapeSqlString(clusterName)}', ${quotedDb}.${quotedTable})`
+        : `${quotedDb}.${quotedTable}`;
 
     const whereConds: string[] = [];
 
@@ -87,10 +92,7 @@ export async function GET(request: Request) {
     const query = `SELECT ${quotedCol} AS value, count() AS count FROM ${tableSource} ${whereClause} GROUP BY value ORDER BY count DESC LIMIT ${MAX_VALUES}`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      QUERY_TIMEOUT_MS,
-    );
+    const timeout = setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
 
     try {
       const result = await client.query(query);
@@ -121,8 +123,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error ? error.message : "Internal Server Error",
+        error: error instanceof Error ? error.message : "Internal Server Error",
       },
       { status: 500 },
     );

@@ -91,6 +91,11 @@ describe("Discover API Route", () => {
   });
 
   it("should stream data correctly", async () => {
+    // Mock getTableEngine
+    mockQuery.mockResolvedValueOnce({
+      data: [{ engine: "MergeTree" }],
+    });
+
     // Mock metadata query response (count)
     mockQuery.mockResolvedValueOnce({
       data: [{ cnt: 100 }],
@@ -130,6 +135,11 @@ describe("Discover API Route", () => {
   });
 
   it("should handle Smart Search parameters", async () => {
+    // Mock getTableEngine
+    mockQuery.mockResolvedValueOnce({
+      data: [{ engine: "MergeTree" }],
+    });
+
     // Mock columns fetch for smart search
     mockQuery.mockResolvedValueOnce({
       data: [

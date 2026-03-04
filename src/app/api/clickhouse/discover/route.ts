@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { getTableEngine } from "@/lib/clickhouse/schema";
 import {
   buildSmartSearchCondition,
   ColumnDefinition,
@@ -83,9 +84,14 @@ export async function GET(request: Request) {
     const quotedTable = quoteIdentifier(table);
     const safeDbStr = escapeSqlString(database);
     const safeTableStr = escapeSqlString(table);
-    const tableSource = clusterName
-      ? `clusterAllReplicas('${escapeSqlString(clusterName)}', ${quotedDb}.${quotedTable})`
-      : `${quotedDb}.${quotedTable}`;
+
+    const engine = await getTableEngine(client, database, table);
+    const isDistributed = engine === "Distributed" || engine === "Dictionary";
+
+    const tableSource =
+      clusterName && !isDistributed
+        ? `clusterAllReplicas('${escapeSqlString(clusterName)}', ${quotedDb}.${quotedTable})`
+        : `${quotedDb}.${quotedTable}`;
 
     if (mode === "histogram") {
       if (!timeColumn)
