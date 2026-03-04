@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // Types
 import type { RunningQuery } from "@/app/api/clickhouse/queries/running/route";
@@ -9,7 +9,7 @@ import type { ExpensiveQuery } from "@/app/api/clickhouse/queries/analytics/rout
 import type { QueryCacheEntry } from "@/app/api/clickhouse/queries/cache/route";
 
 // =============================================================================
-// Generic fetcher hook
+// Generic fetcher hook with AbortController and visibility handling
 // =============================================================================
 
 interface UseQueryDataOptions {
@@ -33,15 +33,21 @@ function useQueryData<T>(
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!enabled) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, { signal: controller.signal });
       const result = await response.json();
 
       if (result.success && result.data) {
@@ -50,6 +56,7 @@ function useQueryData<T>(
         setError(result.error.userMessage || result.error.message);
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setIsLoading(false);
@@ -60,11 +67,19 @@ function useQueryData<T>(
     fetchData();
   }, [fetchData]);
 
-  // Auto-refresh
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   useEffect(() => {
     if (refreshInterval <= 0 || !enabled) return;
 
-    const interval = window.setInterval(fetchData, refreshInterval);
+    const interval = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchData();
+    }, refreshInterval);
     return () => window.clearInterval(interval);
   }, [refreshInterval, fetchData, enabled]);
 

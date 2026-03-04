@@ -122,16 +122,20 @@ describe("Discover API Route", () => {
     const result = await consumeStream(res);
 
     const lines = result.split("\n").filter(Boolean);
-    if (lines.length !== 3) {
+    // Preliminary meta (-1) + 2 rows + trailing meta (resolved count)
+    if (lines.length !== 4) {
       console.error("Stream Failed. Lines:", JSON.stringify(lines, null, 2));
     }
-    expect(lines.length).toBe(3); // Meta + 2 rows
+    expect(lines.length).toBe(4);
 
-    const meta = JSON.parse(lines[0]);
-    expect(meta.meta.totalHits).toBe(100);
+    const prelimMeta = JSON.parse(lines[0]);
+    expect(prelimMeta.meta.totalHits).toBe(-1);
 
     const row1 = JSON.parse(lines[1]);
     expect(row1.message).toBe("Error 1");
+
+    const trailingMeta = JSON.parse(lines[3]);
+    expect(trailingMeta.meta.totalHits).toBe(100);
   });
 
   it("should handle Smart Search parameters", async () => {

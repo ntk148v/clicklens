@@ -90,21 +90,26 @@ export async function* fetchChunks({
     );
   }
 
-  // First yield metadata
-  let totalHits = 0;
-  try {
-    const countQuery = `SELECT count() as cnt FROM ${tableSource} ${
-      whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : ""
-    }`;
-    const countRes = await client.query(countQuery);
-    // wrapper returns { data: [...] } where data is array of objects
-    // data[0] should be { cnt: ... }
-    totalHits = Number(countRes.data[0]?.cnt) || 0;
-  } catch (e) {
-    console.error("Count query failed", e);
-  }
+  // Run count query in parallel with the first data chunk to avoid waterfall
+  const countWhereClause =
+    whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+  const countPromise = client
+    .query(`SELECT count() as cnt FROM ${tableSource} ${countWhereClause}`)
+    .then((res) => Number(res.data[0]?.cnt) || 0)
+    .catch((e) => {
+      console.error("Count query failed", e);
+      return 0;
+    });
 
-  yield JSON.stringify({ meta: { totalHits } }) + "\n";
+  // Yield a preliminary meta (totalHits will be updated when count finishes)
+  let countResolved = false;
+  let totalHits = 0;
+  countPromise.then((count) => {
+    totalHits = count;
+    countResolved = true;
+  });
+
+  yield JSON.stringify({ meta: { totalHits: -1 } }) + "\n";
 
   while (hasMoreChunks && rowsFetched < limit) {
     const currentLow = Math.max(Start, currentHigh - ChunkSize);
@@ -166,4 +171,10 @@ export async function* fetchChunks({
     }
     currentHigh = currentLow;
   }
+
+  // Emit resolved count as a trailing metadata update
+  if (!countResolved) {
+    totalHits = await countPromise;
+  }
+  yield JSON.stringify({ meta: { totalHits } }) + "\n";
 }

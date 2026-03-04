@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchClient } from "@/lib/api/client";
 
 // =============================================================================
@@ -54,8 +54,11 @@ export function useSystemLogs(filters: LogFilters = {}): UseLogsResult {
   const [data, setData] = useState<LogsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fetchIdRef = useRef(0);
 
   const fetchData = useCallback(async () => {
+    const currentFetchId = ++fetchIdRef.current;
+
     try {
       setIsLoading(true);
       setError(null);
@@ -71,18 +74,22 @@ export function useSystemLogs(filters: LogFilters = {}): UseLogsResult {
       if (filters.maxTime) params.set("maxTime", filters.maxTime);
       if (filters.mode) params.set("mode", filters.mode);
 
-      const data = await fetchClient<LogsResponse>(
+      const result = await fetchClient<LogsResponse>(
         `/api/clickhouse/logging?${params.toString()}`,
       );
 
-      setData(data);
+      // Only apply result if this is still the latest fetch
+      if (currentFetchId === fetchIdRef.current) {
+        setData(result);
+      }
     } catch (err) {
-      // Errors are already handled by fetchClient (toast + throw)
-      // We just need to capture the message for local state if needed
-      // or let the UI fallback to empty state
-      setError(err instanceof Error ? err.message : "Unknown error");
+      if (currentFetchId === fetchIdRef.current) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+      }
     } finally {
-      setIsLoading(false);
+      if (currentFetchId === fetchIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [
     filters.limit,

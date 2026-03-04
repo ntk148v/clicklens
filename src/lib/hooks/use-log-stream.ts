@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { LogEntry } from "./use-logs";
 
 interface UseLogStreamConfig<P> {
@@ -36,8 +36,13 @@ export function useLogStream<P extends Record<string, unknown>>({
   // Oldest timestamp seen (for History Mode / Cursor)
   const oldestTimestampRef = useRef<string | null>(null);
 
-  // Abort controller to cancel prev requests
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const fetchStream = useCallback(
     async (mode: "initial" | "history" | "live", params: URLSearchParams) => {
