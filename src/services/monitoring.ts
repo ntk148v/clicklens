@@ -1,31 +1,17 @@
 import type { ClickHouseClient } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import {
-  CLUSTERS_LIST_QUERY,
   CLUSTER_SUMMARY_QUERY,
   CLUSTER_NODES_QUERY,
   OVERVIEW_QUERY,
   computeRounding,
-  getDashboardQueriesPerSecQuery,
-  getDashboardQueriesRunningQuery,
-  getDashboardMergesRunningQuery,
-  getDashboardSelectedRowsQuery,
-  getDashboardInsertedRowsQuery,
-  getDashboardMaxPartsQuery,
-  getDashboardMemoryQuery,
-  getDashboardCPUQuery,
-  getDashboardCPUKernelQuery,
-  getDashboardIOWaitQuery,
-  getDashboardFilesystemQuery,
-  getDashboardNetworkQuery,
-  getDashboardNetworkSendQuery,
-  getDashboardNetworkConnectionsQuery,
-  getDashboardSelectedBytesQuery,
-  getDashboardInsertedBytesQuery,
-  getDashboardDiskReadQuery,
-  getDashboardDiskWriteQuery,
-  type DashboardQuery,
 } from "@/lib/clickhouse/monitoring";
+import {
+  getDashboardMetricLogBatchQuery,
+  getDashboardAsyncMetricLogBatchQuery,
+  type MetricLogBatchRow,
+  type AsyncMetricLogBatchRow,
+} from "@/lib/clickhouse/monitoring/batched";
 
 // Types extracted from route.ts
 export interface TimeSeriesPoint {
@@ -314,96 +300,105 @@ export class MonitoringService {
       // Cluster detection failed, continue as single-node
     }
 
-    // Fetch server info
-    const overviewResult = await this.client.query<OverviewRow>(OVERVIEW_QUERY);
+    // Fetch server info + batched metrics in parallel (3 queries instead of 19)
+    const metricLogDq = getDashboardMetricLogBatchQuery(
+      from,
+      to,
+      rounding,
+      clusterName,
+    );
+    const asyncMetricLogDq = getDashboardAsyncMetricLogBatchQuery(
+      from,
+      to,
+      rounding,
+      clusterName,
+    );
+
+    const [overviewResult, metricLogResult, asyncMetricLogResult] =
+      await Promise.all([
+        this.client.query<OverviewRow>(OVERVIEW_QUERY),
+        this.client.query<MetricLogBatchRow>(metricLogDq.query, {
+          query_params: metricLogDq.query_params,
+        }),
+        this.client.query<AsyncMetricLogBatchRow>(asyncMetricLogDq.query, {
+          query_params: asyncMetricLogDq.query_params,
+        }),
+      ]);
+
     const overview = overviewResult.data[0];
 
-    // Helper to execute a DashboardQuery with typed query_params
-    const execDashboardQuery = (dq: DashboardQuery) =>
-      this.client.query<TimeSeriesPoint>(dq.query, {
-        query_params: dq.query_params,
-      });
+    // --- Parse metric_log batch into individual TimeSeriesPoint[] arrays ---
+    const queriesPerSec: TimeSeriesPoint[] = [];
+    const queriesRunning: TimeSeriesPoint[] = [];
+    const mergesRunning: TimeSeriesPoint[] = [];
+    const selectedRows: TimeSeriesPoint[] = [];
+    const insertedRows: TimeSeriesPoint[] = [];
+    const selectedBytes: TimeSeriesPoint[] = [];
+    const insertedBytes: TimeSeriesPoint[] = [];
+    const memoryTracked: TimeSeriesPoint[] = [];
+    const ioWait: TimeSeriesPoint[] = [];
+    const networkConnections: TimeSeriesPoint[] = [];
+    const diskRead: TimeSeriesPoint[] = [];
+    const diskWrite: TimeSeriesPoint[] = [];
 
-    // Fetch all dashboard metrics in parallel
-    const [
-      queriesPerSecResult,
-      queriesRunningResult,
-      mergesRunningResult,
-      selectedRowsResult,
-      insertedRowsResult,
-      selectedBytesResult,
-      insertedBytesResult,
-      maxPartsResult,
-      memoryResult,
-      cpuResult,
-      cpuKernelResult,
-      ioWaitResult,
-      filesystemResult,
-      networkResult,
-      networkSendResult,
-      networkConnectionsResult,
-      diskReadResult,
-      diskWriteResult,
-    ] = await Promise.all([
-      execDashboardQuery(
-        getDashboardQueriesPerSecQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardQueriesRunningQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardMergesRunningQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardSelectedRowsQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardInsertedRowsQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardSelectedBytesQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardInsertedBytesQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardMaxPartsQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardMemoryQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(getDashboardCPUQuery(from, to, rounding, clusterName)),
-      execDashboardQuery(
-        getDashboardCPUKernelQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardIOWaitQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardFilesystemQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardNetworkQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardNetworkSendQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardNetworkConnectionsQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardDiskReadQuery(from, to, rounding, clusterName),
-      ),
-      execDashboardQuery(
-        getDashboardDiskWriteQuery(from, to, rounding, clusterName),
-      ),
-    ]);
+    for (const row of metricLogResult.data) {
+      const base = { t: row.t, node: row.node };
+      queriesPerSec.push({ ...base, value: Number(row.queries_per_sec) });
+      queriesRunning.push({ ...base, value: Number(row.queries_running) });
+      mergesRunning.push({ ...base, value: Number(row.merges_running) });
+      selectedRows.push({ ...base, value: Number(row.selected_rows) });
+      insertedRows.push({ ...base, value: Number(row.inserted_rows) });
+      selectedBytes.push({ ...base, value: Number(row.selected_bytes) });
+      insertedBytes.push({ ...base, value: Number(row.inserted_bytes) });
+      memoryTracked.push({ ...base, value: Number(row.memory_tracking) });
+      ioWait.push({ ...base, value: Number(row.io_wait) });
+      networkConnections.push({
+        ...base,
+        value: Number(row.network_connections),
+      });
+      diskRead.push({ ...base, value: Number(row.disk_read) });
+      diskWrite.push({ ...base, value: Number(row.disk_write) });
+    }
+
+    // --- Parse async_metric_log batch into individual TimeSeriesPoint[] arrays ---
+    const maxParts: TimeSeriesPoint[] = [];
+    const cpuUsage: TimeSeriesPoint[] = [];
+    const cpuKernel: TimeSeriesPoint[] = [];
+    const filesystemUsed: TimeSeriesPoint[] = [];
+    const networkReceived: TimeSeriesPoint[] = [];
+    const networkSent: TimeSeriesPoint[] = [];
+
+    for (const row of asyncMetricLogResult.data) {
+      const point: TimeSeriesPoint = {
+        t: row.t,
+        node: row.node,
+        value: Number(row.value),
+      };
+      switch (row.metric_name) {
+        case "max_parts":
+          maxParts.push(point);
+          break;
+        case "cpu_user":
+          cpuUsage.push(point);
+          break;
+        case "cpu_kernel":
+          cpuKernel.push(point);
+          break;
+        case "filesystem":
+          filesystemUsed.push(point);
+          break;
+        case "network_recv":
+          networkReceived.push(point);
+          break;
+        case "network_send":
+          networkSent.push(point);
+          break;
+      }
+    }
 
     // Extract unique node names
     const nodeSet = new Set<string>();
-    [...queriesPerSecResult.data, ...memoryResult.data].forEach((p) =>
-      nodeSet.add(p.node),
-    );
+    [...queriesPerSec, ...memoryTracked].forEach((p) => nodeSet.add(p.node));
     const nodes = Array.from(nodeSet).sort();
 
     // Build response
@@ -414,26 +409,26 @@ export class MonitoringService {
         hostname: nodes[0] || "localhost",
       },
       clickhouse: {
-        queriesPerSec: queriesPerSecResult.data,
-        queriesRunning: queriesRunningResult.data,
-        mergesRunning: mergesRunningResult.data,
-        selectedRowsPerSec: selectedRowsResult.data,
-        insertedRowsPerSec: insertedRowsResult.data,
-        selectedBytesPerSec: selectedBytesResult.data,
-        insertedBytesPerSec: insertedBytesResult.data,
-        maxPartsPerPartition: maxPartsResult.data,
+        queriesPerSec,
+        queriesRunning,
+        mergesRunning,
+        selectedRowsPerSec: selectedRows,
+        insertedRowsPerSec: insertedRows,
+        selectedBytesPerSec: selectedBytes,
+        insertedBytesPerSec: insertedBytes,
+        maxPartsPerPartition: maxParts,
       },
       systemHealth: {
-        memoryTracked: memoryResult.data,
-        cpuUsage: cpuResult.data,
-        cpuKernel: cpuKernelResult.data,
-        ioWait: ioWaitResult.data,
-        filesystemUsed: filesystemResult.data,
-        networkReceived: networkResult.data,
-        networkSent: networkSendResult.data,
-        networkConnections: networkConnectionsResult.data,
-        diskRead: diskReadResult.data,
-        diskWrite: diskWriteResult.data,
+        memoryTracked,
+        cpuUsage,
+        cpuKernel,
+        ioWait,
+        filesystemUsed,
+        networkReceived,
+        networkSent,
+        networkConnections,
+        diskRead,
+        diskWrite,
       },
       nodes,
     };
