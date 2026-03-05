@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
 import { Toaster } from "@/components/ui/toaster";
+import { headers } from "next/headers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,11 +48,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read nonce from the request headers to force dynamic rendering
+  // This ensures Next.js injects the dynamic nonce into inline scripts
+  const headersList = await headers();
+  const nonce = headersList.get("x-nonce") || "";
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body

@@ -69,7 +69,9 @@ export const sessionOptions: SessionOptions = {
   password: getSessionSecret(),
   cookieName: "clicklens-session",
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production",
+    secure:
+      process.env.NODE_ENV === "production" &&
+      process.env.DISABLE_SECURE_COOKIES !== "true",
     httpOnly: true,
     sameSite: "lax",
     // Align with server-side session store TTL (24 hours in storage.ts)

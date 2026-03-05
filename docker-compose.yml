@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/ntk148v/clicklens:latest
+    image: kiennt26/clicklens:latest
     container_name: clicklens
     networks:
       cluster_1S_2R_ch_proxy:
