@@ -83,4 +83,4 @@ tags
 # Persistent undo
 [._]*.un~
 
-.plans/**
+/.plans/
