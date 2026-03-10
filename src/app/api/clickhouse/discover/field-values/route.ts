@@ -4,6 +4,7 @@ import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getTableEngine } from "@/lib/clickhouse/schema";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
+import { getFieldValuesQuery } from "@/lib/clickhouse/queries/discover";
 
 const MAX_VALUES = 10;
 const QUERY_TIMEOUT_MS = 15_000;
@@ -89,7 +90,7 @@ export async function GET(request: Request) {
       ? `WHERE ${whereConds.join(" AND ")}`
       : "";
 
-    const query = `SELECT ${quotedCol} AS value, count() AS count FROM ${tableSource} ${whereClause} GROUP BY value ORDER BY count DESC LIMIT ${MAX_VALUES}`;
+    const query = getFieldValuesQuery(tableSource, quotedCol, whereClause, MAX_VALUES);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);

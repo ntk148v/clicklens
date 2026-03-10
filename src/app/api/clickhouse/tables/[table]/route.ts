@@ -15,6 +15,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getTableStructureQuery } from "@/lib/clickhouse/queries/tables";
 
 interface ColumnInfo {
   name: string;
@@ -107,17 +108,9 @@ export async function GET(
 
       const client = createClient(lensConfig);
 
-      const result = await client.query(`
-        SELECT
-          name,
-          type,
-          default_kind,
-          default_expression,
-          comment
-        FROM system.columns
-        WHERE database = '${safeDatabase}' AND table = '${safeTable}'
-        ORDER BY position
-      `);
+      const result = await client.query(
+        getTableStructureQuery(safeDatabase, safeTable),
+      );
 
       return NextResponse.json({
         success: true,

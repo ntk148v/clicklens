@@ -12,6 +12,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getTableOverviewQuery } from "@/lib/clickhouse/queries/tables";
 
 export interface TableOverview {
   database: string;
@@ -113,23 +114,9 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const result = await client.query<TableOverview>(`
-      SELECT
-        database,
-        name,
-        engine,
-        total_rows,
-        total_bytes,
-        ifNull(total_marks, 0) as total_marks,
-        ifNull(parts, 0) as parts,
-        partition_key,
-        sorting_key,
-        primary_key,
-        sampling_key,
-        create_table_query
-      FROM system.tables
-      WHERE database = '${safeDatabase}' AND name = '${safeTable}'
-    `);
+    const result = await client.query<TableOverview>(
+      getTableOverviewQuery(safeDatabase, safeTable),
+    );
 
     if (result.data.length === 0) {
       return NextResponse.json({

@@ -13,6 +13,7 @@ import {
   FEATURE_ROLE_PREFIX,
   type FeatureRole,
 } from "@/lib/rbac";
+import { getFeatureRolesQuery } from "@/lib/clickhouse/queries/access";
 
 export interface FeatureRolesResponse {
   success: boolean;
@@ -38,11 +39,9 @@ export async function GET(): Promise<NextResponse<FeatureRolesResponse>> {
     const client = createClient(config);
 
     // Check which feature roles exist in ClickHouse
-    const result = await client.query<{ name: string }>(`
-      SELECT name
-      FROM system.roles
-      WHERE name LIKE '${FEATURE_ROLE_PREFIX}%'
-    `);
+    const result = await client.query<{ name: string }>(
+      getFeatureRolesQuery(FEATURE_ROLE_PREFIX),
+    );
 
     const installedRoles = result.data.map((r) => r.name);
 

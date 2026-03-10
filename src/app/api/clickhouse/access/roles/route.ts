@@ -23,6 +23,12 @@ import {
   type DataPrivilege,
   type DataPrivilegeType,
 } from "@/lib/rbac";
+import {
+  ROLES_LIST_QUERY,
+  ROLE_GRANTS_LIST_QUERY,
+  ROLE_PRIVILEGES_QUERY,
+  getRoleInheritedRolesQuery,
+} from "@/lib/clickhouse/queries/access";
 
 export interface RoleWithPrivileges extends SystemRole {
   isFeatureRole: boolean;
@@ -126,35 +132,16 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
     await ensureFeatureRoles(client);
 
     // Get all roles
-    const rolesResult = await client.query<SystemRole>(`
-      SELECT name, id, storage
-      FROM system.roles
-      ORDER BY name
-    `);
+    const rolesResult = await client.query<SystemRole>(ROLES_LIST_QUERY);
 
     // Get role grants (which roles are granted to which roles)
     const roleGrantsResult = await client.query<{
       role_name: string;
       granted_role_name: string;
-    }>(`
-      SELECT role_name, granted_role_name
-      FROM system.role_grants
-    `);
+    }>(ROLE_GRANTS_LIST_QUERY);
 
     // Get privilege grants for all roles
-    const grantsResult = await client.query<SystemGrant>(`
-      SELECT
-        user_name,
-        role_name,
-        access_type,
-        database,
-        table,
-        column,
-        is_partial_revoke,
-        grant_option
-      FROM system.grants
-      WHERE role_name IS NOT NULL
-    `);
+    const grantsResult = await client.query<SystemGrant>(ROLE_PRIVILEGES_QUERY);
 
     // Build role -> inherited roles map
     const roleInheritedMap = new Map<string, string[]>();
@@ -443,11 +430,7 @@ export async function PUT(
     const safeRoleName = escapeSqlString(body.name);
     const currentRoleGrants = await client.query<{
       granted_role_name: string;
-    }>(`
-      SELECT granted_role_name
-      FROM system.role_grants
-      WHERE role_name = '${safeRoleName}'
-    `);
+    }>(getRoleInheritedRolesQuery(safeRoleName));
 
     const currentInherited = currentRoleGrants.data.map(
       (r) => r.granted_role_name,

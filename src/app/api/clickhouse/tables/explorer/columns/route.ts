@@ -13,6 +13,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getColumnStatsQuery, getColumnsFallbackQuery } from "@/lib/clickhouse/queries/tables";
 
 export interface ColumnStats {
   column: string;
@@ -130,41 +131,18 @@ export async function GET(
       return resp;
     }
 
-    const result = await client.query<ColumnStats>(`
-      SELECT
-        column,
-        any(type) AS type,
-        sum(rows) AS rows,
-        sum(column_bytes_on_disk) AS bytes_on_disk,
-        sum(column_data_compressed_bytes) AS compressed_bytes,
-        sum(column_data_uncompressed_bytes) AS uncompressed_bytes,
-        if(sum(column_data_uncompressed_bytes) > 0,
-           sum(column_data_compressed_bytes) / sum(column_data_uncompressed_bytes), 0
-        ) AS compression_ratio
-      FROM system.parts_columns
-      WHERE database = '${safeDatabase}' AND table = '${safeTable}' AND active = 1
-      GROUP BY column
-      ORDER BY bytes_on_disk DESC
-    `);
+    const result = await client.query<ColumnStats>(
+      getColumnStatsQuery(safeDatabase, safeTable),
+    );
 
     let columns = result.data as unknown as ColumnStats[];
 
     // Fallback: if no parts_columns data, query system.columns for basic info
     // This handles views, empty tables, and other table types without parts
     if (columns.length === 0) {
-      const fallbackResult = await client.query<ColumnStats>(`
-        SELECT
-          name AS column,
-          type,
-          0 AS rows,
-          0 AS bytes_on_disk,
-          0 AS compressed_bytes,
-          0 AS uncompressed_bytes,
-          0 AS compression_ratio
-        FROM system.columns
-        WHERE database = '${safeDatabase}' AND table = '${safeTable}'
-        ORDER BY position
-      `);
+      const fallbackResult = await client.query<ColumnStats>(
+        getColumnsFallbackQuery(safeDatabase, safeTable),
+      );
       columns = fallbackResult.data as unknown as ColumnStats[];
     }
 

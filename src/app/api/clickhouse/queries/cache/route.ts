@@ -12,6 +12,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { getQueryCacheQuery } from "@/lib/clickhouse/queries/query-analysis";
 
 export interface QueryCacheEntry {
   query: string;
@@ -104,22 +105,9 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
       const nodeField = clusterName ? "hostname() as node," : "";
 
       // Check if query_cache table exists (requires ClickHouse 23.4+)
-      const result = await client.query<QueryCacheEntry>(`
-        SELECT
-          query,
-          ${nodeField}
-          query_id,
-          result_size,
-          stale,
-          shared,
-          compressed,
-          toString(expires_at) as expires_at,
-          toString(key_hash) as key_hash
-        FROM ${table}
-        ORDER BY result_size DESC
-        LIMIT 100
-        ${settings}
-      `);
+      const result = await client.query<QueryCacheEntry>(
+        getQueryCacheQuery(table, nodeField, settings),
+      );
 
       const entries = result.data as unknown as QueryCacheEntry[];
 

@@ -12,6 +12,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
+import { getExpensiveQueriesQuery, getQuerySummaryQuery } from "@/lib/clickhouse/queries/query-analysis";
 
 export interface ExpensiveQuery {
   query: string;
@@ -119,31 +120,9 @@ export async function GET(
       : "system.query_log";
     const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
 
-    // Get aggregated expensive queries grouped by normalized_query_hash
-    const result = await client.query<ExpensiveQuery>(`
-      SELECT
-        any(query) as query,
-        toString(normalized_query_hash) as normalized_query_hash,
-        any(user) as user,
-        any(query_kind) as query_kind,
-        count() as count,
-        sum(query_duration_ms) as total_duration_ms,
-        avg(query_duration_ms) as avg_duration_ms,
-        max(query_duration_ms) as max_duration_ms,
-        sum(memory_usage) as total_memory,
-        avg(memory_usage) as avg_memory,
-        max(memory_usage) as max_memory,
-        sum(read_bytes) as total_read_bytes,
-        avg(read_bytes) as avg_read_bytes,
-        toString(max(event_time)) as last_event_time
-      FROM ${table}
-      WHERE type = 'QueryFinish'
-        AND event_date >= today() - 7
-      GROUP BY normalized_query_hash
-      ORDER BY ${orderBy}
-      LIMIT ${limit}
-      ${settings}
-    `);
+    const result = await client.query<ExpensiveQuery>(
+      getExpensiveQueriesQuery(table, orderBy, limit, settings),
+    );
 
     // Get summary stats
     const summaryResult = await client.query<{
@@ -152,17 +131,7 @@ export async function GET(
       total_memory: number;
       total_read_bytes: number;
       failed_queries: number;
-    }>(`
-      SELECT
-        count() as total_queries,
-        sum(query_duration_ms) as total_duration_ms,
-        sum(memory_usage) as total_memory,
-        sum(read_bytes) as total_read_bytes,
-        countIf(exception_code != 0) as failed_queries
-      FROM ${table}
-      WHERE event_date >= today() - 7
-      ${settings}
-    `);
+    }>(getQuerySummaryQuery(table, settings));
 
     const summary = (
       summaryResult.data as unknown as Array<{

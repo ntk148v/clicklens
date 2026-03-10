@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
+import { getSessionSettingsQuery, getServerSettingsQuery } from "@/lib/clickhouse/queries/settings";
+import { CURRENT_USER_QUERY } from "@/lib/clickhouse/queries/access";
 
 export const dynamic = "force-dynamic";
 
@@ -29,36 +31,9 @@ export async function GET(request: Request) {
     let query = "";
 
     if (scope === "server") {
-      // Fetch from system.server_settings
-      query = `
-        SELECT
-          name,
-          value,
-          default,
-          changed,
-          description,
-          type,
-          changeable_without_restart as is_hot_reloadable
-        FROM system.server_settings
-        WHERE name ILIKE '%${safeSearch}%'
-        ORDER BY name ASC
-      `;
+      query = getServerSettingsQuery(safeSearch);
     } else {
-      // Default: Fetch from system.settings (Session settings)
-      query = `
-        SELECT
-          name,
-          value,
-          changed,
-          description,
-          type,
-          min,
-          max,
-          readonly
-        FROM system.settings
-        WHERE name ILIKE '%${safeSearch}%'
-        ORDER BY name ASC
-      `;
+      query = getSessionSettingsQuery(safeSearch);
     }
 
     // Note: The wrapper only takes (sql, options?). It does not take an object with 'query' field.
@@ -120,7 +95,7 @@ export async function PUT(request: Request) {
     const client = createClient(config);
 
     // First, get the current username since ALTER USER requires a literal name
-    const userResult = await client.query("SELECT currentUser() AS user");
+    const userResult = await client.query(CURRENT_USER_QUERY);
     const currentUsername = userResult.data?.[0]?.user;
 
     if (!currentUsername) {

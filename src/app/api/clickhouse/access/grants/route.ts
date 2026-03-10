@@ -12,6 +12,7 @@ import {
   isClickHouseError,
   type SystemGrant,
 } from "@/lib/clickhouse";
+import { GRANTS_LIST_QUERY } from "@/lib/clickhouse/queries/access";
 import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 /**
@@ -111,22 +112,7 @@ export async function GET(): Promise<NextResponse<GrantsResponse>> {
 
     const client = createClient(config);
 
-    const result = await client.query<SystemGrant>(`
-      SELECT
-        user_name,
-        role_name,
-        access_type,
-        database,
-        table,
-        column,
-        is_partial_revoke,
-        grant_option
-      FROM system.grants
-      ORDER BY
-        user_name NULLS LAST,
-        role_name NULLS LAST,
-        access_type
-    `);
+    const result = await client.query<SystemGrant>(GRANTS_LIST_QUERY);
 
     return NextResponse.json({
       success: true,

@@ -13,6 +13,11 @@ import {
   isClickHouseError,
   type SystemUser,
 } from "@/lib/clickhouse";
+import {
+  USERS_LIST_QUERY,
+  USER_ROLE_GRANTS_QUERY,
+  getUserCurrentRolesQuery,
+} from "@/lib/clickhouse/queries/access";
 
 export interface UsersResponse {
   success: boolean;
@@ -41,36 +46,13 @@ export async function GET(): Promise<NextResponse<UsersResponse>> {
     const client = createClient(config);
 
     // Get users
-    const usersResult = await client.query<SystemUser>(`
-      SELECT
-        name,
-        id,
-        storage,
-        auth_type,
-        host_ip,
-        host_names,
-        host_names_regexp,
-        host_names_like,
-        default_roles_all,
-        default_roles_list,
-        default_roles_except,
-        grantees_any,
-        grantees_list,
-        grantees_except,
-        default_database
-      FROM system.users
-      ORDER BY name
-    `);
+    const usersResult = await client.query<SystemUser>(USERS_LIST_QUERY);
 
     // Get role grants to users
     const roleGrantsResult = await client.query<{
       user_name: string;
       granted_role_name: string;
-    }>(`
-      SELECT user_name, granted_role_name
-      FROM system.role_grants
-      WHERE user_name IS NOT NULL
-    `);
+    }>(USER_ROLE_GRANTS_QUERY);
 
     // Build a map of user -> roles
     const userRolesMap = new Map<string, string[]>();
@@ -287,11 +269,7 @@ export async function PUT(
       // Get current roles
       const currentRolesResult = await client.query<{
         granted_role_name: string;
-      }>(`
-        SELECT granted_role_name
-        FROM system.role_grants
-        WHERE user_name = '${escapeString(body.name)}'
-      `);
+      }>(getUserCurrentRolesQuery(escapeString(body.name)));
       const currentRoles = currentRolesResult.data.map(
         (r) => r.granted_role_name,
       );

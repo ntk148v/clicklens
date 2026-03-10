@@ -13,6 +13,7 @@ import {
 } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getPartsQuery } from "@/lib/clickhouse/queries/tables";
 
 export interface PartInfo {
   partition: string;
@@ -123,27 +124,9 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const tableSource = clusterName
-      ? `clusterAllReplicas('${clusterName}', system.parts)`
-      : "system.parts";
-
-    const result = await client.query<PartInfo>(`
-      SELECT
-        partition,
-        name,
-        part_type,
-        active,
-        rows,
-        bytes_on_disk,
-        data_compressed_bytes,
-        data_uncompressed_bytes,
-        marks,
-        toString(modification_time) as modification_time,
-        is_frozen
-      FROM ${tableSource}
-      WHERE database = '${safeDatabase}' AND table = '${safeTable}' AND active = 1
-      ORDER BY bytes_on_disk DESC
-    `);
+    const result = await client.query<PartInfo>(
+      getPartsQuery(safeDatabase, safeTable, clusterName),
+    );
 
     const parts = result.data as unknown as PartInfo[];
 

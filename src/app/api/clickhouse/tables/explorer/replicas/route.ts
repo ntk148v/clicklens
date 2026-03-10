@@ -13,6 +13,7 @@ import {
 } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getTableReplicasQuery } from "@/lib/clickhouse/queries/tables";
 
 export interface ReplicaInfo {
   is_leader: number;
@@ -121,35 +122,10 @@ export async function GET(
 
     // Auto-detect cluster
     const clusterName = await getClusterName(client);
-    const tableQuery = clusterName
-      ? `clusterAllReplicas('${clusterName}', system.replicas)`
-      : "system.replicas";
-    const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
-    const nodeField = clusterName ? "hostname() as node," : "";
 
-    const result = await client.query<ReplicaInfo>(`
-      SELECT
-        ${nodeField}
-        is_leader,
-        is_readonly,
-        is_session_expired,
-        future_parts,
-        parts_to_check,
-        queue_size,
-        inserts_in_queue,
-        merges_in_queue,
-        log_pointer,
-        total_replicas,
-        active_replicas,
-        toString(last_queue_update) as last_queue_update,
-        absolute_delay,
-        zookeeper_path,
-        replica_path,
-        replica_name
-      FROM ${tableQuery}
-      WHERE database = '${safeDatabase}' AND table = '${safeTable}'
-      ${settings}
-    `);
+    const result = await client.query<ReplicaInfo>(
+      getTableReplicasQuery(safeDatabase, safeTable, clusterName),
+    );
 
     const replicas = result.data as unknown as ReplicaInfo[];
 

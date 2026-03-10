@@ -12,6 +12,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getTableMergesQuery } from "@/lib/clickhouse/queries/tables";
 
 export interface MergeInfo {
   result_part_name: string;
@@ -120,26 +121,9 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const result = await client.query<MergeInfo>(`
-      SELECT
-        result_part_name,
-        elapsed,
-        progress,
-        num_parts,
-        source_part_names,
-        total_size_bytes_compressed,
-        bytes_read_uncompressed,
-        bytes_written_uncompressed,
-        rows_read,
-        rows_written,
-        columns_written,
-        memory_usage,
-        is_mutation,
-        merge_type,
-        merge_algorithm
-      FROM system.merges
-      WHERE database = '${safeDatabase}' AND table = '${safeTable}'
-    `);
+    const result = await client.query<MergeInfo>(
+      getTableMergesQuery(safeDatabase, safeTable),
+    );
 
     const merges = result.data as unknown as MergeInfo[];
 

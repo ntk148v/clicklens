@@ -20,6 +20,7 @@ import {
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getTableDependenciesQuery, ALL_SYSTEM_TABLES_QUERY } from "@/lib/clickhouse/queries/tables";
 
 // Force dynamic rendering to ensure cookies are read on each request
 export const dynamic = "force-dynamic";
@@ -383,29 +384,16 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
 
     // Query all tables with dependency info and create query
-    const result = await client.query<RawTableRow>(`
-      SELECT
-        database,
-        name,
-        engine,
-        total_rows,
-        total_bytes,
-        dependencies_database,
-        dependencies_table,
-        create_table_query
-      FROM system.tables
-      WHERE database = '${safeDatabase}'
-    `);
+    const result = await client.query<RawTableRow>(
+      getTableDependenciesQuery(safeDatabase),
+    );
 
     // Query all existing tables in the system to validate external references
     const allTablesResult = await client.query<{
       database: string;
       name: string;
       engine: string;
-    }>(`
-      SELECT database, name, engine
-      FROM system.tables
-    `);
+    }>(ALL_SYSTEM_TABLES_QUERY);
 
     // Build a set of existing table IDs for fast lookup
     const existingTables = new Map<

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { quoteIdentifier } from "@/lib/clickhouse/utils";
+import { ROLE_GRANTS_ALL_QUERY } from "@/lib/clickhouse/queries/access";
 
 interface RoleGrant {
   user_name: string | null;
@@ -36,18 +37,7 @@ export async function GET(): Promise<NextResponse<RoleGrantsResponse>> {
 
     const client = createClient(config);
 
-    const result = await client.query<RoleGrant>(`
-      SELECT
-        user_name,
-        role_name,
-        granted_role_name,
-        with_admin_option
-      FROM system.role_grants
-      ORDER BY
-        user_name NULLS LAST,
-        role_name NULLS LAST,
-        granted_role_name
-    `);
+    const result = await client.query<RoleGrant>(ROLE_GRANTS_ALL_QUERY);
 
     return NextResponse.json({
       success: true,

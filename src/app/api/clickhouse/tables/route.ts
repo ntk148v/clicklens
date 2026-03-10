@@ -20,6 +20,18 @@ import {
   hasGlobalAccessViaShowGrants,
   probeUserDatabaseAccess,
 } from "@/lib/clickhouse/grants";
+import {
+  getUserRolesQuery,
+  getGlobalAccessQuery,
+  getDbAccessQuery,
+  getTablesQuery,
+  getTablesForDbQuery,
+  getAllowedTablesInDbQuery,
+  getAllowedTablesAllDbsQuery,
+  getTablesFilteredByAccessQuery,
+  getTablesFilteredByTupleQuery,
+  buildGrantFilter,
+} from "@/lib/clickhouse/queries/tables";
 
 interface TableInfo {
   database?: string;
@@ -109,28 +121,18 @@ export async function GET(
 
     try {
       // Get roles assigned to the user
-      const rolesResult = await client.query(`
-        SELECT granted_role_name as role
-        FROM system.role_grants
-        WHERE user_name = '${safeUser}'
-      `);
+      const rolesResult = await client.query(
+        getUserRolesQuery(safeUser),
+      );
       const rolesData = rolesResult.data as unknown as Array<{ role: string }>;
 
-      const userRoles = rolesData
-        .map((r) => `'${escapeSqlString(r.role)}'`)
-        .join(",");
-
-      const grantFilter = userRoles
-        ? `(user_name = '${safeUser}' OR role_name IN (${userRoles}))`
-        : `user_name = '${safeUser}'`;
+      const userRoles = rolesData.map((r) => r.role);
+      const grantFilter = buildGrantFilter(safeUser, userRoles);
 
       // 1. Check for global access (*.*)
-      const globalCheck = await client.query(`
-        SELECT count() as cnt FROM system.grants
-        WHERE ${grantFilter}
-        AND (database IS NULL OR database = '*')
-        AND access_type IN ('SELECT', 'ALL')
-      `);
+      const globalCheck = await client.query(
+        getGlobalAccessQuery(grantFilter),
+      );
 
       const globalData = globalCheck.data as unknown as Array<{
         cnt: string | number;
@@ -150,13 +152,9 @@ export async function GET(
       // 2. Check for database level access (db.*) - ONLY if database is specified
       let hasDbAccess = false;
       if (safeDatabase && !hasGlobalAccess) {
-        const dbCheck = await client.query(`
-            SELECT count() as cnt FROM system.grants
-            WHERE ${grantFilter}
-            AND database = '${safeDatabase}'
-            AND (table IS NULL OR table = '*')
-            AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-          `);
+        const dbCheck = await client.query(
+          getDbAccessQuery(grantFilter, safeDatabase),
+        );
         const dbData = dbCheck.data as unknown as Array<{
           cnt: string | number;
         }>;
@@ -171,82 +169,33 @@ export async function GET(
         const dbFilter = safeDatabase
           ? `WHERE database = '${safeDatabase}'`
           : "";
-        result = await client.query(`
-          SELECT
-            database,
-            name,
-            engine,
-            total_rows,
-            total_bytes
-          FROM system.tables
-          ${dbFilter}
-          ORDER BY database, name
-        `);
+        result = await client.query(
+          getTablesQuery(dbFilter),
+        );
       } else if (hasDbAccess && safeDatabase) {
         // DB access: Fetch all tables for this db
-        result = await client.query(`
-          SELECT
-            database,
-            name,
-            engine,
-            total_rows,
-            total_bytes
-          FROM system.tables
-          WHERE database = '${safeDatabase}'
-          ORDER BY name
-        `);
+        result = await client.query(
+          getTablesForDbQuery(safeDatabase),
+        );
       } else {
         // Specific table access only
         // Complex case: find allowed tables
         let allowedTablesQuery;
 
         if (safeDatabase) {
-          allowedTablesQuery = `
-              SELECT DISTINCT table FROM system.grants
-              WHERE ${grantFilter}
-              AND database = '${safeDatabase}'
-              AND table IS NOT NULL
-              AND table != '*'
-              AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-            `;
+          allowedTablesQuery = getAllowedTablesInDbQuery(grantFilter, safeDatabase);
         } else {
-          // For all databases
-          allowedTablesQuery = `
-              SELECT DISTINCT database, table FROM system.grants
-              WHERE ${grantFilter}
-              AND table IS NOT NULL
-              AND table != '*'
-              AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-            `;
+          allowedTablesQuery = getAllowedTablesAllDbsQuery(grantFilter);
         }
 
         if (safeDatabase) {
-          result = await client.query(`
-              SELECT
-                database,
-                name,
-                engine,
-                total_rows,
-                total_bytes
-              FROM system.tables
-              WHERE database = '${safeDatabase}'
-              AND name IN (${allowedTablesQuery})
-              ORDER BY name
-            `);
+          result = await client.query(
+            getTablesFilteredByAccessQuery(safeDatabase, allowedTablesQuery),
+          );
         } else {
-          // This might be inefficient if user has many grants, but it's the safest way without global/db permissions
-          // We can join or filtering by tuple (database, name)
-          result = await client.query(`
-              SELECT
-                database,
-                name,
-                engine,
-                total_rows,
-                total_bytes
-              FROM system.tables
-              WHERE (database, name) IN (${allowedTablesQuery})
-              ORDER BY database, name
-            `);
+          result = await client.query(
+            getTablesFilteredByTupleQuery(allowedTablesQuery),
+          );
         }
       }
 
@@ -262,11 +211,9 @@ export async function GET(
             const dbFilter = safeDatabase
               ? `WHERE database = '${safeDatabase}'`
               : "";
-            const allTablesResult = await client.query(`
-              SELECT database, name, engine, total_rows, total_bytes
-              FROM system.tables ${dbFilter}
-              ORDER BY database, name
-            `);
+            const allTablesResult = await client.query(
+              getTablesQuery(dbFilter),
+            );
             return NextResponse.json({
               success: true,
               data: allTablesResult.data as unknown as TableInfo[],
@@ -297,11 +244,9 @@ export async function GET(
             const dbFilter = safeDatabase
               ? `WHERE database = '${safeDatabase}'`
               : "";
-            const allTablesResult = await client.query(`
-              SELECT database, name, engine, total_rows, total_bytes
-              FROM system.tables ${dbFilter}
-              ORDER BY database, name
-            `);
+            const allTablesResult = await client.query(
+              getTablesQuery(dbFilter),
+            );
             return NextResponse.json({
               success: true,
               data: allTablesResult.data as unknown as TableInfo[],

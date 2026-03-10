@@ -20,6 +20,7 @@ import {
   hasGlobalAccessViaShowGrants,
   probeUserDatabaseAccess,
 } from "@/lib/clickhouse/grants";
+import { getDatabasesWithRbacQuery, ALL_DATABASES_QUERY } from "@/lib/clickhouse/queries/databases";
 
 interface DatabasesResponse {
   success: boolean;
@@ -98,45 +99,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       // 2. Check if user or their roles have global access (*.*)
       // 3. If global access, return all databases
       // 4. Otherwise, return only databases they have explicit access to (plus 'default')
-      const mergedQuery = `
-        WITH (
-            SELECT groupArray(granted_role_name)
-            FROM system.role_grants
-            WHERE user_name = '${safeUser}'
-        ) AS user_roles,
-        (
-            SELECT count() > 0
-            FROM system.grants
-            WHERE (user_name = '${safeUser}' OR has(user_roles, role_name))
-              AND (database IS NULL OR database = '*')
-              AND access_type IN ('SELECT', 'ALL')
-        ) AS has_global_access
-        SELECT DISTINCT name
-        FROM (
-            -- If they have global access, return all databases
-            SELECT name
-            FROM system.databases
-            WHERE has_global_access
-
-            UNION ALL
-
-            -- Otherwise, return specific databases they have access to
-            SELECT database AS name
-            FROM system.grants
-            WHERE (user_name = '${safeUser}' OR has(user_roles, role_name))
-              AND database IS NOT NULL
-              AND database != '*'
-              AND access_type IN ('SELECT', 'INSERT', 'ALTER', 'CREATE', 'DROP', 'ALL')
-              AND NOT has_global_access
-
-            UNION ALL
-
-            -- Always include default if it exists
-            SELECT 'default' AS name
-        )
-        WHERE name IN (SELECT name FROM system.databases)
-        ORDER BY name
-      `;
+      const mergedQuery = getDatabasesWithRbacQuery(safeUser);
 
       let result;
       let resultData: Array<{ name: string }> = [];
@@ -170,7 +133,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
 
         if (hasGlobalFallback) {
           const allDbsResult = await client.query(
-            `SELECT name FROM system.databases ORDER BY name`,
+            ALL_DATABASES_QUERY,
           );
           resultData = allDbsResult.data as unknown as Array<{ name: string }>;
         }

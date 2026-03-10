@@ -13,6 +13,7 @@ import {
 } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
+import { getQueryHistoryCountQuery, getQueryHistoryQuery } from "@/lib/clickhouse/queries/query-analysis";
 
 export interface QueryHistoryEntry {
   event_time: string;
@@ -154,40 +155,17 @@ export async function GET(
     const settings = clusterName ? "SETTINGS skip_unavailable_shards = 1" : "";
 
     // Get total count
-    const countResult = await client.query<{ count: number }>(`
-      SELECT count() as count FROM ${table} ${whereClause} ${settings}
-    `);
+    const countResult = await client.query<{ count: number }>(
+      getQueryHistoryCountQuery(table, whereClause, settings),
+    );
     const total =
       (countResult.data as unknown as Array<{ count: number }>)[0]?.count || 0;
 
     // Get paginated results
     const nodeField = clusterName ? "hostname() as node," : "";
-    const result = await client.query<QueryHistoryEntry>(`
-      SELECT
-        toString(event_time) as event_time,
-        ${nodeField}
-        query_id,
-        query,
-        query_kind,
-        user,
-        current_database,
-        query_duration_ms,
-        read_rows,
-        read_bytes,
-        written_rows,
-        written_bytes,
-        result_rows,
-        memory_usage,
-        type,
-        exception_code,
-        exception
-        exception
-      FROM ${table}
-      ${whereClause}
-      ORDER BY event_time DESC
-      LIMIT ${limit} OFFSET ${offset}
-      ${settings}
-    `);
+    const result = await client.query<QueryHistoryEntry>(
+      getQueryHistoryQuery(table, whereClause, nodeField, limit, offset, settings),
+    );
 
     return NextResponse.json({
       success: true,

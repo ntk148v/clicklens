@@ -1,17 +1,16 @@
 import { ClickHouseClient } from "./clients/types";
 import { escapeSqlString } from "./utils";
+import { getTableEngineQuery } from "@/lib/clickhouse/queries/schema";
 
 export async function getTableEngine(
   client: ClickHouseClient,
   database: string,
   table: string,
 ): Promise<string> {
-  const query = `
-    SELECT engine
-    FROM system.tables
-    WHERE database = '${escapeSqlString(database)}'
-      AND name = '${escapeSqlString(table)}'
-  `;
+  const query = getTableEngineQuery(
+    escapeSqlString(database),
+    escapeSqlString(table),
+  );
   try {
     const res = await client.query<{ engine: string }>(query);
     return res.data?.[0]?.engine || "";
