@@ -28,11 +28,13 @@ function formatBytes(bytes?: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-function formatDuration(ms?: number): string {
-  if (ms === undefined) return "";
-  if (ms < 1) return "< 1ms";
-  if (ms < 1000) return `${ms.toFixed(0)} milliseconds`;
-  return `${(ms / 1000).toFixed(2)} seconds`;
+function formatDuration(ms?: number | string): string {
+  if (ms === undefined || ms === null) return "";
+  const val = Number(ms);
+  if (isNaN(val)) return "";
+  if (val < 1) return "< 1ms";
+  if (val < 1000) return `${val.toFixed(0)} milliseconds`;
+  return `${(val / 1000).toFixed(2)} seconds`;
 }
 
 interface QueryHistoryProps {

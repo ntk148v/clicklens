@@ -202,25 +202,29 @@ export function formatUptime(seconds: number): string {
   return `${minutes}m`;
 }
 
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  if (bytes < 0 || !isFinite(bytes)) return "-";
+export function formatBytes(bytes: number | string): string {
+  const val = Number(bytes);
+  if (val === 0 || isNaN(val)) return "0 B";
+  if (val < 0 || !isFinite(val)) return "-";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  const i = Math.floor(Math.log(val) / Math.log(k));
+  return `${parseFloat((val / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export function formatNumber(num: number): string {
-  if (num == null || !isFinite(num)) return "0";
-  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-  return num.toLocaleString();
+export function formatNumber(num: number | string): string {
+  const val = Number(num);
+  if (isNaN(val) || num == null || !isFinite(val)) return "0";
+  if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(1)}B`;
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
+  return val.toLocaleString();
 }
 
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms.toFixed(0)}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60000).toFixed(1)}m`;
+export function formatDuration(ms: number | string): string {
+  const val = Number(ms);
+  if (isNaN(val) || ms == null) return "0ms";
+  if (val < 1000) return `${val.toFixed(0)}ms`;
+  if (val < 60000) return `${(val / 1000).toFixed(1)}s`;
+  return `${(val / 60000).toFixed(1)}m`;
 }

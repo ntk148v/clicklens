@@ -103,20 +103,24 @@ const CATEGORY_ORDER: TableCategory[] = [
   "other",
 ];
 
-function formatBytes(bytes: number | null | undefined): string {
-  if (bytes == null || isNaN(bytes)) return "–";
-  if (bytes === 0) return "0 B";
+function formatBytes(bytes: number | string | null | undefined): string {
+  if (bytes == null) return "–";
+  const val = Number(bytes);
+  if (isNaN(val)) return "–";
+  if (val === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  const i = Math.floor(Math.log(val) / Math.log(k));
+  return parseFloat((val / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-function formatNumber(n: number | null | undefined): string {
-  if (n == null || isNaN(n)) return "–";
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return String(n);
+function formatNumber(n: number | string | null | undefined): string {
+  if (n == null) return "–";
+  const val = Number(n);
+  if (isNaN(val)) return "–";
+  if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+  return String(val);
 }
 
 function getTableCategory(engine: string): TableCategory {

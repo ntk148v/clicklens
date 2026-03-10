@@ -66,10 +66,12 @@ function formatNumber(n: number): string {
   return new Intl.NumberFormat().format(n);
 }
 
-function formatDuration(seconds: number): string {
-  if (seconds < 0.001) return `${(seconds * 1000000).toFixed(0)}µs`;
-  if (seconds < 1) return `${(seconds * 1000).toFixed(2)}ms`;
-  return `${seconds.toFixed(3)}s`;
+function formatDuration(seconds: number | string): string {
+  const val = Number(seconds);
+  if (isNaN(val) || seconds == null) return "0s";
+  if (val < 0.001) return `${(val * 1000000).toFixed(0)}µs`;
+  if (val < 1) return `${(val * 1000).toFixed(2)}ms`;
+  return `${val.toFixed(3)}s`;
 }
 
 /**
