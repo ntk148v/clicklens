@@ -94,7 +94,9 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
     );
   }
 
-  const formatLatency = (us: number) => {
+  const formatLatency = (rawUs: number | string) => {
+    const us = Number(rawUs);
+    if (isNaN(us) || rawUs == null) return "0µs";
     if (us < 1000) return `${us.toFixed(0)}µs`;
     if (us < 1000000) return `${(us / 1000).toFixed(1)}ms`;
     return `${(us / 1000000).toFixed(2)}s`;

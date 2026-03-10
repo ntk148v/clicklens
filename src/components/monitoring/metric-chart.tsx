@@ -132,8 +132,9 @@ export function MetricChart({
   const id = useId();
   const gradientId = `gradient-${id}`;
 
-  const formatValue = useCallback((value: number): string => {
-    if (value == null || !isFinite(value)) return "0";
+  const formatValue = useCallback((rawValue: number | string): string => {
+    const value = Number(rawValue);
+    if (isNaN(value) || rawValue == null || !isFinite(value)) return "0";
 
     if (isBytes) {
       return formatBytes(value);
@@ -349,8 +350,9 @@ export function MultiSeriesChart({
     );
   }, [data]);
 
-  const formatValue = (value: number): string => {
-    if (value == null || !isFinite(value)) return "0";
+  const formatValue = (rawValue: number | string): string => {
+    const value = Number(rawValue);
+    if (isNaN(value) || rawValue == null || !isFinite(value)) return "0";
     if (isBytes) return formatBytes(value);
     if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;

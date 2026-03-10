@@ -114,8 +114,10 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
     return "ok" as const;
   };
 
-  const formatCompressionRatio = (ratio?: number) => {
-    if (!ratio || ratio === 0) return "-";
+  const formatCompressionRatio = (rawRatio?: number | string) => {
+    if (!rawRatio) return "-";
+    const ratio = Number(rawRatio);
+    if (ratio === 0 || isNaN(ratio)) return "-";
     return `${(ratio * 100).toFixed(1)}%`;
   };
 

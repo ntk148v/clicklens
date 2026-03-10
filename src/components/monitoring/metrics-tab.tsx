@@ -57,8 +57,9 @@ const categoryColors: Record<MetricCategory, string> = {
 };
 
 // Auto-format value based on metric name
-function formatMetricValue(name: string, value: number): string {
-  if (value == null || !isFinite(value)) return "0";
+function formatMetricValue(name: string, rawValue: number | string): string {
+  const value = Number(rawValue);
+  if (isNaN(value) || rawValue == null || !isFinite(value)) return "0";
 
   const lowerName = name.toLowerCase();
 

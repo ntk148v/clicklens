@@ -216,7 +216,7 @@ export function MergesTab({ database, table }: MergesTabProps) {
                   {formatBytes(merge.memory_usage)}
                 </TableCell>
                 <TableCell className="data-table-cell text-right">
-                  {merge.elapsed.toFixed(1)}s
+                  {Number(merge.elapsed).toFixed(1)}s
                 </TableCell>
               </TableRow>
             ))}
