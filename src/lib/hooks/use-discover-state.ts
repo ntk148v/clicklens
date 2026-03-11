@@ -6,11 +6,6 @@ import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
 import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
 import { MetadataCache } from "@/lib/clickhouse/metadata-cache";
-import {
-  type CacheMetadata,
-  type CacheTrackingState,
-  updateCacheMetadata,
-} from "@/lib/hooks/cache-metadata";
 import type {
   TableSchema,
   DiscoverRow,
@@ -27,6 +22,21 @@ import {
 const COLUMN_PREFS_PREFIX = "clicklens_discover_columns_";
 const DEFAULT_PAGE_SIZE = 100;
 const DEFAULT_COLUMN_COUNT = 10;
+
+interface CacheMetadata {
+  isCached: boolean;
+  cacheAge: number;
+  hitRate: number;
+  totalHits: number;
+  totalMisses: number;
+}
+
+interface CacheTrackingState {
+  totalHits: number;
+  totalMisses: number;
+  lastQueryKey: string | null;
+  lastCacheTimestamp: number | null;
+}
 
 // Valid relative time range values for URL param validation
 const VALID_RELATIVE_RANGES = new Set([
@@ -565,12 +575,35 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
         JSON.stringify(lastExecutedRef.current) === queryKey;
 
       // Update cache metadata
-      const metadata = updateCacheMetadata(
-        cacheTrackingRef.current,
-        queryKey,
-        isFromCache,
-      );
-      setCacheMetadata(metadata);
+      const now = Date.now();
+      if (cacheTrackingRef.current.lastQueryKey !== queryKey) {
+        cacheTrackingRef.current.lastQueryKey = queryKey;
+        cacheTrackingRef.current.totalHits = 0;
+        cacheTrackingRef.current.totalMisses = 0;
+        cacheTrackingRef.current.lastCacheTimestamp = null;
+      }
+
+      if (isFromCache) {
+        cacheTrackingRef.current.totalHits++;
+      } else {
+        cacheTrackingRef.current.totalMisses++;
+        cacheTrackingRef.current.lastCacheTimestamp = now;
+      }
+
+      const cacheAge = cacheTrackingRef.current.lastCacheTimestamp
+        ? now - cacheTrackingRef.current.lastCacheTimestamp
+        : 0;
+
+      const total = cacheTrackingRef.current.totalHits + cacheTrackingRef.current.totalMisses;
+      const hitRate = total === 0 ? 0 : Math.round((cacheTrackingRef.current.totalHits / total) * 100);
+
+      setCacheMetadata({
+        isCached: isFromCache,
+        cacheAge,
+        hitRate,
+        totalHits: cacheTrackingRef.current.totalHits,
+        totalMisses: cacheTrackingRef.current.totalMisses,
+      });
 
       // Snapshot executed state for dirty tracking
       lastExecutedRef.current = {
