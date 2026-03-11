@@ -7,6 +7,7 @@ import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
 import { CacheIndicator } from "@/components/discover/CacheIndicator";
+import { ErrorDisplay } from "@/components/discover/ErrorDisplay";
 import { TimeSelector, RefreshControl } from "@/components/shared";
 import {
   Select,
@@ -18,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FilterX, Database, Table2, AlertCircle } from "lucide-react";
 import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
+import { parseError } from "@/lib/clickhouse/error-parser";
 import { AccessDenied } from "@/components/ui/access-denied";
 import { useAuth } from "@/components/auth";
 import { useDiscoverState } from "@/lib/hooks/use-discover-state";
@@ -195,13 +197,14 @@ function DiscoverPageContent() {
 
         {/* Inline error display (P7) */}
         {error && !isLoading && (
-          <div className="flex items-start gap-2 p-3 rounded-md border border-destructive/50 bg-destructive/5 text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <p className="font-medium">Query Error</p>
-              <p className="text-xs mt-0.5 opacity-90 break-all">{error}</p>
-            </div>
-          </div>
+          <ErrorDisplay
+            error={parseError(error)}
+            query={customFilter}
+            onRetry={handleSearch}
+            onFix={() => {
+              // Show syntax help
+            }}
+          />
         )}
 
         {/* Main Content */}
