@@ -281,7 +281,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
 
   // Sorting and Grouping
   const [sorting, setSorting] = useState<import("@tanstack/react-table").SortingState>([]);
-  const [groupBy, setGroupBy] = useState<string[]>([]);
+  const [groupBy, setGroupByRaw] = useState<string[]>([]);
 
   // Cache metadata tracking
   const [cacheMetadata, setCacheMetadata] = useState<CacheMetadata | undefined>();
@@ -370,6 +370,27 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     },
     [selectedDatabase, selectedTable, selectedColumns],
   );
+
+  // Wrapped setGroupBy to auto-manage "count" column in selectedColumns
+  const setGroupBy = useCallback((newGroupBy: string[]) => {
+    setGroupByRaw(newGroupBy);
+
+    // Auto-manage "count" column in selectedColumns
+    setSelectedColumnsRaw((prev: string[]) => {
+      const hasCount = prev.includes("count");
+      const hasGrouping = newGroupBy.length > 0;
+
+      if (hasGrouping && !hasCount) {
+        // Add count when grouping starts
+        return [...prev, "count"];
+      } else if (!hasGrouping && hasCount) {
+        // Remove count when grouping stops
+        return prev.filter((c: string) => c !== "count");
+      }
+      // Otherwise keep as-is
+      return prev;
+    });
+  }, []);
 
   // Cancel any in-flight queries (P3)
   const cancelQuery = useCallback(() => {
