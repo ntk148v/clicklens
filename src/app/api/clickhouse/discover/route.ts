@@ -65,6 +65,7 @@ export async function GET(request: Request) {
     const parsedLimit = parseInt(searchParams.get("limit") || "100", 10);
     const limit = isNaN(parsedLimit) ? 100 : Math.min(parsedLimit, 10000);
     const cursor = searchParams.get("cursor");
+    const offset = parseInt(searchParams.get("offset") || "0", 10) || 0;
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";
     const minTime = searchParams.get("minTime");
@@ -246,8 +247,9 @@ export async function GET(request: Request) {
       orderByClause = `ORDER BY ${sorts.join(", ")}`;
     }
 
-    // 2b. Single Query branch (for Group By only)
-    if (groupByParam) {
+    // 2b. Single Query branch (for Group By or ORDER BY)
+    // ORDER BY requires offset-based pagination since time-based cursor doesn't work with custom sorting
+    if (groupByParam || orderByParam) {
       let groupByClause = "";
 
       if (groupByParam) {
@@ -284,6 +286,7 @@ export async function GET(request: Request) {
         ${groupByClause}
         ${orderByClause}
         LIMIT ${limit}
+        ${offset > 0 ? `OFFSET ${offset}` : ""}
       `;
 
       // Run count query in parallel
