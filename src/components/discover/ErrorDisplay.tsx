@@ -4,9 +4,8 @@ import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
 import type { ParsedError } from "@/lib/clickhouse/error-parser";
-import { cn } from "@/lib/utils";
 
 interface ErrorDisplayProps {
   error: ParsedError;
