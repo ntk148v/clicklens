@@ -19,6 +19,8 @@ import {
   Filter,
   FilterX,
   Loader2,
+  FolderGit2,
+  X,
 } from "lucide-react";
 import type { ColumnMetadata, TimeColumnCandidate } from "@/lib/types/discover";
 import { cn } from "@/lib/utils";
@@ -34,6 +36,8 @@ interface FieldsSidebarProps {
   onResetColumns?: () => void;
   onFilterForValue?: (column: string, value: unknown) => void;
   onFilterOutValue?: (column: string, value: unknown) => void;
+  groupBy?: string[];
+  onGroupByChange?: (columns: string[]) => void;
   fieldValuesParams?: {
     database: string;
     table: string;
@@ -100,6 +104,8 @@ export function FieldsSidebar({
   onResetColumns,
   onFilterForValue,
   onFilterOutValue,
+  groupBy = [],
+  onGroupByChange,
   fieldValuesParams,
   className,
 }: FieldsSidebarProps) {
@@ -121,6 +127,15 @@ export function FieldsSidebar({
       onSelectedColumnsChange([...selectedColumns, columnName]);
     } else {
       onSelectedColumnsChange(selectedColumns.filter((c) => c !== columnName));
+    }
+  };
+
+  const handleGroupByToggle = (columnName: string) => {
+    if (!onGroupByChange) return;
+    if (groupBy.includes(columnName)) {
+      onGroupByChange(groupBy.filter((c) => c !== columnName));
+    } else {
+      onGroupByChange([...groupBy, columnName]);
     }
   };
 
@@ -258,6 +273,55 @@ export function FieldsSidebar({
             </select>
           </div>
         )}
+
+        {/* Group By selector */}
+        {onGroupByChange && (
+          <div className="space-y-1.5 pt-1 border-t">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <FolderGit2 className="h-3 w-3" />
+              Group By
+            </Label>
+            <div className="flex flex-col gap-1.5">
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) handleGroupByToggle(e.target.value);
+                }}
+                className="w-full h-8 text-xs rounded-md border bg-background px-2"
+              >
+                <option value="">Add field to group...</option>
+                {columns
+                  .filter((c) => !groupBy.includes(c.name))
+                  .map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+
+              {groupBy.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {groupBy.map((g) => (
+                    <Badge
+                      key={g}
+                      variant="secondary"
+                      className="px-1.5 py-0 h-5 text-[10px] items-center gap-1 font-mono"
+                    >
+                      {g}
+                      <button
+                        onClick={() => handleGroupByToggle(g)}
+                        className="opacity-50 hover:opacity-100 transition-opacity"
+                        title="Remove"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Column list */}
@@ -270,15 +334,16 @@ export function FieldsSidebar({
           ) : (
             filteredColumns.map((col) => {
               const isExpanded = expandedFields.has(col.name);
+              const isGrouped = groupBy.includes(col.name);
               const values = fieldValues[col.name];
               const isLoadingValues = loadingFields.has(col.name);
 
               return (
-                <div key={col.name}>
+                <div key={col.name} className="group/field">
                   <div
                     className={cn(
                       "flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors",
-                      selectedColumns.includes(col.name) && "bg-muted/30",
+                      (selectedColumns.includes(col.name) || isGrouped) && "bg-muted/30",
                     )}
                   >
                     {/* Expand chevron */}
@@ -325,6 +390,23 @@ export function FieldsSidebar({
                         className="truncate"
                       />
                     </Badge>
+                    
+                    {onGroupByChange && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-5 w-5 shrink-0 transition-opacity ml-auto",
+                          isGrouped 
+                            ? "opacity-100 text-primary bg-primary/10 hover:bg-primary/20" 
+                            : "opacity-30 hover:opacity-100 group-hover/field:opacity-100 text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => handleGroupByToggle(col.name)}
+                        title={isGrouped ? "Remove from Group By" : "Add to Group By"}
+                      >
+                        <FolderGit2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
 
                   {/* Expanded field values */}

@@ -60,6 +60,8 @@ export interface DiscoverQueryParams {
   filter?: string; // User's custom WHERE expression
   limit: number;
   cursor?: string; // For pagination: "timestamp_uniqueId"
+  orderBy?: string; // User's custom ORDER BY
+  groupBy?: string; // User's custom GROUP BY
 }
 
 /**

@@ -65,6 +65,7 @@ export async function GET(request: Request) {
     const parsedLimit = parseInt(searchParams.get("limit") || "100", 10);
     const limit = isNaN(parsedLimit) ? 100 : Math.min(parsedLimit, 10000);
     const cursor = searchParams.get("cursor");
+    const offset = parseInt(searchParams.get("offset") || "0", 10) || 0;
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";
     const minTime = searchParams.get("minTime");
@@ -76,6 +77,9 @@ export async function GET(request: Request) {
           .map((c) => c.trim())
           .filter(Boolean)
       : [];
+
+    const orderByParam = searchParams.get("orderBy");
+    const groupByParam = searchParams.get("groupBy");
 
     const client = createClient(config);
     const clusterName = await getClusterName(client);
@@ -201,17 +205,125 @@ export async function GET(request: Request) {
       }
     }
 
-    // 2. Prepare Chunker
-    const selectClause = columns.length
+    // 2. Prepare Chunker / Query properties
+    let selectClause = columns.length
       ? columns.map((c: string) => quoteIdentifier(c)).join(", ")
       : "*";
 
+    // 2a. Order By
     const quotedTimeSortCol = timeColumn ? quoteIdentifier(timeColumn) : "";
-    const orderByClause = quotedTimeSortCol
+    let orderByClause = quotedTimeSortCol
       ? `ORDER BY ${quotedTimeSortCol} DESC`
       : "";
 
-    // 3. Start Stream
+    if (orderByParam) {
+      // Expects format "col:desc,col2:asc"
+      const sorts = orderByParam.split(",").map((s) => {
+        const [col, dir] = s.split(":");
+        return `${quoteIdentifier(col)} ${dir.toUpperCase() === "ASC" ? "ASC" : "DESC"}`;
+      });
+      orderByClause = `ORDER BY ${sorts.join(", ")}`;
+    }
+
+    // 2b. Single Query branch (for Group By, explicit Order By, or Pagination Offset)
+    if (groupByParam || orderByParam || offset > 0) {
+      let groupByClause = "";
+
+      if (groupByParam) {
+        const groupCols = groupByParam
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean);
+
+        if (groupCols.length > 0) {
+          // Build GROUP BY
+          const quotedGroupCols = groupCols.map((c) => quoteIdentifier(c));
+          groupByClause = `GROUP BY ${quotedGroupCols.join(", ")}`;
+
+          // When GROUP BY is active, only select the grouped columns + count()
+          // Ignore the user's selected columns to avoid invalid SQL (selecting unaggregated cols)
+          selectClause = `${quotedGroupCols.join(", ")}, count() as count`;
+        }
+      }
+
+      // If we are grouping but have no orderBy, clear orderByClause
+      // because sorting by time makes no sense if we lack it in group.
+      if (groupByParam && !orderByParam) {
+        orderByClause = "";
+      }
+
+      const minTimeNum = minTime ? new Date(minTime).getTime() : 0;
+      const maxTimeNum = maxTime ? new Date(maxTime).getTime() : Date.now();
+      
+      if (timeColumn && minTime) {
+        baseWhere.push(
+          `${quoteIdentifier(timeColumn)} >= toDateTime64(${minTimeNum / 1000}, 3)`
+        );
+      }
+      if (timeColumn && maxTime) {
+        baseWhere.push(
+          `${quoteIdentifier(timeColumn)} <= toDateTime64(${maxTimeNum / 1000}, 3)`
+        );
+      }
+
+      const query = `
+        SELECT ${selectClause}
+        FROM ${tableSource}
+        ${baseWhere.length > 0 ? `WHERE ${baseWhere.join(" AND ")}` : ""}
+        ${groupByClause}
+        ${orderByClause}
+        LIMIT ${limit}
+        ${offset > 0 ? `OFFSET ${offset}` : ""}
+      `;
+
+      // Run count query in parallel
+      let countQuery = `SELECT count() as cnt FROM ${tableSource}`;
+      if (baseWhere.length > 0) countQuery += ` WHERE ${baseWhere.join(" AND ")}`;
+      if (groupByClause) {
+        // If we group, the total hits is the number of distinct groups.
+        countQuery = `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${baseWhere.length > 0 ? `WHERE ${baseWhere.join(" AND ")}` : ""} ${groupByClause})`;
+      }
+
+      const countPromise = client
+        .query(countQuery)
+        .then((res) => Number(res.data[0]?.cnt) || 0)
+        .catch((e) => {
+          console.error("Count query failed", e);
+          return 0;
+        });
+
+      // Create direct NDJSON stream for aggregation / specific order / specific pagination
+      const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              controller.enqueue(JSON.stringify({ meta: { totalHits: -1 } }) + "\n");
+              
+              // Run actual query
+              const rs = await client.query(query);
+              const rows = rs.data;
+              for (const row of rows) {
+                controller.enqueue(JSON.stringify(row) + "\n");
+              }
+              
+              const totalHits = await countPromise;
+              controller.enqueue(JSON.stringify({ meta: { totalHits } }) + "\n");
+            } catch (err) {
+              controller.enqueue(JSON.stringify({ error: String(err) }) + "\n");
+            } finally {
+              controller.close();
+            }
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "application/x-ndjson",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+    }
+
+    // 3. Start Stream (No GROUP BY)
     const iterator = fetchChunks({
       client,
       tableSource,

@@ -48,6 +48,8 @@ interface DiscoverGridProps {
   onPageSizeChange: (size: number) => void;
   onFilterForValue?: (column: string, value: unknown) => void;
   onFilterOutValue?: (column: string, value: unknown) => void;
+  sorting: SortingState;
+  onSortingChange: import("@tanstack/react-table").OnChangeFn<SortingState>;
 }
 
 const columnHelper = createColumnHelper<DiscoverRow>();
@@ -157,8 +159,9 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   onPageSizeChange,
   onFilterForValue,
   onFilterOutValue,
+  sorting,
+  onSortingChange,
 }: DiscoverGridProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -244,8 +247,9 @@ export const DiscoverGrid = memo(function DiscoverGrid({
       },
     },
     manualPagination: true,
+    manualSorting: true,
     pageCount: Math.ceil(totalHits / pageSize),
-    onSortingChange: setSorting,
+    onSortingChange: onSortingChange,
     columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

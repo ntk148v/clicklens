@@ -48,6 +48,8 @@ function DiscoverPageContent() {
     error,
     page,
     pageSize,
+    sorting,
+    groupBy,
 
     setSelectedDatabase,
     handleTableChange,
@@ -58,6 +60,8 @@ function DiscoverPageContent() {
     setRefreshInterval,
     setPage,
     setPageSize,
+    setSorting,
+    setGroupBy,
     handleSearch,
     handleHistogramBarClick,
     cancelQuery,
@@ -256,6 +260,8 @@ function DiscoverPageContent() {
                 onResetColumns={resetColumns}
                 onFilterForValue={filterForValue}
                 onFilterOutValue={filterOutValue}
+                groupBy={groupBy}
+                onGroupByChange={setGroupBy}
                 fieldValuesParams={{
                   database: selectedDatabase,
                   table: selectedTable,
@@ -290,6 +296,8 @@ function DiscoverPageContent() {
                     onPageSizeChange={setPageSize}
                     onFilterForValue={filterForValue}
                     onFilterOutValue={filterOutValue}
+                    sorting={sorting}
+                    onSortingChange={setSorting}
                   />
                   {isLoading && rows.length > 0 && (
                     <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">

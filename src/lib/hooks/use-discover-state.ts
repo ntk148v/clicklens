@@ -130,6 +130,10 @@ export interface DiscoverState {
   error: string | null;
   page: number;
   pageSize: number;
+
+  // Sorting and Grouping
+  sorting: import("@tanstack/react-table").SortingState;
+  groupBy: string[];
 }
 
 export interface DiscoverActions {
@@ -148,6 +152,8 @@ export interface DiscoverActions {
   resetColumns: () => void;
   filterForValue: (column: string, value: unknown) => void;
   filterOutValue: (column: string, value: unknown) => void;
+  setSorting: import("@tanstack/react-table").OnChangeFn<import("@tanstack/react-table").SortingState>;
+  setGroupBy: (groupBy: string[]) => void;
 }
 
 export function useDiscoverState(): DiscoverState & DiscoverActions {
@@ -197,6 +203,10 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
+  // Sorting and Grouping
+  const [sorting, setSorting] = useState<import("@tanstack/react-table").SortingState>([]);
+  const [groupBy, setGroupBy] = useState<string[]>([]);
+
   // Abort controllers for cancellation (P3)
   const dataAbortRef = useRef<AbortController | null>(null);
   const histAbortRef = useRef<AbortController | null>(null);
@@ -207,6 +217,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     flexibleRange: FlexibleTimeRange;
     columns: string[];
     timeColumn: string;
+    sorting: import("@tanstack/react-table").SortingState;
+    groupBy: string[];
   } | null>(null);
 
   // Dirty state: true when user changed query params but hasn't re-executed (P4)
@@ -217,13 +229,17 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       last.filter !== customFilter ||
       JSON.stringify(last.flexibleRange) !== JSON.stringify(flexibleRange) ||
       JSON.stringify(last.columns) !== JSON.stringify(selectedColumns) ||
-      last.timeColumn !== selectedTimeColumn
+      last.timeColumn !== selectedTimeColumn ||
+      JSON.stringify(last.sorting) !== JSON.stringify(sorting) ||
+      JSON.stringify(last.groupBy) !== JSON.stringify(groupBy)
     );
   }, [
     customFilter,
     flexibleRange,
     selectedColumns,
     selectedTimeColumn,
+    sorting,
+    groupBy,
     schema,
   ]);
 
@@ -319,6 +335,14 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       if (appliedFilter.trim()) {
         params.set("filter", appliedFilter.trim());
       }
+      if (sorting.length > 0) {
+        // Encode sorting as "col:desc,col2:asc"
+        const sortStr = sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(",");
+        params.set("orderBy", sortStr);
+      }
+      if (groupBy.length > 0) {
+        params.set("groupBy", groupBy.join(","));
+      }
 
       const res = await fetch(`/api/clickhouse/discover?${params}`, {
         signal: controller.signal,
@@ -383,6 +407,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     appliedFilter,
     page,
     pageSize,
+    sorting,
+    groupBy,
   ]);
 
   const fetchHistogram = useCallback(async () => {
@@ -454,6 +480,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
         flexibleRange,
         columns: [...selectedColumns],
         timeColumn: selectedTimeColumn,
+        sorting: [...sorting],
+        groupBy: [...groupBy],
       };
 
       setAppliedFilter(filterToApply);
@@ -473,6 +501,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       flexibleRange,
       selectedColumns,
       selectedTimeColumn,
+      sorting,
+      groupBy,
     ],
   );
 
@@ -515,6 +545,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     setHistogramData([]);
     setCustomFilter("");
     setAppliedFilter("");
+    setSorting([]);
+    setGroupBy([]);
   }, []);
 
   // -- Click-to-filter helpers (P2a) --
@@ -883,6 +915,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     error,
     page,
     pageSize,
+    sorting,
+    groupBy,
 
     // Actions
     setSelectedDatabase,
@@ -894,6 +928,8 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     setRefreshInterval,
     setPage,
     setPageSize,
+    setSorting,
+    setGroupBy,
     handleSearch,
     handleHistogramBarClick,
     cancelQuery,
