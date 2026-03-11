@@ -9,8 +9,6 @@ export interface ParsedError {
   suggestions: string[];
   quickFixes: QuickFix[];
   details?: string;
-  query?: string;
-  errorLocation?: { line: number; column: number };
 }
 
 const ERROR_PATTERNS = {
