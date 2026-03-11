@@ -342,6 +342,28 @@ ClickLens also supports easy table preview feature. By clicking the table name i
 
 ![](/screenshots/sql-table-preview-structure.png)
 
+#### 2.1.10 Performance Optimizations
+
+The SQL Console includes automatic performance optimizations:
+
+- **Query Timeout Enforcement**: All queries are automatically limited to 5 minutes maximum to prevent resource exhaustion
+- **Query Streaming**: Large result sets are streamed to the UI using NDJSON for efficient memory usage
+- **Pagination**: Results are paginated to reduce memory usage on both client and server
+- **Metadata Caching**: Table schemas and column information are cached to reduce database load
+- **Query Performance Metrics**: Displays execution time, rows read, and bytes read for each query
+
+#### 2.1.11 Security Features
+
+The SQL Console includes comprehensive security protections:
+
+- **SQL Injection Protection**: Automatic validation of all user-provided SQL
+  - Blocks dangerous operations (DROP, DELETE, ALTER, TRUNCATE, INSERT, UPDATE, etc.)
+  - Prevents multiple statements and SQL comments
+  - Blocks dangerous table functions (file, url, remote, s3, gcs, mysql, postgresql, jdbc, odbc, hdfs, input, etc.)
+  - Allows only read operations (SELECT, WITH, SHOW, DESCRIBE, DESC, EXPLAIN, EXISTS, CHECK, USE)
+- **Query Rate Limiting**: Limits query execution to 60 queries per 60 seconds per user to prevent abuse
+- **RBAC Enforcement**: All queries respect user permissions and access controls
+
 ---
 
 ## 3. Table Explorer
@@ -397,6 +419,21 @@ Features:
   any relationships are filtered out for clarity.
 </Callout>
 
+### 3.4. Performance Optimizations
+
+The Table Explorer includes automatic performance optimizations:
+
+- **Redis Caching**: All table data is cached in Redis to reduce database load
+  - Parts data: 10-second cache with stale-while-revalidate (30 seconds)
+  - Mutations data: 10-second cache with stale-while-revalidate (30 seconds)
+  - Merges data: 10-second cache with stale-while-revalidate (30 seconds)
+  - Dependencies data: 30-second cache with stale-while-revalidate (60 seconds)
+  - Columns data: 30-second cache with stale-while-revalidate (60 seconds)
+  - Replicas data: 10-second cache with stale-while-revalidate (30 seconds)
+- **HTTP Caching**: Cache-Control headers enable browser and CDN caching
+- **Metadata Caching**: Table schemas and column information are cached to reduce database load
+- **Skeleton Loaders**: Smooth loading experience without data flashing
+
 ---
 
 ## 4. Monitoring
@@ -436,6 +473,18 @@ Real-time cluster health and performance monitoring.
 > Because the demo cluster does not include ClickHouse Keeper/ZooKeeper, the screenshots show errors. This is expected behavior.
 
 ![](/screenshots/monitoring-zookeeper.png)
+
+### 4.1. Performance Optimizations
+
+The Monitoring feature includes automatic performance optimizations:
+
+- **Redis Caching**: All monitoring metrics are cached in Redis to reduce database load
+  - Overview metrics: 10-second cache with stale-while-revalidate (30 seconds)
+  - Dashboard metrics: 10-second cache with stale-while-revalidate (30 seconds)
+  - Custom metrics: 10-second cache with stale-while-revalidate (30 seconds)
+- **HTTP Caching**: Cache-Control headers enable browser and CDN caching
+- **Skeleton Loaders**: Smooth loading experience without data flashing
+- **Efficient Queries**: Optimized queries for system tables to minimize overhead
 
 ---
 
