@@ -14,6 +14,7 @@ import {
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getTableReplicasQuery } from "@/lib/clickhouse/queries/tables";
+import { getOrSet, tablesCache } from "@/lib/cache";
 
 export interface ReplicaInfo {
   is_leader: number;
@@ -120,22 +121,37 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    // Auto-detect cluster
-    const clusterName = await getClusterName(client);
+    const cacheKey = `tables:replicas:${database}:${table}`;
 
-    const result = await client.query<ReplicaInfo>(
-      getTableReplicasQuery(safeDatabase, safeTable, clusterName),
+    const data = await getOrSet(
+      tablesCache,
+      cacheKey,
+      async () => {
+        // Auto-detect cluster
+        const clusterName = await getClusterName(client);
+
+        const result = await client.query<ReplicaInfo>(
+          getTableReplicasQuery(safeDatabase, safeTable, clusterName),
+        );
+
+        const replicas = result.data as unknown as ReplicaInfo[];
+
+        return {
+          replicas,
+          is_replicated: replicas.length > 0,
+        };
+      },
     );
 
-    const replicas = result.data as unknown as ReplicaInfo[];
-
-    return NextResponse.json({
+    const resp = NextResponse.json({
       success: true,
-      data: {
-        replicas: replicas,
-        is_replicated: replicas.length > 0,
-      },
+      data,
     });
+    resp.headers.set(
+      "Cache-Control",
+      "public, s-maxage=10, stale-while-revalidate=30",
+    );
+    return resp;
   } catch (error) {
     console.error("Table replicas error:", error);
 

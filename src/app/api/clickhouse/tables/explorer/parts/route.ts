@@ -14,6 +14,7 @@ import {
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getPartsQuery } from "@/lib/clickhouse/queries/tables";
+import { getOrSet, tablesCache } from "@/lib/cache";
 
 export interface PartInfo {
   partition: string;
@@ -124,47 +125,55 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const result = await client.query<PartInfo>(
-      getPartsQuery(safeDatabase, safeTable, clusterName),
+    // Cache key includes database and table for proper isolation
+    const cacheKey = `tables:parts:${database}:${table}`;
+
+    const data = await getOrSet(
+      tablesCache,
+      cacheKey,
+      async () => {
+        const result = await client.query<PartInfo>(
+          getPartsQuery(safeDatabase, safeTable, clusterName),
+        );
+
+        const parts = result.data as unknown as PartInfo[];
+
+        // Compute compression ratio for each part
+        parts.forEach((part) => {
+          if (part.data_uncompressed_bytes > 0) {
+            part.compression_ratio =
+              part.data_compressed_bytes / part.data_uncompressed_bytes;
+          }
+        });
+
+        // Compute summary
+        const summary = {
+          total_parts: parts.length,
+          total_rows: parts.reduce((sum, p) => sum + Number(p.rows), 0),
+          total_bytes: parts.reduce((sum, p) => sum + Number(p.bytes_on_disk), 0),
+          total_compressed: parts.reduce(
+            (sum, p) => sum + Number(p.data_compressed_bytes),
+            0,
+          ),
+          total_uncompressed: parts.reduce(
+            (sum, p) => sum + Number(p.data_uncompressed_bytes),
+            0,
+          ),
+          avg_compression_ratio: 0,
+        };
+
+        if (summary.total_uncompressed > 0) {
+          summary.avg_compression_ratio =
+            summary.total_compressed / summary.total_uncompressed;
+        }
+
+        return { parts, summary };
+      },
     );
-
-    const parts = result.data as unknown as PartInfo[];
-
-    // Compute compression ratio for each part
-    parts.forEach((part) => {
-      if (part.data_uncompressed_bytes > 0) {
-        part.compression_ratio =
-          part.data_compressed_bytes / part.data_uncompressed_bytes;
-      }
-    });
-
-    // Compute summary
-    const summary = {
-      total_parts: parts.length,
-      total_rows: parts.reduce((sum, p) => sum + Number(p.rows), 0),
-      total_bytes: parts.reduce((sum, p) => sum + Number(p.bytes_on_disk), 0),
-      total_compressed: parts.reduce(
-        (sum, p) => sum + Number(p.data_compressed_bytes),
-        0,
-      ),
-      total_uncompressed: parts.reduce(
-        (sum, p) => sum + Number(p.data_uncompressed_bytes),
-        0,
-      ),
-      avg_compression_ratio: 0,
-    };
-
-    if (summary.total_uncompressed > 0) {
-      summary.avg_compression_ratio =
-        summary.total_compressed / summary.total_uncompressed;
-    }
 
     return NextResponse.json({
       success: true,
-      data: {
-        parts,
-        summary,
-      },
+      data,
     });
   } catch (error) {
     console.error("Table parts error:", error);

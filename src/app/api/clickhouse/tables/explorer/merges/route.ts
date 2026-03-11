@@ -13,6 +13,7 @@ import {
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getTableMergesQuery } from "@/lib/clickhouse/queries/tables";
+import { getOrSet, tablesCache } from "@/lib/cache";
 
 export interface MergeInfo {
   result_part_name: string;
@@ -121,32 +122,43 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const result = await client.query<MergeInfo>(
-      getTableMergesQuery(safeDatabase, safeTable),
+    const cacheKey = `tables:merges:${database}:${table}`;
+
+    const data = await getOrSet(
+      tablesCache,
+      cacheKey,
+      async () => {
+        const result = await client.query<MergeInfo>(
+          getTableMergesQuery(safeDatabase, safeTable),
+        );
+
+        const merges = result.data as unknown as MergeInfo[];
+
+        const summary = {
+          active_merges: merges.length,
+          total_memory_usage: merges.reduce(
+            (sum, m) => sum + Number(m.memory_usage),
+            0,
+          ),
+          total_bytes_to_merge: merges.reduce(
+            (sum, m) => sum + Number(m.total_size_bytes_compressed),
+            0,
+          ),
+        };
+
+        return { merges, summary };
+      },
     );
 
-    const merges = result.data as unknown as MergeInfo[];
-
-    // Compute summary
-    const summary = {
-      active_merges: merges.length,
-      total_memory_usage: merges.reduce(
-        (sum, m) => sum + Number(m.memory_usage),
-        0,
-      ),
-      total_bytes_to_merge: merges.reduce(
-        (sum, m) => sum + Number(m.total_size_bytes_compressed),
-        0,
-      ),
-    };
-
-    return NextResponse.json({
+    const resp = NextResponse.json({
       success: true,
-      data: {
-        merges,
-        summary,
-      },
+      data,
     });
+    resp.headers.set(
+      "Cache-Control",
+      "public, s-maxage=10, stale-while-revalidate=30",
+    );
+    return resp;
   } catch (error) {
     console.error("Table merges error:", error);
 

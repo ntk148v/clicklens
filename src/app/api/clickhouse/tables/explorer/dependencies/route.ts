@@ -21,6 +21,7 @@ import {
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getTableDependenciesQuery, ALL_SYSTEM_TABLES_QUERY } from "@/lib/clickhouse/queries/tables";
+import { getOrSet, tablesCache } from "@/lib/cache";
 
 // Force dynamic rendering to ensure cookies are read on each request
 export const dynamic = "force-dynamic";
@@ -383,212 +384,224 @@ export async function GET(
     const client = createClient(lensConfig);
     const safeDatabase = escapeSqlString(database);
 
-    // Query all tables with dependency info and create query
-    const result = await client.query<RawTableRow>(
-      getTableDependenciesQuery(safeDatabase),
-    );
+    const cacheKey = `tables:dependencies:${database}`;
 
-    // Query all existing tables in the system to validate external references
-    const allTablesResult = await client.query<{
-      database: string;
-      name: string;
-      engine: string;
-    }>(ALL_SYSTEM_TABLES_QUERY);
+    const data = await getOrSet(
+      tablesCache,
+      cacheKey,
+      async () => {
+        // Query all tables with dependency info and create query
+        const result = await client.query<RawTableRow>(
+          getTableDependenciesQuery(safeDatabase),
+        );
 
-    // Build a set of existing table IDs for fast lookup
-    const existingTables = new Map<
-      string,
-      { database: string; name: string; engine: string }
-    >();
-    for (const row of allTablesResult.data) {
-      existingTables.set(`${row.database}.${row.name}`, row);
-    }
+        // Query all existing tables in the system to validate external references
+        const allTablesResult = await client.query<{
+          database: string;
+          name: string;
+          engine: string;
+        }>(ALL_SYSTEM_TABLES_QUERY);
 
-    // Build the graph
-    const nodes: TableNode[] = [];
-    const edges: TableEdge[] = [];
-    const nodeIds = new Set<string>();
-    const edgeIds = new Set<string>();
-
-    // Helper to add a node if not exists
-    // Returns true if the node was added or already exists, false if the table doesn't exist
-    const addNode = (
-      id: string,
-      database: string,
-      name: string,
-      engine: string = "Unknown",
-      validateExists: boolean = false,
-    ): boolean => {
-      if (nodeIds.has(id)) {
-        return true;
-      }
-
-      // If validation is requested, check if table exists
-      if (validateExists) {
-        const existingTable = existingTables.get(id);
-        if (!existingTable) {
-          // Table doesn't exist, skip it
-          return false;
-        }
-        // Use the actual engine from the database
-        engine = existingTable.engine;
-      }
-
-      nodeIds.add(id);
-      nodes.push({
-        id,
-        database,
-        name,
-        engine,
-        type: getTableType(engine),
-        totalRows: null,
-        totalBytes: null,
-      });
-      return true;
-    };
-
-    // Helper to add an edge if not exists
-    const addEdge = (source: string, target: string, type: EdgeType) => {
-      const edgeId = `${source}->${target}:${type}`;
-      if (!edgeIds.has(edgeId)) {
-        edgeIds.add(edgeId);
-        edges.push({
-          id: edgeId,
-          source,
-          target,
-          type,
-        });
-      }
-    };
-
-    // First pass: create nodes for all tables in the database
-    for (const row of result.data) {
-      const nodeId = `${row.database}.${row.name}`;
-      nodeIds.add(nodeId);
-
-      nodes.push({
-        id: nodeId,
-        database: row.database,
-        name: row.name,
-        engine: row.engine,
-        type: getTableType(row.engine),
-        totalRows: row.total_rows,
-        totalBytes: row.total_bytes,
-      });
-    }
-
-    // Second pass: create edges from all dependency sources
-    for (const row of result.data) {
-      const tableId = `${row.database}.${row.name}`;
-      const engineLower = row.engine.toLowerCase();
-
-      // For Materialized Views with TO clause, extract the target first
-      // ClickHouse includes the TO target in dependencies_table, but we handle it
-      // separately as a "target" edge to avoid creating circular references
-      let mvTargetId: string | null = null;
-      if (engineLower === "materializedview" && row.create_table_query) {
-        const cleanedQuery = stripCommentsAndStrings(row.create_table_query);
-        const mvTarget = extractMVTargetTable(cleanedQuery, row.database);
-        if (mvTarget) {
-          mvTargetId = `${mvTarget.database}.${mvTarget.table}`;
-        }
-      }
-
-      // 1. Dependencies from dependencies_table column (source tables)
-      // These are from ClickHouse's metadata, so we validate they exist
-      const depDbs = row.dependencies_database || [];
-      const depTables = row.dependencies_table || [];
-
-      // Check if this is a queue/streaming engine table
-      // These engines list attached MVs in dependencies_table, but the data flow
-      // is from the engine table TO the MV, not the other way around.
-      // Queue-like engines: Kafka, RabbitMQ, NATS, S3Queue, AzureQueue
-      const queueEngines = [
-        "kafka",
-        "rabbitmq",
-        "nats",
-        "s3queue",
-        "azurequeue",
-      ];
-      const isQueueEngine = queueEngines.includes(engineLower);
-
-      for (let i = 0; i < depTables.length; i++) {
-        const depDb = depDbs[i] || row.database;
-        const depTable = depTables[i];
-        const sourceId = `${depDb}.${depTable}`;
-
-        // Skip the MV target table - it's a write target, not a read source
-        // This prevents circular dependency: MV -> target and target -> MV
-        if (sourceId === mvTargetId) {
-          continue;
+        // Build a set of existing table IDs for fast lookup
+        const existingTables = new Map<
+          string,
+          { database: string; name: string; engine: string }
+        >();
+        for (const row of allTablesResult.data) {
+          existingTables.set(`${row.database}.${row.name}`, row);
         }
 
-        // For queue/streaming engine tables, skip Materialized Views in dependencies_table
-        // These engines list attached MVs as "dependencies" but the data flow is
-        // Engine -> MV, not MV -> Engine. The MV will add the correct edge from
-        // its own dependencies_table (engine table as source)
-        if (isQueueEngine) {
-          const depTableInfo = existingTables.get(sourceId);
-          if (
-            depTableInfo &&
-            depTableInfo.engine.toLowerCase() === "materializedview"
-          ) {
-            continue;
+        // Build the graph
+        const nodes: TableNode[] = [];
+        const edges: TableEdge[] = [];
+        const nodeIds = new Set<string>();
+        const edgeIds = new Set<string>();
+
+        // Helper to add a node if not exists
+        // Returns true if the node was added or already exists, false if the table doesn't exist
+        const addNode = (
+          id: string,
+          database: string,
+          name: string,
+          engine: string = "Unknown",
+          validateExists: boolean = false,
+        ): boolean => {
+          if (nodeIds.has(id)) {
+            return true;
+          }
+
+          // If validation is requested, check if table exists
+          if (validateExists) {
+            const existingTable = existingTables.get(id);
+            if (!existingTable) {
+              // Table doesn't exist, skip it
+              return false;
+            }
+            // Use the actual engine from the database
+            engine = existingTable.engine;
+          }
+
+          nodeIds.add(id);
+          nodes.push({
+            id,
+            database,
+            name,
+            engine,
+            type: getTableType(engine),
+            totalRows: null,
+            totalBytes: null,
+          });
+          return true;
+        };
+
+        // Helper to add an edge if not exists
+        const addEdge = (source: string, target: string, type: EdgeType) => {
+          const edgeId = `${source}->${target}:${type}`;
+          if (!edgeIds.has(edgeId)) {
+            edgeIds.add(edgeId);
+            edges.push({
+              id: edgeId,
+              source,
+              target,
+              type,
+            });
+          }
+        };
+
+        // First pass: create nodes for all tables in the database
+        for (const row of result.data) {
+          const nodeId = `${row.database}.${row.name}`;
+          nodeIds.add(nodeId);
+
+          nodes.push({
+            id: nodeId,
+            database: row.database,
+            name: row.name,
+            engine: row.engine,
+            type: getTableType(row.engine),
+            totalRows: row.total_rows,
+            totalBytes: row.total_bytes,
+          });
+        }
+
+        // Second pass: create edges from all dependency sources
+        for (const row of result.data) {
+          const tableId = `${row.database}.${row.name}`;
+          const engineLower = row.engine.toLowerCase();
+
+          // For Materialized Views with TO clause, extract the target first
+          // ClickHouse includes the TO target in dependencies_table, but we handle it
+          // separately as a "target" edge to avoid creating circular references
+          let mvTargetId: string | null = null;
+          if (engineLower === "materializedview" && row.create_table_query) {
+            const cleanedQuery = stripCommentsAndStrings(row.create_table_query);
+            const mvTarget = extractMVTargetTable(cleanedQuery, row.database);
+            if (mvTarget) {
+              mvTargetId = `${mvTarget.database}.${mvTarget.table}`;
+            }
+          }
+
+          // 1. Dependencies from dependencies_table column (source tables)
+          // These are from ClickHouse's metadata, so we validate they exist
+          const depDbs = row.dependencies_database || [];
+          const depTables = row.dependencies_table || [];
+
+          // Check if this is a queue/streaming engine table
+          // These engines list attached MVs in dependencies_table, but the data flow
+          // is from the engine table TO the MV, not the other way around.
+          // Queue-like engines: Kafka, RabbitMQ, NATS, S3Queue, AzureQueue
+          const queueEngines = [
+            "kafka",
+            "rabbitmq",
+            "nats",
+            "s3queue",
+            "azurequeue",
+          ];
+          const isQueueEngine = queueEngines.includes(engineLower);
+
+          for (let i = 0; i < depTables.length; i++) {
+            const depDb = depDbs[i] || row.database;
+            const depTable = depTables[i];
+            const sourceId = `${depDb}.${depTable}`;
+
+            // Skip the MV target table - it's a write target, not a read source
+            // This prevents circular dependency: MV -> target and target -> MV
+            if (sourceId === mvTargetId) {
+              continue;
+            }
+
+            // For queue/streaming engine tables, skip Materialized Views in dependencies_table
+            // These engines list attached MVs as "dependencies" but the data flow is
+            // Engine -> MV, not MV -> Engine. The MV will add the correct edge from
+            // its own dependencies_table (engine table as source)
+            if (isQueueEngine) {
+              const depTableInfo = existingTables.get(sourceId);
+              if (
+                depTableInfo &&
+                depTableInfo.engine.toLowerCase() === "materializedview"
+              ) {
+                continue;
+              }
+            }
+
+            // Add external node if it exists, skip if it doesn't
+            const nodeAdded = addNode(sourceId, depDb, depTable, "Unknown", true);
+            if (nodeAdded) {
+              // Edge: source table -> this table (this table depends on source)
+              addEdge(sourceId, tableId, "source");
+            }
+          }
+
+          // 2. Dependencies parsed from create_table_query
+          // These are from regex parsing, so we validate they exist to avoid false positives
+          const parsedDeps = parseCreateQuery(
+            row.create_table_query,
+            row.engine,
+            row.database,
+          );
+
+          for (const dep of parsedDeps) {
+            const depId = `${dep.database}.${dep.table}`;
+
+            // Add external node only if it exists in the database
+            const nodeAdded = addNode(
+              depId,
+              dep.database,
+              dep.table,
+              "Unknown",
+              true,
+            );
+            if (!nodeAdded) {
+              // Table doesn't exist, skip this dependency
+              continue;
+            }
+
+            if (dep.type === "target") {
+              // MV writes TO target: this MV -> target table
+              addEdge(tableId, depId, "target");
+            } else if (dep.type === "distributed") {
+              // Distributed references local: this distributed -> local table
+              addEdge(tableId, depId, "distributed");
+            } else {
+              // join, dictionary: dep table -> this table
+              addEdge(depId, tableId, dep.type);
+            }
           }
         }
 
-        // Add external node if it exists, skip if it doesn't
-        const nodeAdded = addNode(sourceId, depDb, depTable, "Unknown", true);
-        if (nodeAdded) {
-          // Edge: source table -> this table (this table depends on source)
-          addEdge(sourceId, tableId, "source");
-        }
-      }
-
-      // 2. Dependencies parsed from create_table_query
-      // These are from regex parsing, so we validate they exist to avoid false positives
-      const parsedDeps = parseCreateQuery(
-        row.create_table_query,
-        row.engine,
-        row.database,
-      );
-
-      for (const dep of parsedDeps) {
-        const depId = `${dep.database}.${dep.table}`;
-
-        // Add external node only if it exists in the database
-        const nodeAdded = addNode(
-          depId,
-          dep.database,
-          dep.table,
-          "Unknown",
-          true,
-        );
-        if (!nodeAdded) {
-          // Table doesn't exist, skip this dependency
-          continue;
-        }
-
-        if (dep.type === "target") {
-          // MV writes TO target: this MV -> target table
-          addEdge(tableId, depId, "target");
-        } else if (dep.type === "distributed") {
-          // Distributed references local: this distributed -> local table
-          addEdge(tableId, depId, "distributed");
-        } else {
-          // join, dictionary: dep table -> this table
-          addEdge(depId, tableId, dep.type);
-        }
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        nodes,
-        edges,
+        return { nodes, edges };
       },
+    );
+
+    const resp = NextResponse.json({
+      success: true,
+      data,
     });
+    resp.headers.set(
+      "Cache-Control",
+      "public, s-maxage=30, stale-while-revalidate=60",
+    );
+    return resp;
   } catch (error) {
     console.error("Table dependencies error:", error);
 

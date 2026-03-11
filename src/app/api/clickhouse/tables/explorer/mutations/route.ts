@@ -14,6 +14,7 @@ import {
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getTableMutationsQuery } from "@/lib/clickhouse/queries/tables";
+import { getOrSet, tablesCache } from "@/lib/cache";
 
 export interface MutationInfo {
   mutation_id: string;
@@ -120,27 +121,35 @@ export async function GET(
     // Auto-detect cluster
     const clusterName = await getClusterName(client);
 
-    const result = await client.query<MutationInfo>(
-      getTableMutationsQuery(safeDatabase, safeTable, clusterName),
+    // Cache key includes database and table for proper isolation
+    const cacheKey = `tables:mutations:${database}:${table}`;
+
+    const data = await getOrSet(
+      tablesCache,
+      cacheKey,
+      async () => {
+        const result = await client.query<MutationInfo>(
+          getTableMutationsQuery(safeDatabase, safeTable, clusterName),
+        );
+
+        const mutations = result.data as unknown as MutationInfo[];
+
+        // Compute summary
+        const summary = {
+          total: mutations.length,
+          pending: mutations.filter((m) => m.is_done === 0 && !m.latest_fail_reason)
+            .length,
+          completed: mutations.filter((m) => m.is_done === 1).length,
+          failed: mutations.filter((m) => m.latest_fail_reason).length,
+        };
+
+        return { mutations, summary };
+      },
     );
-
-    const mutations = result.data as unknown as MutationInfo[];
-
-    // Compute summary
-    const summary = {
-      total: mutations.length,
-      pending: mutations.filter((m) => m.is_done === 0 && !m.latest_fail_reason)
-        .length,
-      completed: mutations.filter((m) => m.is_done === 1).length,
-      failed: mutations.filter((m) => m.latest_fail_reason).length,
-    };
 
     return NextResponse.json({
       success: true,
-      data: {
-        mutations,
-        summary,
-      },
+      data,
     });
   } catch (error) {
     console.error("Table mutations error:", error);

@@ -36,6 +36,13 @@ export const monitoringCache: AppCache = new LRUCache<string, CacheValue>({
   allowStale: true, // serve stale while revalidating
 });
 
+/** Cache for tables explorer data (parts, mutations, merges, etc.) */
+export const tablesCache: AppCache = new LRUCache<string, CacheValue>({
+  max: 200,
+  ttl: 300_000, // 5 minutes
+  allowStale: true, // serve stale while revalidating
+});
+
 // ---------------------------------------------------------------------------
 // getOrSet helper
 // ---------------------------------------------------------------------------
