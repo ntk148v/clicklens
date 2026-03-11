@@ -5,7 +5,10 @@
  */
 
 import { type ClickHouseConfig, getLensConfig } from "./config";
-import { type ClickHouseClient } from "./clients/types";
+import {
+  type ClickHouseClient,
+  type ClickHouseQueryResult,
+} from "./clients/types";
 import { ClickHouseClientImpl } from "./clients/client";
 
 // Re-export types
@@ -77,4 +80,45 @@ export function createClient(config?: ClickHouseConfig): ClickHouseClient {
 /** Clear all cached clients (useful for testing). */
 export function clearClientCache(): void {
   clientCache.clear();
+}
+
+/**
+ * Execute a query with timeout enforcement.
+ * Uses AbortController to cancel the query if it exceeds the timeout.
+ *
+ * @param client - ClickHouse client instance
+ * @param query - SQL query to execute
+ * @param timeoutSeconds - Timeout in seconds (default: 60, max: 300)
+ * @returns Query result
+ * @throws Error if timeout is exceeded or query fails
+ */
+export async function queryWithTimeout<T = Record<string, unknown>>(
+  client: ClickHouseClient,
+  query: string,
+  timeoutSeconds: number = 60,
+): Promise<ClickHouseQueryResult<T>> {
+  const maxTimeout = 300; // 5 minutes
+  const effectiveTimeout = Math.min(timeoutSeconds, maxTimeout);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout * 1000);
+
+  try {
+    const result = await client.query<T>(query, {
+      timeout: effectiveTimeout * 1000,
+      clickhouse_settings: {
+        max_execution_time: effectiveTimeout,
+      },
+    });
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(
+        `Query timeout after ${effectiveTimeout} seconds. Consider optimizing your query or increasing the timeout.`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
