@@ -65,7 +65,6 @@ export async function GET(request: Request) {
     const parsedLimit = parseInt(searchParams.get("limit") || "100", 10);
     const limit = isNaN(parsedLimit) ? 100 : Math.min(parsedLimit, 10000);
     const cursor = searchParams.get("cursor");
-    const offset = parseInt(searchParams.get("offset") || "0", 10) || 0;
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";
     const minTime = searchParams.get("minTime");
@@ -168,6 +167,28 @@ export async function GET(request: Request) {
 
     // DATA MODE - Streaming & Chunking
 
+    // Helper function to build time-based WHERE conditions
+    const buildTimeWhereConditions = (
+      timeCol: string | null,
+      minT: string | null,
+      maxT: string | null
+    ): string[] => {
+      const conds: string[] = [];
+      if (timeCol && minT) {
+        const minTimeNum = new Date(minT).getTime();
+        conds.push(
+          `${quoteIdentifier(timeCol)} >= toDateTime64(${minTimeNum / 1000}, 3)`
+        );
+      }
+      if (timeCol && maxT) {
+        const maxTimeNum = new Date(maxT).getTime();
+        conds.push(
+          `${quoteIdentifier(timeCol)} <= toDateTime64(${maxTimeNum / 1000}, 3)`
+        );
+      }
+      return conds;
+    };
+
     // 1. Build Base WHERE (Filter + Smart Search)
     const baseWhere: string[] = [];
 
@@ -225,8 +246,8 @@ export async function GET(request: Request) {
       orderByClause = `ORDER BY ${sorts.join(", ")}`;
     }
 
-    // 2b. Single Query branch (for Group By, explicit Order By, or Pagination Offset)
-    if (groupByParam || orderByParam || offset > 0) {
+    // 2b. Single Query branch (for Group By only)
+    if (groupByParam) {
       let groupByClause = "";
 
       if (groupByParam) {
@@ -252,19 +273,9 @@ export async function GET(request: Request) {
         orderByClause = "";
       }
 
-      const minTimeNum = minTime ? new Date(minTime).getTime() : 0;
-      const maxTimeNum = maxTime ? new Date(maxTime).getTime() : Date.now();
-      
-      if (timeColumn && minTime) {
-        baseWhere.push(
-          `${quoteIdentifier(timeColumn)} >= toDateTime64(${minTimeNum / 1000}, 3)`
-        );
-      }
-      if (timeColumn && maxTime) {
-        baseWhere.push(
-          `${quoteIdentifier(timeColumn)} <= toDateTime64(${maxTimeNum / 1000}, 3)`
-        );
-      }
+      // Add time filtering conditions
+      const timeWhereConditions = buildTimeWhereConditions(timeColumn, minTime, maxTime);
+      baseWhere.push(...timeWhereConditions);
 
       const query = `
         SELECT ${selectClause}
@@ -273,7 +284,6 @@ export async function GET(request: Request) {
         ${groupByClause}
         ${orderByClause}
         LIMIT ${limit}
-        ${offset > 0 ? `OFFSET ${offset}` : ""}
       `;
 
       // Run count query in parallel
