@@ -106,7 +106,7 @@ function extractDetails(error: string, category: ParsedError['category']): strin
   return undefined;
 }
 
-function generateQuickFixes(category: ParsedError['category'], details?: string): QuickFix[] {
+function generateQuickFixes(category: ParsedError['category'], _details?: string): QuickFix[] {
   const fixes: QuickFix[] = [];
 
   if (category === 'connection') {
