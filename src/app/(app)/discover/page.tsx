@@ -6,6 +6,7 @@ import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
 import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
+import { CacheIndicator } from "@/components/discover/CacheIndicator";
 import { TimeSelector, RefreshControl } from "@/components/shared";
 import {
   Select,
@@ -50,6 +51,7 @@ function DiscoverPageContent() {
     pageSize,
     sorting,
     groupBy,
+    cacheMetadata,
 
     setSelectedDatabase,
     handleTableChange,
@@ -275,10 +277,19 @@ function DiscoverPageContent() {
 
               <div className="flex-1 flex flex-col min-h-0 bg-card border rounded-md shadow-sm overflow-hidden">
                 <div className="p-2 border-b text-xs text-muted-foreground flex justify-between items-center">
-                  <span>
-                    {rows.length.toLocaleString()} of{" "}
-                    {totalHits.toLocaleString()} hits
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {rows.length.toLocaleString()} of{" "}
+                      {totalHits.toLocaleString()} hits
+                    </span>
+                    <CacheIndicator
+                      isCached={cacheMetadata?.isCached || false}
+                      cacheAge={cacheMetadata?.cacheAge}
+                      hitRate={cacheMetadata?.hitRate}
+                      totalHits={cacheMetadata?.totalHits}
+                      totalMisses={cacheMetadata?.totalMisses}
+                    />
+                  </div>
                   <span className="font-mono">
                     {selectedDatabase}.{selectedTable}
                   </span>
