@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaginationControls } from "@/components/monitoring";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { useTableMutations } from "@/lib/hooks/use-table-explorer";
 import { TruncatedCell } from "@/components/ui/truncated-cell";
 
@@ -83,9 +84,11 @@ export function MutationsTab({ database, table }: MutationsTabProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-destructive">
-        {error}
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load mutations"
+        message={error}
+      />
     );
   }
 

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PaginationControls } from "@/components/monitoring";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { useTableColumns } from "@/lib/hooks/use-table-explorer";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 
@@ -88,9 +89,11 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-destructive">
-        {error}
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load columns"
+        message={error}
+      />
     );
   }
 

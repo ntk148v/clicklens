@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Loader2, Network, AlertCircle, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import {
   useTableDependencies,
   type TableNode,
@@ -116,10 +117,11 @@ export function DependenciesTab({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-destructive gap-2">
-        <AlertCircle className="h-8 w-8" />
-        <span>{error}</span>
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load dependencies"
+        message={error}
+      />
     );
   }
 

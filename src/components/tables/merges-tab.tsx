@@ -14,6 +14,7 @@ import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { useTableMerges } from "@/lib/hooks/use-table-explorer";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 
@@ -66,9 +67,11 @@ export function MergesTab({ database, table }: MergesTabProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-destructive">
-        {error}
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load merges"
+        message={error}
+      />
     );
   }
 
