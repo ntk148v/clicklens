@@ -1,220 +1,236 @@
 /**
- * ClickHouse Discover/Explore SQL Queries
+ * Discover Query Builder
  *
- * Centralized queries for field-value faceting in the discover page.
+ * Builds ClickHouse SQL queries for the Discover feature.
+ * Separates query construction logic from route handlers for better testability and reusability.
  */
 
 import { quoteIdentifier, escapeSqlString } from "../utils";
 import type {
-  QueryBuilderConfig,
-  HistogramOptions,
-  DataQueryOptions,
-  CountQueryOptions,
-  QueryBuilderResult,
+  DiscoverQueryParams,
+  TableMetadata,
+  HistogramQueryResult,
+  DataQueryResult,
 } from "./types";
 
-// =============================================================================
-// Discover Query Builder
-// =============================================================================
-
 export class DiscoverQueryBuilder {
-  private config: QueryBuilderConfig;
+  private params: DiscoverQueryParams;
+  private metadata: TableMetadata;
 
-  constructor(config: QueryBuilderConfig) {
-    this.config = config;
+  constructor(params: DiscoverQueryParams, metadata: TableMetadata) {
+    this.params = params;
+    this.metadata = metadata;
   }
 
-  buildHistogramQuery(options: HistogramOptions = {}): string {
-    const { minTime, maxTime, filter } = options;
-    const { tableSource, timeColumn, timeColumnType } = this.config;
+  /**
+   * Build histogram query for time-series visualization
+   */
+  buildHistogramQuery(columnType: string = "DateTime"): HistogramQueryResult {
+    const { timeColumn, minTime, maxTime, filter } = this.params;
+    const { tableSource } = this.metadata;
 
     if (!timeColumn) {
-      return `SELECT '' as time, 0 as count`;
+      return {
+        query: "",
+        isDateOnly: false,
+      };
     }
 
     const quotedTimeCol = quoteIdentifier(timeColumn);
-    const isDateOnly = timeColumnType === "Date" || timeColumnType === "Date32";
+    const isDateOnly = columnType === "Date" || columnType === "Date32";
 
     const whereConds: string[] = [];
     if (minTime) {
       const minTimeNum = new Date(minTime).getTime();
       whereConds.push(
-        `${quotedTimeCol} >= toDateTime64(${minTimeNum / 1000}, 3)`,
+        `${quotedTimeCol} >= toDateTime64(${minTimeNum / 1000}, 3)`
       );
     }
     if (maxTime) {
       const maxTimeNum = new Date(maxTime).getTime();
       whereConds.push(
-        `${quotedTimeCol} <= toDateTime64(${maxTimeNum / 1000}, 3)`,
+        `${quotedTimeCol} <= toDateTime64(${maxTimeNum / 1000}, 3)`
       );
     }
-    if (filter) whereConds.push(`(${filter})`);
+    if (filter) {
+      whereConds.push(`(${filter})`);
+    }
 
     const whereClause = whereConds.length
       ? `WHERE ${whereConds.join(" AND ")}`
       : "";
 
+    let query: string;
+
     if (isDateOnly) {
-      return `SELECT ${quotedTimeCol} as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
+      query = `SELECT ${quotedTimeCol} as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
+    } else {
+      const interval = this.calculateHistogramInterval(minTime || undefined, maxTime || undefined);
+      query = `SELECT toStartOfInterval(${quotedTimeCol}, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
     }
 
-    const interval = options.interval || this.calculateInterval(minTime, maxTime);
-    return `SELECT toStartOfInterval(${quotedTimeCol}, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
+    return {
+      query,
+      isDateOnly,
+    };
   }
 
-  buildDataQuery(options: DataQueryOptions): QueryBuilderResult {
-    const {
-      columns,
-      filter,
-      search,
-      minTime,
-      maxTime,
-      limit,
-      offset,
-      orderBy,
-      groupBy,
-    } = options;
-    const { tableSource, timeColumn } = this.config;
+  /**
+   * Calculate histogram interval based on time range
+   * Targets roughly 30-100 buckets to prevent frontend freeze
+   */
+  private calculateHistogramInterval(
+    minTime: string | undefined,
+    maxTime: string | undefined
+  ): string {
+    let interval = "1 week";
 
-    const metadata = {
-      hasGroupBy: !!groupBy,
-      hasOrderBy: !!orderBy || !!timeColumn,
-      hasTimeFilter: !!(minTime || maxTime),
-      hasFilter: !!filter,
-      hasSearch: !!search,
-    };
+    if (minTime) {
+      const diffMs =
+        (maxTime ? new Date(maxTime).getTime() : Date.now()) -
+        new Date(minTime).getTime();
+      const diffHours = diffMs / 36e5;
 
-    let selectClause = columns.length
+      if (diffHours <= 1) interval = "1 minute";
+      else if (diffHours <= 6) interval = "5 minute";
+      else if (diffHours <= 24) interval = "15 minute";
+      else if (diffHours <= 72) interval = "1 hour";
+      else if (diffHours <= 24 * 7) interval = "4 hour";
+      else if (diffHours <= 24 * 30) interval = "1 day";
+      else if (diffHours <= 24 * 365) interval = "1 week";
+      else interval = "1 month";
+    }
+
+    return interval;
+  }
+
+  /**
+   * Build data query for fetching rows
+   */
+  buildDataQuery(): DataQueryResult {
+    const { columns, filter, limit, offset, orderBy, groupBy, timeColumn, minTime, maxTime } = this.params;
+    const { tableSource } = this.metadata;
+
+    const selectClause = columns && columns.length > 0
       ? columns.map((c) => quoteIdentifier(c)).join(", ")
       : "*";
 
-    let groupByClause = "";
-    let groupCols: string[] = [];
+    const baseWhere: string[] = [];
 
-    if (groupBy) {
-      groupCols = groupBy
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean);
-
-      if (groupCols.length > 0) {
-        const quotedGroupCols = groupCols.map((c) => quoteIdentifier(c));
-        groupByClause = `GROUP BY ${quotedGroupCols.join(", ")}`;
-        selectClause = `${quotedGroupCols.join(", ")}, count() as count`;
-      }
+    if (filter && filter.trim()) {
+      baseWhere.push(`(${filter})`);
     }
 
-    let orderByClause = "";
-    if (timeColumn && !orderBy) {
-      orderByClause = `ORDER BY ${quoteIdentifier(timeColumn)} DESC`;
-    }
+    const timeWhereConditions = this.buildTimeWhereConditions(timeColumn, minTime, maxTime);
+    baseWhere.push(...timeWhereConditions);
 
-    if (orderBy) {
-      const validatedOrderBy = this.validateOrderBy(orderBy, groupCols);
-      if (validatedOrderBy) {
-        orderByClause = `ORDER BY ${validatedOrderBy}`;
-      }
-    }
-
-    const whereConds: string[] = [];
-    if (filter) whereConds.push(`(${filter})`);
-    if (search) whereConds.push(`(${search})`);
-
-    if (timeColumn && minTime) {
-      const minTimeNum = new Date(minTime).getTime();
-      whereConds.push(
-        `${quoteIdentifier(timeColumn)} >= toDateTime64(${minTimeNum / 1000}, 3)`,
-      );
-    }
-    if (timeColumn && maxTime) {
-      const maxTimeNum = new Date(maxTime).getTime();
-      whereConds.push(
-        `${quoteIdentifier(timeColumn)} <= toDateTime64(${maxTimeNum / 1000}, 3)`,
-      );
-    }
-
-    const whereClause = whereConds.length
-      ? `WHERE ${whereConds.join(" AND ")}`
+    const whereClause = baseWhere.length > 0
+      ? `WHERE ${baseWhere.join(" AND ")}`
       : "";
 
+    const orderByClause = this.buildOrderByClause(orderBy, groupBy, timeColumn);
+    const groupByClause = this.buildGroupByClause(groupBy, selectClause);
+
+    const finalSelectClause = groupByClause && groupBy ? this.getGroupBySelectClause(groupBy) : selectClause;
+
     const query = `
-      SELECT ${selectClause}
+      SELECT ${finalSelectClause}
       FROM ${tableSource}
       ${whereClause}
       ${groupByClause}
       ${orderByClause}
       LIMIT ${limit}
       ${offset > 0 ? `OFFSET ${offset}` : ""}
-    `.trim();
+    `;
 
-    return { query, metadata };
+    const countQuery = this.buildCountQuery(whereClause, groupByClause);
+
+    return {
+      query: query.trim(),
+      countQuery,
+      selectClause: finalSelectClause,
+      groupByClause,
+      orderByClause,
+      whereClause,
+    };
   }
 
-  buildCountQuery(options: CountQueryOptions): string {
-    const { filter, search, minTime, maxTime, groupBy } = options;
-    const { tableSource, timeColumn } = this.config;
+  /**
+   * Build time-based WHERE conditions
+   */
+  private buildTimeWhereConditions(
+    timeCol: string | undefined,
+    minT: string | undefined,
+    maxT: string | undefined
+  ): string[] {
+    const conds: string[] = [];
 
-    const whereConds: string[] = [];
-    if (filter) whereConds.push(`(${filter})`);
-    if (search) whereConds.push(`(${search})`);
-
-    if (timeColumn && minTime) {
-      const minTimeNum = new Date(minTime).getTime();
-      whereConds.push(
-        `${quoteIdentifier(timeColumn)} >= toDateTime64(${minTimeNum / 1000}, 3)`,
+    if (timeCol && minT) {
+      const minTimeNum = new Date(minT).getTime();
+      conds.push(
+        `${quoteIdentifier(timeCol)} >= toDateTime64(${minTimeNum / 1000}, 3)`
       );
     }
-    if (timeColumn && maxTime) {
-      const maxTimeNum = new Date(maxTime).getTime();
-      whereConds.push(
-        `${quoteIdentifier(timeColumn)} <= toDateTime64(${maxTimeNum / 1000}, 3)`,
+
+    if (timeCol && maxT) {
+      const maxTimeNum = new Date(maxT).getTime();
+      conds.push(
+        `${quoteIdentifier(timeCol)} <= toDateTime64(${maxTimeNum / 1000}, 3)`
       );
     }
 
-    const whereClause = whereConds.length
-      ? `WHERE ${whereConds.join(" AND ")}`
-      : "";
+    return conds;
+  }
 
-    if (groupBy) {
-      const groupCols = groupBy
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean);
-      const quotedGroupCols = groupCols.map((c) => quoteIdentifier(c));
-      const groupByClause = `GROUP BY ${quotedGroupCols.join(", ")}`;
+  /**
+   * Build ORDER BY clause with validation for GROUP BY queries
+   */
+  private buildOrderByClause(
+    orderBy: string | undefined,
+    groupBy: string | undefined,
+    timeColumn: string | undefined
+  ): string {
+    const quotedTimeSortCol = timeColumn ? quoteIdentifier(timeColumn) : "";
+    let orderByClause = "";
 
-      return `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${whereClause} ${groupByClause})`;
+    if (!groupBy && quotedTimeSortCol) {
+      orderByClause = `ORDER BY ${quotedTimeSortCol} DESC`;
     }
 
-    return `SELECT count() as cnt FROM ${tableSource} ${whereClause}`;
-  }
-
-  private calculateInterval(minTime?: string, maxTime?: string): string {
-    if (!minTime) return "1 week";
-
-    const diffMs =
-      (maxTime ? new Date(maxTime).getTime() : Date.now()) -
-      new Date(minTime).getTime();
-    const diffHours = diffMs / 36e5;
-
-    if (diffHours <= 1) return "1 minute";
-    if (diffHours <= 6) return "5 minute";
-    if (diffHours <= 24) return "15 minute";
-    if (diffHours <= 72) return "1 hour";
-    if (diffHours <= 24 * 7) return "4 hour";
-    if (diffHours <= 24 * 30) return "1 day";
-    if (diffHours <= 24 * 365) return "1 week";
-    return "1 month";
-  }
-
-  private validateOrderBy(orderBy: string, groupCols: string[]): string | null {
-    if (!groupCols.length) {
+    if (orderBy) {
       const sorts = orderBy.split(",").map((s) => {
         const [col, dir] = s.split(":");
         return `${quoteIdentifier(col)} ${dir.toUpperCase() === "ASC" ? "ASC" : "DESC"}`;
       });
-      return sorts.join(", ");
+
+      if (groupBy) {
+        const validSorts = this.validateOrderByForGroupBy(orderBy, groupBy);
+        if (validSorts.length > 0) {
+          const parsedValidSorts = validSorts.map((s) => {
+            const [col, dir] = s.split(":");
+            return `${quoteIdentifier(col)} ${dir.toUpperCase() === "ASC" ? "ASC" : "DESC"}`;
+          });
+          orderByClause = `ORDER BY ${parsedValidSorts.join(", ")}`;
+        } else {
+          orderByClause = "";
+        }
+      } else {
+        orderByClause = `ORDER BY ${sorts.join(", ")}`;
+      }
     }
+
+    return orderByClause;
+  }
+
+  /**
+   * Validate ORDER BY columns when GROUP BY is active
+   * SQL only allows ORDER BY on columns in GROUP BY or aggregate functions
+   */
+  private validateOrderByForGroupBy(orderBy: string, groupBy: string): string[] {
+    const groupCols = groupBy
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
 
     const aggregateFunctions = [
       "count",
@@ -226,40 +242,110 @@ export class DiscoverQueryBuilder {
       "anyLast",
     ];
 
-    const validSorts = orderBy.split(",").filter((sortStr) => {
+    return orderBy.split(",").filter((sortStr) => {
       const [col] = sortStr.split(":");
       const colName = col.trim();
 
       if (groupCols.includes(colName)) return true;
+
       if (
         aggregateFunctions.some((agg) =>
-          colName.toLowerCase().startsWith(agg + "("),
+          colName.toLowerCase().startsWith(agg + "(")
         )
       )
         return true;
 
       return false;
     });
+  }
 
-    if (validSorts.length === 0) return null;
+  /**
+   * Build GROUP BY clause
+   */
+  private buildGroupByClause(groupBy: string | undefined, selectClause: string): string {
+    if (!groupBy) return "";
 
-    const sorts = validSorts.map((s) => {
-      const [col, dir] = s.split(":");
-      return `${quoteIdentifier(col)} ${dir.toUpperCase() === "ASC" ? "ASC" : "DESC"}`;
-    });
-    return sorts.join(", ");
+    const groupCols = groupBy
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    if (groupCols.length === 0) return "";
+
+    const quotedGroupCols = groupCols.map((c) => quoteIdentifier(c));
+    return `GROUP BY ${quotedGroupCols.join(", ")}`;
+  }
+
+  /**
+   * Get SELECT clause for GROUP BY queries
+   * When GROUP BY is active, only select the grouped columns + count()
+   */
+  private getGroupBySelectClause(groupBy: string): string {
+    const groupCols = groupBy
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    const quotedGroupCols = groupCols.map((c) => quoteIdentifier(c));
+    return `${quotedGroupCols.join(", ")}, count() as count`;
+  }
+
+  /**
+   * Build count query for pagination
+   */
+  private buildCountQuery(whereClause: string, groupByClause: string): string {
+    const { tableSource } = this.metadata;
+
+    let countQuery = `SELECT count() as cnt FROM ${tableSource}`;
+
+    if (whereClause) {
+      countQuery += ` ${whereClause}`;
+    }
+
+    if (groupByClause) {
+      countQuery = `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${whereClause} ${groupByClause})`;
+    }
+
+    return countQuery;
+  }
+
+  /**
+   * Validate SQL filter for dangerous operations
+   */
+  static validateFilter(filter: string): { valid: boolean; error?: string } {
+    const DANGEROUS_KEYWORDS =
+      /\b(DROP|DELETE|ALTER|GRANT|REVOKE|TRUNCATE|INSERT|UPDATE|CREATE|ATTACH|DETACH|RENAME|KILL|SYSTEM)\b/i;
+    const DANGEROUS_PATTERNS = /;\s*\S/;
+
+    if (DANGEROUS_KEYWORDS.test(filter) || DANGEROUS_PATTERNS.test(filter)) {
+      return {
+        valid: false,
+        error: "Invalid filter: contains disallowed keywords",
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Build query to get distinct values for a column with counts
+   * Used for faceted exploration in the field sidebar
+   */
+  static getFieldValuesQuery(
+    tableSource: string,
+    quotedColumn: string,
+    whereClause: string,
+    limit: number
+  ): string {
+    return `SELECT ${quotedColumn} as value, count() as count FROM ${tableSource} ${whereClause} GROUP BY value ORDER BY count DESC LIMIT ${limit}`;
   }
 }
 
-// =============================================================================
-// Field Values (Faceted Exploration)
-// =============================================================================
-
-/** Get top distinct values for a column, used by field sidebar */
-export const getFieldValuesQuery = (
+export function getFieldValuesQuery(
   tableSource: string,
-  quotedCol: string,
+  quotedColumn: string,
   whereClause: string,
-  limit: number,
-) =>
-  `SELECT ${quotedCol} AS value, count() AS count FROM ${tableSource} ${whereClause} GROUP BY value ORDER BY count DESC LIMIT ${limit}`;
+  limit: number
+): string {
+  return DiscoverQueryBuilder.getFieldValuesQuery(tableSource, quotedColumn, whereClause, limit);
+}

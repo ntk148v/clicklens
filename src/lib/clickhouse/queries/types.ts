@@ -1,75 +1,65 @@
 /**
- * Types for ClickHouse Discover Query Builder
+ * Discover Query Builder Types
+ *
+ * Type definitions for the Discover feature query builder module.
  */
 
-import type { DiscoverQueryParams, TableSchema } from "@/lib/types/discover";
-
-/**
- * Query builder configuration
- */
-export interface QueryBuilderConfig {
+export interface DiscoverQueryParams {
   database: string;
   table: string;
-  tableSource: string; // Fully qualified table name with cluster if applicable
+  mode: "data" | "histogram";
+  columns?: string[];
   timeColumn?: string;
-  timeColumnType?: string; // DateTime, Date, Date32, etc.
-}
-
-/**
- * Histogram query options
- */
-export interface HistogramOptions {
   minTime?: string;
   maxTime?: string;
   filter?: string;
-  interval?: string; // Auto-calculated if not provided
-}
-
-/**
- * Data query options
- */
-export interface DataQueryOptions {
-  columns: string[];
-  filter?: string;
-  search?: string;
-  minTime?: string;
-  maxTime?: string;
   limit: number;
   offset: number;
   orderBy?: string;
   groupBy?: string;
-}
-
-/**
- * Count query options
- */
-export interface CountQueryOptions {
-  filter?: string;
   search?: string;
-  minTime?: string;
-  maxTime?: string;
-  groupBy?: string;
 }
 
-/**
- * Built query result
- */
-export interface BuiltQuery {
-  query: string;
-  params?: Record<string, unknown>;
+export interface TableMetadata {
+  database: string;
+  table: string;
+  engine: string;
+  clusterName?: string;
+  isDistributed: boolean;
+  tableSource: string;
 }
 
-/**
- * Query builder result with metadata
- */
-export interface QueryBuilderResult {
+export interface HistogramQueryResult {
   query: string;
-  countQuery?: string;
-  metadata?: {
-    hasGroupBy: boolean;
-    hasOrderBy: boolean;
-    hasTimeFilter: boolean;
-    hasFilter: boolean;
-    hasSearch: boolean;
-  };
+  isDateOnly: boolean;
 }
+
+export interface DataQueryResult {
+  query: string;
+  countQuery: string;
+  selectClause: string;
+  groupByClause: string;
+  orderByClause: string;
+  whereClause: string;
+}
+
+export interface QueryBuilderOptions {
+  validateSQL?: boolean;
+  enableSmartSearch?: boolean;
+}
+
+export interface SortDirection {
+  column: string;
+  direction: "ASC" | "DESC";
+}
+
+export interface ValidationError {
+  valid: false;
+  error: string;
+}
+
+export interface ValidationSuccess {
+  valid: true;
+}
+
+export type ValidationResult = ValidationError | ValidationSuccess;
