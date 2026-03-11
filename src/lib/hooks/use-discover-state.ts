@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
 import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
+import { MetadataCache } from "@/lib/clickhouse/metadata-cache";
 import type {
   TableSchema,
   DiscoverRow,
@@ -134,6 +135,13 @@ export interface DiscoverState {
   // Sorting and Grouping
   sorting: import("@tanstack/react-table").SortingState;
   groupBy: string[];
+
+  // Row windowing
+  rowWindow: {
+    startIndex: number;
+    endIndex: number;
+    rows: DiscoverRow[];
+  };
 }
 
 export interface DiscoverActions {
@@ -154,6 +162,7 @@ export interface DiscoverActions {
   filterOutValue: (column: string, value: unknown) => void;
   setSorting: import("@tanstack/react-table").OnChangeFn<import("@tanstack/react-table").SortingState>;
   setGroupBy: (groupBy: string[]) => void;
+  updateRowWindow: (visibleStart: number, visibleEnd: number) => void;
 }
 
 export function useDiscoverState(): DiscoverState & DiscoverActions {
@@ -175,7 +184,15 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
   const [schemaLoading, setSchemaLoading] = useState(false);
 
   // Schema cache: avoids re-fetching when switching back to a table
-  const schemaCacheRef = useRef<Map<string, TableSchema>>(new Map());
+  const schemaCache = useMemo(() => new MetadataCache(), []);
+
+  // Invalidate cache when database or table changes
+  useEffect(() => {
+    if (selectedDatabase && selectedTable) {
+      const cacheKey = `${selectedDatabase}.${selectedTable}`;
+      schemaCache.invalidate(cacheKey);
+    }
+  }, [selectedDatabase, selectedTable, schemaCache]);
 
   // Query
   const [selectedColumns, setSelectedColumnsRaw] = useState<string[]>([]);
@@ -202,6 +219,47 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  // Row windowing for memory efficiency
+  const BUFFER_SIZE = 50;
+  const [rowWindow, setRowWindow] = useState<{
+    startIndex: number;
+    endIndex: number;
+    rows: DiscoverRow[];
+  }>({
+    startIndex: 0,
+    endIndex: Math.min(BUFFER_SIZE * 2, DEFAULT_PAGE_SIZE),
+    rows: [],
+  });
+
+  // Update row window based on visible rows
+  const updateRowWindow = useCallback(
+    (visibleStart: number, visibleEnd: number) => {
+      setRowWindow((prev) => {
+        const newStart = Math.max(0, visibleStart - BUFFER_SIZE);
+        const newEnd = Math.min(totalHits, visibleEnd + BUFFER_SIZE);
+
+        if (newStart === prev.startIndex && newEnd === prev.endIndex) {
+          return prev;
+        }
+
+        return {
+          startIndex: newStart,
+          endIndex: newEnd,
+          rows: rows.slice(newStart, newEnd),
+        };
+      });
+    },
+    [rows, totalHits],
+  );
+
+  // Update row window when rows change
+  useEffect(() => {
+    setRowWindow((prev) => ({
+      ...prev,
+      rows: rows.slice(prev.startIndex, prev.endIndex),
+    }));
+  }, [rows]);
 
   // Sorting and Grouping
   const [sorting, setSorting] = useState<import("@tanstack/react-table").SortingState>([]);
@@ -712,38 +770,32 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
 
     const cacheKey = `${selectedDatabase}.${selectedTable}`;
 
-    // Check cache first
-    const cached = schemaCacheRef.current.get(cacheKey);
-    if (cached) {
-      applySchema(cached);
-      return;
-    }
-
     const loadSchema = async () => {
       setSchemaLoading(true);
       try {
-        const res = await fetch(
-          `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(selectedDatabase)}&table=${encodeURIComponent(selectedTable)}`,
-        );
-        const data = await res.json();
-        if (data.success && data.data) {
-          schemaCacheRef.current.set(cacheKey, data.data);
-          applySchema(data.data);
-        } else if (data.error) {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: data.error.userMessage || data.error,
-          });
-          setSchema(null);
-        }
+        const fetchSchema = async () => {
+          const res = await fetch(
+            `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(selectedDatabase)}&table=${encodeURIComponent(selectedTable)}`,
+          );
+          const data = await res.json();
+          if (data.success && data.data) {
+            return data.data;
+          } else if (data.error) {
+            throw new Error(data.error.userMessage || data.error);
+          }
+          throw new Error("Failed to load schema");
+        };
+
+        const tableSchema = await schemaCache.getOrFetch(cacheKey, fetchSchema);
+        applySchema(tableSchema);
       } catch (err) {
         console.error("Failed to load schema:", err);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to load table schema",
+          description: err instanceof Error ? err.message : "Failed to load table schema",
         });
+        setSchema(null);
       } finally {
         setSchemaLoading(false);
       }
@@ -917,6 +969,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     pageSize,
     sorting,
     groupBy,
+    rowWindow,
 
     // Actions
     setSelectedDatabase,
@@ -936,5 +989,6 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     resetColumns,
     filterForValue,
     filterOutValue,
+    updateRowWindow,
   };
 }

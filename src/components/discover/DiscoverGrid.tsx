@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo, useRef, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,6 +10,7 @@ import {
   SortingState,
   ColumnDef,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Table,
   TableBody,
@@ -50,6 +51,7 @@ interface DiscoverGridProps {
   onFilterOutValue?: (column: string, value: unknown) => void;
   sorting: SortingState;
   onSortingChange: import("@tanstack/react-table").OnChangeFn<SortingState>;
+  updateRowWindow?: (visibleStart: number, visibleEnd: number) => void;
 }
 
 const columnHelper = createColumnHelper<DiscoverRow>();
@@ -161,6 +163,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   onFilterOutValue,
   sorting,
   onSortingChange,
+  updateRowWindow,
 }: DiscoverGridProps) {
   const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
@@ -168,6 +171,8 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   const [contextMenu, setContextMenu] = useState<CellContextMenuState | null>(
     null,
   );
+
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const columnTypes = useMemo(() => {
     const types: Record<string, string> = {};
@@ -255,6 +260,23 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     getSortedRowModel: getSortedRowModel(),
   });
 
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 40,
+    overscan: 10,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+
+  useEffect(() => {
+    if (updateRowWindow && virtualRows.length > 0) {
+      const visibleStart = virtualRows[0].index;
+      const visibleEnd = virtualRows[virtualRows.length - 1].index;
+      updateRowWindow(visibleStart, visibleEnd);
+    }
+  }, [virtualRows, updateRowWindow]);
+
   const handleRowClick = (row: DiscoverRow, index: number) => {
     setSelectedRow(row);
     setSelectedRowIndex(index);
@@ -282,7 +304,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   return (
     <>
       <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-auto">
+        <div ref={parentRef} className="flex-1 overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -319,39 +341,59 @@ export const DiscoverGrid = memo(function DiscoverGrid({
               ))}
             </TableHeader>
             <TableBody isLoading={isLoading}>
-              {table.getRowModel().rows.map((row, index) => (
-                <tr
-                  key={row.id}
-                  data-slot="table-row"
-                  className={cn(
-                    "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
-                    selectedRow === row.original && sheetOpen && "bg-muted",
-                  )}
-                  onClick={() => handleRowClick(row.original, index)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className="data-table-cell last:border-r-0"
-                      onContextMenu={(e) =>
-                        handleCellContextMenu(
-                          e,
-                          cell.column.id,
-                          cell.getValue(),
-                        )
-                      }
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                {virtualRows.map((virtualRow) => {
+                  const row = table.getRowModel().rows[virtualRow.index];
+                  return (
+                    <tr
+                      key={row.id}
+                      data-slot="table-row"
+                      data-index={virtualRow.index}
+                      className={cn(
+                        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group absolute w-full",
+                        selectedRow === row.original && sheetOpen && "bg-muted",
                       )}
-                    </TableCell>
-                  ))}
-                  <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
-                    <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </td>
-                </tr>
-              ))}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      onClick={() => handleRowClick(row.original, virtualRow.index)}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          className="data-table-cell last:border-r-0"
+                          onContextMenu={(e) =>
+                            handleCellContextMenu(
+                              e,
+                              cell.column.id,
+                              cell.getValue(),
+                            )
+                          }
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      ))}
+                      <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
+                        <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </div>
             </TableBody>
           </Table>
         </div>

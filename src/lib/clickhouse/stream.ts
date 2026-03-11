@@ -1,4 +1,10 @@
 import { createClient } from "./client";
+import {
+  generateTimeWindowsDescending,
+  shouldUseWindowing,
+  type TimeWindow,
+} from "./time-windows";
+import type { DiscoverRow } from "@/lib/types/discover";
 
 export interface FetchChunksParams {
   client: ReturnType<typeof createClient>;
@@ -62,26 +68,30 @@ export async function* fetchChunks({
     return;
   }
 
-  // Calculate Chunks
-  // Start from maxTime (or now) down to minTime
-  // Ensure valid times
+  // Calculate Chunks using progressive time windowing
   const MaxTimeNum = maxTime ? new Date(maxTime).getTime() : Date.now();
   const MinTimeNum = minTime
     ? new Date(minTime).getTime()
     : Date.now() - 24 * 3600 * 1000;
 
-  const End = MaxTimeNum;
-  const Start = MinTimeNum;
+  const startDate = new Date(MinTimeNum);
+  const endDate = new Date(MaxTimeNum);
 
-  const TotalDuration = End - Start;
-  let ChunkSize = 6 * 60 * 60 * 1000; // 6 hours
+  let windows: TimeWindow[] = [];
 
-  if (TotalDuration < ChunkSize && TotalDuration > 0) {
-    ChunkSize = TotalDuration; // Single chunk
+  if (shouldUseWindowing(startDate, endDate)) {
+    windows = generateTimeWindowsDescending(startDate, endDate);
+  } else {
+    // Single window for small time ranges
+    windows = [
+      {
+        startTime: startDate,
+        endTime: endDate,
+        windowIndex: 0,
+        direction: "DESC",
+      },
+    ];
   }
-
-  let currentHigh = End;
-  let hasMoreChunks = true;
 
   if (cursor) {
     const cursorTimeNum = new Date(cursor).getTime();
@@ -111,24 +121,19 @@ export async function* fetchChunks({
 
   yield JSON.stringify({ meta: { totalHits: -1 } }) + "\n";
 
-  while (hasMoreChunks && rowsFetched < limit) {
-    const currentLow = Math.max(Start, currentHigh - ChunkSize);
+  // Execute chunks in parallel (max 3 concurrent)
+  const MAX_CONCURRENT_CHUNKS = 3;
+  const chunkPromises: Promise<{ rows: DiscoverRow[]; windowIndex: number }>[] = [];
+
+  for (let i = 0; i < windows.length && rowsFetched < limit; i++) {
+    const window = windows[i];
+    const currentLow = window.startTime.getTime();
+    const currentHigh = window.endTime.getTime();
 
     const chunkWhere = [...whereConditions];
 
     // Chunk Time Range
-    // If we are at the very top (End), we include <= highIso IF it's the first chunk logic,
-    // but typically we want < highIso for subsequent chunks.
-    // However, our loop logic is: [low, high).
-    // Let's stick to the existing logic:
-    // If currentHigh == End (first iteration), use <= if no cursor?
-    // Actually, if we have a cursor, we already added `safeTimeCol < cursor`.
-    // The chunk logic is `safeTimeCol >= low` AND `safeTimeCol < high`.
-    // Exception: If currentHigh is the absolute max requested, we might want <= ?
-    // But typically usually logs are continuous.
-
-    // Original Logic:
-    if (currentHigh === End) {
+    if (i === 0) {
       chunkWhere.push(
         `${safeTimeCol} <= toDateTime64(${currentHigh / 1000}, 3)`,
       );
@@ -151,25 +156,33 @@ export async function* fetchChunks({
       LIMIT ${chunkLimit}
     `;
 
-    try {
-      const rs = await client.query(query);
-      const rows = rs.data;
+    const promise = client
+      .query(query)
+      .then((rs) => ({
+        rows: rs.data as DiscoverRow[],
+        windowIndex: i,
+      }))
+      .catch((e) => {
+        console.error("Chunk query error", e);
+        return { rows: [], windowIndex: i };
+      });
 
-      for (const row of rows) {
-        yield JSON.stringify(row) + "\n";
-        rowsFetched++;
+    chunkPromises.push(promise);
+
+    if (chunkPromises.length >= MAX_CONCURRENT_CHUNKS || i === windows.length - 1) {
+      const results = await Promise.all(chunkPromises);
+
+      for (const result of results) {
+        for (const row of result.rows) {
+          yield JSON.stringify(row) + "\n";
+          rowsFetched++;
+          if (rowsFetched >= limit) break;
+        }
         if (rowsFetched >= limit) break;
       }
-    } catch (e) {
-      console.error("Chunk query error", e);
-      yield JSON.stringify({ error: String(e) }) + "\n";
-      return;
-    }
 
-    if (currentLow <= Start) {
-      hasMoreChunks = false;
+      chunkPromises.length = 0;
     }
-    currentHigh = currentLow;
   }
 
   // Emit resolved count as a trailing metadata update
