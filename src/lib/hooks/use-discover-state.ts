@@ -6,6 +6,11 @@ import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
 import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
 import { MetadataCache } from "@/lib/clickhouse/metadata-cache";
+import {
+  type CacheMetadata,
+  type CacheTrackingState,
+  updateCacheMetadata,
+} from "@/lib/hooks/cache-metadata";
 import type {
   TableSchema,
   DiscoverRow,
@@ -142,6 +147,9 @@ export interface DiscoverState {
     endIndex: number;
     rows: DiscoverRow[];
   };
+
+  // Cache metadata
+  cacheMetadata?: CacheMetadata;
 }
 
 export interface DiscoverActions {
@@ -264,6 +272,15 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
   // Sorting and Grouping
   const [sorting, setSorting] = useState<import("@tanstack/react-table").SortingState>([]);
   const [groupBy, setGroupBy] = useState<string[]>([]);
+
+  // Cache metadata tracking
+  const [cacheMetadata, setCacheMetadata] = useState<CacheMetadata | undefined>();
+  const cacheTrackingRef = useRef<CacheTrackingState>({
+    totalHits: 0,
+    totalMisses: 0,
+    lastQueryKey: null,
+    lastCacheTimestamp: null,
+  });
 
   // Abort controllers for cancellation (P3)
   const dataAbortRef = useRef<AbortController | null>(null);
@@ -531,6 +548,29 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       ) {
         setCustomFilter(filterOverride);
       }
+
+      // Generate query key for cache tracking
+      const queryKey = JSON.stringify({
+        filter: filterToApply,
+        flexibleRange,
+        columns: selectedColumns,
+        timeColumn: selectedTimeColumn,
+        sorting,
+        groupBy,
+      });
+
+      // Determine if this is a cache hit (same query as last executed)
+      const isFromCache =
+        lastExecutedRef.current !== null &&
+        JSON.stringify(lastExecutedRef.current) === queryKey;
+
+      // Update cache metadata
+      const metadata = updateCacheMetadata(
+        cacheTrackingRef.current,
+        queryKey,
+        isFromCache,
+      );
+      setCacheMetadata(metadata);
 
       // Snapshot executed state for dirty tracking
       lastExecutedRef.current = {
@@ -970,6 +1010,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
     sorting,
     groupBy,
     rowWindow,
+    cacheMetadata,
 
     // Actions
     setSelectedDatabase,
