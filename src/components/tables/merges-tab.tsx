@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Combine, Activity } from "lucide-react";
+import { Combine, Activity } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { useTableMerges } from "@/lib/hooks/use-table-explorer";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 
@@ -58,11 +59,7 @@ export function MergesTab({ database, table }: MergesTabProps) {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Loader2,
   Server,
   AlertTriangle,
   CheckCircle,
@@ -9,6 +8,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { useTableReplicas } from "@/lib/hooks/use-table-explorer";
 
 interface ReplicasTabProps {
@@ -44,11 +44,7 @@ export function ReplicasTab({ database, table }: ReplicasTabProps) {
   const { data, isLoading, error } = useTableReplicas(database, table);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

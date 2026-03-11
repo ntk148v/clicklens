@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { Loader2, Network, AlertCircle, Info } from "lucide-react";
+import { Network, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import {
   useTableDependencies,
   type TableNode,
@@ -108,11 +109,7 @@ export function DependenciesTab({
   }, [data, selectedTable, database]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

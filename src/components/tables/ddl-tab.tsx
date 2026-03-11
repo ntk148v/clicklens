@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Code, Copy, Check } from "lucide-react";
+import { Code, Copy, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { copyToClipboard } from "@/lib/utils";
 
 interface DdlTabProps {
@@ -86,11 +87,7 @@ export function DdlTab({ database, table }: DdlTabProps) {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Loader2, Layers } from "lucide-react";
+import { Layers } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaginationControls } from "@/components/monitoring";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { useTableParts } from "@/lib/hooks/use-table-explorer";
 import { formatBytes, formatNumber } from "@/lib/hooks/use-monitoring";
 
@@ -74,11 +75,7 @@ export function PartsTab({ database, table }: PartsTabProps) {
   }, [parts, pageSize]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

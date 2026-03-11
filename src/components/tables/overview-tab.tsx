@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Loader2,
   Database,
   HardDrive,
   Layers,
@@ -12,6 +11,7 @@ import {
   Eye,
   Info,
 } from "lucide-react";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { useTableOverview } from "@/lib/hooks/use-table-explorer";
 
 interface OverviewTabProps {
@@ -86,11 +86,7 @@ export function OverviewTab({ database, table }: OverviewTabProps) {
   const { data, isLoading, error } = useTableOverview(database, table);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

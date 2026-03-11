@@ -10,3 +10,4 @@ export * from "./TimeRangeSelector";
 export { TablePreview } from "./TablePreview";
 export { SavedQueries } from "./SavedQueries";
 export { SaveQueryDialog } from "./SaveQueryDialog";
+export { SqlResultSkeleton } from "./SqlResultSkeleton";

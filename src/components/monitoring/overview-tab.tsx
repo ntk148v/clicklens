@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { MonitoringOverviewSkeleton } from "@/components/monitoring/MonitoringOverviewSkeleton";
 import { useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type { FlexibleTimeRange } from "@/lib/types/discover";
 import { getMinTimeFromRange, type TimeRange } from "@/lib/types/discover";
@@ -125,6 +126,10 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
         onRetry={fetchData}
       />
     );
+  }
+
+  if (isLoading && !data) {
+    return <MonitoringOverviewSkeleton />;
   }
 
   const nodes = data?.nodes || [];

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Loader2, Columns } from "lucide-react";
+import { Columns } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PaginationControls } from "@/components/monitoring";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { useTableColumns } from "@/lib/hooks/use-table-explorer";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 
@@ -80,11 +81,7 @@ export function ColumnsTab({ database, table }: ColumnsTabProps) {
   }, [columns]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableExplorerSkeleton />;
   }
 
   if (error) {

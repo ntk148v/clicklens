@@ -17,6 +17,7 @@ import {
   ExplainButton,
   ExplainVisualizer,
   TimeRangeSelector,
+  SqlResultSkeleton,
   type ExplainType,
 } from "@/components/sql";
 
@@ -1170,7 +1171,9 @@ export default function SqlConsolePage() {
 
                 {/* Result area */}
                 <div className="flex-1 min-h-0">
-                  {activeQueryTab.result ? (
+                  {activeQueryTab.isRunning && !activeQueryTab.result ? (
+                    <SqlResultSkeleton />
+                  ) : activeQueryTab.result ? (
                     <ResultGrid
                       data={activeQueryTab.result.data}
                       meta={activeQueryTab.result.meta}
