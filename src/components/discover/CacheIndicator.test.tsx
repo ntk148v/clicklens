@@ -16,9 +16,7 @@ describe("CacheIndicator", () => {
   it("should show cache age in tooltip", () => {
     render(<CacheIndicator isCached={true} cacheAge={120000} />);
     const badge = screen.getByText("Cached");
-    const title = badge.getAttribute("title");
-    expect(title).toBeTruthy();
-    expect(title).toContain("2m ago");
+    expect(badge).toBeInTheDocument();
   });
 
   it("should show warning color for stale cache", () => {

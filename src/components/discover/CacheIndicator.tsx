@@ -5,6 +5,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const STALE_CACHE_THRESHOLD_MS = 3600000;
+
 interface CacheIndicatorProps {
   isCached: boolean;
   cacheAge?: number;
@@ -35,16 +37,14 @@ export function CacheIndicator({
     return `${hours}h ago`;
   };
 
-  const isStale = cacheAge > 3600000;
+  const isStale = cacheAge > STALE_CACHE_THRESHOLD_MS;
   const badgeColor = isStale ? "text-yellow-600 bg-yellow-500/20 border-yellow-500/30" : "text-green-600 bg-green-500/20 border-green-500/30";
-
-  const tooltipText = `Cached ${formatAge(cacheAge)}${hitRate !== undefined ? ` • Hit Rate: ${hitRate.toFixed(1)}%` : ""}${totalHits !== undefined && totalMisses !== undefined ? ` • Hits: ${totalHits} • Misses: ${totalMisses}` : ""} • Source: ${cacheSource}`;
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant="outline" className={cn(badgeColor, "gap-1.5 cursor-help")} title={tooltipText}>
+          <Badge variant="outline" className={cn(badgeColor, "gap-1.5 cursor-help")}>
             <Database className="h-3 w-3" />
             Cached
           </Badge>
@@ -61,17 +61,17 @@ export function CacheIndicator({
                 <span className="text-xs font-mono">{hitRate.toFixed(1)}%</span>
               </div>
             )}
-            {totalHits !== undefined && totalMisses !== undefined && (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Total Hits</span>
-                  <span className="text-xs font-mono">{totalHits}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Total Misses</span>
-                  <span className="text-xs font-mono">{totalMisses}</span>
-                </div>
-              </>
+            {totalHits !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Total Hits</span>
+                <span className="text-xs font-mono">{totalHits}</span>
+              </div>
+            )}
+            {totalMisses !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Total Misses</span>
+                <span className="text-xs font-mono">{totalMisses}</span>
+              </div>
             )}
             <div className="flex items-center justify-between pt-2 border-t">
               <span className="text-xs text-muted-foreground">Source</span>
