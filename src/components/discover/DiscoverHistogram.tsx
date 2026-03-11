@@ -56,6 +56,20 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
     return Math.abs(t2 - t1);
   }, [data]);
 
+  const adaptiveHeight = useMemo(() => {
+    if (data.length === 0) return 150;
+
+    const minHeight = 100;
+    const maxHeight = 300;
+    const heightPerPoint = 2;
+
+    const calculatedHeight = Math.min(
+      minHeight + data.length * heightPerPoint,
+      maxHeight,
+    );
+    return calculatedHeight;
+  }, [data.length]);
+
   const formatDate = useCallback(
     (time: string) => {
       try {
@@ -163,7 +177,10 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
 
   if (isLoading && data.length === 0) {
     return (
-      <Card className="h-[150px] w-full flex items-center justify-center bg-muted/20 animate-pulse border-none shadow-none">
+      <Card
+        className={`h-[${adaptiveHeight}px] w-full flex items-center justify-center bg-muted/20 animate-pulse border-none shadow-none`}
+        style={{ height: `${adaptiveHeight}px` }}
+      >
         <span className="text-muted-foreground text-sm">
           Loading histogram...
         </span>
@@ -176,7 +193,10 @@ export const DiscoverHistogram = memo(function DiscoverHistogram({
   }
 
   return (
-    <div className="w-full h-[150px] transition-all duration-300 select-none">
+    <div
+      className="w-full transition-all duration-300 select-none"
+      style={{ height: `${adaptiveHeight}px` }}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={formattedData}
