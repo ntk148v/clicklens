@@ -81,6 +81,163 @@ When a time column is selected, a bar chart shows document distribution over tim
 
 ![](/screenshots/discovery-expandable-row.png)
 
+#### 1.1.7. Performance Optimizations
+
+The Discover feature includes automatic performance optimizations:
+
+- **Progressive Time Windows**: Automatically adjusts query granularity based on date range (6h → 6h → 12h → 24h)
+- **Row Windowing**: Loads data in chunks (50 rows buffer) to prevent memory issues
+- **Parallel Chunk Queries**: Executes multiple chunks concurrently (max 3) for faster results
+- **Query Caching**: Caches query results in Redis for improved performance on repeated queries
+- **Adaptive Histogram Height**: Adjusts histogram height based on data density (100px-250px)
+
+#### 1.1.8. Security Features
+
+The Discover feature includes comprehensive security protections:
+
+- **SQL Injection Protection**: Automatic validation of all user-provided SQL
+  - Blocks dangerous operations (DROP, DELETE, ALTER, TRUNCATE, INSERT, UPDATE, etc.)
+  - Prevents multiple statements and SQL comments
+  - Validates column names and filter expressions
+
+- **Query Timeout Enforcement**: Prevents runaway queries
+  - Default timeout: 60 seconds
+  - Maximum timeout: 300 seconds (5 minutes)
+  - Clear error messages on timeout
+
+- **Rate Limiting**: Prevents abuse and protects system resources
+  - Default limit: 10 queries per minute per user
+  - Sliding window implementation for accurate rate limiting
+  - Returns remaining count and reset time
+
+<Callout type="warning">
+  All security features maintain full RBAC compatibility. Queries are executed with the user's credentials and respect all existing permission checks.
+</Callout>
+
+#### 1.1.9. Query Syntax Guide
+
+##### Filter Syntax
+
+**Basic Filters**
+```
+column = value
+column > 100
+column LIKE '%pattern%'
+column IN (1, 2, 3)
+column BETWEEN 1 AND 100
+column IS NULL
+```
+
+**Complex Filters**
+```
+column1 = value1 AND column2 > 100
+column1 = value1 OR column2 = value2
+NOT column = value
+(column1 = value1 OR column2 = value2) AND column3 > 100
+```
+
+**Time Filters**
+```
+event_time >= '2024-01-01'
+event_time BETWEEN '2024-01-01' AND '2024-01-31'
+event_time >= toDateTime64(1704067200, 3)
+```
+
+##### Order By Syntax
+
+**Single Column**
+```
+column:asc
+column:desc
+```
+
+**Multiple Columns**
+```
+column1:desc,column2:asc
+```
+
+##### Group By Syntax
+
+**Single Column**
+```
+column
+```
+
+**Multiple Columns**
+```
+column1,column2
+```
+
+#### 1.1.10. Performance Tips
+
+1. **Use Time Filters**: Always filter by time when querying large datasets
+   ```
+   event_time >= '2024-01-01' AND event_time < '2024-02-01'
+   ```
+
+2. **Select Only Needed Columns**: Avoid selecting all columns when you only need specific ones
+
+3. **Use Appropriate Limits**: Start with smaller limits and increase as needed
+
+4. **Leverage Query Caching**: Repeated queries will be served from cache for faster results
+
+5. **Use Indexes**: Ensure your time columns and frequently filtered columns are indexed
+
+6. **Avoid Complex Calculations in WHERE Clauses**: Move calculations to SELECT clause when possible
+
+#### 1.1.11. Troubleshooting Guide
+
+##### Query Timeout
+
+**Problem**: Query exceeds timeout limit
+
+**Solutions**:
+1. Add more specific filters to reduce result set
+2. Use time range filtering
+3. Select fewer columns
+4. Reduce the limit
+5. Contact administrator to increase timeout limit
+
+##### Rate Limit Exceeded
+
+**Problem**: "Rate limit exceeded" error
+
+**Solutions**:
+1. Wait a minute before retrying
+2. Use query caching by repeating the same query
+3. Contact administrator to increase rate limit
+
+##### SQL Validation Error
+
+**Problem**: "Invalid filter: contains disallowed keywords"
+
+**Solutions**:
+1. Remove dangerous keywords (DROP, DELETE, ALTER, etc.)
+2. Use only SELECT-compatible syntax
+3. Check for multiple statements (separated by ;)
+
+##### Slow Query Performance
+
+**Problem**: Query takes too long to execute
+
+**Solutions**:
+1. Add time filters
+2. Reduce the limit
+3. Select fewer columns
+4. Use GROUP BY for aggregations
+5. Check if query is cached
+
+##### No Results Returned
+
+**Problem**: Query returns no data
+
+**Solutions**:
+1. Check if database and table are correct
+2. Verify time range filters
+3. Check filter conditions
+4. Ensure you have access to the data (RBAC)
+5. Try a simpler query first
+
 ---
 
 ## 2. SQL Console
