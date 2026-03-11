@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
+import { monitoringCache } from "@/lib/cache";
 import {
   METRICS_QUERY,
   ASYNC_METRICS_QUERY,
@@ -43,6 +44,21 @@ export async function GET(
     const category = searchParams.get("category");
     const type = searchParams.get("type"); // metrics, async, events, or all
 
+    // Cache key includes category and type for proper cache isolation
+    const cacheKey = `metrics:${category ?? "_all"}:${type ?? "_all"}`;
+    const cached = monitoringCache.get(cacheKey);
+    if (cached) {
+      const resp = NextResponse.json({
+        success: true,
+        data: cached as MetricsResponse,
+      } as MonitoringApiResponse<MetricsResponse>);
+      resp.headers.set(
+        "Cache-Control",
+        "public, s-maxage=10, stale-while-revalidate=30",
+      );
+      return resp;
+    }
+
     const client = createClient(config);
 
     // Fetch based on type parameter
@@ -67,14 +83,24 @@ export async function GET(
       metrics = metrics.filter((m) => m.category === category);
     }
 
-    return NextResponse.json({
+    const responseData: MetricsResponse = {
+      metrics,
+      asyncMetrics,
+      events,
+    };
+
+    // Cache the response
+    monitoringCache.set(cacheKey, responseData);
+
+    const resp = NextResponse.json({
       success: true,
-      data: {
-        metrics,
-        asyncMetrics,
-        events,
-      },
+      data: responseData,
     });
+    resp.headers.set(
+      "Cache-Control",
+      "public, s-maxage=10, stale-while-revalidate=30",
+    );
+    return resp;
   } catch (error) {
     console.error("Monitoring metrics error:", error);
 
