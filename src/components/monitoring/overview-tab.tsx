@@ -10,6 +10,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { useHealthChecks } from "@/lib/hooks/use-monitoring";
 import type { FlexibleTimeRange } from "@/lib/types/discover";
 import { getMinTimeFromRange, type TimeRange } from "@/lib/types/discover";
@@ -117,15 +118,12 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
 
   if (error) {
     return (
-      <Card className="border-red-500/30">
-        <CardContent className="py-8 text-center">
-          <XCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
-          <p className="text-red-500 font-medium">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={fetchData}>
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
+      <ErrorDisplay
+        severity="high"
+        title="Failed to load overview data"
+        message={error}
+        onRetry={fetchData}
+      />
     );
   }
 

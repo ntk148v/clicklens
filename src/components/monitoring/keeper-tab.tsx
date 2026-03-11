@@ -20,6 +20,7 @@ import { StatCard, StatusBadge } from "@/components/monitoring";
 import { formatNumber } from "@/lib/hooks/use-monitoring";
 import type { MonitoringApiResponse } from "@/lib/clickhouse/monitoring";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
+import { ErrorDisplay } from "@/components/ui/error-display";
 
 interface KeeperData {
   isConnected: boolean;
@@ -87,10 +88,11 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-8 text-destructive">
-        <AlertCircle className="w-5 h-5 mr-2" />
-        <span>{error}</span>
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load Keeper information"
+        message={error}
+      />
     );
   }
 

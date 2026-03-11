@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "./pagination-controls";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { useMetrics, formatBytes } from "@/lib/hooks/use-monitoring";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import type { MetricCategory } from "@/lib/clickhouse/monitoring";
@@ -244,10 +245,11 @@ export function MetricsTab({ refreshInterval = 30000 }: MetricsTabProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-8 text-destructive">
-        <AlertCircle className="w-5 h-5 mr-2" />
-        <span>{error}</span>
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load metrics"
+        message={error}
+      />
     );
   }
 

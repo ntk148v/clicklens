@@ -16,6 +16,7 @@ import { TruncatedCell } from "@/components/ui/truncated-cell";
 import { StatusBadge } from "@/components/monitoring";
 import { Badge } from "@/components/ui/badge";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { useDisks, formatBytes } from "@/lib/hooks/use-monitoring";
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -101,10 +102,11 @@ export function DisksTab({ refreshInterval = 30000 }: DisksTabProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-8 text-destructive">
-        <AlertCircle className="w-5 h-5 mr-2" />
-        <span>{error}</span>
-      </div>
+      <ErrorDisplay
+        severity="medium"
+        title="Failed to load disk information"
+        message={error}
+      />
     );
   }
 
