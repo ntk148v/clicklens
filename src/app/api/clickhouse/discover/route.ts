@@ -234,9 +234,12 @@ export async function GET(request: Request) {
 
     // 2a. Order By
     const quotedTimeSortCol = timeColumn ? quoteIdentifier(timeColumn) : "";
-    let orderByClause = quotedTimeSortCol
-      ? `ORDER BY ${quotedTimeSortCol} DESC`
-      : "";
+    let orderByClause = "";
+
+    // Only set default ORDER BY if not using GROUP BY
+    if (!groupByParam && quotedTimeSortCol) {
+      orderByClause = `ORDER BY ${quotedTimeSortCol} DESC`;
+    }
 
     if (orderByParam) {
       // Expects format "col:desc,col2:asc"

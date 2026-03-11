@@ -304,8 +304,8 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   return (
     <>
       <div className="flex flex-col h-full">
-        <div ref={parentRef} className="flex-1 overflow-auto">
-          <Table>
+        <div ref={parentRef} className="flex-1 overflow-auto relative">
+          <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 bg-background z-10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -373,6 +373,9 @@ export const DiscoverGrid = memo(function DiscoverGrid({
                         <TableCell
                           key={cell.id}
                           className="data-table-cell last:border-r-0"
+                          style={{
+                            width: cell.column.getSize(),
+                          }}
                           onContextMenu={(e) =>
                             handleCellContextMenu(
                               e,
@@ -395,7 +398,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
                 })}
               </div>
             </TableBody>
-          </Table>
+          </table>
         </div>
 
         <PaginationControls
