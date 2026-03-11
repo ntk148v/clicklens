@@ -247,13 +247,14 @@ export async function GET(request: Request) {
       orderByClause = `ORDER BY ${sorts.join(", ")}`;
     }
 
-    // 2b. Single Query branch (for Group By or ORDER BY)
-    // ORDER BY requires offset-based pagination since time-based cursor doesn't work with custom sorting
+// 2b. Single Query branch (for Group By or ORDER BY)
+    // ORDER BY requires offset-based pagination since time-based cursor doesn\'t work with custom sorting
     if (groupByParam || orderByParam) {
       let groupByClause = "";
+      let groupCols: string[] = [];
 
       if (groupByParam) {
-        const groupCols = groupByParam
+        groupCols = groupByParam
           .split(",")
           .map((c) => c.trim())
           .filter(Boolean);
@@ -269,10 +270,36 @@ export async function GET(request: Request) {
         }
       }
 
-      // If we are grouping but have no orderBy, clear orderByClause
-      // because sorting by time makes no sense if we lack it in group.
-      if (groupByParam && !orderByParam) {
-        orderByClause = "";
+      // Validate ORDER BY columns when GROUP BY is active
+      // SQL only allows ORDER BY on columns in GROUP BY or aggregate functions
+      if (groupByParam && orderByParam) {
+        const aggregateFunctions = ['count', 'sum', 'avg', 'min', 'max', 'any', 'anyLast'];
+        
+        const validSorts = orderByParam.split(",").filter((sortStr) => {
+          const [col] = sortStr.split(":");
+          const colName = col.trim();
+          
+          // Allow if column is in GROUP BY
+          if (groupCols.includes(colName)) return true;
+          
+          // Allow if it's an aggregate function
+          if (aggregateFunctions.some(agg => colName.toLowerCase().startsWith(agg + '('))) return true;
+          
+          // Otherwise, filter it out
+          return false;
+        });
+        
+        // Rebuild orderByClause with only valid columns
+        if (validSorts.length > 0) {
+          const sorts = validSorts.map((s) => {
+            const [col, dir] = s.split(":");
+            return `${quoteIdentifier(col)} ${dir.toUpperCase() === "ASC" ? "ASC" : "DESC"}`;
+          });
+          orderByClause = `ORDER BY ${sorts.join(", ")}`;
+        } else {
+          // No valid ORDER BY columns, clear it
+          orderByClause = "";
+        }
       }
 
       // Add time filtering conditions
