@@ -8,6 +8,7 @@ const mockCreateClient = mock();
 const mockQuery = mock();
 const mockGetLensConfig = mock();
 const mockIsLensUserConfigured = mock();
+const mockGetOrSet = mock();
 
 // Mock module imports
 mock.module("@/lib/auth", () => ({
@@ -20,6 +21,14 @@ mock.module("@/lib/clickhouse", () => ({
   isLensUserConfigured: mockIsLensUserConfigured,
   isClickHouseError: (err: unknown) =>
     err && typeof err === "object" && "code" in err,
+}));
+
+mock.module("@/lib/cache", () => ({
+  getOrSet: mockGetOrSet,
+  tablesCache: {
+    get: mock(() => Promise.resolve(null)),
+    set: mock(() => Promise.resolve()),
+  },
 }));
 
 // Helper to create GET request with query params
@@ -57,6 +66,11 @@ const setupMockQueries = (
         }));
       return Promise.resolve({ data: validationData });
     }
+  });
+
+  // Mock getOrSet to call the query function directly
+  mockGetOrSet.mockImplementation(async (_cache, _key, fn) => {
+    return await fn();
   });
 };
 
