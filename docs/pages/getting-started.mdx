@@ -16,6 +16,7 @@ Before installing ClickLens, ensure you have:
 - A running **ClickHouse server** (version 21.8 or later recommended)
 - ClickHouse HTTP interface enabled (ports 8123 for HTTP, 8443 for HTTPS)
 - A ClickHouse user account with appropriate permissions
+- **Redis server** (optional, for improved caching performance)
 
 <Callout type="info">
   ClickLens uses the ClickHouse **HTTP interface** (ports 8123/8443). The native
@@ -37,6 +38,7 @@ docker run -d \
   -e LENS_USER=lensuser \
   -e LENS_PASSWORD=your-password \
   -e SESSION_SECRET=your-32-character-secret-key-here \
+  -e REDIS_URL=redis://redis-host:6379 \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
@@ -60,6 +62,15 @@ services:
       - SESSION_SECRET=your-32-character-secret-key-here
       - NODE_ENV=production
       - DISABLE_SECURE_COOKIES=true
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 ```
 
@@ -91,9 +102,9 @@ bun dev
 
 The app will be available at [http://localhost:3000](http://localhost:3000).
 
-## 3. Understanding the Service User
+## 3. Understanding the Dual Client Architecture
 
-ClickLens uses **two types of ClickHouse connections**:
+ClickLens uses **two types of ClickHouse connections** to separate metadata operations from user queries:
 
 ### 3.1. Lens Service User (Environment Credentials)
 
@@ -101,6 +112,7 @@ Configured via `LENS_USER` and `LENS_PASSWORD` environment variables. This servi
 
 - Schema introspection and metadata queries
 - System table access for monitoring features
+- Permission derivation at login time
 - Background operations that don't require user context
 
 **Required grants:**
@@ -109,14 +121,18 @@ Configured via `LENS_USER` and `LENS_PASSWORD` environment variables. This servi
 -- Single node
 CREATE USER lensuser IDENTIFIED BY 'password';
 GRANT ACCESS MANAGEMENT ON *.* TO lensuser;
-GRANT SELECT ON *.* TO lensuser;
-GRANT REMOTE ON *.* TO lensuser;
+GRANT SELECT ON system.* TO lensuser;
+GRANT SHOW DATABASES ON *.* TO lensuser;
+GRANT SHOW TABLES ON *.* TO lensuser;
+GRANT SHOW COLUMNS ON *.* TO lensuser;
 
 -- Cluster
 CREATE USER lensuser ON CLUSTER cluster-name IDENTIFIED BY 'password';
 GRANT ACCESS MANAGEMENT ON *.* ON CLUSTER cluster-name TO lensuser;
-GRANT SELECT ON *.* ON CLUSTER cluster-name TO lensuser;
-GRANT REMOTE ON *.* ON CLUSTER cluster-name TO lensuser;
+GRANT SELECT ON system.* ON CLUSTER cluster-name TO lensuser;
+GRANT SHOW DATABASES ON *.* ON CLUSTER cluster-name TO lensuser;
+GRANT SHOW TABLES ON *.* ON CLUSTER cluster-name TO lensuser;
+GRANT SHOW COLUMNS ON *.* ON CLUSTER cluster-name TO lensuser;
 ```
 
 ### 3.2. User Client (Session Credentials)
@@ -133,11 +149,84 @@ When you log in to ClickLens, your ClickHouse username and password are used dir
   what your ClickHouse account can do.
 </Callout>
 
-## 4. ClickHouse System Tables
+## 4. Redis Configuration (Optional)
+
+ClickLens supports optional Redis caching to improve performance for monitoring and table browsing features.
+
+### 4.1. Benefits of Redis Caching
+
+- **Faster Response Times**: Cached data reduces ClickHouse query load
+- **Improved User Experience**: Instant data display for monitoring dashboards
+- **Reduced Resource Usage**: Less load on ClickHouse server
+- **Better Scalability**: Handles more concurrent users efficiently
+
+### 4.2. What Gets Cached
+
+- Table Explorer data (schemas, parts, merges, mutations)
+- Monitoring metrics (system.metrics, system.asynchronous_metrics)
+- Query analytics data
+- Time-series chart data
+
+### 4.3. Setting Up Redis
+
+**Docker Compose** (recommended):
+
+```yaml
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+```
+
+**Local Development**:
+
+```bash
+# Using Docker
+docker run -d -p 6379:6379 redis:7-alpine
+
+# Or install Redis locally
+# Ubuntu/Debian
+sudo apt-get install redis-server
+
+# macOS
+brew install redis
+brew services start redis
+```
+
+### 4.4. Configuration
+
+Add the `REDIS_URL` environment variable to your ClickLens configuration:
+
+```bash
+# Docker
+-e REDIS_URL=redis://redis:6379
+
+# Docker Compose
+- REDIS_URL=redis://redis:6379
+
+# Local development (.env.local)
+REDIS_URL=redis://localhost:6379
+```
+
+**Connection String Format**:
+- Basic: `redis://localhost:6379`
+- With password: `redis://:password@localhost:6379`
+- With database: `redis://localhost:6379/0`
+- Full example: `redis://:mypassword@redis.example.com:6379/1`
+
+<Callout type="info">
+  Redis is completely optional. If `REDIS_URL` is not configured, ClickLens
+  will function normally without caching. Redis is recommended for production
+  deployments with multiple users or frequent monitoring usage.
+</Callout>
+
+## 5. ClickHouse System Tables
 
 ClickLens relies on ClickHouse's built-in system tables to provide its features. Understanding which tables are used helps with permission planning and troubleshooting.
 
-### 4.1. System Tables by Feature
+### 5.1. System Tables by Feature
 
 | Feature                 | System Tables Used                                                                     | Purpose                                          |
 | ----------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -157,7 +246,7 @@ ClickLens relies on ClickHouse's built-in system tables to provide its features.
   documentation](https://clickhouse.com/docs/en/operations/system-tables/metric_log).
 </Callout>
 
-### 4.2. Optional System Tables
+### 5.2. Optional System Tables
 
 Some ClickLens features depend on tables that may not exist by default:
 
@@ -197,7 +286,7 @@ To enable optional logging tables, add to your ClickHouse `config.xml`:
 </clickhouse>
 ```
 
-## 5. First Login
+## 6. First Login
 
 1. Navigate to [http://localhost:3000](http://localhost:3000)
 2. Enter your ClickHouse credentials:
@@ -207,7 +296,7 @@ To enable optional logging tables, add to your ClickHouse `config.xml`:
 
 Upon successful login, you'll be taken to the **Dashboard**.
 
-## 6. The Dashboard
+## 7. The Dashboard
 
 The Dashboard is your starting point in ClickLens. It displays feature cards based on your permissions:
 
@@ -226,7 +315,114 @@ The Dashboard is your starting point in ClickLens. It displays feature cards bas
   grants.
 </Callout>
 
-## 7. Next Steps
+## 8. Permission System Overview
+
+ClickLens implements a sophisticated permission derivation model that leverages ClickHouse's native RBAC system.
+
+### 8.1. How Permissions Work
+
+When you log in:
+
+1. ClickLens authenticates against your ClickHouse server
+2. Your grants are queried from `system.grants` (via Lens Client)
+3. Grants are mapped to UI permission flags
+4. The UI shows only what you have permission to access
+
+### 8.2. Permission Flags
+
+| Permission Flag | Derived From | Feature Enabled |
+| --------------- | ------------ | --------------- |
+| `canManageUsers` | `ACCESS MANAGEMENT` grant | User/Role Management |
+| `canViewProcesses` | `SELECT ON system.processes` | Query Monitoring |
+| `canKillQueries` | `KILL QUERY` grant | Query Termination |
+| `canViewCluster` | `SELECT ON system.clusters` | Cluster Monitoring |
+| `canBrowseTables` | `SHOW TABLES` grant | Table Explorer |
+| `canExecuteQueries` | `SELECT` on any database | SQL Console |
+| `canDiscover` | `SHOW TABLES + SELECT` | Discover Feature |
+| `canViewSettings` | `SELECT ON system.settings` | Settings Module |
+| `canViewServerLogs` | `SELECT ON system.text_log` | Server Logs Tab |
+| `canViewSessionLogs` | `SELECT ON system.session_log` | Session Logs Tab |
+| `canViewCrashLogs` | `SELECT ON system.crash_log` | Crash Logs Tab |
+
+### 8.3. Feature Roles
+
+ClickLens defines 6 predefined ClickHouse roles that bundle common permission sets:
+
+| Role | Purpose | Required Grants |
+| ---- | ------- | --------------- |
+| `clicklens_table_explorer` | Browse schemas | `SHOW DATABASES`, `SHOW TABLES`, `SELECT ON system.{tables,columns,parts,replicas,mutations,merges}` |
+| `clicklens_query_monitor` | Monitor queries | `KILL QUERY`, `SELECT ON system.{processes,query_log,query_cache}` |
+| `clicklens_cluster_monitor` | Monitor cluster | `SELECT ON system.{clusters,replicas,metrics,events,disks,replication_queue,asynchronous_metrics}` |
+| `clicklens_user_admin` | Manage users/roles | `ACCESS MANAGEMENT ON *.*` |
+| `clicklens_table_admin` | DDL operations | `TRUNCATE`, `OPTIMIZE ON *.*` |
+| `clicklens_settings_admin` | View configuration | `SELECT ON system.{settings,server_settings}` |
+
+<Callout type="info">
+  **XML-Configured Users (e.g., default user):** Some users receive access via
+  `users.xml` instead of SQL grants. Since these privileges don't appear in
+  `system.grants`, ClickLens intelligently falls back to user-credential probes
+  (running `SHOW GRANTS` and probing `system.tables` with the user's
+  credentials) to accurately determine access.
+</Callout>
+
+## 9. Troubleshooting
+
+### 9.1. Connection Issues
+
+**Problem**: Cannot connect to ClickHouse
+
+**Solutions**:
+1. Verify `CLICKHOUSE_HOST` and `CLICKHOUSE_PORT` are correct
+2. Ensure the HTTP interface is enabled (not just native protocol)
+3. Check firewall rules
+4. Verify ClickHouse is running: `curl http://localhost:8123/ping`
+
+### 9.2. Permission Issues
+
+**Problem**: Features not showing on dashboard
+
+**Solutions**:
+1. Check your ClickHouse grants: `SHOW GRANTS FOR current_user()`
+2. Ensure required system tables are accessible
+3. Verify the Lens service user has proper permissions
+4. Check if you're using XML-configured users (see note above)
+
+### 9.3. Session Issues
+
+**Problem**: Frequent session expirations
+
+**Solutions**:
+1. Ensure `SESSION_SECRET` is consistent across restarts
+2. Check cookie settings if behind a proxy (`DISABLE_SECURE_COOKIES`)
+3. Verify the secret is at least 32 characters
+
+### 9.4. SSL Certificate Errors
+
+**Problem**: SSL certificate verification failed
+
+**Solutions**:
+1. Set `CLICKHOUSE_VERIFY=false` for self-signed certificates
+2. Or install the CA certificate in the container
+3. Ensure `CLICKHOUSE_SECURE=true` if using HTTPS
+
+### 9.5. Redis Connection Issues
+
+**Problem**: Redis caching not working
+
+**Solutions**:
+1. Verify Redis is running: `redis-cli ping` should return `PONG`
+2. Check `REDIS_URL` environment variable is correct
+3. Ensure Redis is accessible from ClickLens container (network connectivity)
+4. Verify Redis port (default 6379) is not blocked by firewall
+5. Check Redis logs for connection errors
+
+<Callout type="info">
+  Redis is optional. If Redis is unavailable, ClickLens will continue to function
+  normally without caching. You can temporarily disable Redis by removing the
+  `REDIS_URL` environment variable.
+</Callout>
+
+## 10. Next Steps
 
 - Explore the [Features](/features) guide to learn about each module
 - Read about [Deployment](/deployment) for production configuration

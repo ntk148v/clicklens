@@ -15,19 +15,17 @@ The **Discover** feature provides a flexible, Kibana-style interface for explori
 
 ![](/screenshots/discovery-overview.png)
 
-### 1.1. Components
+### 1.1. Key Components
 
-#### 1.1.1. Database & Table Selection
+#### Database & Table Selection
 
 Use the dropdowns in the header to select your data source:
+- **Database Selector**: Choose from available databases
+- **Table Selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
 
-- **① Database Selector**: Choose from available databases
-- **② Table Selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
+#### Fields Sidebar
 
-#### 1.1.2. Fields Sidebar
-
-The **④ left sidebar** controls which columns appear in your query:
-
+The left sidebar controls which columns appear in your query:
 - **Search**: Filter columns by name
 - **Select All / None**: Quick selection toggles
 - **Time Column Picker**: Choose which DateTime column to use for time filtering
@@ -38,9 +36,9 @@ The **④ left sidebar** controls which columns appear in your query:
   the data grid and query performance.
 </Callout>
 
-#### 1.1.3. Query Bar
+#### Query Bar
 
-**③ Query Bar** allows user to enter custom ClickHouse `WHERE` clause expressions:
+Enter custom ClickHouse `WHERE` clause expressions:
 
 ```sql
 level = 'Error'
@@ -51,27 +49,24 @@ level IN ('Error', 'Fatal')
 ```
 
 Features:
-
 - **Query History**: Persisted in localStorage (up to 20 entries)
 - **Syntax Help**: Hover over the help icon for examples
 - **Execute**: Press Enter or click Search
 
-#### 1.1.4. Time Range Selector
+#### Time Range Selector
 
 Filter data by time using presets:
+- Minutes: 5m, 15m, 30m
+- Hours: 1h, 3h, 6h, 12h, 24h
+- Days: 3d, 7d
 
-- 5m, 15m, 30m (minutes)
-- 1h, 3h, 6h, 12h, 24h (hours)
-- 3d, 7d (days)
-
-#### 1.1.5. Histogram
+#### Histogram
 
 When a time column is selected, a bar chart shows document distribution over time:
-
 - **Click a bar** to zoom into that time range
 - **Reset Zoom** button to return to the selected preset
 
-#### 1.1.6. Results Grid
+#### Results Grid
 
 - **Row Count**: Shows "X of Y hits"
 - **Row Detail**: Click any row to see all fields in a slide-out panel
@@ -81,42 +76,7 @@ When a time column is selected, a bar chart shows document distribution over tim
 
 ![](/screenshots/discovery-expandable-row.png)
 
-#### 1.1.7. Performance Optimizations
-
-The Discover feature includes automatic performance optimizations:
-
-- **Progressive Time Windows**: Automatically adjusts query granularity based on date range (6h → 6h → 12h → 24h)
-- **Row Windowing**: Loads data in chunks (50 rows buffer) to prevent memory issues
-- **Parallel Chunk Queries**: Executes multiple chunks concurrently (max 3) for faster results
-- **Query Caching**: Caches query results in Redis for improved performance on repeated queries
-- **Adaptive Histogram Height**: Adjusts histogram height based on data density (100px-250px)
-
-#### 1.1.8. Security Features
-
-The Discover feature includes comprehensive security protections:
-
-- **SQL Injection Protection**: Automatic validation of all user-provided SQL
-  - Blocks dangerous operations (DROP, DELETE, ALTER, TRUNCATE, INSERT, UPDATE, etc.)
-  - Prevents multiple statements and SQL comments
-  - Validates column names and filter expressions
-
-- **Query Timeout Enforcement**: Prevents runaway queries
-  - Default timeout: 60 seconds
-  - Maximum timeout: 300 seconds (5 minutes)
-  - Clear error messages on timeout
-
-- **Rate Limiting**: Prevents abuse and protects system resources
-  - Default limit: 10 queries per minute per user
-  - Sliding window implementation for accurate rate limiting
-  - Returns remaining count and reset time
-
-<Callout type="warning">
-  All security features maintain full RBAC compatibility. Queries are executed with the user's credentials and respect all existing permission checks.
-</Callout>
-
-#### 1.1.9. Query Syntax Guide
-
-##### Filter Syntax
+### 1.2. Query Syntax Guide
 
 **Basic Filters**
 ```
@@ -143,100 +103,45 @@ event_time BETWEEN '2024-01-01' AND '2024-01-31'
 event_time >= toDateTime64(1704067200, 3)
 ```
 
-##### Order By Syntax
-
-**Single Column**
+**Order By Syntax**
 ```
 column:asc
 column:desc
-```
-
-**Multiple Columns**
-```
 column1:desc,column2:asc
 ```
 
-##### Group By Syntax
-
-**Single Column**
+**Group By Syntax**
 ```
 column
-```
-
-**Multiple Columns**
-```
 column1,column2
 ```
 
-#### 1.1.10. Performance Tips
+### 1.3. Performance & Security
 
-1. **Use Time Filters**: Always filter by time when querying large datasets
-   ```
-   event_time >= '2024-01-01' AND event_time < '2024-02-01'
-   ```
+**Performance Optimizations**:
+- Progressive time windows based on date range
+- Row windowing (50 rows buffer) to prevent memory issues
+- Parallel chunk queries (max 3 concurrent)
+- Query caching for repeated queries
+- Adaptive histogram height (100px-250px)
 
-2. **Select Only Needed Columns**: Avoid selecting all columns when you only need specific ones
+**Security Features**:
+- SQL injection protection (blocks dangerous operations)
+- Query timeout enforcement (default 60s, max 300s)
+- Rate limiting (10 queries per minute per user)
+- Full RBAC compatibility
 
-3. **Use Appropriate Limits**: Start with smaller limits and increase as needed
+### 1.4. Troubleshooting
 
-4. **Leverage Query Caching**: Repeated queries will be served from cache for faster results
+**Query Timeout**: Add more specific filters, use time range filtering, select fewer columns
 
-5. **Use Indexes**: Ensure your time columns and frequently filtered columns are indexed
+**Rate Limit Exceeded**: Wait a minute, use query caching, contact admin to increase limit
 
-6. **Avoid Complex Calculations in WHERE Clauses**: Move calculations to SELECT clause when possible
+**SQL Validation Error**: Remove dangerous keywords, use only SELECT-compatible syntax
 
-#### 1.1.11. Troubleshooting Guide
+**Slow Query Performance**: Add time filters, reduce limit, select fewer columns, use GROUP BY
 
-##### Query Timeout
-
-**Problem**: Query exceeds timeout limit
-
-**Solutions**:
-1. Add more specific filters to reduce result set
-2. Use time range filtering
-3. Select fewer columns
-4. Reduce the limit
-5. Contact administrator to increase timeout limit
-
-##### Rate Limit Exceeded
-
-**Problem**: "Rate limit exceeded" error
-
-**Solutions**:
-1. Wait a minute before retrying
-2. Use query caching by repeating the same query
-3. Contact administrator to increase rate limit
-
-##### SQL Validation Error
-
-**Problem**: "Invalid filter: contains disallowed keywords"
-
-**Solutions**:
-1. Remove dangerous keywords (DROP, DELETE, ALTER, etc.)
-2. Use only SELECT-compatible syntax
-3. Check for multiple statements (separated by ;)
-
-##### Slow Query Performance
-
-**Problem**: Query takes too long to execute
-
-**Solutions**:
-1. Add time filters
-2. Reduce the limit
-3. Select fewer columns
-4. Use GROUP BY for aggregations
-5. Check if query is cached
-
-##### No Results Returned
-
-**Problem**: Query returns no data
-
-**Solutions**:
-1. Check if database and table are correct
-2. Verify time range filters
-3. Check filter conditions
-4. Ensure you have access to the data (RBAC)
-5. Try a simpler query first
+**No Results Returned**: Check database/table, verify time range, check filter conditions, ensure RBAC access
 
 ---
 
@@ -251,23 +156,17 @@ A full-featured SQL editor for writing and executing ClickHouse queries.
 
 ![](/screenshots/sql-overview.png)
 
-- **① Database selector**: Choose from available databases
-- **② Table selector**: Shows tables with their engine type (e.g., MergeTree, ReplicatedMergeTree)
-- **③ SQL editor**: User can enter the query here, ClickLens could help with autocomplete and syntax highlighting.
-- **④ Execution modes**: Control how ClickLens enter the input queries.
-
 ### 2.1. Key Features
 
-#### 2.1.1. Multi-Tab Support
+#### Multi-Tab Support
 
 - Open multiple query tabs simultaneously
 - Tabs are persisted locally (SQL content survives browser refresh)
 - Each tab maintains its own result set and history
 
-#### 2.1.2. SQL Editor
+#### SQL Editor
 
 Built on CodeMirror 6 with ClickHouse-specific enhancements:
-
 - **Syntax Highlighting**: Keywords, functions, strings, numbers
 - **Context-Aware Autocomplete**:
   - Keywords after `FROM`, `JOIN` → table suggestions
@@ -280,42 +179,38 @@ Built on CodeMirror 6 with ClickHouse-specific enhancements:
 
 ![](/screenshots/sql-run-result.png)
 
-#### 2.1.3. Execution Modes
+#### Execution Modes
 
-| Shortcut           | Action                                        |
-| ------------------ | --------------------------------------------- |
-| `Ctrl+Enter`       | Execute all statements in the editor          |
+| Shortcut | Action |
+| -------- | ------ |
+| `Ctrl+Enter` | Execute all statements in the editor |
 | `Ctrl+Shift+Enter` | Execute only the statement at cursor position |
 
-#### 2.1.4. Query Streaming
+#### Query Streaming
 
 Large result sets are streamed to the UI using NDJSON:
-
 - Progress indicator shows rows being fetched
 - Results appear incrementally
 - Cancel running queries with the Stop button
 
-#### 2.1.5. Explain Queries
+#### Explain Queries
 
 Use the Explain dropdown to analyze query plans:
-
 - **AST**: Abstract Syntax Tree
 - **SYNTAX**: Normalized query syntax
 - **PLAN**: Query execution plan
 - **PIPELINE**: Processing pipeline visualization
 
-#### 2.1.6. Saved Queries
+#### Saved Queries
 
 Save frequently-used queries for quick access:
-
 - Click the Save icon to store a query
 - Access saved queries from the Bookmarks panel
 - Queries are stored server-side
 
-#### 2.1.7. Query History
+#### Query History
 
 The History panel shows recent executions with:
-
 - SQL text
 - Duration
 - Rows returned / read
@@ -326,7 +221,7 @@ The History panel shows recent executions with:
 
 ![](/screenshots/sql-history.png)
 
-#### 2.1.8. Time Range Insertion
+#### Time Range Insertion
 
 Use the Time Range Selector to quickly insert time filter clauses into your SQL, properly handling the `WHERE` vs `AND` syntax.
 
@@ -334,35 +229,29 @@ Use the Time Range Selector to quickly insert time filter clauses into your SQL,
 
 ![](/screenshots/sql-time-range-apply.png)
 
-#### 2.1.9 Table preview
+#### Table Preview
 
-ClickLens also supports easy table preview feature. By clicking the table name in the sidebar, you can navigate this table's structure and data (only the first 100 rows).
+Click the table name in the sidebar to navigate to the table's structure and data (first 100 rows).
 
 ![](/screenshots/sql-table-preview-data.png)
 
 ![](/screenshots/sql-table-preview-structure.png)
 
-#### 2.1.10 Performance Optimizations
+### 2.2. Performance & Security
 
-The SQL Console includes automatic performance optimizations:
+**Performance Optimizations**:
+- Query timeout enforcement (max 5 minutes)
+- NDJSON streaming for large result sets
+- Pagination to reduce memory usage
+- Metadata caching for table schemas
+- Query performance metrics display
 
-- **Query Timeout Enforcement**: All queries are automatically limited to 5 minutes maximum to prevent resource exhaustion
-- **Query Streaming**: Large result sets are streamed to the UI using NDJSON for efficient memory usage
-- **Pagination**: Results are paginated to reduce memory usage on both client and server
-- **Metadata Caching**: Table schemas and column information are cached to reduce database load
-- **Query Performance Metrics**: Displays execution time, rows read, and bytes read for each query
-
-#### 2.1.11 Security Features
-
-The SQL Console includes comprehensive security protections:
-
-- **SQL Injection Protection**: Automatic validation of all user-provided SQL
-  - Blocks dangerous operations (DROP, DELETE, ALTER, TRUNCATE, INSERT, UPDATE, etc.)
-  - Prevents multiple statements and SQL comments
-  - Blocks dangerous table functions (file, url, remote, s3, gcs, mysql, postgresql, jdbc, odbc, hdfs, input, etc.)
-  - Allows only read operations (SELECT, WITH, SHOW, DESCRIBE, DESC, EXPLAIN, EXISTS, CHECK, USE)
-- **Query Rate Limiting**: Limits query execution to 60 queries per 60 seconds per user to prevent abuse
-- **RBAC Enforcement**: All queries respect user permissions and access controls
+**Security Features**:
+- SQL injection protection (blocks dangerous operations)
+- Blocks dangerous table functions (file, url, remote, s3, etc.)
+- Allows only read operations (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN, etc.)
+- Query rate limiting (60 queries per 60 seconds)
+- Full RBAC enforcement
 
 ---
 
@@ -383,16 +272,16 @@ Browse and inspect your ClickHouse schema in detail.
 
 ### 3.2. Table Detail Tabs
 
-| Tab              | Description                                |
-| ---------------- | ------------------------------------------ |
-| **Overview**     | Summary statistics (rows, size, engine)    |
-| **Columns**      | Column definitions with types and defaults |
-| **Parts**        | Data parts with sizes and row counts       |
-| **Merges**       | Active merge operations                    |
-| **Mutations**    | Pending ALTER mutations                    |
-| **Replicas**     | Replication status (for replicated tables) |
-| **Dependencies** | Interactive graph of table relationships   |
-| **DDL**          | `CREATE TABLE` statement                   |
+| Tab | Description |
+| --- | ----------- |
+| **Overview** | Summary statistics (rows, size, engine) |
+| **Columns** | Column definitions with types and defaults |
+| **Parts** | Data parts with sizes and row counts |
+| **Merges** | Active merge operations |
+| **Mutations** | Pending ALTER mutations |
+| **Replicas** | Replication status (for replicated tables) |
+| **Dependencies** | Interactive graph of table relationships |
+| **DDL** | `CREATE TABLE` statement |
 
 ![](/screenshots/tables-columns.png)
 
@@ -407,9 +296,8 @@ The **Dependencies** tab visualizes relationships between tables as an interacti
 - **Distributed Tables** - Shows underlying local tables
 
 Features:
-
 - **Interactive Graph**: Pan, zoom, and explore the dependency tree
-- **Visual Node Types**: Different colors and icons for table types (MergeTree, View, MaterializedView, Distributed)
+- **Visual Node Types**: Different colors and icons for table types
 - **Hierarchical Layout**: Source tables appear at the top, dependent tables flow downward
 - **MiniMap**: Navigate large graphs easily
 - **Connected Highlighting**: When a table is selected, its dependencies are highlighted
@@ -421,17 +309,9 @@ Features:
 
 ### 3.4. Performance Optimizations
 
-The Table Explorer includes automatic performance optimizations:
-
-- **Redis Caching**: All table data is cached in Redis to reduce database load
-  - Parts data: 10-second cache with stale-while-revalidate (30 seconds)
-  - Mutations data: 10-second cache with stale-while-revalidate (30 seconds)
-  - Merges data: 10-second cache with stale-while-revalidate (30 seconds)
-  - Dependencies data: 30-second cache with stale-while-revalidate (60 seconds)
-  - Columns data: 30-second cache with stale-while-revalidate (60 seconds)
-  - Replicas data: 10-second cache with stale-while-revalidate (30 seconds)
+- **Redis Caching**: All table data cached with stale-while-revalidate strategy
 - **HTTP Caching**: Cache-Control headers enable browser and CDN caching
-- **Metadata Caching**: Table schemas and column information are cached to reduce database load
+- **Metadata Caching**: Table schemas and column information cached
 - **Skeleton Loaders**: Smooth loading experience without data flashing
 
 ---
@@ -445,24 +325,24 @@ Real-time cluster health and performance monitoring.
   on system cluster tables.
 </Callout>
 
-**Available Tabs**
+### 4.1. Available Tabs
 
-| Tab             | Route                     | Description                 |
-| --------------- | ------------------------- | --------------------------- |
-| **Overview**    | `/monitoring/overview`    | Dashboard with key metrics  |
-| **Metrics**     | `/monitoring/metrics`     | Browse `system.metrics`     |
-| **Cluster**     | `/monitoring/cluster`     | Cluster topology and nodes  |
-| **Health**      | `/monitoring/health`      | Health check status         |
-| **Disks**       | `/monitoring/disks`       | Disk usage and capacity     |
-| **Keeper**      | `/monitoring/keeper`      | ClickHouse Keeper status    |
-| **Operations**  | `/monitoring/operations`  | Active merges and mutations |
-| **Replication** | `/monitoring/replication` | Replication queue status    |
+| Tab | Route | Description |
+| --- | ----- | ----------- |
+| **Overview** | `/monitoring/overview` | Dashboard with key metrics |
+| **Metrics** | `/monitoring/metrics` | Browse `system.metrics` |
+| **Cluster** | `/monitoring/cluster` | Cluster topology and nodes |
+| **Health** | `/monitoring/health` | Health check status |
+| **Disks** | `/monitoring/disks` | Disk usage and capacity |
+| **Keeper** | `/monitoring/keeper` | ClickHouse Keeper status |
+| **Operations** | `/monitoring/operations` | Active merges and mutations |
+| **Replication** | `/monitoring/replication` | Replication queue status |
 
 ![](/screenshots/monitoring-overview.png)
 
-- **① The Cluster status**: shows the number of shards, replicas, as well as the cluster name.
-- **② The Overall healthcheck**: ClickLens performs multiple checks: uptime, readonly replicas, parts to check, max parts per partition, active queries, memory usage, and replication delay.
-- **③ Multiple Graphs**: these graphs are based on [ClickHouse built-in advanced monitoring dashboards](https://clickhouse.com/docs/operations/system-tables/dashboards). ClickLens selects metrics following the [ClickHouse operations documentation](https://clickhouse.com/docs/operations/monitoring). Charts are grouped into **ClickHouse Metrics**, **System Health**, and **Network Metrics**, and they support multiline timestamps on their X-axis for optimal readability over extended time ranges.
+- **Cluster Status**: Shows the number of shards, replicas, and cluster name
+- **Health Checks**: Uptime, readonly replicas, parts to check, max parts per partition, active queries, memory usage, and replication delay
+- **Multiple Graphs**: Based on ClickHouse built-in monitoring dashboards, grouped into ClickHouse Metrics, System Health, and Network Metrics
 
 ![](/screenshots/monitoring-metrics.png)
 
@@ -474,14 +354,9 @@ Real-time cluster health and performance monitoring.
 
 ![](/screenshots/monitoring-zookeeper.png)
 
-### 4.1. Performance Optimizations
+### 4.2. Performance Optimizations
 
-The Monitoring feature includes automatic performance optimizations:
-
-- **Redis Caching**: All monitoring metrics are cached in Redis to reduce database load
-  - Overview metrics: 10-second cache with stale-while-revalidate (30 seconds)
-  - Dashboard metrics: 10-second cache with stale-while-revalidate (30 seconds)
-  - Custom metrics: 10-second cache with stale-while-revalidate (30 seconds)
+- **Redis Caching**: All monitoring metrics cached with stale-while-revalidate
 - **HTTP Caching**: Cache-Control headers enable browser and CDN caching
 - **Skeleton Loaders**: Smooth loading experience without data flashing
 - **Efficient Queries**: Optimized queries for system tables to minimize overhead
@@ -499,12 +374,12 @@ Analyze query performance and identify slow queries.
 
 ### 5.1. Available Views
 
-| View          | Route                | Description                                  |
-| ------------- | -------------------- | -------------------------------------------- |
-| **Running**   | `/queries/running`   | Currently executing queries                  |
-| **History**   | `/queries/history`   | Historical query log from `system.query_log` |
-| **Analytics** | `/queries/analytics` | Top resource-consuming queries               |
-| **Cache**     | `/queries/cache`     | Query cache statistics                       |
+| View | Route | Description |
+| ---- | ----- | ----------- |
+| **Running** | `/queries/running` | Currently executing queries |
+| **History** | `/queries/history` | Historical query log from `system.query_log` |
+| **Analytics** | `/queries/analytics` | Top resource-consuming queries |
+| **Cache** | `/queries/cache` | Query cache statistics |
 
 ![](/screenshots/queries-analytics.png)
 
@@ -512,17 +387,17 @@ Analyze query performance and identify slow queries.
 
 ![](/screenshots/queries-history-filter.png)
 
-- **① Filter by user**: Filters queries executed by a specific user.
-- **② Filter by execution duration**: Enter a minimum duration to show only queries that took longer.
-- **③ Filter by query type**: Filter by query type (INSERT, CREATE, SELECT, ALTER, DROP).
-- **④ Filter by status**: Filter by execution status ('Success' or 'Error').
+- **Filter by user**: Filters queries executed by a specific user
+- **Filter by execution duration**: Enter a minimum duration to show only queries that took longer
+- **Filter by query type**: Filter by query type (INSERT, CREATE, SELECT, ALTER, DROP)
+- **Filter by status**: Filter by execution status ('Success' or 'Error')
 
 ### 5.2. Query Cancellation
 
 ![](/screenshots/queries-running.png)
 
-- **① Refresh Control**: Like other components (logging & monitoring), user can control the refresh behavior by using the Refresh Control. It's very similar to Grafana and Kibana.
-- **② Kill action**: From the Running Queries view, you can kill queries using the KILL QUERY command. This requires the `canKillQueries` permission.
+- **Refresh Control**: Control the refresh behavior (similar to Grafana and Kibana)
+- **Kill action**: Kill queries using the KILL QUERY command (requires `canKillQueries` permission)
 
 ---
 
@@ -534,19 +409,19 @@ View and search through ClickHouse logs.
   Different log types require different permissions.
 </Callout>
 
-| Log Type         | Route              | Required Permission  |
-| ---------------- | ------------------ | -------------------- |
-| **Server Logs**  | `/logging/server`  | `canViewServerLogs`  |
+| Log Type | Route | Required Permission |
+| -------- | ----- | ------------------- |
+| **Server Logs** | `/logging/server` | `canViewServerLogs` |
 | **Session Logs** | `/logging/session` | `canViewSessionLogs` |
-| **Crash Logs**   | `/logging/crash`   | `canViewCrashLogs`   |
+| **Crash Logs** | `/logging/crash` | `canViewCrashLogs` |
 
 ![](/screenshots/logging-server.png)
 
-- **① Time range**: Select the time range for logs.
-- **② Filter by log level**: Filter to show only specific log levels (e.g., ERROR).
-- **③ Filter by component**: Enter a component name to filter logs.
-- **④ Filter by message**: Enter part of a message to search (uses `WHERE LIKE '%string%'`).
-- **Live Mode**: Auto-refresh uses efficient streaming to prepend only new logs.
+- **Time range**: Select the time range for logs
+- **Filter by log level**: Filter to show only specific log levels (e.g., ERROR)
+- **Filter by component**: Enter a component name to filter logs
+- **Filter by message**: Enter part of a message to search (uses `WHERE LIKE '%string%'`)
+- **Live Mode**: Auto-refresh uses efficient streaming to prepend only new logs
 
 > The system.crash_log table does not exist in the database by default, it is created only when fatal errors occur.
 
@@ -563,7 +438,9 @@ Manage ClickHouse users and roles.
   MANAGEMENT` grant.
 </Callout>
 
-In ClickHouse, Access control management is supported via RBAC approach. The entities that are part of ClickHouse RBAC are
+### 7.1. RBAC Overview
+
+In ClickHouse, Access control management is supported via RBAC approach. The entities that are part of ClickHouse RBAC are:
 
 - **User Account** – Identifies individual end users or applications that connect and access data in ClickHouse
 - **Role** – Roles hold the information about privileges, settings, and constraints for the users
@@ -584,23 +461,10 @@ flowchart LR
     SETTINGS --> ROLES
 ```
 
-The above illustration shows the access entities and the possible assignment of access entities among themselves. In ClickHouse, it is possible to
+ClickLens enforces a strict RBAC approach to ensure consistency and the Principle of Least Privilege:
 
-- Grant roles, settings profile, and any specific privilege to users
-- Grant settings profile and any specific privilege to any role
-
-While this approach can help in implementing RBAC, the strict enforcement of the Principle of Least Privilege is entirely in the hands of the database admin. This is because, let’s say, we have two users A and B, with the same role. They can end up having different sets of privileges and settings because it is possible to grant settings profiles and any specific privileges to individual users. We can enforce the upcoming RBAC approach to ensure consistency and strict implementation of the Principle of Least Privilege.
-
-<Callout type="info">
-  The **principle of least privilege** is an information security concept that
-  states that every entity must be able to access only the information and
-  resources that are necessary for completing the required task.
-</Callout>
-
-ClickLens chooses the different approach, simpler and more effective. This will ensure that we have a consistent set of privileges and enforce the Principle of Least Privilege effectively.
-
-- We shall grant only the roles to users
-- We shall grant privileges and settings profile to roles
+- Grant only roles to users
+- Grant privileges and settings profiles to roles
 
 ```mermaid
 flowchart LR
@@ -615,6 +479,12 @@ flowchart LR
 ```
 
 <Callout type="info">
+  The **principle of least privilege** is an information security concept that
+  states that every entity must be able to access only the information and
+  resources that are necessary for completing the required task.
+</Callout>
+
+<Callout type="info">
   **XML-Configured Users (e.g., default user):** Some users receive access via
   `users.xml` instead of SQL grants. Since these privileges don't appear in
   `system.grants`, ClickLens intelligently falls back to user-credential probes
@@ -622,18 +492,18 @@ flowchart LR
   credentials) to accurately determine access.
 </Callout>
 
-**Available views**
+### 7.2. Available Views
 
-| View      | Route           | Description                    |
-| --------- | --------------- | ------------------------------ |
+| View | Route | Description |
+| ---- | ----- | ----------- |
 | **Users** | `/access/users` | List and manage database users |
-| **Roles** | `/access/roles` | Manage roles and their grants  |
+| **Roles** | `/access/roles` | Manage roles and their grants |
 
-User can view all ClickHouse's users here.
+View all ClickHouse users:
 
 ![](/screenshots/access-user-overview.png)
 
-Create/Edit user and grant role(s).
+Create/Edit user and grant role(s):
 
 ![](/screenshots/access-user-create.png)
 
@@ -643,11 +513,11 @@ View roles. There are two types of roles:
 
 ![](/screenshots/access-role-overview.png)
 
-- **① Feature roles**: System-managed roles that enable UI features. These are read-only and can be viewed by clicking on each role.
+- **Feature roles**: System-managed roles that enable UI features. These are read-only and can be viewed by clicking on each role.
 
 ![](/screenshots/access-role-feature-role.png)
 
-- **② Custom roles**: User-created roles containing two types of permissions: inherited roles and data privileges. This allows for flexible role configuration.
+- **Custom roles**: User-created roles containing two types of permissions: inherited roles and data privileges. This allows for flexible role configuration.
 
 ![](/screenshots/access-role-create.png)
 
@@ -662,12 +532,12 @@ View ClickHouse server and session settings.
   `SELECT` on `system.settings`.
 </Callout>
 
-**Available views**
+### 8.1. Available Views
 
-| View                 | Route               | Description                                                                                                                                                                                                                                                         |
-| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Server Settings**  | `/settings/server`  | Read from `system.server_settings`, contains information about global settings for the server, which are specified in `config.xml`. Currently, the table shows only settings from the first layer of `config.xml` and doesn't support nested configs (e.g. logger). |
-| **Session Settings** | `/settings/session` | Read from `system.settings`, contains information about session settings for current user.                                                                                                                                                                          |
+| View | Route | Description |
+| ---- | ----- | ----------- |
+| **Server Settings** | `/settings/server` | Read from `system.server_settings`, contains information about global settings for the server, which are specified in `config.xml` |
+| **Session Settings** | `/settings/session` | Read from `system.settings`, contains information about session settings for current user |
 
 ![](/screenshots/settings-server.png)
 
@@ -676,6 +546,8 @@ View ClickHouse server and session settings.
 ![](/screenshots/settings-session.png)
 
 ![](/screenshots/settings-session-expandable-row.png)
+
+---
 
 ## 9. Profile
 
