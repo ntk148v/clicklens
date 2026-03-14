@@ -25,11 +25,15 @@ const DANGEROUS_KEYWORDS = [
 ] as const;
 
 const DANGEROUS_PATTERNS = [
-  /;\s*\S/, // semicolons followed by more SQL (multiple statements)
-  /--\s*\S/, // SQL comments that could hide malicious code
+  /;.*\S/, // semicolons followed by more SQL (multiple statements) - catches ;SELECT, ; DROP, etc.
+  /--/, // SQL comments that could hide malicious code
   /\/\*[\s\S]*?\*\//, // Multi-line comments
   /`[^`]*`/, // Backtick identifiers (could be used for injection)
+  /``/, // Escaped backticks
   /\$\$/, // Dollar-quoted strings
+  /\\x[0-9a-fA-F]+/, // Hex-encoded characters
+  /\\u[0-9a-fA-F]{4}/, // Unicode escape sequences
+  /%[0-9a-fA-F]{2}/, // URL-encoded characters
 ] as const;
 
 export function validateSQL(sql: string): ValidationResult {

@@ -9,6 +9,8 @@ import {
 } from "@/lib/clickhouse/search";
 import { fetchChunks } from "@/lib/clickhouse/stream";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
+import { validateFilter } from "@/lib/clickhouse/sql-validator";
+import { getGlobalRateLimiter } from "@/lib/rate-limiter";
 
 // ... Legacy sources handling could be preserved or refactored.
 // For this major refactor, I will keep legacy support but adapt it to the new structure where possible.
@@ -41,6 +43,31 @@ export async function GET(request: Request) {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
     const { config } = auth;
+
+    // Rate limiting check
+    const rateLimiter = getGlobalRateLimiter();
+    const clientIp = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    const rateLimitResult = await rateLimiter.check(clientIp);
+    
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "Rate limit exceeded. Please try again later.",
+          resetTime: rateLimitResult.resetTime 
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(rateLimitResult.resetTime)
+          }
+        }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const legacySource = searchParams.get("source");
@@ -194,15 +221,13 @@ export async function GET(request: Request) {
     const baseWhere: string[] = [];
 
     if (filter && filter.trim()) {
-      // Defense-in-depth: block dangerous SQL keywords that could modify data/schema
-      const DANGEROUS_KEYWORDS =
-        /\b(DROP|DELETE|ALTER|GRANT|REVOKE|TRUNCATE|INSERT|UPDATE|CREATE|ATTACH|DETACH|RENAME|KILL|SYSTEM)\b/i;
-      const DANGEROUS_PATTERNS = /;\s*\S/; // semicolons followed by more SQL
-      if (DANGEROUS_KEYWORDS.test(filter) || DANGEROUS_PATTERNS.test(filter)) {
+      // Use comprehensive SQL validation to prevent injection attacks
+      const validationResult = validateFilter(filter);
+      if (!validationResult.valid) {
         return NextResponse.json(
           {
             success: false,
-            error: "Invalid filter: contains disallowed keywords",
+            error: `Invalid filter: ${validationResult.error}`,
           },
           { status: 400 },
         );

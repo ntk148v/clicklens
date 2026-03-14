@@ -20,17 +20,17 @@ describe('RateLimiter', () => {
   });
 
   describe('check', () => {
-    it('should allow requests within limit', () => {
-      const result = rateLimiter.check('user1');
+    it('should allow requests within limit', async () => {
+      const result = await rateLimiter.check('user1');
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
       expect(result.resetTime).toBeGreaterThan(Date.now());
     });
 
-    it('should track multiple requests', () => {
+    it('should track multiple requests', async () => {
       const results = [];
       for (let i = 0; i < 5; i++) {
-        results.push(rateLimiter.check('user1'));
+        results.push(await rateLimiter.check('user1'));
       }
 
       expect(results[0].remaining).toBe(4);
@@ -40,14 +40,14 @@ describe('RateLimiter', () => {
       expect(results[4].remaining).toBe(0);
     });
 
-    it('should deny requests exceeding limit', () => {
+    it('should deny requests exceeding limit', async () => {
       // Use up all requests
       for (let i = 0; i < 5; i++) {
-        rateLimiter.check('user1');
+        await rateLimiter.check('user1');
       }
 
       // Next request should be denied
-      const result = rateLimiter.check('user1');
+      const result = await rateLimiter.check('user1');
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
     });
@@ -55,97 +55,97 @@ describe('RateLimiter', () => {
     it('should allow requests after window expires', async () => {
       // Use up all requests
       for (let i = 0; i < 5; i++) {
-        rateLimiter.check('user1');
+        await rateLimiter.check('user1');
       }
 
       // Wait for window to expire
       await new Promise((resolve) => setTimeout(resolve, 1100));
 
       // Should allow new requests
-      const result = rateLimiter.check('user1');
+      const result = await rateLimiter.check('user1');
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
     }, 2000);
 
-    it('should handle different users independently', () => {
+    it('should handle different users independently', async () => {
       // User 1 uses all requests
       for (let i = 0; i < 5; i++) {
-        rateLimiter.check('user1');
+        await rateLimiter.check('user1');
       }
 
       // User 2 should still be allowed
-      const result = rateLimiter.check('user2');
+      const result = await rateLimiter.check('user2');
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
     });
 
-    it('should use custom limit when provided', () => {
-      const result = rateLimiter.check('user1', 2);
+    it('should use custom limit when provided', async () => {
+      const result = await rateLimiter.check('user1', 2);
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(1);
 
       // Second request
-      const result2 = rateLimiter.check('user1', 2);
+      const result2 = await rateLimiter.check('user1', 2);
       expect(result2.allowed).toBe(true);
       expect(result2.remaining).toBe(0);
 
       // Third request should be denied
-      const result3 = rateLimiter.check('user1', 2);
+      const result3 = await rateLimiter.check('user1', 2);
       expect(result3.allowed).toBe(false);
     });
 
     it('should provide correct reset time', async () => {
-      const result1 = rateLimiter.check('user1');
+      const result1 = await rateLimiter.check('user1');
       const resetTime1 = result1.resetTime;
 
       // Wait a bit
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const result2 = rateLimiter.check('user1');
+      const result2 = await rateLimiter.check('user1');
       const resetTime2 = result2.resetTime;
 
       // Reset time should be based on the first request
       expect(resetTime2).toBe(resetTime1);
     });
 
-    it('should handle empty identifier', () => {
-      const result = rateLimiter.check('');
+    it('should handle empty identifier', async () => {
+      const result = await rateLimiter.check('');
       expect(result.allowed).toBe(true);
     });
 
-    it('should handle special characters in identifier', () => {
-      const result = rateLimiter.check('user@example.com');
+    it('should handle special characters in identifier', async () => {
+      const result = await rateLimiter.check('user@example.com');
       expect(result.allowed).toBe(true);
     });
   });
 
   describe('reset', () => {
-    it('should reset rate limit for specific user', () => {
+    it('should reset rate limit for specific user', async () => {
       // Use up all requests
       for (let i = 0; i < 5; i++) {
-        rateLimiter.check('user1');
+        await rateLimiter.check('user1');
       }
 
       // Reset
       rateLimiter.reset('user1');
 
       // Should allow new requests
-      const result = rateLimiter.check('user1');
+      const result = await rateLimiter.check('user1');
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
     });
 
-    it('should not affect other users', () => {
+    it('should not affect other users', async () => {
       // User 1 uses all requests
       for (let i = 0; i < 5; i++) {
-        rateLimiter.check('user1');
+        await rateLimiter.check('user1');
       }
 
       // Reset user 1
       rateLimiter.reset('user1');
 
       // User 2 should still have their own limit
-      const result = rateLimiter.check('user2');
+      const result = await rateLimiter.check('user2');
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
     });
@@ -156,19 +156,19 @@ describe('RateLimiter', () => {
   });
 
   describe('getUsage', () => {
-    it('should return current usage count', () => {
+    it('should return current usage count', async () => {
       expect(rateLimiter.getUsage('user1')).toBe(0);
 
-      rateLimiter.check('user1');
+      await rateLimiter.check('user1');
       expect(rateLimiter.getUsage('user1')).toBe(1);
 
-      rateLimiter.check('user1');
+      await rateLimiter.check('user1');
       expect(rateLimiter.getUsage('user1')).toBe(2);
     });
 
     it('should only count requests within time window', async () => {
-      rateLimiter.check('user1');
-      rateLimiter.check('user1');
+      await rateLimiter.check('user1');
+      await rateLimiter.check('user1');
 
       expect(rateLimiter.getUsage('user1')).toBe(2);
 
@@ -184,11 +184,11 @@ describe('RateLimiter', () => {
   });
 
   describe('clear', () => {
-    it('should clear all rate limit data', () => {
+    it('should clear all rate limit data', async () => {
       // Use up requests for multiple users
       for (let i = 0; i < 5; i++) {
-        rateLimiter.check('user1');
-        rateLimiter.check('user2');
+        await rateLimiter.check('user1');
+        await rateLimiter.check('user2');
       }
 
       // Clear all
@@ -201,9 +201,9 @@ describe('RateLimiter', () => {
   });
 
   describe('getStats', () => {
-    it('should return cache statistics', () => {
-      rateLimiter.check('user1');
-      rateLimiter.check('user2');
+    it('should return cache statistics', async () => {
+      await rateLimiter.check('user1');
+      await rateLimiter.check('user2');
 
       const stats = rateLimiter.getStats();
       expect(stats.size).toBe(2);
@@ -215,9 +215,9 @@ describe('RateLimiter', () => {
   describe('sliding window behavior', () => {
     it('should implement sliding window correctly', async () => {
       // Make 3 requests
-      rateLimiter.check('user1');
-      rateLimiter.check('user1');
-      rateLimiter.check('user1');
+      await rateLimiter.check('user1');
+      await rateLimiter.check('user1');
+      await rateLimiter.check('user1');
 
       expect(rateLimiter.getUsage('user1')).toBe(3);
 
@@ -225,21 +225,21 @@ describe('RateLimiter', () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Make 2 more requests
-      rateLimiter.check('user1');
-      rateLimiter.check('user1');
+      await rateLimiter.check('user1');
+      await rateLimiter.check('user1');
 
       // Should still be within limit (5 total)
       expect(rateLimiter.getUsage('user1')).toBe(5);
 
       // Next request should be denied
-      const result = rateLimiter.check('user1');
+      const result = await rateLimiter.check('user1');
       expect(result.allowed).toBe(false);
 
       // Wait for the first 3 requests to expire
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       // Should allow new requests now
-      const result2 = rateLimiter.check('user1');
+      const result2 = await rateLimiter.check('user1');
       expect(result2.allowed).toBe(true);
     });
   });
@@ -257,20 +257,20 @@ describe('Global Rate Limiter', () => {
     expect(limiter1).toBe(limiter2);
   });
 
-  it('should persist state across calls', () => {
+  it('should persist state across calls', async () => {
     const limiter = getGlobalRateLimiter();
 
-    limiter.check('user1');
+    await limiter.check('user1');
     expect(limiter.getUsage('user1')).toBe(1);
 
     const limiter2 = getGlobalRateLimiter();
     expect(limiter2.getUsage('user1')).toBe(1);
   });
 
-  it('should reset when resetGlobalRateLimiter is called', () => {
+  it('should reset when resetGlobalRateLimiter is called', async () => {
     const limiter = getGlobalRateLimiter();
 
-    limiter.check('user1');
+    await limiter.check('user1');
     expect(limiter.getUsage('user1')).toBe(1);
 
     resetGlobalRateLimiter();

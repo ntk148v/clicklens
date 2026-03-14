@@ -42,11 +42,25 @@ export async function getRedisClient(): Promise<RedisClientType> {
     redisClient.on("error", (err) => {
       console.error("Redis client error:", err);
       connectionError = err;
+      isConnecting = false;
+      redisClient = null;
     });
 
     redisClient.on("connect", () => {
       console.log("Redis client connected");
       connectionError = null;
+    });
+
+    redisClient.on("disconnect", () => {
+      console.log("Redis client disconnected");
+      isConnecting = false;
+      redisClient = null;
+    });
+
+    redisClient.on("end", () => {
+      console.log("Redis client connection ended");
+      isConnecting = false;
+      redisClient = null;
     });
 
     await redisClient.connect();
