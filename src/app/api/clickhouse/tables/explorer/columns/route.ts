@@ -118,7 +118,7 @@ export async function GET(
 
     // Cache key includes database and table
     const cacheKey = `columns:${database}:${table}`;
-    const cachedData = metadataCache.get(cacheKey);
+    const cachedData = await metadataCache.get(cacheKey);
     if (cachedData) {
       const resp = NextResponse.json({
         success: true,
@@ -171,7 +171,7 @@ export async function GET(
       summary,
     };
 
-    metadataCache.set(cacheKey, responseData);
+    await metadataCache.set(cacheKey, responseData);
     const resp = NextResponse.json({
       success: true,
       data: responseData,

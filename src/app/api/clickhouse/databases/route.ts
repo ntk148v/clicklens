@@ -78,7 +78,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
 
     // Cache key includes username for per-user RBAC filtering
     const cacheKey = `databases:${session.user.username}`;
-    const cachedData = metadataCache.get(cacheKey) as
+    const cachedData = await metadataCache.get(cacheKey) as
       | Array<{ name: string }>
       | undefined;
     if (cachedData) {
@@ -160,7 +160,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
         }
       }
 
-      metadataCache.set(cacheKey, resultData);
+      await metadataCache.set(cacheKey, resultData);
       const resp = NextResponse.json({
         success: true,
         data: resultData,

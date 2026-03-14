@@ -46,7 +46,7 @@ export async function GET(
 
     // Cache key includes category and type for proper cache isolation
     const cacheKey = `metrics:${category ?? "_all"}:${type ?? "_all"}`;
-    const cached = monitoringCache.get(cacheKey);
+    const cached = await monitoringCache.get(cacheKey);
     if (cached) {
       const resp = NextResponse.json({
         success: true,
@@ -90,7 +90,7 @@ export async function GET(
     };
 
     // Cache the response
-    monitoringCache.set(cacheKey, responseData);
+    await monitoringCache.set(cacheKey, responseData);
 
     const resp = NextResponse.json({
       success: true,

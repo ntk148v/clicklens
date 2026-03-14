@@ -1,50 +1,51 @@
 /**
- * Server-side in-memory cache using lru-cache
+ * Hybrid Cache Layer
  *
- * Provides two pre-configured caches:
- * - metadataCache: for databases, tables, columns (30s TTL)
- * - monitoringCache: for monitoring dashboard data (10s TTL, 30s SWR)
+ * Provides Redis-backed caching with in-memory LRU fallback.
+ * - Redis: Primary cache, shared across server instances
+ * - In-memory: Local fallback when Redis unavailable
  *
- * The `getOrSet` helper implements the cache-aside pattern with
- * in-flight request deduplication to avoid thundering herd.
+ * All caches use async interface for consistency.
  */
 
-import { LRUCache } from "lru-cache";
-
-// ---------------------------------------------------------------------------
-// Type alias for our cache instances
-// ---------------------------------------------------------------------------
+import { HybridCache } from "./hybrid-cache";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CacheValue = Record<string, any>;
-type AppCache = LRUCache<string, CacheValue>;
 
 // ---------------------------------------------------------------------------
-// Pre-configured caches
+// Pre-configured hybrid caches
 // ---------------------------------------------------------------------------
 
 /** Cache for metadata routes (databases, tables, columns) */
-export const metadataCache: AppCache = new LRUCache<string, CacheValue>({
+export const metadataCache = new HybridCache({
+  name: "metadata",
   max: 500,
-  ttl: 30_000, // 30 seconds
+  ttl: 30_000, // 30 seconds in-memory
+  redisTTL: 60, // 60 seconds in Redis
 });
 
 /** Cache for monitoring/dashboard data */
-export const monitoringCache: AppCache = new LRUCache<string, CacheValue>({
+export const monitoringCache = new HybridCache({
+  name: "monitoring",
   max: 100,
-  ttl: 10_000, // 10 seconds
-  allowStale: true, // serve stale while revalidating
+  ttl: 10_000, // 10 seconds in-memory
+  redisTTL: 30, // 30 seconds in Redis
 });
 
 /** Cache for tables explorer data (parts, mutations, merges, etc.) */
-export const tablesCache: AppCache = new LRUCache<string, CacheValue>({
+export const tablesCache = new HybridCache({
+  name: "tables",
   max: 200,
-  ttl: 300_000, // 5 minutes
-  allowStale: true, // serve stale while revalidating
+  ttl: 300_000, // 5 minutes in-memory
+  redisTTL: 600, // 10 minutes in Redis
 });
 
+// Type alias for backward compatibility
+export type AppCache = HybridCache;
+
 // ---------------------------------------------------------------------------
-// getOrSet helper
+// getOrSet helper (updated for async)
 // ---------------------------------------------------------------------------
 
 /**
@@ -62,14 +63,14 @@ const inflightRequests = new Map<string, Promise<CacheValue>>();
  * request instead of duplicating work.
  */
 export const getOrSet = async <T extends CacheValue>(
-  cache: AppCache,
+  cache: HybridCache,
   key: string,
   fetcher: () => Promise<T>,
 ): Promise<T> => {
   // 1. Check cache
-  const cached = cache.get(key);
+  const cached = await cache.get<T>(key);
   if (cached !== undefined) {
-    return cached as T;
+    return cached;
   }
 
   // 2. Check in-flight requests (dedup)
@@ -80,8 +81,8 @@ export const getOrSet = async <T extends CacheValue>(
 
   // 3. Fetch, cache, cleanup
   const promise = fetcher()
-    .then((result) => {
-      cache.set(key, result);
+    .then(async (result) => {
+      await cache.set(key, result);
       return result;
     })
     .finally(() => {
@@ -95,13 +96,16 @@ export const getOrSet = async <T extends CacheValue>(
 /**
  * Invalidate a specific cache key.
  */
-export const invalidateCache = (cache: AppCache, key: string): void => {
-  cache.delete(key);
+export const invalidateCache = async (
+  cache: HybridCache,
+  key: string,
+): Promise<void> => {
+  await cache.delete(key);
 };
 
 /**
  * Clear all entries in a cache.
  */
-export const clearCache = (cache: AppCache): void => {
-  cache.clear();
+export const clearCache = async (cache: HybridCache): Promise<void> => {
+  await cache.clear();
 };

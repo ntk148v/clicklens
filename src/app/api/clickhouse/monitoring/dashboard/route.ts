@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const cacheKey = `dashboard:${timeRange}:${from ?? "_"}:${to ?? "_"}`;
 
     if (!isIncremental) {
-      const cached = monitoringCache.get(cacheKey);
+      const cached = await monitoringCache.get(cacheKey);
       if (cached) {
         return successResponse(cached as DashboardResponse);
       }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!isIncremental) {
-      monitoringCache.set(cacheKey, data);
+      await monitoringCache.set(cacheKey, data);
     }
 
     return successResponse(data);

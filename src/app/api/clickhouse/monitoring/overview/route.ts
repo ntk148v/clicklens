@@ -193,7 +193,7 @@ export async function GET(
 
     // Cache check: key includes timeRange and cluster for overview data
     const cacheKey = `overview:${timeRange}:${clusterName ?? "_single"}`;
-    const cached = monitoringCache.get(cacheKey);
+    const cached = await monitoringCache.get(cacheKey);
     if (cached) {
       const resp = NextResponse.json({
         success: true,
@@ -358,7 +358,7 @@ export async function GET(
       }
     }
 
-    monitoringCache.set(cacheKey, dashboard);
+    await monitoringCache.set(cacheKey, dashboard);
     const resp = NextResponse.json({
       success: true,
       data: dashboard,

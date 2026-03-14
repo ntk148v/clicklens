@@ -105,7 +105,7 @@ export async function GET(
 
     // Cache key includes username + database for per-user RBAC filtering
     const cacheKey = `tables:${session.user.username}:${database ?? "_all"}`;
-    const cachedData = metadataCache.get(cacheKey) as TableInfo[] | undefined;
+    const cachedData = await metadataCache.get(cacheKey) as TableInfo[] | undefined;
     if (cachedData) {
       const resp = NextResponse.json({ success: true, data: cachedData });
       resp.headers.set(
@@ -222,7 +222,7 @@ export async function GET(
         }
       }
 
-      metadataCache.set(cacheKey, resultData);
+      await metadataCache.set(cacheKey, resultData);
       const resp = NextResponse.json({
         success: true,
         data: resultData,
