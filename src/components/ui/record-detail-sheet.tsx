@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Copy, Check, FileJson } from "lucide-react";
 import { useState } from "react";
 import { cn, copyToClipboard } from "@/lib/utils";
-import { TruncatedCell } from "./truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 
 interface ColumnMeta {
   name: string;
