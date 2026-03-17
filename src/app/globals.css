@@ -285,15 +285,21 @@
      ============================================ */
 
   .scrollable-y {
-    @apply overflow-y-auto scrollbar-thin;
+    @apply overflow-y-auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--background);
   }
 
   .scrollable-x {
-    @apply overflow-x-auto scrollbar-thin;
+    @apply overflow-x-auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--background);
   }
 
   .scrollable-both {
-    @apply overflow-auto scrollbar-thin;
+    @apply overflow-auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--background);
   }
 
   /* ============================================
