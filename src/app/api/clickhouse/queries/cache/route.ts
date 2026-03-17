@@ -16,7 +16,6 @@ import { getQueryCacheQuery } from "@/lib/clickhouse/queries/query-analysis";
 
 export interface QueryCacheEntry {
   query: string;
-  query_id: string;
   result_size: number;
   stale: number;
   shared: number;

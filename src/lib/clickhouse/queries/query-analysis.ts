@@ -116,7 +116,6 @@ export const getQueryCacheQuery = (
 SELECT
   query,
   ${nodeField}
-  query_id,
   result_size,
   stale,
   shared,
