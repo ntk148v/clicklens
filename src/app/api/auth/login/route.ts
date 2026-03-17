@@ -13,7 +13,7 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
-import { createSession } from "@/lib/auth/storage";
+import { createSession, destroySession } from "@/lib/auth/storage";
 import {
   getUserConfig,
   buildConnectionUrl,
@@ -154,7 +154,14 @@ export async function POST(
       sessionOptions,
     );
 
-    // Store credentials in server-side session
+    // SECURITY FIX: Prevent session fixation attacks
+    // Destroy any existing session before creating a new one
+    if (session.sessionId) {
+      destroySession(session.sessionId);
+    }
+    session.destroy();
+
+    // Store credentials in server-side session with fresh session ID
     const sessionId = createSession({
       username: body.username,
       password: body.password || "",

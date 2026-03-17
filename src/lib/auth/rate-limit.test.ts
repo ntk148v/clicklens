@@ -117,29 +117,34 @@ describe("Rate Limiter", () => {
       }
     });
 
-    test("extracts IP from x-forwarded-for header when trusted proxy", () => {
-      process.env.TRUSTED_PROXY_IPS = "true";
+    test("extracts IP from x-forwarded-for header when connection is from trusted proxy", () => {
+      process.env.TRUSTED_PROXY_IPS = "10.0.0.1";
       const request = new Request("http://localhost", {
         headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
       });
-      expect(getClientIdentifier(request)).toBe("1.2.3.4");
+      // Connection IP is in trusted proxy list
+      expect(getClientIdentifier(request, "10.0.0.1")).toBe("1.2.3.4");
     });
 
-    test("extracts IP from x-real-ip header when trusted proxy", () => {
-      process.env.TRUSTED_PROXY_IPS = "true";
+    test("extracts IP from x-real-ip header when connection is from trusted proxy", () => {
+      process.env.TRUSTED_PROXY_IPS = "10.0.0.1";
       const request = new Request("http://localhost", {
         headers: { "x-real-ip": "9.8.7.6" },
       });
-      expect(getClientIdentifier(request)).toBe("9.8.7.6");
+      // Connection IP is in trusted proxy list
+      expect(getClientIdentifier(request, "10.0.0.1")).toBe("9.8.7.6");
     });
 
-    test("returns fallback when no IP headers present and trusted", () => {
-      process.env.TRUSTED_PROXY_IPS = "true";
-      const request = new Request("http://localhost");
-      expect(getClientIdentifier(request)).toContain("fallback:");
+    test("returns connection IP when not from trusted proxy even with headers", () => {
+      process.env.TRUSTED_PROXY_IPS = "10.0.0.1";
+      const request = new Request("http://localhost", {
+        headers: { "x-forwarded-for": "1.1.1.1" },
+      });
+      // Connection IP is NOT in trusted proxy list - should use connection IP
+      expect(getClientIdentifier(request, "192.168.1.1")).toBe("192.168.1.1");
     });
 
-    test("returns fallback when NOT trusted proxy even with headers", () => {
+    test("returns fallback when no connection IP and no trusted proxy", () => {
       delete process.env.TRUSTED_PROXY_IPS;
       const request = new Request("http://localhost", {
         headers: { "x-forwarded-for": "1.1.1.1" },
@@ -147,15 +152,36 @@ describe("Rate Limiter", () => {
       expect(getClientIdentifier(request)).toContain("fallback:");
     });
 
-    test("prefers x-forwarded-for over x-real-ip when trusted", () => {
-      process.env.TRUSTED_PROXY_IPS = "true";
+    test("prefers x-forwarded-for over x-real-ip when from trusted proxy", () => {
+      process.env.TRUSTED_PROXY_IPS = "10.0.0.1";
       const request = new Request("http://localhost", {
         headers: {
           "x-forwarded-for": "1.1.1.1",
           "x-real-ip": "2.2.2.2",
         },
       });
-      expect(getClientIdentifier(request)).toBe("1.1.1.1");
+      expect(getClientIdentifier(request, "10.0.0.1")).toBe("1.1.1.1");
+    });
+
+    test("ignores forwarded headers when connection IP is not trusted", () => {
+      process.env.TRUSTED_PROXY_IPS = "10.0.0.1,10.0.0.2";
+      const request = new Request("http://localhost", {
+        headers: {
+          "x-forwarded-for": "1.1.1.1",
+          "x-real-ip": "2.2.2.2",
+        },
+      });
+      // Connection from untrusted IP - should not trust headers
+      expect(getClientIdentifier(request, "192.168.1.1")).toBe("192.168.1.1");
+    });
+
+    test("supports multiple trusted proxies", () => {
+      process.env.TRUSTED_PROXY_IPS = "10.0.0.1,10.0.0.2,10.0.0.3";
+      const request = new Request("http://localhost", {
+        headers: { "x-forwarded-for": "1.2.3.4" },
+      });
+      // Connection from second trusted proxy
+      expect(getClientIdentifier(request, "10.0.0.2")).toBe("1.2.3.4");
     });
   });
 });

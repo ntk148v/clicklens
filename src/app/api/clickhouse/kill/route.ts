@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
+import { requireCsrf } from "@/lib/auth/csrf";
 
 interface KillRequest {
   queryId: string;
@@ -34,6 +35,10 @@ export async function POST(
         { status: 429, headers: { "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)) } },
       );
     }
+
+    // CSRF protection for state-changing operation
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
 
     const authError = await checkPermission("canKillQueries");
     if (authError) return authError;

@@ -96,29 +96,44 @@ export function checkRateLimit(
 }
 
 /**
- * Check if the request is from a trusted proxy.
- * Set TRUSTED_PROXY_IPS env var to a comma-separated list of proxy IPs
- * to enable trusting X-Forwarded-For / X-Real-IP headers.
- *
- * SECURITY: Without this, X-Forwarded-For can be trivially spoofed
- * to bypass rate limiting.
+ * Get list of trusted proxy IPs from environment.
+ * Set TRUSTED_PROXY_IPS env var to a comma-separated list of proxy IPs.
  */
-function isTrustedProxy(): boolean {
-  return !!process.env.TRUSTED_PROXY_IPS;
+function getTrustedProxies(): string[] {
+  const ips = process.env.TRUSTED_PROXY_IPS;
+  return ips ? ips.split(",").map((ip) => ip.trim()) : [];
+}
+
+/**
+ * Check if an IP is in the trusted proxy list.
+ */
+function isTrustedProxy(ip: string): boolean {
+  const trustedProxies = getTrustedProxies();
+  return trustedProxies.includes(ip);
 }
 
 /**
  * Get client identifier from request.
  *
- * Only trusts X-Forwarded-For / X-Real-IP headers when running behind
- * a known trusted proxy (TRUSTED_PROXY_IPS is set). Otherwise, uses
- * a deterministic hash of available request metadata as a fallback.
+ * SECURITY FIX: Only trusts X-Forwarded-For / X-Real-IP headers when the
+ * immediate connection IP is in the trusted proxy list. This prevents
+ * IP spoofing attacks where clients set these headers directly.
+ *
+ * @param request - The incoming request
+ * @param connectionIp - The actual connection IP (from NextRequest.ip or similar)
  */
-export function getClientIdentifier(request: Request): string {
-  if (isTrustedProxy()) {
-    // Trust forwarded headers only when behind a configured proxy
+export function getClientIdentifier(
+  request: Request,
+  connectionIp?: string,
+): string {
+  // Get the immediate connection IP
+  const clientIp = connectionIp || "unknown";
+
+  // Only trust forwarded headers if the connection came from a trusted proxy
+  if (isTrustedProxy(clientIp)) {
     const forwardedFor = request.headers.get("x-forwarded-for");
     if (forwardedFor) {
+      // Take the first IP in the chain (closest to the client)
       return forwardedFor.split(",")[0].trim();
     }
 
@@ -126,6 +141,11 @@ export function getClientIdentifier(request: Request): string {
     if (realIp) {
       return realIp;
     }
+  }
+
+  // If we have a real connection IP, use it
+  if (clientIp !== "unknown") {
+    return clientIp;
   }
 
   // Fallback: combine multiple request signals to make bucket rotation harder.

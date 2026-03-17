@@ -50,6 +50,7 @@ export interface RolesResponse {
 }
 
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
+import { requireCsrf } from "@/lib/auth/csrf";
 
 // Ensure feature roles exist (auto-create on first access)
 async function ensureFeatureRoles(
@@ -238,6 +239,10 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // CSRF protection for state-changing operation
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     // Check authorization
     const authError = await checkPermission("canManageUsers");
     if (authError) return authError;
@@ -377,6 +382,10 @@ export async function PUT(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // CSRF protection for state-changing operation
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     // Check authorization
     const authError = await checkPermission("canManageUsers");
     if (authError) return authError;
@@ -544,6 +553,10 @@ export async function DELETE(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // CSRF protection for state-changing operation
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     // Check authorization
     const authError = await checkPermission("canManageUsers");
     if (authError) return authError;
