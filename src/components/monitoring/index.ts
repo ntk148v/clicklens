@@ -20,6 +20,7 @@ export {
 } from "./MetricChart";
 export { PaginationControls } from "@/components/shared/PaginationControls";
 export { TruncatedCell } from "@/components/shared/TruncatedCell";
+export { RefreshControl, type RefreshControlProps } from "@/components/shared/RefreshControl";
 export { OverviewTab } from "./OverviewTab";
 export { MetricsTab } from "./MetricsTab";
 export { ReplicationTab } from "./ReplicationTab";
