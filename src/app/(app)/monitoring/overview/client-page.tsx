@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth";
 import { Header } from "@/components/layout";
-import { OverviewTab } from "@/components/monitoring/overview-tab";
+import { OverviewTab } from "@/components/monitoring/OverviewTab";
 import { TimeSelector, RefreshControl } from "@/components/shared";
 import { Loader2 } from "lucide-react";
 import {

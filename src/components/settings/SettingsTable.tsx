@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { PaginationControls } from "@/components/monitoring/pagination-controls";
+import { PaginationControls } from "@/components/shared/PaginationControls";
 import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import { useToast } from "@/components/ui/use-toast";
 

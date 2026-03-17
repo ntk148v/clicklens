@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PaginationControls } from "@/components/monitoring/pagination-controls";
+import { PaginationControls } from "@/components/shared/PaginationControls";
 import {
   useQueryHistory,
   type QueryHistoryEntry,
