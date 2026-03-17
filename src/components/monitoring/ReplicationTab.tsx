@@ -11,7 +11,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
-import { PaginationControls } from "./pagination-controls";
+import { PaginationControls } from "@/components/shared/PaginationControls";
 import { StatCard, TruncatedCell } from "@/components/monitoring";
 import { StatusBadge, StatusDot } from "@/components/monitoring";
 import { useReplicas, formatNumber } from "@/lib/hooks/use-monitoring";

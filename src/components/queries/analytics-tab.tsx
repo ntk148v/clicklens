@@ -31,7 +31,7 @@ import {
   formatBytes,
   formatNumber,
 } from "@/lib/hooks/use-monitoring";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import { PaginationControls } from "@/components/monitoring";
 
 const DEFAULT_PAGE_SIZE = 50;

@@ -3,14 +3,13 @@
  * Exports all monitoring-related components
  */
 
-export { StatCard, type StatCardProps } from "./stat-card";
+export { StatCard, type StatCardProps } from "@/components/shared/StatCard";
 export {
   StatusBadge,
   StatusDot,
   type StatusBadgeProps,
   type StatusType,
-} from "./status-badge";
-export { RefreshControl, type RefreshControlProps } from "@/components/shared";
+} from "@/components/ui/StatusBadge";
 export {
   MetricChart,
   Sparkline,
@@ -18,14 +17,14 @@ export {
   type MetricChartProps,
   type MultiSeriesChartProps,
   type PerNodeDataPoint,
-} from "./metric-chart";
-export { PaginationControls } from "./pagination-controls";
-export { TruncatedCell } from "@/components/ui/truncated-cell";
-export { OverviewTab } from "./overview-tab";
-export { MetricsTab } from "./metrics-tab";
-export { ReplicationTab } from "./replication-tab";
-export { OperationsTab } from "./operations-tab";
-export { HealthTab } from "./health-tab";
-export { DisksTab } from "./disks-tab";
-export { KeeperTab } from "./keeper-tab";
-export { ClusterTab } from "./cluster-tab";
+} from "./MetricChart";
+export { PaginationControls } from "@/components/shared/PaginationControls";
+export { TruncatedCell } from "@/components/shared/TruncatedCell";
+export { OverviewTab } from "./OverviewTab";
+export { MetricsTab } from "./MetricsTab";
+export { ReplicationTab } from "./ReplicationTab";
+export { OperationsTab } from "./OperationsTab";
+export { HealthTab } from "./HealthTab";
+export { DisksTab } from "./DisksTab";
+export { KeeperTab } from "./KeeperTab";
+export { ClusterTab } from "./ClusterTab";

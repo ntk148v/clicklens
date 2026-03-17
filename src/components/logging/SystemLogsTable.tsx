@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { VirtualizedDataTable } from "./VirtualizedDataTable";
 import { Badge } from "@/components/ui/badge";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import type { LogEntry } from "@/lib/hooks/use-logs";
 import { formatDateTime } from "@/lib/utils";
 

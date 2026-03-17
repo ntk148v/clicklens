@@ -17,7 +17,7 @@ import { PaginationControls } from "@/components/monitoring";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { useTableMutations } from "@/lib/hooks/use-table-explorer";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 
 interface MutationsTabProps {
   database: string;

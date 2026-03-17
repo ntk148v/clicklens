@@ -30,7 +30,7 @@ import {
 
 import { useRunningQueries } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import type { RunningQuery } from "@/lib/hooks/use-query-analytics";
 
 interface RunningTabProps {

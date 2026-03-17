@@ -215,4 +215,132 @@
   .data-table-cell {
     @apply py-1.5 px-4 font-mono text-xs;
   }
+
+  /* ============================================
+     LAYOUT UTILITIES
+     ============================================ */
+
+  .layout-flex-center {
+    @apply flex items-center gap-2;
+  }
+
+  .layout-flex-between {
+    @apply flex items-center justify-between;
+  }
+
+  .layout-flex-col-full {
+    @apply flex flex-col h-full;
+  }
+
+  .layout-flex-wrap {
+    @apply flex flex-wrap gap-2;
+  }
+
+  /* ============================================
+     CARD PATTERNS
+     ============================================ */
+
+  .card-default {
+    @apply p-4 rounded-lg bg-card border shadow-sm;
+  }
+
+  .card-muted {
+    @apply p-4 rounded-lg bg-muted border;
+  }
+
+  .card-hover {
+    @apply p-4 rounded-lg bg-card border shadow-sm transition-colors hover:bg-muted/50;
+  }
+
+  /* ============================================
+     TEXT PATTERNS
+     ============================================ */
+
+  .text-mono-data {
+    @apply font-mono text-xs;
+  }
+
+  .text-mono-sm {
+    @apply font-mono text-sm;
+  }
+
+  .text-muted-small {
+    @apply text-muted-foreground text-sm;
+  }
+
+  .text-muted-xs {
+    @apply text-muted-foreground text-xs;
+  }
+
+  .text-heading-sm {
+    @apply text-sm font-medium;
+  }
+
+  .text-heading-base {
+    @apply text-base font-semibold;
+  }
+
+  /* ============================================
+     SCROLLABLE CONTAINERS
+     ============================================ */
+
+  .scrollable-y {
+    @apply overflow-y-auto scrollbar-thin;
+  }
+
+  .scrollable-x {
+    @apply overflow-x-auto scrollbar-thin;
+  }
+
+  .scrollable-both {
+    @apply overflow-auto scrollbar-thin;
+  }
+
+  /* ============================================
+     TABLE PATTERNS
+     ============================================ */
+
+  .table-container {
+    @apply relative overflow-auto border rounded-md;
+  }
+
+  .table-header-row {
+    @apply bg-muted/50 border-b;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-muted/50 transition-colors;
+  }
+
+  /* ============================================
+     FORM PATTERNS
+     ============================================ */
+
+  .input-group {
+    @apply flex items-center gap-2;
+  }
+
+  .input-with-icon {
+    @apply pl-9;
+  }
+
+  /* ============================================
+     STATUS INDICATORS
+     ============================================ */
+
+  .badge-status {
+    @apply inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  /* ============================================
+     ANIMATION UTILITIES
+     ============================================ */
+
+  .animate-fade-in {
+    @apply animate-in fade-in duration-200;
+  }
+
+  .animate-slide-in {
+    @apply animate-in slide-in-from-bottom-2 duration-200;
+  }
 }

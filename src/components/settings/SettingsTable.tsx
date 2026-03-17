@@ -26,7 +26,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { PaginationControls } from "@/components/monitoring/pagination-controls";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import { useToast } from "@/components/ui/use-toast";
 
 const DEFAULT_PAGE_SIZE = 50;

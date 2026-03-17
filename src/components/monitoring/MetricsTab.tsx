@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PaginationControls } from "./pagination-controls";
+import { PaginationControls } from "@/components/shared/PaginationControls";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { useMetrics, formatBytes } from "@/lib/hooks/use-monitoring";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";

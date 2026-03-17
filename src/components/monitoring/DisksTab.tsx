@@ -12,7 +12,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { StatCard, PaginationControls } from "@/components/monitoring";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import { StatusBadge } from "@/components/monitoring";
 import { Badge } from "@/components/ui/badge";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";

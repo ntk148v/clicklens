@@ -29,7 +29,7 @@ import {
 } from "@/lib/hooks/use-query-analytics";
 import { formatDuration, formatBytes } from "@/lib/hooks/use-monitoring";
 import { useRouter, usePathname } from "next/navigation";
-import { TruncatedCell } from "@/components/ui/truncated-cell";
+import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import { formatDateTime } from "@/lib/utils";
 
 const DEFAULT_PAGE_SIZE = 50;
