@@ -141,27 +141,56 @@ export async function POST(request: NextRequest) {
     let meta: { name: string; type: string }[] = [];
 
     // Create a new stream that transforms ClickHouse output to our NDJSON format
+    // PERFORMANCE FIX: Proper backpressure handling to prevent memory issues
     const customStream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
+        let isClosed = false;
 
-        // Helper to push JSON
-        const push = (data: unknown) => {
-          controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+        // Helper to push JSON with closed check
+        const push = (data: unknown): boolean => {
+          if (isClosed) return false;
+          try {
+            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+            return true;
+          } catch {
+            return false;
+          }
+        };
+
+        // Proper backpressure wait with timeout
+        const waitForBackpressure = async (): Promise<boolean> => {
+          if (isClosed) return false;
+
+          const startTime = Date.now();
+          while (
+            controller.desiredSize !== null &&
+            controller.desiredSize <= 0
+          ) {
+            if (isClosed || Date.now() - startTime > 30000) {
+              return false; // Timeout after 30s
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+          return true;
         };
 
         try {
           let lineCount = 0;
           let colNames: string[] = [];
-          const batch: unknown[] = [];
-          const BATCH_SIZE = 1000;
+          // PERFORMANCE FIX: Smaller batch size for better memory management
+          const BATCH_SIZE = 100;
+          let batch: unknown[] = [];
 
           for await (const chunk of stream) {
+            if (isClosed) break;
+
             const items = Array.isArray(chunk) ? chunk : [chunk];
 
             for (const item of items) {
-              // Helper to handle ClickHouse stream chunks which might be wrapped in { text: "..." }
-              // or just be the data itself (though Client usually returns objects)
+              if (isClosed) break;
+
+              // Helper to handle ClickHouse stream chunks
               let data = item;
               if (
                 data &&
@@ -188,54 +217,58 @@ export async function POST(request: NextRequest) {
                     type: String(colTypes[i]),
                   }));
                 } else {
-                  // Fallback if format is unexpected
                   meta = [{ name: "result", type: "String" }];
                 }
 
-                // Send Schema
-                push({ type: "meta", data: meta, rows: 0 }); // Initial meta
+                if (!push({ type: "meta", data: meta, rows: 0 })) {
+                  isClosed = true;
+                  break;
+                }
                 lineCount++;
               } else {
-                // Data Row
-                // Backpressure handling
-                if (
-                  controller.desiredSize !== null &&
-                  controller.desiredSize <= 0
-                ) {
-                  await new Promise((resolve) => setTimeout(resolve, 0));
-                }
-
                 if (rowsRead >= MAX_ROWS) {
                   limitReached = true;
                   break;
                 }
 
                 rowsRead++;
-
-                // Add to batch
                 batch.push(data);
 
-                // Flush batch if full
+                // PERFORMANCE FIX: Check backpressure before sending batch
                 if (batch.length >= BATCH_SIZE) {
-                  push({
-                    type: "data",
-                    data: batch,
-                    rows_count: rowsRead,
-                  });
-                  batch.length = 0; // Clear array
-                }
+                  if (!(await waitForBackpressure())) {
+                    isClosed = true;
+                    break;
+                  }
 
-                // Send progress occasionally
-                if (rowsRead % 1000 === 0) {
-                  push({ type: "progress", rows_read: rowsRead });
+                  if (
+                    !push({
+                      type: "data",
+                      data: batch,
+                      rows_count: rowsRead,
+                    })
+                  ) {
+                    isClosed = true;
+                    break;
+                  }
+                  batch = [];
+
+                  // PERFORMANCE FIX: Send progress less frequently
+                  if (rowsRead % 5000 === 0) {
+                    if (!push({ type: "progress", rows_read: rowsRead })) {
+                      isClosed = true;
+                      break;
+                    }
+                  }
                 }
               }
             }
-            if (limitReached) break;
+            if (limitReached || isClosed) break;
           }
 
           // Flush remaining items
-          if (batch.length > 0) {
+          if (batch.length > 0 && !isClosed) {
+            await waitForBackpressure();
             push({
               type: "data",
               data: batch,
@@ -243,35 +276,35 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          if (limitReached) {
-            // If we stopped early
-          } else {
-            // We finished naturally
+          if (!isClosed) {
+            push({
+              type: "done",
+              limit_reached: limitReached,
+              statistics: {
+                elapsed: 0,
+                rows_read: rowsRead,
+                bytes_read: 0,
+              },
+            });
           }
-
-          push({
-            type: "done",
-            limit_reached: limitReached,
-            statistics: {
-              elapsed: 0, // Not easily available in stream
-              rows_read: rowsRead,
-              bytes_read: 0,
-            },
-          });
         } catch (err) {
-          // Format error using secure error handler
-          const formattedError = formatQueryError(
-            err instanceof Error ? err : String(err),
-            undefined,
-            true, // Log full details server-side
-          );
-          push({
-            type: "error",
-            error: formattedError,
-          });
+          if (!isClosed) {
+            push({
+              type: "error",
+              error: formatQueryError(
+                err instanceof Error ? err : String(err),
+              ),
+            });
+          }
         } finally {
+          isClosed = true;
           controller.close();
         }
+      },
+
+      // PERFORMANCE FIX: Handle client cancellation
+      cancel(reason) {
+        console.log("Query stream cancelled by client:", reason);
       },
     });
 

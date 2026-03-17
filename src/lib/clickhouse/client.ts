@@ -15,15 +15,33 @@ import { ClickHouseClientImpl } from "./clients/client";
 export * from "./clients/types";
 export { ClickHouseClientImpl } from "./clients/client";
 
-const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
-const MAX_CACHED_CLIENTS = 100;
+const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHED_CLIENTS = 50; // Reduced from 100
+const CLEANUP_INTERVAL_MS = 60 * 1000; // Cleanup every minute
 
 interface CachedEntry {
   client: ClickHouseClient;
   lastUsed: number;
+  createdAt: number;
 }
 
 const clientCache = new Map<string, CachedEntry>();
+
+// Periodic cleanup interval
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+function startCleanupInterval(): void {
+  if (cleanupInterval) return;
+
+  cleanupInterval = setInterval(() => {
+    evictStaleClients();
+  }, CLEANUP_INTERVAL_MS);
+
+  // Don't prevent process exit
+  if (cleanupInterval.unref) {
+    cleanupInterval.unref();
+  }
+}
 
 function buildCacheKey(config: ClickHouseConfig): string {
   const settingsKey = config.settings
@@ -34,17 +52,42 @@ function buildCacheKey(config: ClickHouseConfig): string {
 
 function evictStaleClients(): void {
   const now = Date.now();
+  const keysToDelete: string[] = [];
+
   for (const [key, entry] of clientCache) {
-    if (now - entry.lastUsed > CLIENT_CACHE_TTL_MS) {
+    // Evict if stale or if entry is too old (even if recently used)
+    if (
+      now - entry.lastUsed > CLIENT_CACHE_TTL_MS ||
+      now - entry.createdAt > CLIENT_CACHE_TTL_MS * 2
+    ) {
+      keysToDelete.push(key);
+    }
+  }
+
+  // Delete stale entries
+  for (const key of keysToDelete) {
+    const entry = clientCache.get(key);
+    if (entry) {
+      // Close underlying connection if possible
+      (
+        entry.client as ClickHouseClientImpl & { close?: () => void }
+      )?.close?.();
       clientCache.delete(key);
     }
   }
+
+  // If still over limit, evict oldest by lastUsed
   if (clientCache.size > MAX_CACHED_CLIENTS) {
-    const oldest = [...clientCache.entries()].sort(
+    const sorted = [...clientCache.entries()].sort(
       (a, b) => a[1].lastUsed - b[1].lastUsed,
     );
-    for (let i = 0; i < oldest.length - MAX_CACHED_CLIENTS; i++) {
-      clientCache.delete(oldest[i][0]);
+    const toEvict = sorted.slice(0, sorted.length - MAX_CACHED_CLIENTS);
+
+    for (const [key, entry] of toEvict) {
+      (
+        entry.client as ClickHouseClientImpl & { close?: () => void }
+      )?.close?.();
+      clientCache.delete(key);
     }
   }
 }
@@ -70,16 +113,58 @@ export function createClient(config?: ClickHouseConfig): ClickHouseClient {
     return cached.client;
   }
 
+  // Start periodic cleanup
+  startCleanupInterval();
+
+  // Evict before adding new client
   evictStaleClients();
 
   const client = new ClickHouseClientImpl(resolvedConfig);
-  clientCache.set(key, { client, lastUsed: Date.now() });
+  clientCache.set(key, {
+    client,
+    lastUsed: Date.now(),
+    createdAt: Date.now(),
+  });
   return client;
 }
 
 /** Clear all cached clients (useful for testing). */
 export function clearClientCache(): void {
+  // Close all connections before clearing
+  for (const [, entry] of clientCache) {
+    (
+      entry.client as ClickHouseClientImpl & { close?: () => void }
+    )?.close?.();
+  }
   clientCache.clear();
+
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
+
+/**
+ * Get cache statistics for monitoring
+ */
+export function getClientCacheStats(): {
+  size: number;
+  maxSize: number;
+  oldestEntryAge: number;
+} {
+  const now = Date.now();
+  let oldestAge = 0;
+
+  for (const entry of clientCache.values()) {
+    const age = now - entry.lastUsed;
+    if (age > oldestAge) oldestAge = age;
+  }
+
+  return {
+    size: clientCache.size,
+    maxSize: MAX_CACHED_CLIENTS,
+    oldestEntryAge: oldestAge,
+  };
 }
 
 /**
