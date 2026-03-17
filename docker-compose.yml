@@ -126,6 +126,8 @@ services:
       - "8686:8686"
     depends_on:
       - nginx
+    environment:
+      - VECTOR_LOG=debug
 
   redis:
     image: redis:7-alpine
@@ -136,12 +138,7 @@ services:
         ipv4_address: 192.168.5.13
     ports:
       - "127.0.0.1:6379:6379"
-    volumes:
-      - redis_data:/data
     command: redis-server --appendonly yes
-
-volumes:
-  redis_data:
 
 networks:
   cluster_1S_2R_ch_proxy:

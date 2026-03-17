@@ -55,7 +55,7 @@ sinks:
     compression: none
     inputs:
       - parsed_syslog
-    endpoint: http://nginx:8080
+    endpoint: http://nginx
     database: logs
     table: syslog
     auth:
@@ -78,7 +78,7 @@ sinks:
     compression: none
     inputs:
       - parsed_httplog
-    endpoint: http://nginx:8080
+    endpoint: http://nginx
     database: logs
     table: http
     auth:
