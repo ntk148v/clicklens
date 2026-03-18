@@ -14,11 +14,8 @@ services:
       - ./.env.local:/app/.env.local
     environment:
       - NODE_ENV=production
-      # For dev environment only
-      - DISABLE_SECURE_COOKIES=true
+      - DISABLE_SECURE_COOKIES=false
     restart: unless-stopped
-    depends_on:
-      - nginx
 
   clickhouse-01:
     image: "clickhouse/clickhouse-server:${CHVER:-latest}"
@@ -107,11 +104,15 @@ services:
         ipv4_address: 192.168.5.10
     ports:
       - "8080:80"
+      - "8443:443"
     volumes:
       - ${PWD}/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${PWD}/dev/nginx/entrypoint.sh:/etc/nginx/entrypoint.sh:ro
+    entrypoint: /etc/nginx/entrypoint.sh
     depends_on:
       - clickhouse-01
       - clickhouse-02
+      - clicklens
 
   vector:
     image: timberio/vector:nightly-alpine
