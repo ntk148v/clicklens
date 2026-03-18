@@ -37,6 +37,7 @@ interface Permissions {
 interface AuthContextType {
   user: User | null;
   permissions: Permissions | null;
+  csrfToken: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (
@@ -72,6 +73,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<Permissions | null>(null);
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -110,16 +112,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (data.isLoggedIn && data.user) {
         setUser(data.user);
+        setCsrfToken(data.csrfToken || null);
         // Fetch permissions after session is confirmed
         await fetchPermissions();
       } else {
         setUser(null);
         setPermissions(null);
+        setCsrfToken(null);
       }
     } catch (error) {
       console.error("Failed to fetch session:", error);
       setUser(null);
       setPermissions(null);
+      setCsrfToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -169,6 +174,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await fetch("/api/auth/logout", { method: "POST" });
       setUser(null);
       setPermissions(null);
+      setCsrfToken(null);
 
       // Clear client-side stores
       useSqlBrowserStore.getState().reset();
@@ -185,6 +191,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       value={{
         user,
         permissions,
+        csrfToken,
         isLoading,
         isAuthenticated: !!user,
         login,

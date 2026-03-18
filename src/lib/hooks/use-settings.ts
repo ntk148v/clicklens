@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/components/auth";
 
 export interface ClickHouseSetting {
   name: string;
@@ -29,6 +30,7 @@ export function useSettings(
   search: string = "",
   scope: SettingsScope = "session"
 ): UseSettingsResponse {
+  const { csrfToken } = useAuth();
   const [settings, setSettings] = useState<ClickHouseSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,7 @@ export function useSettings(
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
         },
         body: JSON.stringify({ name, value }),
       });

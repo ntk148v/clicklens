@@ -125,7 +125,7 @@ interface TableInfo {
 }
 
 export default function RolesPage() {
-  const { permissions, isLoading: authLoading } = useAuth();
+  const { permissions, isLoading: authLoading, csrfToken } = useAuth();
   const { toast } = useToast();
   const [roles, setRoles] = useState<RoleWithPrivileges[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,7 +327,10 @@ export default function RolesPage() {
 
       const response = await fetch(endpoint, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({
           name: formData.name.trim(),
           inheritedRoles: formData.inheritedRoles,
@@ -364,7 +367,10 @@ export default function RolesPage() {
     try {
       const response = await fetch("/api/clickhouse/access/roles", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({ name: roleName }),
       });
 

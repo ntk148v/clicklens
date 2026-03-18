@@ -14,6 +14,7 @@ import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/auth/session";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
 import { createSession, destroySession } from "@/lib/auth/storage";
+import { generateCsrfToken } from "@/lib/auth/csrf";
 import {
   getUserConfig,
   buildConnectionUrl,
@@ -31,6 +32,7 @@ export interface LoginResponse {
   version?: string;
   error?: string;
   retryAfter?: number;
+  csrfToken?: string;
 }
 
 export async function POST(
@@ -177,9 +179,12 @@ export async function POST(
 
     await session.save();
 
+    const csrfToken = await generateCsrfToken();
+
     return NextResponse.json({
       success: true,
       version,
+      csrfToken,
     });
   } catch (error) {
     console.error("Login error:", error);

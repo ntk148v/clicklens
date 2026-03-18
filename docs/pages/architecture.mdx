@@ -467,7 +467,7 @@ ClickLens implements defense-in-depth security through multiple layers.
 
 1. **HTTPS Support**: Optional SSL/TLS for ClickHouse connections
 2. **Cookie Security**: Secure, HttpOnly cookies in production
-3. **CSRF Protection**: SameSite cookie policies
+3. **CSRF Protection**: SameSite cookie policies and explicit Double-Submit Cookie token (`x-csrf-token` header) for state-mutating API routes
 4. **CORS Control**: Configured API access policies
 
 ## Performance Optimizations

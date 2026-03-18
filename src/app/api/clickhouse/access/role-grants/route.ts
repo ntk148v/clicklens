@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { quoteIdentifier } from "@/lib/clickhouse/utils";
+import { requireCsrf } from "@/lib/auth/csrf";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 import { ROLE_GRANTS_ALL_QUERY } from "@/lib/clickhouse/queries/access";
 
 interface RoleGrant {
@@ -72,6 +74,10 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // CSRF protection
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -96,13 +102,16 @@ export async function POST(
         ? `ROLE ${quoteIdentifier(body.granteeName)}`
         : quoteIdentifier(body.granteeName);
 
-    let sql = `GRANT ${quoteIdentifier(body.roleName)} TO ${grantee}`;
+    const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
+
+    let sql = `GRANT${onCluster} ${quoteIdentifier(body.roleName)} TO ${grantee}`;
 
     if (body.withAdminOption) {
       sql += " WITH ADMIN OPTION";
     }
 
-    const client = createClient(config);
     await client.command(sql);
 
     return NextResponse.json({ success: true });
@@ -134,6 +143,10 @@ export async function DELETE(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    // CSRF protection
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -158,9 +171,11 @@ export async function DELETE(
         ? `ROLE ${quoteIdentifier(body.granteeName)}`
         : quoteIdentifier(body.granteeName);
 
-    const sql = `REVOKE ${quoteIdentifier(body.roleName)} FROM ${grantee}`;
-
     const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
+    const sql = `REVOKE${onCluster} ${quoteIdentifier(body.roleName)} FROM ${grantee}`;
+
     await client.command(sql);
 
     return NextResponse.json({ success: true });

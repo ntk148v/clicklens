@@ -5,7 +5,7 @@
  * specific UI features. They are managed by code and not user-editable.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import {
@@ -14,6 +14,9 @@ import {
   type FeatureRole,
 } from "@/lib/rbac";
 import { getFeatureRolesQuery } from "@/lib/clickhouse/queries/access";
+import { requireCsrf } from "@/lib/auth/csrf";
+import { getClusterName } from "@/lib/clickhouse/cluster";
+import { quoteIdentifier } from "@/lib/clickhouse/utils";
 
 export interface FeatureRolesResponse {
   success: boolean;
@@ -70,10 +73,15 @@ export async function GET(): Promise<NextResponse<FeatureRolesResponse>> {
 }
 
 // POST: Setup/install feature roles (requires ACCESS MANAGEMENT)
-export async function POST(): Promise<
+export async function POST(
+  request: NextRequest
+): Promise<
   NextResponse<{ success: boolean; error?: string; created?: string[] }>
 > {
   try {
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     const config = await getSessionClickHouseConfig();
 
     if (!config) {
@@ -84,18 +92,22 @@ export async function POST(): Promise<
     }
 
     const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
     const created: string[] = [];
 
     // Create each feature role with its privileges (using FEATURE_ROLES as source of truth)
     for (const role of FEATURE_ROLES) {
       try {
         // Create the role
-        await client.command(`CREATE ROLE IF NOT EXISTS \`${role.id}\``);
+        await client.command(`CREATE ROLE IF NOT EXISTS \`${role.id}\`${onCluster}`);
 
         // Grant privileges
         for (const grant of role.grants) {
           try {
-            await client.command(grant);
+            // Replace 'GRANT' with 'GRANT ON CLUSTER' if needed, but since role grants are hardcoded in lib/rbac:
+            const grantSql = onCluster ? grant.replace(/^GRANT /i, `GRANT${onCluster} `) : grant;
+            await client.command(grantSql);
           } catch (e) {
             // Continue if individual grant fails
             console.warn(`Failed to execute: ${grant}`, e);

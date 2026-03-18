@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
 import { copyToClipboard } from "@/lib/utils";
+import { useAuth } from "@/components/auth";
 
 interface DdlTabProps {
   database: string;
@@ -14,6 +15,7 @@ interface DdlTabProps {
 }
 
 export function DdlTab({ database, table }: DdlTabProps) {
+  const { csrfToken } = useAuth();
   const [ddl, setDdl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,10 @@ export function DdlTab({ database, table }: DdlTabProps) {
       try {
         const response = await fetch("/api/clickhouse/query", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-csrf-token": csrfToken || "",
+          },
           body: JSON.stringify({
             sql: `SHOW CREATE TABLE \`${database}\`.\`${table}\``,
           }),
@@ -74,7 +79,7 @@ export function DdlTab({ database, table }: DdlTabProps) {
     }
 
     fetchDdl();
-  }, [database, table]);
+  }, [database, table, csrfToken]);
 
   const handleCopy = async () => {
     if (ddl) {

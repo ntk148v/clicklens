@@ -73,7 +73,7 @@ export async function checkPermission(
 
   try {
     // Get effective roles for the user
-    const effectiveRoles = await getEffectiveRoles(client, username);
+    const effectiveRoles = await getEffectiveRoles(username);
 
     // Check if user has global access
     const hasGlobalAccess = await checkGlobalAccess(username);
@@ -112,14 +112,19 @@ export async function checkPermission(
  * Get all effective roles for a user (including inherited roles)
  */
 async function getEffectiveRoles(
-  client: ReturnType<typeof createClient>,
   username: string,
 ): Promise<Set<string>> {
   const effectiveRoles = new Set<string>();
 
+  if (!isLensUserConfigured()) return effectiveRoles;
+  const lensConfig = getLensConfig();
+  if (!lensConfig) return effectiveRoles;
+
   try {
+    const lensClient = createClient(lensConfig);
+
     // Get all role grants
-    const allGrantsResult = await client.query<{
+    const allGrantsResult = await lensClient.query<{
       user_name: string | null;
       role_name: string | null;
       granted_role_name: string;

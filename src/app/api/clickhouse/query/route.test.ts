@@ -6,11 +6,16 @@ const mockGetSessionClickHouseConfig = mock();
 const mockCheckPermission = mock();
 const mockCreateClient = mock();
 const mockQueryStream = mock();
+const mockRequireCsrf = mock();
 
 // Mock module imports
 mock.module("@/lib/auth", () => ({
   getSessionClickHouseConfig: mockGetSessionClickHouseConfig,
   checkPermission: mockCheckPermission,
+}));
+
+mock.module("@/lib/auth/csrf", () => ({
+  requireCsrf: mockRequireCsrf,
 }));
 
 mock.module("@/lib/clickhouse", () => ({
@@ -59,9 +64,11 @@ describe("Query API Route (Streaming)", () => {
     mockCheckPermission.mockReset();
     mockCreateClient.mockReset();
     mockQueryStream.mockReset();
+    mockRequireCsrf.mockReset();
 
     // Default: permission check passes (returns null = authorized)
     mockCheckPermission.mockResolvedValue(null);
+    mockRequireCsrf.mockResolvedValue(null);
 
     // Default valid session
     mockGetSessionClickHouseConfig.mockResolvedValue({

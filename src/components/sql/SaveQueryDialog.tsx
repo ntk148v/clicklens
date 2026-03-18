@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ export function SaveQueryDialog({
   sql,
   onSaved,
 }: SaveQueryDialogProps) {
+  const { csrfToken } = useAuth();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
@@ -44,7 +46,10 @@ export function SaveQueryDialog({
     try {
       const res = await fetch("/api/saved-queries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({
           name,
           description,

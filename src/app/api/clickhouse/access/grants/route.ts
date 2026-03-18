@@ -14,6 +14,8 @@ import {
 } from "@/lib/clickhouse";
 import { GRANTS_LIST_QUERY } from "@/lib/clickhouse/queries/access";
 import { quoteIdentifier } from "@/lib/clickhouse/utils";
+import { requireCsrf } from "@/lib/auth/csrf";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 /**
  * Allowlist of valid ClickHouse access types to prevent SQL injection.
@@ -149,6 +151,9 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     const authError = await checkPermission("canManageUsers");
     if (authError) return authError;
 
@@ -195,13 +200,16 @@ export async function POST(
         ? `ROLE ${quoteIdentifier(body.granteeName)}`
         : quoteIdentifier(body.granteeName);
 
-    let sql = `GRANT ${body.accessType.toUpperCase()} ${target} TO ${grantee}`;
+    const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
+
+    let sql = `GRANT${onCluster} ${body.accessType.toUpperCase()} ${target} TO ${grantee}`;
 
     if (body.withGrantOption) {
       sql += " WITH GRANT OPTION";
     }
 
-    const client = createClient(config);
     await client.command(sql);
 
     return NextResponse.json({ success: true });
@@ -235,6 +243,9 @@ export async function DELETE(
   request: NextRequest,
 ): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     const authError = await checkPermission("canManageUsers");
     if (authError) return authError;
 
@@ -281,9 +292,12 @@ export async function DELETE(
         ? `ROLE ${quoteIdentifier(body.granteeName)}`
         : quoteIdentifier(body.granteeName);
 
-    const sql = `REVOKE ${body.accessType.toUpperCase()} ${target} FROM ${grantee}`;
-
     const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
+
+    const sql = `REVOKE${onCluster} ${body.accessType.toUpperCase()} ${target} FROM ${grantee}`;
+
     await client.command(sql);
 
     return NextResponse.json({ success: true });

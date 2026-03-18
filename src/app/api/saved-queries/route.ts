@@ -19,6 +19,7 @@ import {
   SAVED_QUERIES_TABLE,
 } from "@/lib/clickhouse/metadata";
 import { ApiErrors, apiError } from "@/lib/api";
+import { requireCsrf } from "@/lib/auth/csrf";
 
 export interface SavedQuery {
   id: string;
@@ -63,6 +64,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const csrfError = await requireCsrf(request);
+  if (csrfError) return csrfError;
+
   const session = await getSession();
   if (!session.isLoggedIn || !session.user) {
     return ApiErrors.unauthorized();

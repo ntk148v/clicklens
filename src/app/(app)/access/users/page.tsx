@@ -78,7 +78,7 @@ interface UserWithRoles extends SystemUser {
 }
 
 export default function UsersPage() {
-  const { permissions, isLoading: authLoading } = useAuth();
+  const { permissions, isLoading: authLoading, csrfToken } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [roles, setRoles] = useState<SystemRole[]>([]);
@@ -235,7 +235,10 @@ export default function UsersPage() {
 
       const response = await fetch(endpoint, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify(body),
       });
 
@@ -268,7 +271,10 @@ export default function UsersPage() {
     try {
       const response = await fetch("/api/clickhouse/access/users", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({ name: userName }),
       });
 

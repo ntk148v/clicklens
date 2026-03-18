@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/components/auth";
 
 const passwordSchema = z
   .object({
@@ -33,6 +34,7 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 export function PasswordChangeForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { csrfToken } = useAuth();
 
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -48,7 +50,10 @@ export function PasswordChangeForm() {
     try {
       const response = await fetch("/api/auth/password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({
           currentPassword: data.currentPassword,
           newPassword: data.newPassword,

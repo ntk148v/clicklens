@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 import { getSessionSettingsQuery, getServerSettingsQuery } from "@/lib/clickhouse/queries/settings";
 import { CURRENT_USER_QUERY } from "@/lib/clickhouse/queries/access";
+import { requireCsrf } from "@/lib/auth/csrf";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export const dynamic = "force-dynamic";
 
@@ -65,8 +67,10 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
     // Check authorization - requires canViewSettings permission
     const authError = await checkPermission("canViewSettings");
     if (authError) return authError;
@@ -108,11 +112,14 @@ export async function PUT(request: Request) {
     // Use ALTER USER to persist setting for the current user
     // Note: This requires privileges to ALTER USER
     // We sanitize input manually as the client wrapper expects a string
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
+
     const safeName = name.replace(/[^a-zA-Z0-9_.]/g, ""); // Strict allowlist for setting name
     const safeValue = escapeSqlString(String(value));
     const quotedUsername = quoteIdentifier(String(currentUsername));
 
-    const query = `ALTER USER ${quotedUsername} SETTINGS ${safeName} = '${safeValue}'`;
+    const query = `ALTER USER ${quotedUsername}${onCluster} SETTINGS ${safeName} = '${safeValue}'`;
 
     await client.command(query);
 

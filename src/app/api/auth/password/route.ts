@@ -4,9 +4,15 @@ import { getUserConfig, getLensConfig, createClient } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 import { updateSessionPassword } from "@/lib/auth/storage";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
+import { requireCsrf } from "@/lib/auth/csrf";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 export async function POST(request: NextRequest) {
   try {
+    // CSRF protection for state-changing operation
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     // Rate limiting check - 5 attempts per minute per IP
     const clientIp = getClientIdentifier(request);
     const rateLimit = checkRateLimit(clientIp, 5, 60000);
@@ -99,6 +105,10 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createClient(adminConfig);
+    const clusterName = await getClusterName(adminClient);
+    const onCluster = clusterName
+      ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
+      : "";
 
     // Use consistent escaping from shared utility to prevent SQL injection
     const escapedPassword = escapeSqlString(newPassword);
@@ -106,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     try {
       await adminClient.command(
-        `ALTER USER ${quotedUsername} IDENTIFIED BY '${escapedPassword}'`,
+        `ALTER USER IF EXISTS ${quotedUsername}${onCluster} IDENTIFIED BY '${escapedPassword}'`,
       );
     } catch (e) {
       console.error("ClickHouse password change error:", e);

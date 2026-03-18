@@ -9,8 +9,8 @@ import { randomBytes, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const CSRF_COOKIE_NAME = "clicklens-csrf";
-const CSRF_HEADER_NAME = "x-csrf-token";
+export const CSRF_COOKIE_NAME = "clicklens-csrf";
+export const CSRF_HEADER_NAME = "x-csrf-token";
 
 /**
  * Generate a new CSRF token and set it in a cookie

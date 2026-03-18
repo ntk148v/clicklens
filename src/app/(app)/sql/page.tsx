@@ -166,7 +166,7 @@ export default function SqlConsolePage() {
     useTabsStore();
   const { selectedDatabase, databases, tables, getColumnsForTable } =
     useSqlBrowserStore();
-  const { user, permissions, isLoading: authLoading } = useAuth();
+  const { user, permissions, isLoading: authLoading, csrfToken } = useAuth();
   const router = useRouter();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
@@ -235,7 +235,10 @@ export default function SqlConsolePage() {
 
           const response = await fetch("/api/clickhouse/query", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-csrf-token": csrfToken || "",
+            },
             body: JSON.stringify({
               sql: statement,
               query_id: queryId,
@@ -489,7 +492,10 @@ export default function SqlConsolePage() {
     try {
       await fetch("/api/clickhouse/kill", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({ queryId: tab.queryId }),
       });
 
@@ -539,7 +545,10 @@ export default function SqlConsolePage() {
     try {
       const response = await fetch("/api/clickhouse/query", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({
           sql: statement,
           query_id: queryId,
@@ -739,7 +748,10 @@ export default function SqlConsolePage() {
 
         const response = await fetch("/api/clickhouse/query", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-csrf-token": csrfToken || "",
+          },
           body: JSON.stringify({
             sql: query,
             database: selectedDatabase,

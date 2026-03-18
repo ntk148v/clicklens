@@ -4,6 +4,7 @@ import { createClient } from "@/lib/clickhouse";
 import { formatQueryError } from "@/lib/errors";
 import { validateSqlStatement } from "@/lib/sql/validator";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
+import { requireCsrf } from "@/lib/auth/csrf";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,9 @@ const QUERY_RATE_WINDOW_MS = 60000;
 
 export async function POST(request: NextRequest) {
   try {
+    const csrfError = await requireCsrf(request);
+    if (csrfError) return csrfError;
+
     const clientId = getClientIdentifier(request);
     const rateLimit = checkRateLimit(`query:${clientId}`, QUERY_RATE_LIMIT, QUERY_RATE_WINDOW_MS);
     if (!rateLimit.success) {

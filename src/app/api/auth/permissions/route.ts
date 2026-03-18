@@ -45,13 +45,18 @@ interface PermissionsResponse {
  * Recursively resolve all effective roles for a user, including inherited roles.
  */
 async function getEffectiveRoles(
-  client: ReturnType<typeof createClient>,
   username: string,
 ): Promise<Set<string>> {
   const effectiveRoles = new Set<string>();
 
+  if (!isLensUserConfigured()) return effectiveRoles;
+  const lensConfig = getLensConfig();
+  if (!lensConfig) return effectiveRoles;
+
+  const lensClient = createClient(lensConfig);
+
   // Get all role grants (both user->role and role->role)
-  const allGrantsResult = await client.query<{
+  const allGrantsResult = await lensClient.query<{
     user_name: string | null;
     role_name: string | null;
     granted_role_name: string;
@@ -242,7 +247,7 @@ export async function GET(): Promise<NextResponse<PermissionsResponse>> {
     const [effectiveRolesResult, featuresResult, accessInfoResult] =
       await Promise.allSettled([
         // 1. Get all effective roles (including inherited)
-        getEffectiveRoles(client, username),
+        getEffectiveRoles(username),
         // 2. Run probes using user's credentials
         Promise.allSettled([
           // manage users probe

@@ -27,6 +27,7 @@ export interface UsersResponse {
 
 import { quoteIdentifier, escapeString } from "@/lib/clickhouse/utils";
 import { requireCsrf } from "@/lib/auth/csrf";
+import { getClusterName } from "@/lib/clickhouse/cluster";
 
 // GET: List all users with their assigned roles
 export async function GET(): Promise<NextResponse<UsersResponse>> {
@@ -130,10 +131,14 @@ export async function POST(
     }
 
     const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName
+      ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
+      : "";
     const quotedUser = quoteIdentifier(body.name);
 
     // Build CREATE USER statement
-    let sql = `CREATE USER IF NOT EXISTS ${quotedUser}`;
+    let sql = `CREATE USER IF NOT EXISTS ${quotedUser}${onCluster}`;
 
     if (body.password) {
       sql += ` IDENTIFIED WITH sha256_password BY '${escapeString(
@@ -156,7 +161,7 @@ export async function POST(
       for (const role of body.roles) {
         try {
           await client.command(
-            `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`,
+            `GRANT${onCluster} ${quoteIdentifier(role)} TO ${quotedUser}`,
           );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -171,7 +176,9 @@ export async function POST(
       // Set as default roles
       const roleList = body.roles.map(quoteIdentifier).join(", ");
       try {
-        await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
+        await client.command(
+          `ALTER USER IF EXISTS ${quotedUser}${onCluster} DEFAULT ROLE ${roleList}`,
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(
@@ -249,12 +256,16 @@ export async function PUT(
     }
 
     const client = createClient(config);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName
+      ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
+      : "";
     const quotedUser = quoteIdentifier(body.name);
 
     // Update password if provided
     if (body.newPassword) {
       await client.command(
-        `ALTER USER ${quotedUser} IDENTIFIED WITH sha256_password BY '${escapeString(
+        `ALTER USER ${quotedUser}${onCluster} IDENTIFIED WITH sha256_password BY '${escapeString(
           body.newPassword,
         )}'`,
       );
@@ -264,7 +275,7 @@ export async function PUT(
     if (body.defaultDatabase !== undefined) {
       if (body.defaultDatabase) {
         await client.command(
-          `ALTER USER ${quotedUser} DEFAULT DATABASE ${quoteIdentifier(
+          `ALTER USER ${quotedUser}${onCluster} DEFAULT DATABASE ${quoteIdentifier(
             body.defaultDatabase,
           )}`,
         );
@@ -293,7 +304,7 @@ export async function PUT(
       for (const role of rolesToRevoke) {
         try {
           await client.command(
-            `REVOKE ${quoteIdentifier(role)} FROM ${quotedUser}`,
+            `REVOKE${onCluster} ${quoteIdentifier(role)} FROM ${quotedUser}`,
           );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -310,7 +321,7 @@ export async function PUT(
         if (!currentRoles.includes(role)) {
           try {
             await client.command(
-              `GRANT ${quoteIdentifier(role)} TO ${quotedUser}`,
+              `GRANT${onCluster} ${quoteIdentifier(role)} TO ${quotedUser}`,
             );
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -327,7 +338,9 @@ export async function PUT(
       if (newRoles.length > 0) {
         const roleList = newRoles.map(quoteIdentifier).join(", ");
         try {
-          await client.command(`SET DEFAULT ROLE ${roleList} TO ${quotedUser}`);
+          await client.command(
+            `ALTER USER IF EXISTS ${quotedUser}${onCluster} DEFAULT ROLE ${roleList}`,
+          );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error(
@@ -338,7 +351,9 @@ export async function PUT(
         }
       } else {
         try {
-          await client.command(`SET DEFAULT ROLE NONE TO ${quotedUser}`);
+          await client.command(
+            `ALTER USER IF EXISTS ${quotedUser}${onCluster} DEFAULT ROLE NONE`,
+          );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.error(
@@ -414,7 +429,11 @@ export async function DELETE(
     }
 
     const client = createClient(config);
-    await client.command(`DROP USER IF EXISTS ${quoteIdentifier(body.name)}`);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName
+      ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
+      : "";
+    await client.command(`DROP USER IF EXISTS ${quoteIdentifier(body.name)}${onCluster}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

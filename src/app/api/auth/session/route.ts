@@ -4,7 +4,9 @@
  */
 
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
+import { generateCsrfToken, CSRF_COOKIE_NAME } from "@/lib/auth/csrf";
 
 export interface SessionResponse {
   isLoggedIn: boolean;
@@ -13,6 +15,7 @@ export interface SessionResponse {
     host?: string;
     database?: string;
   };
+  csrfToken?: string;
 }
 
 export async function GET(): Promise<NextResponse<SessionResponse>> {
@@ -22,6 +25,12 @@ export async function GET(): Promise<NextResponse<SessionResponse>> {
     return NextResponse.json({ isLoggedIn: false });
   }
 
+  const cookieStore = await cookies();
+  let csrfToken = cookieStore.get(CSRF_COOKIE_NAME)?.value;
+  if (!csrfToken) {
+    csrfToken = await generateCsrfToken();
+  }
+
   return NextResponse.json({
     isLoggedIn: true,
     user: {
@@ -29,5 +38,6 @@ export async function GET(): Promise<NextResponse<SessionResponse>> {
       host: session.user.host,
       database: session.user.database,
     },
+    csrfToken,
   });
 }

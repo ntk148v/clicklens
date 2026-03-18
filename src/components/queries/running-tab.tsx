@@ -32,6 +32,7 @@ import { useRunningQueries } from "@/lib/hooks/use-query-analytics";
 import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/shared/TruncatedCell";
 import type { RunningQuery } from "@/lib/hooks/use-query-analytics";
+import { useAuth } from "@/components/auth";
 
 interface RunningTabProps {
   refreshInterval: number;
@@ -40,6 +41,7 @@ interface RunningTabProps {
 export function RunningTab({ refreshInterval }: RunningTabProps) {
   const { data, isLoading, error, refetch } =
     useRunningQueries(refreshInterval);
+  const { csrfToken } = useAuth();
   const [killingId, setKillingId] = useState<string | null>(null);
 
   // Sorting state
@@ -74,7 +76,10 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
     try {
       const response = await fetch("/api/clickhouse/kill", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken || "",
+        },
         body: JSON.stringify({ queryId }),
       });
       const result = await response.json();
