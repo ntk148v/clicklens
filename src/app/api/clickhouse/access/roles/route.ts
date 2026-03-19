@@ -57,11 +57,17 @@ import { getClusterName } from "@/lib/clickhouse/cluster";
 async function ensureFeatureRoles(
   client: ReturnType<typeof createClient>,
 ): Promise<void> {
+  const clusterName = await getClusterName(client);
+  const onCluster = clusterName
+    ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
+    : "";
   try {
     // Ensure all feature roles and their grants are present
     for (const fr of FEATURE_ROLES) {
       try {
-        await client.command(`CREATE ROLE IF NOT EXISTS \`${fr.id}\``);
+        await client.command(
+          `CREATE ROLE IF NOT EXISTS \`${fr.id}\`${onCluster}`,
+        );
         for (const grant of fr.grants) {
           try {
             await client.command(grant);
@@ -308,7 +314,9 @@ export async function POST(
     if (body.inheritedRoles && body.inheritedRoles.length > 0) {
       for (const ir of body.inheritedRoles) {
         try {
-          await client.command(`GRANT${onCluster} ${quoteIdentifier(ir)} TO ${quotedRole}`);
+          await client.command(
+            `GRANT${onCluster} ${quoteIdentifier(ir)} TO ${quotedRole}`,
+          );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.warn(`Failed to grant role ${ir}:`, msg);
@@ -329,12 +337,16 @@ export async function POST(
 
         for (const priv of dp.privileges) {
           try {
-            await client.command(`GRANT${onCluster} ${priv} ON ${target} TO ${quotedRole}`);
+            await client.command(
+              `GRANT${onCluster} ${priv} ON ${target} TO ${quotedRole}`,
+            );
             // Auto-grant REMOTE when SELECT is granted (needed for clusterAllReplicas in Discover)
             // REMOTE is a SOURCES privilege - must be granted globally
             if (priv === "SELECT") {
               try {
-                await client.command(`GRANT${onCluster} REMOTE ON *.* TO ${quotedRole}`);
+                await client.command(
+                  `GRANT${onCluster} REMOTE ON *.* TO ${quotedRole}`,
+                );
               } catch {
                 // REMOTE grant may fail on non-cluster setups, ignore silently
               }
@@ -476,7 +488,9 @@ export async function PUT(
     for (const ir of newInherited) {
       if (!currentInherited.includes(ir)) {
         try {
-          await client.command(`GRANT${onCluster} ${quoteIdentifier(ir)} TO ${quotedRole}`);
+          await client.command(
+            `GRANT${onCluster} ${quoteIdentifier(ir)} TO ${quotedRole}`,
+          );
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.warn(`Failed to grant role ${ir}:`, msg);
@@ -506,12 +520,16 @@ export async function PUT(
 
         for (const priv of dp.privileges) {
           try {
-            await client.command(`GRANT${onCluster} ${priv} ON ${target} TO ${quotedRole}`);
+            await client.command(
+              `GRANT${onCluster} ${priv} ON ${target} TO ${quotedRole}`,
+            );
             // Auto-grant REMOTE when SELECT is granted (needed for clusterAllReplicas in Discover)
             // REMOTE is a SOURCES privilege - must be granted globally
             if (priv === "SELECT") {
               try {
-                await client.command(`GRANT${onCluster} REMOTE ON *.* TO ${quotedRole}`);
+                await client.command(
+                  `GRANT${onCluster} REMOTE ON *.* TO ${quotedRole}`,
+                );
               } catch {
                 // REMOTE grant may fail on non-cluster setups, ignore silently
               }
@@ -601,7 +619,9 @@ export async function DELETE(
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";
-    await client.command(`DROP ROLE IF EXISTS ${quoteIdentifier(body.name)}${onCluster}`);
+    await client.command(
+      `DROP ROLE IF EXISTS ${quoteIdentifier(body.name)}${onCluster}`,
+    );
 
     return NextResponse.json({ success: true }, { status: 500 });
   } catch (error) {

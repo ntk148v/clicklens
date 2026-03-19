@@ -5,11 +5,14 @@
 
 import { createClient } from "./client";
 import { getLensConfig, isLensUserConfigured } from "./config";
+import { getClusterName } from "./cluster";
+import { quoteIdentifier } from "./utils";
 
 const METADATA_DB = "clicklens_metadata";
 const SAVED_QUERIES_TABLE = "saved_queries";
 
-export const SAVED_QUERIES_SCHEMA = `
+export function getSavedQueriesSchema(onCluster: string = ""): string {
+  return `
 CREATE TABLE IF NOT EXISTS ${METADATA_DB}.${SAVED_QUERIES_TABLE} (
     id UUID,
     name String,
@@ -20,7 +23,11 @@ CREATE TABLE IF NOT EXISTS ${METADATA_DB}.${SAVED_QUERIES_TABLE} (
     updated_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
 ORDER BY (created_by, created_at)
+${onCluster}
 `;
+}
+
+export const SAVED_QUERIES_SCHEMA = getSavedQueriesSchema();
 
 /**
  * Ensure the metadata database and tables exist
@@ -37,11 +44,16 @@ export async function ensureMetadataInfrastructure() {
   const client = createClient(config);
 
   try {
-    // Create database
-    await client.command(`CREATE DATABASE IF NOT EXISTS ${METADATA_DB}`);
+    const clusterName = await getClusterName(client);
+    const onCluster = clusterName
+      ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
+      : "";
 
-    // Create tables
-    await client.command(SAVED_QUERIES_SCHEMA);
+    await client.command(
+      `CREATE DATABASE IF NOT EXISTS ${METADATA_DB}${onCluster}`,
+    );
+
+    await client.command(getSavedQueriesSchema(onCluster));
 
     return true;
   } catch (error) {
