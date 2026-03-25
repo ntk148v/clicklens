@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, memo, useCallback, useRef } from "react";
+import { useMemo, useState, memo, useCallback, useRef, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -27,6 +27,16 @@ import { Copy, Download } from "lucide-react";
 import { cn, copyToClipboard, formatDateTime } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "@/components/monitoring";
 import { DEFAULT_ROW_HEIGHT, DEFAULT_OVERSCAN } from "@/lib/virtual/virtual.config";
+import { useGridAccessibility } from "@/components/virtual/accessibility";
+import {
+  type CellSelection,
+  isCellInSelection,
+  extractSelectedCells,
+  selectionToTsv,
+  isCopyShortcut,
+  validateSelection,
+  formatCellValueForCopy,
+} from "@/lib/virtual/edge-cases";
 
 interface ColumnMeta {
   name: string;
@@ -115,6 +125,8 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
 }: VirtualizedResultGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>("onChange");
+  const [cellSelection, setCellSelection] = useState<CellSelection | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo<ColumnDef<unknown>[]>(() => {
@@ -181,6 +193,14 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
+  const accessibility = useGridAccessibility({
+    rowCount: rows.length,
+    columnCount: columns.length,
+    scrollToRow: (rowIndex) => {
+      rowVirtualizer.scrollToIndex(rowIndex);
+    },
+  });
+
   const handleCopyToClipboard = useCallback(async () => {
     const headers = meta.map((c) => c.name).join("\t");
     const rows = data.map((row) =>
@@ -209,6 +229,79 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
     a.click();
     URL.revokeObjectURL(url);
   }, [data, meta]);
+
+  const handleCellMouseDown = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      setIsSelecting(true);
+      setCellSelection({
+        startRow: rowIndex,
+        endRow: rowIndex,
+        startCol: colIndex,
+        endCol: colIndex,
+      });
+    },
+    []
+  );
+
+  const handleCellMouseEnter = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (!isSelecting || !cellSelection) return;
+      setCellSelection((prev) =>
+        prev
+          ? {
+              ...prev,
+              endRow: rowIndex,
+              endCol: colIndex,
+            }
+          : null
+      );
+    },
+    [isSelecting, cellSelection]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsSelecting(false);
+  }, []);
+
+  const handleCopySelection = useCallback(async () => {
+    if (!cellSelection) return;
+
+    const validated = validateSelection(
+      cellSelection,
+      data.length,
+      meta.length
+    );
+    const columnNames = meta.map((c) => c.name);
+    const selectedData = extractSelectedCells(
+      data,
+      columnNames,
+      validated,
+      (row, column, colIndex) => getRowValue(row, column, colIndex)
+    );
+    const tsv = selectionToTsv(selectedData);
+    await copyToClipboard(tsv);
+  }, [cellSelection, data, meta]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isCopyShortcut(e) && cellSelection) {
+        e.preventDefault();
+        handleCopySelection();
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      setIsSelecting(false);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mouseup", handleGlobalMouseUp);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [cellSelection, handleCopySelection]);
 
   if (data.length === 0) {
     return (
@@ -276,8 +369,11 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
           className="flex-1 overflow-auto"
           style={{ contain: "strict" }}
         >
-          <div style={{ height: `${totalSize}px`, width: "100%", position: "relative" }}>
-            <table className="w-full caption-bottom text-sm">
+          <div
+            style={{ height: `${totalSize}px`, width: "100%", position: "relative" }}
+            {...accessibility.getGridProps()}
+          >
+            <table className="w-full caption-bottom text-sm" role="presentation">
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -331,16 +427,36 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
                         height: `${virtualRow.size}px`,
                         transform: `translateY(${virtualRow.start - (rowVirtualizer.getVirtualItems()[0]?.start ?? 0)}px)`,
                       }}
+                      {...accessibility.getRowProps(virtualRow.index)}
                     >
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          data-slot="table-cell"
-                          className="p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-mono"
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
+                      {row.getVisibleCells().map((cell, cellIndex) => {
+                        const isSelected = isCellInSelection(
+                          virtualRow.index,
+                          cellIndex,
+                          cellSelection
+                        );
+                        const cellProps = accessibility.getCellProps(virtualRow.index, cellIndex);
+                        return (
+                          <td
+                            key={cell.id}
+                            data-slot="table-cell"
+                            className={cn(
+                              "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-mono cursor-cell select-none",
+                              isSelected && "bg-primary/20 ring-1 ring-primary"
+                            )}
+                            onMouseDown={() =>
+                              handleCellMouseDown(virtualRow.index, cellIndex)
+                            }
+                            onMouseEnter={() =>
+                              handleCellMouseEnter(virtualRow.index, cellIndex)
+                            }
+                            onMouseUp={handleMouseUp}
+                            {...cellProps}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        );
+                      })}
                     </ClickableTableRow>
                   );
                 })}

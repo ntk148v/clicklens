@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useMemo, useCallback, useRef, memo, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -29,6 +29,16 @@ import { TruncatedCell } from "@/components/monitoring";
 import { PaginationControls } from "@/components/monitoring";
 import { DiscoverGridSkeleton } from "./DiscoverGridSkeleton";
 import { DEFAULT_ROW_HEIGHT, DEFAULT_OVERSCAN } from "@/lib/virtual/virtual.config";
+import {
+  type CellSelection,
+  isCellInSelection,
+  extractSelectedCells,
+  selectionToTsv,
+  isCopyShortcut,
+  validateSelection,
+  formatCellValueForCopy,
+} from "@/lib/virtual/edge-cases";
+import { copyToClipboard } from "@/lib/utils";
 
 interface VirtualizedDiscoverGridProps {
   rows: DiscoverRow[];
@@ -164,6 +174,8 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
   const [contextMenu, setContextMenu] = useState<CellContextMenuState | null>(
     null,
   );
+  const [cellSelection, setCellSelection] = useState<CellSelection | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -191,6 +203,80 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
     },
     [onFilterForValue, onFilterOutValue],
   );
+
+  const handleCellMouseDown = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      setIsSelecting(true);
+      setCellSelection({
+        startRow: rowIndex,
+        endRow: rowIndex,
+        startCol: colIndex,
+        endCol: colIndex,
+      });
+    },
+    []
+  );
+
+  const handleCellMouseEnter = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (!isSelecting || !cellSelection) return;
+      setCellSelection((prev) =>
+        prev
+          ? {
+              ...prev,
+              endRow: rowIndex,
+              endCol: colIndex,
+            }
+          : null
+      );
+    },
+    [isSelecting, cellSelection]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsSelecting(false);
+  }, []);
+
+  const handleCopySelection = useCallback(async () => {
+    if (!cellSelection) return;
+
+    const columnsToShow =
+      selectedColumns.length > 0 ? selectedColumns : Object.keys(rows[0] || {});
+    const validated = validateSelection(
+      cellSelection,
+      rows.length,
+      columnsToShow.length
+    );
+    const selectedData = extractSelectedCells(
+      rows,
+      columnsToShow,
+      validated,
+      (row, column) => row[column]
+    );
+    const tsv = selectionToTsv(selectedData);
+    await copyToClipboard(tsv);
+  }, [cellSelection, rows, selectedColumns]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isCopyShortcut(e) && cellSelection) {
+        e.preventDefault();
+        handleCopySelection();
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      setIsSelecting(false);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mouseup", handleGlobalMouseUp);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [cellSelection, handleCopySelection]);
 
   const tableColumns = useMemo(() => {
     const columnsToShow =
@@ -360,13 +446,84 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
                         }}
                         onClick={() => handleRowClick(row.original, row.index)}
                       >
-                        {row.getVisibleCells().map((cell) => (
+                        {row.getVisibleCells().map((cell, cellIndex) => {
+                          const isSelected = isCellInSelection(
+                            virtualRow.index,
+                            cellIndex,
+                            cellSelection
+                          );
+                          return (
+                            <td
+                              key={cell.id}
+                              className={cn(
+                                "p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0 cursor-cell select-none",
+                                isSelected && "bg-primary/20 ring-1 ring-primary"
+                              )}
+                              style={{
+                                width: cell.column.getSize(),
+                              }}
+                              onMouseDown={() =>
+                                handleCellMouseDown(virtualRow.index, cellIndex)
+                              }
+                              onMouseEnter={() =>
+                                handleCellMouseEnter(virtualRow.index, cellIndex)
+                              }
+                              onMouseUp={handleMouseUp}
+                              onContextMenu={(e) =>
+                                handleCellContextMenu(
+                                  e,
+                                  cell.column.id,
+                                  cell.getValue(),
+                                )
+                              }
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
+                          <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </td>
+                      </tr>
+                    );
+                  })
+                : tableRows.map((row, rowIndex) => (
+                    <tr
+                      key={row.id}
+                      data-slot="table-row"
+                      className={cn(
+                        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
+                        selectedRow === row.original && sheetOpen && "bg-muted",
+                      )}
+                      style={{ height: `${DEFAULT_ROW_HEIGHT}px` }}
+                      onClick={() => handleRowClick(row.original, row.index)}
+                    >
+                      {row.getVisibleCells().map((cell, cellIndex) => {
+                        const isSelected = isCellInSelection(
+                          rowIndex,
+                          cellIndex,
+                          cellSelection
+                        );
+                        return (
                           <td
                             key={cell.id}
-                            className="p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0"
+                            className={cn(
+                              "p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0 cursor-cell select-none",
+                              isSelected && "bg-primary/20 ring-1 ring-primary"
+                            )}
                             style={{
                               width: cell.column.getSize(),
                             }}
+                            onMouseDown={() =>
+                              handleCellMouseDown(rowIndex, cellIndex)
+                            }
+                            onMouseEnter={() =>
+                              handleCellMouseEnter(rowIndex, cellIndex)
+                            }
+                            onMouseUp={handleMouseUp}
                             onContextMenu={(e) =>
                               handleCellContextMenu(
                                 e,
@@ -380,45 +537,8 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
                               cell.getContext(),
                             )}
                           </td>
-                        ))}
-                        <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
-                          <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </td>
-                      </tr>
-                    );
-                  })
-                : tableRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      data-slot="table-row"
-                      className={cn(
-                        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
-                        selectedRow === row.original && sheetOpen && "bg-muted",
-                      )}
-                      style={{ height: `${DEFAULT_ROW_HEIGHT}px` }}
-                      onClick={() => handleRowClick(row.original, row.index)}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className="p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0"
-                          style={{
-                            width: cell.column.getSize(),
-                          }}
-                          onContextMenu={(e) =>
-                            handleCellContextMenu(
-                              e,
-                              cell.column.id,
-                              cell.getValue(),
-                            )
-                          }
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </td>
-                      ))}
+                        );
+                      })}
                       <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
                         <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </td>
