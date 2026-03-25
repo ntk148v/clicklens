@@ -133,8 +133,6 @@ export async function executeExactCount(
 ): Promise<CountResult> {
   const startTime = Date.now();
   const { database, table, whereConditions = [] } = options;
-  const safeDbStr = escapeSqlString(database);
-  const safeTableStr = escapeSqlString(table);
 
   // Check cache first
   if (useCache) {
