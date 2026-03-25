@@ -1,81 +1,288 @@
 /**
- * Query Result Cache
+ * Query Cache Middleware
  *
- * Caches expensive query results using Redis with graceful degradation.
+ * Provides caching for ClickHouse query results with LRU backend.
+ * Integrates with Discover API and SQL Console query routes.
  */
 
-import { getRedisClient, isRedisAvailable } from "./redis-client";
+import { LRUCacheImpl, CacheStats } from "./lru-cache";
+import { generateCacheKey, QueryParams } from "./key-generator";
 
+export interface QueryCacheOptions {
+  /** Maximum number of cache entries (default: 500) */
+  maxEntries?: number;
+  /** TTL in milliseconds (default: 5 minutes = 300000ms) */
+  ttl?: number;
+  /** Cache name for logging */
+  name?: string;
+}
+
+export interface CachedQueryResult<T = unknown> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CacheMetadata {
+  cacheHit: boolean;
+  cacheAge?: number;
+  remainingTtl?: number;
+}
+
+/**
+ * Query Cache class for managing query result caching
+ */
 export class QueryCache {
-  private defaultTTL: number;
+  private cache: LRUCacheImpl;
+  private name: string;
 
-  constructor(defaultTTL: number = 60) {
-    this.defaultTTL = defaultTTL;
+  constructor(cache: LRUCacheImpl, name: string = "query-cache") {
+    this.cache = cache;
+    this.name = name;
   }
 
-  async get<T>(key: string): Promise<T | null> {
+  /**
+   * Get a cached query result
+   */
+  getCachedQuery<T>(key: string): CachedQueryResult<T> | undefined {
     try {
-      if (!isRedisAvailable()) {
-        return null;
+      const result = this.cache.get<CachedQueryResult<T>>(key);
+      if (result) {
+        return result;
       }
-
-      const redis = await getRedisClient();
-      const data = await redis.get(key);
-
-      if (!data) {
-        return null;
-      }
-
-      return JSON.parse(data) as T;
+      return undefined;
     } catch (error) {
-      console.error("Failed to get from cache:", error);
-      return null;
+      console.error(`[${this.name}] Cache get error:`, error);
+      return undefined;
     }
   }
 
-  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
+  /**
+   * Set a query result in cache
+   */
+  setCachedQuery<T>(
+    key: string,
+    data: T,
+    metadata?: Record<string, unknown>
+  ): void {
     try {
-      if (!isRedisAvailable()) {
-        return;
-      }
-
-      const redis = await getRedisClient();
-      const serialized = JSON.stringify(value);
-      const expiry = ttl || this.defaultTTL;
-
-      await redis.setEx(key, expiry, serialized);
+      const ttl = (this.cache as unknown as { options: { ttl: number } }).options.ttl;
+      const cachedResult: CachedQueryResult<T> = {
+        data,
+        timestamp: Date.now(),
+        ttl,
+        metadata,
+      };
+      this.cache.set(key, cachedResult);
     } catch (error) {
-      console.error("Failed to set cache:", error);
+      console.error(`[${this.name}] Cache set error:`, error);
     }
   }
 
-  async invalidate(pattern: string): Promise<void> {
+  /**
+   * Invalidate a specific query from cache
+   */
+  invalidateQuery(key: string): boolean {
     try {
-      if (!isRedisAvailable()) {
-        return;
-      }
-
-      const redis = await getRedisClient();
-      const keys = await redis.keys(pattern);
-
-      if (keys.length > 0) {
-        await redis.del(keys);
-      }
+      return this.cache.delete(key);
     } catch (error) {
-      console.error("Failed to invalidate cache:", error);
+      console.error(`[${this.name}] Cache invalidation error:`, error);
+      return false;
     }
   }
 
-  async clear(): Promise<void> {
+  /**
+   * Check if a key exists in cache
+   */
+  hasQuery(key: string): boolean {
     try {
-      if (!isRedisAvailable()) {
-        return;
-      }
-
-      const redis = await getRedisClient();
-      await redis.flushDb();
+      return this.cache.has(key);
     } catch (error) {
-      console.error("Failed to clear cache:", error);
+      console.error(`[${this.name}] Cache has error:`, error);
+      return false;
     }
   }
+
+  /**
+   * Clear all cached queries
+   */
+  clear(): void {
+    try {
+      this.cache.clear();
+    } catch (error) {
+      console.error(`[${this.name}] Cache clear error:`, error);
+    }
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getStats(): CacheStats & { size: number } {
+    return {
+      ...this.cache.getStats(),
+      size: this.cache.size,
+    };
+  }
+
+  /**
+   * Get current cache size
+   */
+  get size(): number {
+    return this.cache.size;
+  }
+
+  /**
+   * Get remaining TTL for a key
+   */
+  getRemainingTtl(key: string): number {
+    try {
+      const entry = this.cache.peek<CachedQueryResult>(key);
+      if (!entry) return 0;
+      const age = Date.now() - entry.timestamp;
+      return Math.max(0, entry.ttl - age);
+    } catch (error) {
+      console.error(`[${this.name}] Get remaining TTL error:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Generate cache key for discover query
+   */
+  generateDiscoverKey(params: {
+    database: string;
+    table: string;
+    filter?: string;
+    timeRange?: { minTime?: string; maxTime?: string };
+    columns?: string[];
+    groupBy?: string;
+    orderBy?: string;
+    limit?: number;
+    offset?: number;
+    cursor?: string;
+  }): string {
+    const queryParams: QueryParams = {
+      database: params.database,
+      table: params.table,
+      filter: params.filter,
+      columns: params.columns,
+      groupBy: params.groupBy,
+      orderBy: params.orderBy,
+      limit: params.limit,
+      offset: params.offset,
+      cursor: params.cursor,
+    };
+
+    // Add time range as object (will be hashed by key-generator)
+    if (params.timeRange) {
+      queryParams.minTime = params.timeRange.minTime;
+      queryParams.maxTime = params.timeRange.maxTime;
+    }
+
+    return generateCacheKey("discover", queryParams);
+  }
+
+  /**
+   * Generate cache key for SQL query
+   */
+  generateSqlKey(sql: string, database?: string): string {
+    const queryParams: QueryParams = {
+      database,
+    };
+
+    return generateCacheKey(`sql:${sql}`, queryParams);
+  }
+}
+
+// Default cache instance
+let defaultQueryCache: QueryCache | null = null;
+
+/**
+ * Create a new query cache instance
+ */
+export function createQueryCache(options: QueryCacheOptions = {}): QueryCache {
+  const lruCache = new LRUCacheImpl({
+    max: options.maxEntries ?? 500,
+    ttl: options.ttl ?? 300_000, // 5 minutes
+    name: options.name ?? "query-cache",
+  });
+
+  return new QueryCache(lruCache, options.name ?? "query-cache");
+}
+
+/**
+ * Get the default query cache instance (singleton)
+ */
+export function getQueryCache(): QueryCache {
+  if (!defaultQueryCache) {
+    defaultQueryCache = createQueryCache({
+      maxEntries: 500,
+      ttl: 300_000, // 5 minutes
+      name: "default-query-cache",
+    });
+  }
+  return defaultQueryCache;
+}
+
+/**
+ * Reset the default query cache (useful for testing)
+ */
+export function resetQueryCache(): void {
+  if (defaultQueryCache) {
+    defaultQueryCache.clear();
+  }
+  defaultQueryCache = null;
+}
+
+/**
+ * Helper function to wrap a query execution with caching
+ *
+ * @param cache - QueryCache instance
+ * @param key - Cache key
+ * @param queryFn - Function to execute query if cache miss
+ * @param options - Additional options
+ * @returns Promise<{ data: T; metadata: CacheMetadata }>
+ */
+export async function executeWithCache<T>(
+  cache: QueryCache,
+  key: string,
+  queryFn: () => Promise<T>,
+  options: {
+    /** Whether to skip cache and always execute */
+    bypassCache?: boolean;
+    /** Custom metadata to store with cache entry */
+    metadata?: Record<string, unknown>;
+  } = {}
+): Promise<{ data: T; metadata: CacheMetadata }> {
+  // Check cache first (unless bypassed)
+  if (!options.bypassCache) {
+    const cached = cache.getCachedQuery<T>(key);
+    if (cached) {
+      const remainingTtl = cache.getRemainingTtl(key);
+      return {
+        data: cached.data,
+        metadata: {
+          cacheHit: true,
+          cacheAge: Date.now() - cached.timestamp,
+          remainingTtl,
+        },
+      };
+    }
+  }
+
+  // Execute query
+  const data = await queryFn();
+
+  // Store in cache
+  cache.setCachedQuery(key, data, options.metadata);
+
+  return {
+    data,
+    metadata: {
+      cacheHit: false,
+      cacheAge: 0,
+      remainingTtl: cache.getRemainingTtl(key),
+    },
+  };
 }

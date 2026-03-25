@@ -8,10 +8,11 @@ import {
   ColumnDefinition,
 } from "@/lib/clickhouse/search";
 import { fetchChunks } from "@/lib/clickhouse/stream";
-import { executeExactCount, shouldUseExactCount } from "@/lib/clickhouse/exact-count";
+import { executeExactCount } from "@/lib/clickhouse/exact-count";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 import { validateFilter } from "@/lib/clickhouse/sql-validator";
 import { getGlobalRateLimiter } from "@/lib/rate-limiter";
+import { getQueryCache } from "@/lib/cache/query-cache";
 
 // ... Legacy sources handling could be preserved or refactored.
 // For this major refactor, I will keep legacy support but adapt it to the new structure where possible.
@@ -115,6 +116,10 @@ export async function GET(request: Request) {
     const client = createClient(config);
     const clusterName = await getClusterName(client);
 
+    // Initialize query cache
+    const queryCache = getQueryCache();
+    const cacheEnabled = searchParams.get("cache") !== "false";
+
     const quotedDb = quoteIdentifier(database);
     const quotedTable = quoteIdentifier(table);
     const safeDbStr = escapeSqlString(database);
@@ -193,7 +198,44 @@ export async function GET(request: Request) {
         histogramQuery = `SELECT toStartOfInterval(${quotedTimeCol}, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
       }
 
+      // Check cache for histogram query
+      if (cacheEnabled) {
+        const cacheKey = queryCache.generateDiscoverKey({
+          database,
+          table,
+          filter,
+          timeRange: { minTime: minTime || undefined, maxTime: maxTime || undefined },
+          columns,
+          groupBy: groupByParam || undefined,
+          orderBy: orderByParam || undefined,
+        });
+        const cachedResult = queryCache.getCachedQuery(cacheKey);
+        if (cachedResult) {
+          return NextResponse.json({ 
+            success: true, 
+            histogram: cachedResult.data,
+            cacheHit: true,
+            cacheAge: Date.now() - cachedResult.timestamp,
+          });
+        }
+      }
+
       const histRes = await client.query(histogramQuery);
+      
+      // Store histogram result in cache
+      if (cacheEnabled) {
+        const cacheKey = queryCache.generateDiscoverKey({
+          database,
+          table,
+          filter,
+          timeRange: { minTime: minTime || undefined, maxTime: maxTime || undefined },
+          columns,
+          groupBy: groupByParam || undefined,
+          orderBy: orderByParam || undefined,
+        });
+        queryCache.setCachedQuery(cacheKey, histRes.data);
+      }
+      
       return NextResponse.json({ success: true, histogram: histRes.data });
     }
 

@@ -5,6 +5,7 @@ import { formatQueryError } from "@/lib/errors";
 import { validateSqlStatement } from "@/lib/sql/validator";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
 import { requireCsrf } from "@/lib/auth/csrf";
+import { getQueryCache } from "@/lib/cache/query-cache";
 
 export const runtime = "nodejs";
 
@@ -89,6 +90,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Initialize query cache
+    const queryCache = getQueryCache();
+    const cacheEnabled = body.cache !== false;
+
     let sql = body.sql;
     if (typeof body.page === "number") {
       const pageSize = typeof body.pageSize === "number" ? body.pageSize : 1000;
@@ -128,6 +133,52 @@ export async function POST(request: NextRequest) {
     const queryId = body.query_id
       ? `${QUERY_ID_PREFIX}${config.username}-${body.query_id}`
       : undefined;
+
+    // Check cache for SELECT queries (only cache small result sets)
+    if (cacheEnabled && /^\s*SELECT\b/i.test(sql)) {
+      const cacheKey = queryCache.generateSqlKey(sql, body.database);
+      const cachedResult = queryCache.getCachedQuery(cacheKey);
+      
+      if (cachedResult) {
+        // Return cached result as stream
+        const cachedData = cachedResult.data as { meta?: unknown[]; data?: unknown[]; error?: string };
+        
+        const cachedStream = new ReadableStream({
+          start(controller) {
+            const encoder = new TextEncoder();
+            try {
+              if (cachedData.meta) {
+                controller.enqueue(encoder.encode(JSON.stringify({ type: "meta", data: cachedData.meta, rows: 0 }) + "\n"));
+              }
+              if (cachedData.data && Array.isArray(cachedData.data)) {
+                for (const row of cachedData.data) {
+                  controller.enqueue(encoder.encode(JSON.stringify({ type: "data", data: [row], rows_count: cachedData.data.length }) + "\n"));
+                }
+              }
+              controller.enqueue(encoder.encode(JSON.stringify({ 
+                type: "done", 
+                limit_reached: false,
+                statistics: { elapsed: 0, rows_read: cachedData.data?.length || 0, bytes_read: 0 },
+                cacheHit: true,
+                cacheAge: Date.now() - cachedResult.timestamp,
+              }) + "\n"));
+            } catch (e) {
+              controller.enqueue(encoder.encode(JSON.stringify({ type: "error", error: String(e) }) + "\n"));
+            } finally {
+              controller.close();
+            }
+          },
+        });
+        
+        return new Response(cachedStream, {
+          headers: {
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+        });
+      }
+    }
 
     // Get the ClickHouse stream
     const resultSet = await client.queryStream(sql, {
