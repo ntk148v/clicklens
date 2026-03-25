@@ -11,6 +11,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test": "bun test src",
     "test:coverage": "bun test src --coverage",
+    "benchmark:baseline": "bun run scripts/benchmark/baseline.ts",
     "prepare": "husky"
   },
   "lint-staged": {
