@@ -507,3 +507,71 @@ Implemented exact count query option with LRU caching, providing users with cont
 3. Cache TTL of 5 minutes balances freshness vs performance
 4. Cache hit indicator included in response for debugging
 5. Execution time tracking for performance monitoring
+
+---
+
+# Task 28 Learnings: LRU Cache Integration for Query Routes
+
+## Summary
+Integrated in-memory LRU cache into Discover API and SQL Console query routes for caching query results and improving performance.
+
+## Files Created
+- `src/lib/cache/query-cache.ts` - Query cache middleware with LRU backend (282 lines)
+- `test/cache/query-cache.test.ts` - 30 tests covering all functionality
+
+## Files Modified
+- `src/app/api/clickhouse/discover/route.ts` - Added cache lookup for histogram mode
+- `src/app/api/clickhouse/query/route.ts` - Added cache lookup for SELECT queries
+
+## Key Features Implemented
+
+### 1. Query Cache Middleware
+- Uses existing LRU cache from Task 5 (500 entries, 5 min TTL)
+- getCachedQuery() - Retrieves cached query result
+- setCachedQuery() - Stores query result in cache
+- invalidateQuery() - Invalidates specific query
+- getStats() - Returns cache statistics
+- generateDiscoverKey() - Generate cache key for discover queries
+- generateSqlKey() - Generate cache key for SQL queries
+
+### 2. Discover API Integration
+- Added cache lookup before histogram query execution
+- Returns cached histogram with cacheHit indicator
+- Stores histogram result after query execution
+- Cache key includes: database, table, filter, timeRange, columns, groupBy, orderBy
+
+### 3. SQL Console Integration
+- Added cache lookup for SELECT queries only
+- Returns cached result as NDJSON stream with cacheHit indicator
+- Only caches small result sets (not large result sets)
+- Cache key includes: SQL query, database
+
+### 4. Cache Configuration
+- TTL: 5 minutes (300000ms)
+- Max entries: 500
+- Cache enabled by default, can be disabled via query param (cache=false)
+- Cache hit indicator included in response for debugging
+
+## Test Results
+- 30 tests pass for query-cache.test.ts
+- 0 failures
+- 53 expect() calls (including lru-cache tests)
+- All tests pass, LSP diagnostics clean
+
+## Design Decisions
+1. Only cache histogram mode in Discover API (streaming data not cached)
+2. Only cache SELECT queries in SQL Console (DML not cached)
+3. Include cacheAge and remainingTtl in response metadata
+4. Graceful fallback when cache errors occur (query still executes)
+5. Cache disabled via query param (cache=false) for flexibility
+
+## Usage Guide
+| Feature | Cache Key | Enable |
+|---------|-----------|--------|
+| Discover histogram | database, table, filter, timeRange, columns, groupBy, orderBy | cache=true (default) |
+| SQL Console SELECT | SQL query, database | cache=true (default) |
+
+## API Changes
+- Discover API: `?cache=false` to disable cache
+- SQL Console: `body.cache = false` to disable cache
+- Both return `cacheHit: true` and `cacheAge: ms` in response when cached

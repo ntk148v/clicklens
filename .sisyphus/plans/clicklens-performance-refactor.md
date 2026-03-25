@@ -2952,7 +2952,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): add query timeout handling`
   - Files: `src/lib/clickhouse/timeout.ts`
 
-- [ ] 28. **In-Memory LRU Cache Implementation**
+- [x] 28. **In-Memory LRU Cache Implementation**
 
   **What to do**:
   - Integrate in-memory LRU cache into query routes (already implemented in Task 5)
