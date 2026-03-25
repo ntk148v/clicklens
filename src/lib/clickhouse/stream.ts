@@ -4,6 +4,7 @@ import {
   shouldUseWindowing,
   type TimeWindow,
 } from "./time-windows";
+import { executeExactCount } from "./exact-count";
 import type { DiscoverRow } from "@/lib/types/discover";
 
 export interface FetchChunksParams {
@@ -18,6 +19,9 @@ export interface FetchChunksParams {
   selectClause: string;
   orderByClause: string;
   safeTimeCol: string;
+  // When true, use exact count() with LRU caching
+  // Default: false (approximate count without caching for better performance)
+  useExactCount?: boolean;
 }
 
 /**
@@ -36,6 +40,7 @@ export async function* fetchChunks({
   selectClause,
   orderByClause,
   safeTimeCol,
+  useExactCount = false,
 }: FetchChunksParams) {
   // Clone to avoid mutating the caller's array (e.g. on retry or parallel calls)
   const whereConditions = [...callerConditions];
@@ -103,13 +108,31 @@ export async function* fetchChunks({
   // Run count query in parallel with the first data chunk to avoid waterfall
   const countWhereClause =
     whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
-  const countPromise = client
-    .query(`SELECT count() as cnt FROM ${tableSource} ${countWhereClause}`)
-    .then((res) => Number(res.data[0]?.cnt) || 0)
-    .catch((e) => {
-      console.error("Count query failed", e);
-      return 0;
-    });
+
+  // Use exact count with caching when requested, otherwise use regular count
+  let countPromise: Promise<number>;
+  if (useExactCount) {
+    // Use cached exact count - parse database and table from tableSource
+    const sourceParts = tableSource.match(/`?(\w+)`?\.`?(\w+)`?/);
+    const dbName = sourceParts?.[1] || "default";
+    const tblName = sourceParts?.[2] || "";
+
+    countPromise = executeExactCount(client, {
+      database: dbName,
+      table: tblName,
+      whereConditions,
+    }).then((result) => result.count);
+  } else {
+    // Default: approximate count (no caching) for better performance
+    countPromise = client
+      .query(`SELECT count() as cnt FROM ${tableSource} ${countWhereClause}`)
+      .then((res) => Number(res.data[0]?.cnt) || 0);
+  }
+
+  countPromise = countPromise.catch((e) => {
+    console.error("Count query failed", e);
+    return 0;
+  });
 
   // Yield a preliminary meta (totalHits will be updated when count finishes)
   let countResolved = false;

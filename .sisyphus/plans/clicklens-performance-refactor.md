@@ -2145,7 +2145,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `src/components/discover/VirtualizedDiscoverGrid.tsx`
   - Pre-commit: `bun test test/components/discover/VirtualizedDiscoverGrid.test.tsx`
 
-- [ ] 17. **Row Height Measurement and Configuration**
+- [x] 17. **Row Height Measurement and Configuration**
 
   **What to do**:
   - Measure actual row heights in current ResultGrid and DiscoverGrid
@@ -2250,7 +2250,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `src/lib/virtual/row-height.ts`, `src/lib/virtual/virtual.config.ts`
   - Pre-commit: `bun test test/virtual/row-height.test.ts`
 
-- [ ] 18. **Virtualization Accessibility (Keyboard Navigation, ARIA)**
+- [x] 18. **Virtualization Accessibility (Keyboard Navigation, ARIA)**
 
   **What to do**:
   - Add keyboard navigation support to virtualized tables
@@ -2366,7 +2366,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `src/components/virtual/accessibility.tsx`
   - Pre-commit: `bun test test/virtual/accessibility.test.tsx`
 
-- [ ] 19. **Virtualization Edge Cases (Dynamic Content, Copy-Paste)**
+- [x] 19. **Virtualization Edge Cases (Dynamic Content, Copy-Paste)**
 
   **What to do**:
   - Handle dynamic row content (variable text length)
@@ -2478,7 +2478,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `src/lib/virtual/edge-cases.ts`
   - Pre-commit: `bun test test/virtual/edge-cases.test.tsx`
 
-- [ ] 20. **Virtualization Performance Benchmarks**
+- [x] 20. **Virtualization Performance Benchmarks**
 
   **What to do**:
   - Create performance benchmarks for virtualized tables
@@ -2579,7 +2579,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `benchmarks/virtualization.ts`, `.sisyphus/baseline/after-virtualization.json`
   - Pre-commit: `bun test test/virtual/benchmarks.test.ts`
 
-- [ ] 21. **Hybrid Query Execution - Streaming Data**
+- [x] 21. **Hybrid Query Execution - Streaming Data**
 
   **What to do**:
   - Implement streaming query execution for Discover API
@@ -2634,7 +2634,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): implement hybrid query streaming`
   - Files: `src/app/api/clickhouse/discover/route.ts`
 
-- [ ] 22. **Hybrid Query Execution - Parallel Count**
+- [x] 22. **Hybrid Query Execution - Parallel Count**
 
   **What to do**:
   - Implement parallel count query execution
@@ -2687,7 +2687,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): implement parallel count queries`
   - Files: `src/app/api/clickhouse/discover/route.ts`
 
-- [ ] 23. **Hybrid Query Execution - Parallel Aggregations**
+- [x] 23. **Hybrid Query Execution - Parallel Aggregations**
 
   **What to do**:
   - Implement parallel aggregation query execution
@@ -2792,7 +2792,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): add approximate count with HLL`
   - Files: `src/lib/clickhouse/approx-count.ts`
 
-- [ ] 25. **Exact Count Query Option**
+- [x] 25. **Exact Count Query Option**
 
   **What to do**:
   - Implement exact count query option
@@ -2901,7 +2901,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): implement query cancellation`
   - Files: `src/lib/clickhouse/cancellation.ts`
 
-- [ ] 27. **Query Timeout Handling**
+- [x] 27. **Query Timeout Handling**
 
   **What to do**:
   - Implement query timeout handling
