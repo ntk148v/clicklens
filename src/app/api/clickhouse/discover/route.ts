@@ -8,6 +8,7 @@ import {
   ColumnDefinition,
 } from "@/lib/clickhouse/search";
 import { fetchChunks } from "@/lib/clickhouse/stream";
+import { executeExactCount, shouldUseExactCount } from "@/lib/clickhouse/exact-count";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 import { validateFilter } from "@/lib/clickhouse/sql-validator";
 import { getGlobalRateLimiter } from "@/lib/rate-limiter";
@@ -107,6 +108,9 @@ export async function GET(request: Request) {
 
     const orderByParam = searchParams.get("orderBy");
     const groupByParam = searchParams.get("groupBy");
+    // exact count toggle: when true, use exact count() with caching
+    // default is approximate (no cache) for better performance on large tables
+    const useExactCount = searchParams.get("exact") === "true";
 
     const client = createClient(config);
     const clusterName = await getClusterName(client);
@@ -344,7 +348,7 @@ export async function GET(request: Request) {
         ${offset > 0 ? `OFFSET ${offset}` : ""}
       `;
 
-      // Run count query in parallel
+      // Run count query in parallel (use exact count with caching when requested)
       let countQuery = `SELECT count() as cnt FROM ${tableSource}`;
       if (baseWhere.length > 0) countQuery += ` WHERE ${baseWhere.join(" AND ")}`;
       if (groupByClause) {
@@ -352,13 +356,27 @@ export async function GET(request: Request) {
         countQuery = `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${baseWhere.length > 0 ? `WHERE ${baseWhere.join(" AND ")}` : ""} ${groupByClause})`;
       }
 
-      const countPromise = client
-        .query(countQuery)
-        .then((res) => Number(res.data[0]?.cnt) || 0)
-        .catch((e) => {
-          console.error("Count query failed", e);
-          return 0;
-        });
+      let countPromise: Promise<number>;
+      if (useExactCount) {
+        // Use exact count with caching
+        countPromise = executeExactCount(client, {
+          database,
+          table,
+          whereConditions: baseWhere,
+          clusterName,
+          isDistributed,
+        }).then((result) => result.count);
+      } else {
+        // Default: approximate count (no caching)
+        countPromise = client
+          .query(countQuery)
+          .then((res) => Number(res.data[0]?.cnt) || 0);
+      }
+
+      countPromise = countPromise.catch((e) => {
+        console.error("Count query failed", e);
+        return 0;
+      });
 
       // Create direct NDJSON stream for aggregation / specific order / specific pagination
       const stream = new ReadableStream({
@@ -404,6 +422,7 @@ export async function GET(request: Request) {
       selectClause,
       orderByClause,
       safeTimeCol: quotedTimeSortCol,
+      useExactCount,
     });
 
     const stream = new ReadableStream({
