@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getTableEngine } from "@/lib/clickhouse/schema";
@@ -45,6 +45,10 @@ export async function GET(request: Request) {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
     const { config } = auth;
+
+    // RBAC: Check canDiscover permission
+    const permissionError = await checkPermission("canDiscover");
+    if (permissionError) return permissionError;
 
     // Rate limiting check
     const rateLimiter = getGlobalRateLimiter();
