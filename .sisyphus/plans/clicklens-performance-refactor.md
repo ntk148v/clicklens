@@ -3589,13 +3589,13 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `feat(error): add error handling and graceful degradation`
 
-- [ ] 39. **Loading States and Progress Indicators**
+- [x] 39. **Loading States and Progress Indicators**
 
   **What to do**: Add loading states and progress indicators for hybrid queries (streaming, count, aggregations)
   **Category**: `visual-engineering`, **Skills**: [`frontend-design`]
   **Parallelization**: Wave 6, **Blocks**: F1-F4, **Blocked By**: Tasks 34, 35
   **References**: `/src/components/ui/loading.tsx`
-  **Acceptance**: [ ] Loading states added, [ ] Tests: `test/ui/loading.test.tsx` → PASS
+  **Acceptance**: [x] Loading states added, [x] Tests: `test/ui/loading.test.tsx` → PASS
 
   **QA Scenarios**:
   ```

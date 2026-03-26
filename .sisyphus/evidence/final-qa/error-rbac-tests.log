@@ -1,0 +1,45 @@
+bun test v1.3.6 (d530ed99)
+
+test/error/handling.test.ts:
+[VirtualizationError] {
+  type: "MEMORY_PRESSURE",
+  message: "Out of memory",
+  stack: "Error: Out of memory\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:90:25)",
+  context: {
+    rowCount: 10000,
+  },
+  timestamp: "2026-03-26T01:20:46.587Z",
+}
+[VirtualizationError] {
+  type: "RENDER_FAILURE",
+  message: "Render failed",
+  stack: "Error: Render failed\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:100:25)",
+  context: undefined,
+  timestamp: "2026-03-26T01:20:46.587Z",
+}
+[VirtualizationError] {
+  type: "INITIALIZATION_FAILURE",
+  message: "Failed to initialize",
+  stack: "Error: Failed to initialize\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:109:25)",
+  context: undefined,
+  timestamp: "2026-03-26T01:20:46.587Z",
+}
+[VirtualizationError] {
+  type: "MEMORY_PRESSURE",
+  message: "Out of memory",
+  stack: "Error: Out of memory\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:150:55)\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:149:53)",
+  context: undefined,
+  timestamp: "2026-03-26T01:20:46.588Z",
+}
+[VirtualizationError] {
+  type: "INITIALIZATION_FAILURE",
+  message: "Failed to initialize",
+  stack: "Error: Failed to initialize\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:164:32)\n    at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/error/handling.test.ts:161:50)",
+  context: undefined,
+  timestamp: "2026-03-26T01:20:46.588Z",
+}
+
+ 125 pass
+ 0 fail
+ 236 expect() calls
+Ran 125 tests across 4 files. [770.00ms]
