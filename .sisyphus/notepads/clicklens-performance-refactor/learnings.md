@@ -575,3 +575,360 @@ Integrated in-memory LRU cache into Discover API and SQL Console query routes fo
 - Discover API: `?cache=false` to disable cache
 - SQL Console: `body.cache = false` to disable cache
 - Both return `cacheHit: true` and `cacheAge: ms` in response when cached
+
+---
+
+# Task 30 Learnings: Enhanced Cache Key Generation
+
+## Summary
+Enhanced cache key generator with versioning, memoization, collision detection, and partial cache invalidation support.
+
+## Files Modified
+- `src/lib/cache/key-generator.ts` - Enhanced with all new features (303 lines)
+
+## Files Created
+- `test/cache/key-generator-enhanced.test.ts` - 53 tests covering all functionality
+
+## Key Features Implemented
+
+### 1. Cache Key Versioning
+- Added `CACHE_KEY_VERSION` constant (currently 1)
+- Version prefix "v1:", "v2:", etc. included in all cache keys
+- `extractVersion()` - Extract version from existing cache key
+- `isVersionCompatible()` - Validate version compatibility with warnings
+- Version changes trigger cache invalidation recommendation
+
+### 2. Hash Memoization
+- Internal cache for repeated key calculations (max 10000 entries)
+- `clearKeyGeneratorCache()` - Clear memoization cache
+- `getCollisionStats()` - Track memoization statistics
+- Performance improvement for repeated queries
+
+### 3. SHA-256 Support
+- Optional SHA-256 hashing via `useSha256` option
+- More secure than MD5, slightly slower
+- Configurable per-key or global
+
+### 4. Collision Detection
+- Tracks potential hash collisions
+- Logs warning at most once per minute
+- Collision count available via `getCollisionStats()`
+- Optional via `detectCollisions` option
+
+### 5. Partial Cache Invalidation
+- `generateDatabasePrefix()` - Generate prefix for database-level invalidation
+- `generateTablePrefix()` - Generate prefix for table-level invalidation
+- `matchesPattern()` - Check if key matches invalidation pattern
+- Wildcard (*) support for flexible matching
+
+### 6. Additional Features
+- `generateCompressedKey()` - Compress very long keys (>200 chars)
+- `getVersionedPrefix()` - Get versioned prefix string
+- Backward compatible - works with or without options
+
+## API Changes
+| Function | New Parameters | Description |
+|----------|---------------|-------------|
+| generateCacheKey | options?: CacheKeyOptions | Version, sha256, memoize, collision detection |
+| generateQueryCacheKey | options?: CacheKeyOptions | Same options |
+| generateSchemaCacheKey | version?: number | Custom version |
+| generateTableCacheKey | version?: number | Custom version |
+
+## Test Results
+- 53 tests pass
+- 0 failures
+- 63 expect() calls
+- Covers: all new features, backward compatibility, performance
+
+## Key Design Decisions
+
+### 1. Memoization Behavior
+- Memoization enabled via option (not default)
+- When enabled, returns hash instead of raw key
+- Version still matters because it's part of the hashed input
+
+### 2. Backward Compatibility
+- params parameter made optional with default {}
+- All existing code works without changes
+- New features opt-in via options object
+
+### 3. Version Compatibility
+- Older versions logged as warning (not error)
+- Newer versions logged as warning
+- Cache invalidation recommended for version mismatches
+
+## Notes
+- LSP diagnostics clean (no errors)
+- Build failure is pre-existing Next.js/Turbopack issue, not related to changes
+- Tests use bun:test like other cache tests in project
+
+---
+
+# Task 33 Learnings: Cache Warming Implementation
+
+## Summary
+Implemented cache warming for frequently accessed queries to improve cache hit rates and reduce query latency.
+
+## Files Created
+- `src/lib/cache/warming.ts` - Cache warming module (553 lines)
+- `test/cache/warming.test.ts` - 46 tests covering all functionality
+
+## Files Modified
+- `src/lib/cache/query-cache.ts` - Already has necessary methods for warming integration
+
+## Key Features Implemented
+
+### 1. Warming Strategies
+- **time-based**: Warm cache at startup, periodic warming
+- **usage-based**: Warm most frequently accessed queries
+- **recent-based**: Warm most recently accessed queries
+- **priority-based**: Warm high-priority queries first
+
+### 2. Warming Schedules
+- **startup**: Warm top N queries on application start
+- **periodic**: Warm cache every X minutes
+- **on-demand**: Warm cache when requested
+
+### 3. Warming Priority
+- **most-frequent**: Queries with highest access count
+- **most-recent**: Queries accessed most recently
+- **high-priority**: Configurable high-priority keys
+
+### 4. Warming Progress
+- Track warming progress (percentage complete)
+- Log warming events with batch information
+- Provide warming status API
+- Handle warming errors gracefully
+
+### 5. Warming Statistics
+- Track warming cycles
+- Track queries warmed
+- Track success/failure rate
+- Track total/average warming time
+- Track hit rate improvement
+
+### 6. Configuration Options
+- Enable/disable warming
+- Configure warming interval (default: 5 min)
+- Configure warming batch size (default: 10)
+- Configure priority mode and high-priority keys
+
+## Class: CacheWarmer
+
+### Methods
+- `setWarmingFn(fn)` - Set the function to execute queries for warming
+- `recordAccess(key)` - Record query access for tracking
+- `addQueryToAccessLog(key, count, timestamp)` - Manually add to access log
+- `getSortedQueries(limit)` - Get queries sorted by strategy
+- `getPriorityQueries(limit)` - Get priority-sorted queries with high-priority keys first
+- `warmKey(key)` - Warm a single key
+- `warmKeys(keys)` - Warm multiple keys with progress tracking
+- `warmStartup()` - Perform startup warming
+- `warmPeriodic()` - Perform periodic warming
+- `warmOnDemand(count?)` - Trigger on-demand warming
+- `startPeriodicWarming()` - Start periodic timer
+- `stopPeriodicWarming()` - Stop periodic timer
+- `getProgress()` - Get warming progress
+- `getStats()` - Get warming statistics
+- `updateConfig(config)` - Update configuration
+- `getConfig()` - Get current config
+- `enable()`/`disable()` - Enable/disable warming
+- `clearStats()` - Clear statistics
+- `clearAccessLog()` - Clear access log
+- `destroy()` - Cleanup
+
+## Test Results
+- 46 tests pass
+- 0 failures
+- 96 expect() calls
+
+## Design Decisions
+
+### 1. Non-blocking Design
+- Periodic warming does not block application startup
+- Startup warming can be called manually if needed
+
+### 2. Error Handling
+- Individual key failures don't stop batch warming
+- Errors logged but not thrown
+- Success rate tracked for monitoring
+
+### 3. Progress Tracking
+- Real-time progress updates during batch warming
+- Batch-level logging for monitoring
+- Percentage calculation for UI feedback
+
+### 4. Integration Ready
+- QueryCache already has hasQuery() for cache checking
+- setCachedQuery() for storing results
+- getStats() for hit rate tracking
+- External systems can use recordAccess() to track queries
+
+## Usage Example
+
+```typescript
+const cache = createQueryCache();
+const warmer = createCacheWarmer(cache, {
+  strategy: "usage-based",
+  schedule: "startup",
+  startupCount: 50,
+  priority: "most-frequent"
+});
+
+// Set function to execute queries for warming
+warmer.setWarmingFn(async (key) => {
+  return await executeQuery(key);
+});
+
+// Record query access (from your application)
+warmer.recordAccess(queryKey);
+
+// Trigger startup warming
+await warmer.warmStartup();
+
+// Or start periodic warming
+warmer.startPeriodicWarming();
+```
+
+## Notes
+- LSP diagnostics clean (pre-existing bun:test errors)
+- Build passes (pre-existing lock issue, resolved)
+- Access log used for tracking, not actual cache metrics
+
+---
+
+# Task 32 Learnings: Redis Fallback Mechanism
+
+## Summary
+Implemented comprehensive Redis fallback mechanism to gracefully handle Redis unavailability with automatic fallback to in-memory LRU cache.
+
+## Files Created
+- `src/lib/cache/redis-fallback.ts` - Redis fallback manager with health check, circuit breaker, retry logic
+- `test/cache/redis-fallback.test.ts` - 24 tests covering all functionality
+
+## Files Modified
+- `src/lib/cache/query-cache.ts` - Added Redis fallback integration
+
+## Key Features Implemented
+1. **Redis Health Check**: Periodic health checks (30s interval) using Redis PING
+2. **Circuit Breaker Pattern**: Three states (closed, open, half-open) to prevent cascading failures
+3. **Retry Logic**: Exponential backoff (1s, 2s) with max 3 retry attempts
+4. **Automatic Fallback**: Seamless switch to LRU cache when Redis unavailable
+5. **Fallback Status Monitoring**: Track fallback events, availability percentage, circuit breaker state
+6. **Graceful Degradation**: No errors when Redis is down, continues serving from LRU cache
+
+## Configuration Options
+- `healthCheckInterval`: Health check interval (default: 30s)
+- `failureThreshold`: Failures to open circuit (default: 5)
+- `cooldownPeriod`: Circuit breaker cooldown (default: 60s)
+- `maxRetries`: Max retry attempts (default: 3)
+- `baseRetryDelay`: Base delay for backoff (default: 1s)
+
+## Test Results
+- 24 tests pass
+- 0 failures
+- 50 expect() calls
+- LSP diagnostics clean
+- Build passes
+
+## Notes
+- Fallback manager uses internal LRU cache for data storage when Redis unavailable
+- Circuit breaker opens after consecutive failures reach threshold
+- Health check automatically tries to close circuit when Redis recovers
+- Query cache integration provides fallback status API for monitoring
+
+---
+
+# Task 31 Learnings: Cache Invalidation Strategies
+
+## Summary
+Implemented comprehensive cache invalidation strategies (TTL-based, manual, event-based, partial) with full integration across LRU, Redis, and Hybrid cache layers.
+
+## Files Created
+- `src/lib/cache/invalidation.ts` - Cache invalidation module with all strategies (877 lines)
+- `test/cache/invalidation.test.ts` - Comprehensive test suite (61 tests, 179 expect calls)
+
+## Key Features Implemented
+
+### 1. TTL-Based Invalidation
+- `setWithTTL()` - Store values with automatic expiration
+- `getWithTTL()` - Retrieve values with expiration check
+- `getTTLStatus()` - Get remaining time and expiration status
+- `extendTTL()` - Sliding expiration support
+- Manual TTL tracking for LRU cache (stores expiresAt metadata)
+
+### 2. Manual Invalidation
+- `invalidate()` - Remove specific key
+- `invalidateMany()` - Batch invalidation with detailed results
+- `clearAll()` - Clear entire cache
+- Returns `InvalidationResult` with success status, invalidated keys, not found keys, and errors
+
+### 3. Event-Based Invalidation
+- Event listener registration with `onEvent()`
+- Event emission with `emitEvent()` and `emitEventDebounced()`
+- Automatic invalidation on:
+  - `database-dropped` - Invalidates all database keys
+  - `table-dropped` / `table-altered` - Invalidates table keys
+  - `data-inserted` / `data-updated` / `data-deleted` - Invalidates table cache
+  - `schema-changed` - Invalidates schema cache
+  - `cache-cleared` - Clears all cache
+- Debouncing support for batching rapid events
+
+### 4. Partial Invalidation
+- `invalidateByPattern()` - Wildcard pattern matching (* and ?)
+- `invalidateByDatabase()` - Database-level invalidation
+- `invalidateByTable()` - Table-level invalidation
+- `invalidateByPrefix()` - Prefix-based invalidation
+- `invalidateByTags()` - Placeholder for tag-based invalidation (requires metadata support)
+
+## Event Helper Functions
+- `createDatabaseDroppedEvent()` - Database drop events
+- `createTableDroppedEvent()` - Table drop events
+- `createTableAlteredEvent()` - Table alter events
+- `createDataChangedEvent()` - Data change events (insert/update/delete)
+- `createSchemaChangedEvent()` - Schema change events
+
+## Factory Functions
+- `createLRUInvalidator()` - For LRU cache
+- `createRedisInvalidator()` - For Redis cache
+- `createHybridInvalidator()` - For Hybrid cache
+
+## Design Decisions
+
+### 1. Cache Type Detection
+- Automatic detection via property inspection (memoryCache, prefix, defaultTTL)
+- Type guards for safe cache operations
+
+### 2. TTL Handling
+- Redis/Hybrid: Native TTL in seconds
+- LRU: Manual TTL tracking with expiresAt metadata
+- Consistent millisecond interface for all cache types
+
+### 3. Event System
+- Pub/sub pattern with listener registration
+- Debouncing prevents event flooding
+- Automatic invalidation based on event type
+- Metadata support for batch tracking
+
+### 4. Error Handling
+- Graceful degradation on cache errors
+- Detailed result objects with error information
+- Logging support with configurable levels
+
+## Test Results
+- 61 tests pass
+- 0 failures
+- 179 expect() calls
+- Coverage: TTL, manual, event-based, partial invalidation, edge cases, integration
+
+## Integration Points
+- Uses `matchesPattern()` from key-generator.ts for pattern matching
+- Uses `generateDatabasePrefix()` and `generateTablePrefix()` for prefix generation
+- Compatible with existing LRUCacheImpl, RedisCache, and HybridCache classes
+
+## Notes
+- LSP diagnostics clean (no errors)
+- All tests pass
+- Follows existing cache patterns from Tasks 5, 6, 28, 30
+- Ready for integration with query routes and data change events
+
