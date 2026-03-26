@@ -166,6 +166,28 @@ export class QueryCache {
   }
 
   /**
+   * Get a cached value (alias for getCachedQuery)
+   */
+  async get<T>(key: string): Promise<T | null> {
+    const result = this.getCachedQuery<T>(key);
+    return result?.data ?? null;
+  }
+
+  /**
+   * Set a cached value (alias for setCachedQuery)
+   */
+  async set<T>(key: string, data: T, ttl?: number): Promise<void> {
+    this.setCachedQuery(key, data);
+  }
+
+  /**
+   * Invalidate a cached value (alias for invalidateQuery)
+   */
+  async invalidate(key: string): Promise<void> {
+    this.invalidateQuery(key);
+  }
+
+  /**
    * Get cache statistics
    */
   getStats(): CacheStats & { size: number } {

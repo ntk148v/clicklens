@@ -227,6 +227,6 @@ describe("key-generator", () => {
     
     const key = generateSchemaCacheKey("default", "users");
     
-    expect(key).toBe("schema:default:users");
+    expect(key).toBe("v1:schema:default:users");
   });
 });

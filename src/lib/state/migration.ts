@@ -222,18 +222,19 @@ export function createMigrationTracker(): {
 export const migrationTracker = createMigrationTracker();
 
 export function useMigrationProgress(): MigrationProgress {
-  const trackerRef = useRef(migrationTracker);
-  const [, forceUpdate] = useState({});
+  const [progress, setProgress] = useState<MigrationProgress>(
+    migrationTracker.getProgress(),
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
-      forceUpdate({});
+      setProgress(migrationTracker.getProgress());
     }, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
-  return trackerRef.current.getProgress();
+  return progress;
 }
 
 export function createActionMapper<THookActions, TStoreActions>(
