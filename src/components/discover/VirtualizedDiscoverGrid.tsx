@@ -101,7 +101,7 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
   }
 
   return (
-    <TruncatedCell value={displayValue} className={className} maxWidth={300} />
+    <TruncatedCell value={displayValue} className={className} maxWidth={280} />
   );
 }
 
@@ -290,6 +290,10 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
 
         return columnHelper.accessor((row) => row[colName], {
           id: colName,
+          size: 150,
+          minSize: 80,
+          maxSize: 500,
+          enableResizing: true,
           header: ({ column }) => (
             <Button
               variant="ghost"
@@ -380,7 +384,7 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
     <>
       <div className="flex flex-col h-full">
         <div ref={scrollContainerRef} className="flex-1 overflow-auto">
-          <table className="w-full caption-bottom text-sm">
+          <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'auto' }}>
             <thead className="sticky top-0 bg-background z-10 shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b">
@@ -421,31 +425,39 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
                 isLoading &&
                   "opacity-50 pointer-events-none select-none transition-opacity duration-200",
               )}
-              style={isVirtualizing ? {
-                height: `${totalSize}px`,
-                width: "100%",
-                position: "relative",
-              } : undefined}
             >
               {isVirtualizing
-                ? virtualRows.map((virtualRow) => {
-                    const row = tableRows[virtualRow.index];
-                    if (!row) return null;
+                ? (() => {
+                    const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start || 0 : 0;
+                    const paddingBottom = virtualRows.length > 0
+                      ? totalSize - (virtualRows[virtualRows.length - 1]?.end || 0)
+                      : 0;
 
                     return (
-                      <tr
-                        key={row.id}
-                        data-slot="table-row"
-                        className={cn(
-                          "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group absolute w-full",
-                          selectedRow === row.original && sheetOpen && "bg-muted",
+                      <>
+                        {paddingTop > 0 && (
+                          <tr>
+                            <td
+                              style={{ height: `${paddingTop}px` }}
+                              colSpan={tableColumns.length + 1}
+                            />
+                          </tr>
                         )}
-                        style={{
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                        onClick={() => handleRowClick(row.original, row.index)}
-                      >
+                        {virtualRows.map((virtualRow) => {
+                          const row = tableRows[virtualRow.index];
+                          if (!row) return null;
+
+                          return (
+                            <tr
+                              key={row.id}
+                              data-slot="table-row"
+                              className={cn(
+                                "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
+                                selectedRow === row.original && sheetOpen && "bg-muted",
+                              )}
+                              style={{ height: `${virtualRow.size}px` }}
+                              onClick={() => handleRowClick(row.original, row.index)}
+                            >
                         {row.getVisibleCells().map((cell, cellIndex) => {
                           const isSelected = isCellInSelection(
                             virtualRow.index,
@@ -457,7 +469,7 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
                               key={cell.id}
                               className={cn(
                                 "p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0 cursor-cell select-none",
-                                isSelected && "bg-primary/20 ring-1 ring-primary"
+                                isSelected && "bg-primary/20 ring-1 ring-inset ring-primary"
                               )}
                               style={{
                                 width: cell.column.getSize(),
@@ -489,7 +501,18 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
                         </td>
                       </tr>
                     );
-                  })
+                  })}
+                  {paddingBottom > 0 && (
+                    <tr>
+                      <td
+                        style={{ height: `${paddingBottom}px` }}
+                        colSpan={tableColumns.length + 1}
+                      />
+                    </tr>
+                  )}
+                </>
+                );
+              })()
                 : tableRows.map((row, rowIndex) => (
                     <tr
                       key={row.id}
