@@ -251,7 +251,7 @@ export async function executeApproximateCount(
 
   // Use system.parts for approximate count
   // Only count active (not deleted) parts
-  let query = `
+  const query = `
     SELECT sum(rows) as cnt
     FROM system.parts
     WHERE database = '${safeDbStr}'

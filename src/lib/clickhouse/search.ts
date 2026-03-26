@@ -13,6 +13,7 @@ export interface ColumnDefinition {
  * Ignores LowCardinality wrapper for the check.
  */
 function isStringColumn(type: string): boolean {
+  if (!type) return false;
   const normalized = type
     .replace("LowCardinality(", "")
     .replace(")", "")
