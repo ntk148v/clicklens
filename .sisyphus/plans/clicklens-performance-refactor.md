@@ -3439,7 +3439,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `refactor(sql): migrate to new architecture`
 
-- [ ] 36. **API Route Updates for Hybrid Queries**
+- [x] 36. **API Route Updates for Hybrid Queries**
 
   **What to do**: Update API routes to support hybrid query execution (streaming + parallel count/aggs)
   **Category**: `deep`, **Skills**: []
