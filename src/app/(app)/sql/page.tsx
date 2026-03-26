@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useMemo } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -42,6 +42,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  QueryLoadingState,
+  StreamingProgressIndicator,
+} from "@/components/ui/loading";
 import {
   Play,
   FileText,
@@ -92,6 +96,9 @@ export default function SqlConsolePage() {
 
   const router = useRouter();
   const activeTab = useSqlPage().activeTab;
+
+  const streamedRows = activeQueryTab?.result?.data?.length ?? 0;
+  const isStreaming = Boolean(activeQueryTab?.isRunning) && streamedRows > 0;
 
   if (authLoading) {
     return (
@@ -313,22 +320,33 @@ export default function SqlConsolePage() {
 
                 <div className="flex-1 min-h-0">
                   {activeQueryTab.isRunning && !activeQueryTab.result ? (
-                    <SqlResultSkeleton />
-                  ) : activeQueryTab.result ? (
-                    <VirtualizedResultGrid
-                      data={activeQueryTab.result.data}
-                      meta={activeQueryTab.result.meta}
-                      statistics={activeQueryTab.result.statistics}
-                      totalRows={undefined}
-                      page={tabPagination[activeTabId || ""]?.page || 0}
-                      pageSize={
-                        tabPagination[activeTabId || ""]?.pageSize || 100
-                      }
-                      onPageChange={handlePageChange}
-                      onPageSizeChange={handlePageSizeChange}
-                      className="h-full"
-                      isLoading={activeQueryTab.isRunning}
+                    <QueryLoadingState
+                      isRunning={true}
+                      className="h-full flex items-center justify-center"
                     />
+                  ) : activeQueryTab.result ? (
+                    <div className="relative h-full">
+                      <VirtualizedResultGrid
+                        data={activeQueryTab.result.data}
+                        meta={activeQueryTab.result.meta}
+                        statistics={activeQueryTab.result.statistics}
+                        totalRows={undefined}
+                        page={tabPagination[activeTabId || ""]?.page || 0}
+                        pageSize={
+                          tabPagination[activeTabId || ""]?.pageSize || 100
+                        }
+                        onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="h-full"
+                        isLoading={activeQueryTab.isRunning}
+                      />
+                      <StreamingProgressIndicator
+                        isStreaming={isStreaming}
+                        rowCount={streamedRows}
+                        totalHits={-1}
+                        className="absolute bottom-4 left-4 right-4 z-10"
+                      />
+                    </div>
                   ) : activeQueryTab.explainResult ? (
                     <ExplainVisualizer
                       type={activeQueryTab.explainResult.type}
