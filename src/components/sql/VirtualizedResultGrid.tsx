@@ -22,7 +22,6 @@ import {
   type RowData,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Copy, Download } from "lucide-react";
 import { cn, copyToClipboard, formatDateTime } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "@/components/monitoring";
@@ -137,15 +136,7 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
         return (row as Record<string, unknown>)[col.name];
       },
       header: () => (
-        <div className="flex items-center gap-1">
-          <span className="font-semibold">{col.name}</span>
-          <Badge
-            variant="outline"
-            className="text-[10px] px-1 py-0 font-mono text-muted-foreground"
-          >
-            {col.type}
-          </Badge>
-        </div>
+        <span className="font-semibold">{col.name}</span>
       ),
       cell: ({ getValue }) => {
         const value = getValue();
@@ -153,12 +144,14 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
           <TruncatedCell
             value={formatCellValue(value)}
             className={getCellClassName(value)}
+            maxWidth={280}
           />
         );
       },
-      size: 150,
-      minSize: 80,
-      enableResizing: true,
+size: 180,
+          minSize: 100,
+          maxSize: 600,
+          enableResizing: true,
     }));
   }, [meta]);
 
@@ -373,7 +366,7 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
             style={{ height: `${totalSize}px`, width: "100%", position: "relative" }}
             {...accessibility.getGridProps()}
           >
-            <table className="w-full caption-bottom text-sm" role="presentation">
+            <table className="w-full caption-bottom text-sm" role="presentation" style={{ tableLayout: 'auto' }}>
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -410,25 +403,38 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
                     "opacity-50 pointer-events-none select-none transition-opacity duration-200"
                 )}
               >
-                {virtualRows.map((virtualRow) => {
-                  const row = rows[virtualRow.index];
-                  const displayIndex = onPageChange
-                    ? page * pageSize + virtualRow.index
-                    : virtualRow.index;
-                  return (
-                    <ClickableTableRow
-                      key={row.id}
-                      data-index={virtualRow.index}
-                      record={data[virtualRow.index] as RowData}
-                      columns={meta}
-                      rowIndex={displayIndex}
-                      sheetTitle="Query Result"
-                      style={{
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start - (rowVirtualizer.getVirtualItems()[0]?.start ?? 0)}px)`,
-                      }}
-                      {...accessibility.getRowProps(virtualRow.index)}
-                    >
+                {(() => {
+                    const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start || 0 : 0;
+                    const paddingBottom = virtualRows.length > 0
+                      ? totalSize - (virtualRows[virtualRows.length - 1]?.end || 0)
+                      : 0;
+
+                    return (
+                      <>
+                        {paddingTop > 0 && (
+                          <tr>
+                            <td
+                              style={{ height: `${paddingTop}px` }}
+                              colSpan={columns.length}
+                            />
+                          </tr>
+                        )}
+                        {virtualRows.map((virtualRow) => {
+                          const row = rows[virtualRow.index];
+                          const displayIndex = onPageChange
+                            ? page * pageSize + virtualRow.index
+                            : virtualRow.index;
+                          return (
+                            <ClickableTableRow
+                              key={row.id}
+                              data-index={virtualRow.index}
+                              record={data[virtualRow.index] as RowData}
+                              columns={meta}
+                              rowIndex={displayIndex}
+                              sheetTitle="Query Result"
+                              style={{ height: `${virtualRow.size}px` }}
+                              {...accessibility.getRowProps(virtualRow.index)}
+                            >
                       {row.getVisibleCells().map((cell, cellIndex) => {
                         const isSelected = isCellInSelection(
                           virtualRow.index,
@@ -442,7 +448,7 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
                             data-slot="table-cell"
                             className={cn(
                               "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-mono cursor-cell select-none",
-                              isSelected && "bg-primary/20 ring-1 ring-primary"
+                              isSelected && "bg-primary/20 ring-1 ring-inset ring-primary"
                             )}
                             onMouseDown={() =>
                               handleCellMouseDown(virtualRow.index, cellIndex)
@@ -460,6 +466,17 @@ export const VirtualizedResultGrid = memo(function VirtualizedResultGrid({
                     </ClickableTableRow>
                   );
                 })}
+                {paddingBottom > 0 && (
+                  <tr>
+                    <td
+                      style={{ height: `${paddingBottom}px` }}
+                      colSpan={columns.length}
+                    />
+                  </tr>
+                )}
+              </>
+              );
+            })()}
               </tbody>
             </table>
           </div>
