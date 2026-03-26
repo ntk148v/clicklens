@@ -182,9 +182,30 @@ export class QueryCache {
 
   /**
    * Invalidate a cached value (alias for invalidateQuery)
+   * Supports pattern matching with * (matches any sequence) and ? (matches any single character)
    */
   async invalidate(key: string): Promise<void> {
-    this.invalidateQuery(key);
+    if (key.includes('*') || key.includes('?')) {
+      const allKeys = this.cache.keys();
+      const pattern = this.globToRegex(key);
+
+      for (const cacheKey of allKeys) {
+        if (pattern.test(cacheKey)) {
+          this.invalidateQuery(cacheKey);
+        }
+      }
+    } else {
+      this.invalidateQuery(key);
+    }
+  }
+
+  private globToRegex(glob: string): RegExp {
+    const regexString = glob
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+
+    return new RegExp(`^${regexString}$`);
   }
 
   /**
