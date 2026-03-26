@@ -3412,7 +3412,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `refactor(discover): migrate to new architecture`
 
-- [ ] 35. **SQL Console Migration to New Architecture**
+- [x] 35. **SQL Console Migration to New Architecture**
 
   **What to do**: Migrate SQL Console to use Zustand stores, virtualized tables, hybrid queries, caching
   **Category**: `deep`, **Skills`: []
