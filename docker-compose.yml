@@ -9,7 +9,7 @@ services:
       cluster_1S_2R_ch_proxy:
         ipv4_address: 192.168.5.11
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - ./.env.local:/app/.env.local
     environment:
