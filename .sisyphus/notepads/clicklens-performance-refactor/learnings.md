@@ -1076,3 +1076,222 @@ Integrated existing RBAC with new architecture (Zustand stores, virtualized grid
 - Pre-existing LSP errors about bun:test type declarations are expected in this project
 - All RBAC checks properly ordered: auth → permission → rate limit → execute
 
+
+---
+
+# Task 38 Learnings: Centralized Error Handling Module
+
+## Summary
+Created centralized error handling module (`src/lib/error/handling.ts`) that provides comprehensive error handling and graceful degradation for query errors, API errors, cache failures, virtualization failures, and network errors.
+
+## Files Created
+- `src/lib/error/handling.ts` - Centralized error handling module (727 lines)
+- `test/error/handling.test.ts` - Comprehensive tests (63 tests)
+
+## Key Patterns
+
+### 1. Re-export Existing Error Handling
+The module re-exports all existing error handling utilities from:
+- `src/lib/errors/query-error.ts` - Query error categorization and formatting
+- `src/lib/api/errors.ts` - API error response utilities
+- `src/lib/cache/redis-fallback.ts` - Redis fallback with circuit breaker
+
+This provides a single import point for all error handling needs.
+
+### 2. Virtualization Error Handling
+New error handling for virtualization failures with graceful degradation:
+
+**VirtualizationError Class:**
+- Custom error class with `fallbackAvailable` flag
+- Detects error type: MEMORY_PRESSURE, RENDER_FAILURE, INITIALIZATION_FAILURE, SCROLL_ERROR, UNKNOWN
+
+**withVirtualizationFallback() Function:**
+- Wraps virtualization operations with automatic fallback
+- Falls back to non-virtualized rendering on most errors
+- Throws on INITIALIZATION_FAILURE (no fallback available)
+- Returns `{ result, isFallback, error }` for transparent handling
+
+**Error Detection:**
+- Memory errors → MEMORY_PRESSURE (fallback available)
+- Render/DOM errors → RENDER_FAILURE (fallback available)
+- Init errors → INITIALIZATION_FAILURE (no fallback)
+- Scroll errors → SCROLL_ERROR (fallback available)
+
+### 3. Network Retry Logic with Exponential Backoff
+New retry mechanism for network errors:
+
+**NetworkError Class:**
+- Custom error class with `retryable` flag and `statusCode`
+- Error types: TIMEOUT, CONNECTION_REFUSED, NETWORK_UNREACHABLE, SERVER_ERROR, RATE_LIMITED, CLIENT_ERROR, UNKNOWN
+
+**withRetry() Function:**
+- Exponential backoff: `baseDelay * 2^attempt`
+- Jitter: `delay * (1 ± jitterFactor)` to prevent thundering herd
+- Max delay cap to prevent excessive waits
+- Configurable retryable status codes (default: 408, 429, 500, 502, 503, 504)
+- Custom `shouldRetry` predicate for fine-grained control
+- `onRetry` callback for logging/monitoring
+
+**fetchWithRetry() Function:**
+- Wraps fetch requests with retry logic
+- Automatically retries on server errors (5xx)
+- Does NOT retry on client errors (4xx)
+- Returns `RetryResult<Response>` with metadata
+
+**Retry Configuration:**
+```typescript
+{
+  maxRetries: 3,           // Default: 3 attempts
+  baseDelay: 1000,         // Default: 1 second
+  maxDelay: 30000,         // Default: 30 seconds
+  jitterFactor: 0.1,       // Default: 10% jitter
+  retryableStatusCodes: [408, 429, 500, 502, 503, 504]
+}
+```
+
+### 4. Unified Error Interface
+New unified error handling interface:
+
+**UnifiedError Interface:**
+```typescript
+{
+  type: string;           // Error type/category
+  severity: ErrorSeverity; // low | medium | high | critical
+  message: string;        // Technical message (may be sanitized)
+  userMessage: string;    // User-friendly message
+  hint?: string;          // Optional helpful hint
+  retryable: boolean;     // Whether error is retryable
+  cause?: Error;          // Original error
+  metadata?: Record<string, unknown>;
+}
+```
+
+**createUnifiedError() Function:**
+- Converts any error to UnifiedError format
+- Handles NetworkError, VirtualizationError, and generic errors
+- Provides consistent error structure across the application
+
+**logError() Function:**
+- Logs errors with appropriate severity level
+- Critical/High → console.error
+- Medium → console.warn
+- Low → console.info
+
+### 5. Error Boundary Helpers
+New helpers for React error boundaries:
+
+**ErrorBoundaryState Interface:**
+```typescript
+{
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: UnifiedError | null;
+}
+```
+
+**Functions:**
+- `createErrorBoundaryState()` - Initial state
+- `handleErrorBoundary(error, context)` - Handle error and return state
+- `resetErrorBoundary()` - Reset to initial state
+
+## Test Results
+- 63 tests pass
+- 0 failures
+- 144 expect() calls
+
+## Test Coverage
+1. VirtualizationError class creation and properties
+2. Virtualization error type detection (MEMORY_PRESSURE, RENDER_FAILURE, etc.)
+3. Virtualization error handling with fallback logic
+4. withVirtualizationFallback() with success, failure, and fallback scenarios
+5. NetworkError class creation and properties
+6. Network error type detection from status codes and messages
+7. isRetryableError() for various error types
+8. calculateRetryDelay() with exponential backoff and jitter
+9. withRetry() with success, retry, and max retry scenarios
+10. fetchWithRetry() with success, server error, and client error scenarios
+11. createUnifiedError() for different error types
+12. logError() with appropriate severity levels
+13. Error boundary helpers (create, handle, reset)
+14. Re-export verification for existing error handling utilities
+
+## Usage Examples
+
+### Virtualization with Fallback
+```typescript
+const { result, isFallback, error } = await withVirtualizationFallback(
+  () => virtualizeData(data),
+  () => renderSimpleList(data),
+  { rowCount: data.length }
+);
+
+if (isFallback) {
+  showWarning(error.userMessage);
+}
+```
+
+### Network Retry
+```typescript
+const { result, attempts, totalTime } = await withRetry(
+  () => fetch('/api/data'),
+  {
+    maxRetries: 3,
+    baseDelay: 1000,
+    onRetry: (error, attempt, delay) => {
+      console.log(`Retry ${attempt} after ${delay}ms`);
+    }
+  }
+);
+```
+
+### Unified Error Handling
+```typescript
+try {
+  await operation();
+} catch (error) {
+  const unifiedError = createUnifiedError(error, { context: 'data-fetch' });
+  logError(error, { context: 'data-fetch' });
+  showErrorToUser(unifiedError.userMessage);
+}
+```
+
+### Error Boundary
+```typescript
+class MyErrorBoundary extends React.Component {
+  state = createErrorBoundaryState();
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    this.setState(handleErrorBoundary(error, { component: 'MyComponent' }));
+  }
+
+  handleReset = () => {
+    this.setState(resetErrorBoundary());
+  };
+}
+```
+
+## Implementation Notes
+1. **No modifications to existing error handling** - All existing error handling in query-error.ts, api/errors.ts, and redis-fallback.ts remains unchanged
+2. **Re-exports preserve compatibility** - Existing imports continue to work
+3. **Graceful degradation** - Virtualization failures fall back to simpler rendering
+4. **Exponential backoff with jitter** - Prevents thundering herd on retries
+5. **Severity-based logging** - Different log levels for different error severities
+6. **User-friendly messages** - All errors provide clear, actionable messages
+
+## Security Considerations
+1. **Error sanitization** - Existing sanitization from query-error.ts is preserved
+2. **No sensitive data in user messages** - Technical details only in logs
+3. **Retry limits** - Prevents infinite retry loops
+4. **Client errors not retried** - 4xx errors are not retried (client issue, not server)
+
+## Performance Considerations
+1. **Lazy error creation** - UnifiedError only created when needed
+2. **Efficient retry delays** - Exponential backoff with jitter prevents resource exhaustion
+3. **Fallback caching** - Virtualization fallback reuses existing non-virtualized rendering
+4. **Minimal overhead** - Error handling only activates on errors
+
+## Future Enhancements
+1. **Error reporting integration** - Connect to error tracking service (Sentry, etc.)
+2. **Error analytics** - Track error patterns and frequencies
+3. **Custom retry strategies** - Per-endpoint retry configuration
+4. **Error recovery suggestions** - AI-powered error resolution hints
