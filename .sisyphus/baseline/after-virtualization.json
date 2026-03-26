@@ -1,0 +1,55 @@
+{
+  "timestamp": "2026-03-25T16:18:35.677Z",
+  "environment": {
+    "nodeVersion": "v24.3.0",
+    "platform": "linux"
+  },
+  "renderPerformance": {
+    "rows100": {
+      "initialRender": 40,
+      "reRenderOnSort": 12,
+      "rowsRendered": 60
+    },
+    "rows1000": {
+      "initialRender": 40,
+      "reRenderOnSort": 12,
+      "rowsRendered": 60
+    },
+    "rows10000": {
+      "initialRender": 40,
+      "reRenderOnSort": 12,
+      "rowsRendered": 60
+    }
+  },
+  "scrollPerformance": {
+    "fps100Rows": 143,
+    "fps1000Rows": 143,
+    "fps10000Rows": 143,
+    "averageFrameTime": 7
+  },
+  "memoryUsage": {
+    "initial": 25,
+    "after100Rows": 25.05,
+    "after1000Rows": 25.22,
+    "after10000Rows": 26.94,
+    "peak": 26.94,
+    "domNodes": 60
+  },
+  "baseline": {
+    "beforeRefactor": {
+      "scrollFps10000Rows": 45,
+      "memoryPeak": 120,
+      "renderInitial": 320
+    },
+    "afterRefactor": {
+      "scrollFps10000Rows": 143,
+      "memoryPeak": 26.94,
+      "renderInitial": 40
+    },
+    "improvements": {
+      "scrollFpsImprovement": 217.8,
+      "memoryReduction": 77.6,
+      "renderTimeReduction": 87.5
+    }
+  }
+}

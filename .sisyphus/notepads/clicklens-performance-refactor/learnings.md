@@ -932,3 +932,83 @@ Implemented comprehensive cache invalidation strategies (TTL-based, manual, even
 - Follows existing cache patterns from Tasks 5, 6, 28, 30
 - Ready for integration with query routes and data change events
 
+---
+
+# Task 34 Learnings: Discover Page Migration to Zustand Stores
+
+## Summary
+Migrated Discover page to use Zustand stores (query, data, UI), VirtualizedDiscoverGrid component, hybrid query execution, and caching.
+
+## Files Created
+- `src/lib/hooks/use-discover-page.ts` - New hook combining Zustand stores with data fetching logic (905 lines)
+- `test/discover/migration.test.tsx` - 39 tests verifying migration completeness
+
+## Files Modified
+- `src/app/(app)/discover/page.tsx` - Migrated to use useDiscoverPage hook and VirtualizedDiscoverGrid
+
+## Key Patterns
+- Created `useDiscoverPage` hook that wraps Zustand stores (query-store, data-store, ui-store) with data fetching logic
+- Hook provides same API as original `useDiscoverState` for backward compatibility
+- Uses `createDiscoverDataStore()` factory for data store instance
+- Integrates query store for filter/sort/groupBy state
+- Integrates data store for rows/histogram/loading/error state
+- Integrates UI store for selection/expansion state (via useDiscoverUIStore)
+- Replaced `DiscoverGrid` with `VirtualizedDiscoverGrid` for virtualized rendering
+
+## Migration Strategy
+1. Created `useDiscoverPage` hook that combines:
+   - Query store (filter, time range, sorting, groupBy, selected columns)
+   - Data store (rows, histogram, loading, error, total count)
+   - UI store (selection, expansion, sidebar)
+   - Data fetching logic (fetchData, fetchHistogram, handleSearch)
+   - URL synchronization
+   - Schema loading with caching
+   - Column preferences persistence
+
+2. Updated Discover page to:
+   - Import Zustand stores directly
+   - Use `useDiscoverPage` hook instead of `useDiscoverState`
+   - Use `VirtualizedDiscoverGrid` instead of `DiscoverGrid`
+
+## Functionality Preserved
+- Search with Cmd/Ctrl+Enter keyboard shortcut
+- Filter with ClickHouse SQL syntax
+- Sort by clicking column headers
+- Expand rows via RecordDetailSheet
+- Cancel query with Escape key
+- Histogram with time range zoom
+- Cache indicator with hit rate
+- Fields sidebar with column selection
+- Query bar with syntax highlighting
+- Error display with retry
+- Time selector with relative/absolute ranges
+- Refresh control with auto-refresh
+- Database/table selectors
+- Pagination controls
+- Access denied check
+
+## Test Results
+- 39 tests pass
+- 0 failures
+- 56 expect() calls
+- Tests verify: Zustand store imports, VirtualizedDiscoverGrid usage, functionality preservation, props passing
+
+## Design Decisions
+1. **Hook wrapper pattern**: Created `useDiscoverPage` to maintain API compatibility while using Zustand stores internally
+2. **Data store instance**: Used `createDiscoverDataStore()` factory to create a single data store instance
+3. **Query store integration**: Direct usage of `useQueryStore` for query state management
+4. **UI store integration**: Direct usage of `useDiscoverUIStore` for UI state management
+5. **VirtualizedDiscoverGrid**: Replaced `DiscoverGrid` with `VirtualizedDiscoverGrid` for better performance with large datasets
+
+## LSP Diagnostics
+- All modified files clean (zero errors)
+- Pre-existing bun:test type errors unchanged
+
+## Notes
+- The `useDiscoverPage` hook maintains the same API as `useDiscoverState` for backward compatibility
+- Data fetching logic is now centralized in the hook
+- URL synchronization is preserved
+- Schema loading with MetadataCache is preserved
+- Column preferences persistence is preserved
+- All existing functionality is maintained
+
