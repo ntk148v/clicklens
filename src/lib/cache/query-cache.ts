@@ -7,6 +7,14 @@
 
 import { LRUCacheImpl, CacheStats } from "./lru-cache";
 import { generateCacheKey, QueryParams } from "./key-generator";
+import {
+  RedisFallbackManager,
+  getFallbackManager,
+  createFallbackManager,
+  CircuitBreakerState,
+  type FallbackOptions,
+  type FallbackStatus,
+} from "./redis-fallback";
 
 export interface QueryCacheOptions {
   /** Maximum number of cache entries (default: 500) */
@@ -15,6 +23,10 @@ export interface QueryCacheOptions {
   ttl?: number;
   /** Cache name for logging */
   name?: string;
+  /** Enable Redis fallback mechanism (default: true) */
+  enableRedisFallback?: boolean;
+  /** Redis fallback options */
+  fallbackOptions?: FallbackOptions;
 }
 
 export interface CachedQueryResult<T = unknown> {
@@ -36,10 +48,48 @@ export interface CacheMetadata {
 export class QueryCache {
   private cache: LRUCacheImpl;
   private name: string;
+  private fallbackManager: RedisFallbackManager | null = null;
+  private enableRedisFallback: boolean;
 
-  constructor(cache: LRUCacheImpl, name: string = "query-cache") {
+  constructor(
+    cache: LRUCacheImpl,
+    name: string = "query-cache",
+    enableRedisFallback: boolean = false
+  ) {
     this.cache = cache;
     this.name = name;
+    this.enableRedisFallback = enableRedisFallback;
+  }
+
+  /**
+   * Initialize Redis fallback manager
+   */
+  initFallback(options: FallbackOptions = {}): void {
+    if (this.enableRedisFallback && !this.fallbackManager) {
+      this.fallbackManager = createFallbackManager(options);
+    }
+  }
+
+  /**
+   * Get fallback status
+   */
+  getFallbackStatus(): FallbackStatus | null {
+    return this.fallbackManager?.getStatus() ?? null;
+  }
+
+  /**
+   * Check if using fallback mode
+   */
+  isUsingFallback(): boolean {
+    return this.fallbackManager?.getStatus()?.isUsingFallback ?? false;
+  }
+
+  /**
+   * Get circuit breaker state
+   */
+  getCircuitBreakerState(): CircuitBreakerState | null {
+    const status = this.getFallbackStatus();
+    return status?.circuitBreakerState ?? null;
   }
 
   /**
@@ -204,11 +254,18 @@ let defaultQueryCache: QueryCache | null = null;
 export function createQueryCache(options: QueryCacheOptions = {}): QueryCache {
   const lruCache = new LRUCacheImpl({
     max: options.maxEntries ?? 500,
-    ttl: options.ttl ?? 300_000, // 5 minutes
+    ttl: options.ttl ?? 300_000,
     name: options.name ?? "query-cache",
   });
 
-  return new QueryCache(lruCache, options.name ?? "query-cache");
+  const enableRedisFallback = options.enableRedisFallback ?? false;
+  const cache = new QueryCache(lruCache, options.name ?? "query-cache", enableRedisFallback);
+
+  if (enableRedisFallback && options.fallbackOptions) {
+    cache.initFallback(options.fallbackOptions);
+  }
+
+  return cache;
 }
 
 /**
@@ -218,7 +275,7 @@ export function getQueryCache(): QueryCache {
   if (!defaultQueryCache) {
     defaultQueryCache = createQueryCache({
       maxEntries: 500,
-      ttl: 300_000, // 5 minutes
+      ttl: 300_000,
       name: "default-query-cache",
     });
   }
@@ -233,6 +290,18 @@ export function resetQueryCache(): void {
     defaultQueryCache.clear();
   }
   defaultQueryCache = null;
+}
+
+/**
+ * Create a query cache with Redis fallback enabled
+ */
+export function createQueryCacheWithFallback(
+  options: QueryCacheOptions = {}
+): QueryCache {
+  return createQueryCache({
+    ...options,
+    enableRedisFallback: true,
+  });
 }
 
 /**
