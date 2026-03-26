@@ -1,0 +1,211 @@
+bun test v1.3.6 (d530ed99)
+
+test/cache/key-generator-enhanced.test.ts:
+[CacheKeyGenerator] Cache key version 1 is older than current 2. Consider cache invalidation.
+[CacheKeyGenerator] Cache key version 3 is newer than current 2.
+
+test/cache/warming.test.ts:
+[CacheWarmer] No warming function set, skipping key: new-key
+[CacheWarmer] Failed to warm key error-key: 206 |     });
+207 | 
+208 |     it("should handle warming errors gracefully", async () => {
+209 |       warmer = createCacheWarmer(cache);
+210 |       warmer.setWarmingFn(async () => {
+211 |         throw new Error("Query failed");
+                        ^
+error: Query failed
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:211:19)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:210:39)
+      at warmKey (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:238:33)
+      at warmKey (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:225:17)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:214:35)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:208:51)
+
+[CacheWarmer] Batch 1/2 complete: 2/2 succeeded
+[CacheWarmer] Batch 2/2 complete: 2/2 succeeded
+[CacheWarmer] Failed to warm key key2: 236 |       let callCount = 0;
+237 |       warmer = createCacheWarmer(cache, { batchSize: 2 });
+238 |       warmer.setWarmingFn(async (key) => {
+239 |         callCount++;
+240 |         if (key === "key2") {
+241 |           throw new Error("Failed");
+                          ^
+error: Failed
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:241:21)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:238:34)
+      at warmKey (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:238:33)
+      at warmKey (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:225:17)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:267:38)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:266:26)
+      at map (1:11)
+      at warmKeys (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:266:15)
+      at warmKeys (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:250:18)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:247:35)
+
+[CacheWarmer] Batch 1/2 complete: 1/2 succeeded
+[CacheWarmer] Batch 2/2 complete: 1/1 succeeded
+[CacheWarmer] Batch 1/2 complete: 2/2 succeeded
+[CacheWarmer] Batch 2/2 complete: 1/1 succeeded
+[CacheWarmer] Starting startup warming for 3 queries...
+[CacheWarmer] Batch 1/1 complete: 3/3 succeeded
+[CacheWarmer] Startup warming complete: 3 queries warmed in 0ms
+[CacheWarmer] Starting periodic warming for 2 queries...
+[CacheWarmer] Batch 1/1 complete: 2/2 succeeded
+[CacheWarmer] Periodic warming complete: 2 queries warmed in 0ms
+[CacheWarmer] Starting on-demand warming for 2 queries...
+[CacheWarmer] Batch 1/1 complete: 2/2 succeeded
+[CacheWarmer] On-demand warming complete: 2 queries warmed in 1ms
+[CacheWarmer] Starting on-demand warming for 3 queries...
+[CacheWarmer] Batch 1/1 complete: 3/3 succeeded
+[CacheWarmer] On-demand warming complete: 3 queries warmed in 0ms
+[CacheWarmer] Starting periodic warming every 100ms
+[CacheWarmer] Starting periodic warming for 1 queries...
+[CacheWarmer] Periodic warming stopped
+[CacheWarmer] Batch 1/1 complete: 1/1 succeeded
+[CacheWarmer] Periodic warming complete: 1 queries warmed in 0ms
+[CacheWarmer] Starting periodic warming every 100ms
+[CacheWarmer] Starting periodic warming for 20 queries...
+[CacheWarmer] Periodic warming already running
+[CacheWarmer] Periodic warming stopped
+[CacheWarmer] Periodic warming complete: 0 queries warmed in 0ms
+[CacheWarmer] Starting periodic warming every 50ms
+[CacheWarmer] Starting periodic warming for 20 queries...
+[CacheWarmer] Periodic warming stopped
+[CacheWarmer] Periodic warming complete: 0 queries warmed in 0ms
+[CacheWarmer] Starting on-demand warming for 1 queries...
+[CacheWarmer] Batch 1/1 complete: 1/1 succeeded
+[CacheWarmer] On-demand warming complete: 1 queries warmed in 0ms
+[CacheWarmer] Starting on-demand warming for 2 queries...
+[CacheWarmer] Failed to warm key key2: 420 |       warmer = createCacheWarmer(cache, { schedule: "on-demand" });
+421 |       warmer.addQueryToAccessLog("key1", 10);
+422 |       warmer.addQueryToAccessLog("key2", 5);
+423 |       warmer.setWarmingFn((key) => {
+424 |         if (key === "key2") {
+425 |           return Promise.reject(new Error("Fail"));
+                                          ^
+error: Fail
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/warming.test.ts:425:37)
+      at warmKey (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:238:33)
+      at warmKey (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:225:17)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:267:38)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:266:26)
+      at map (1:11)
+      at warmKeys (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:266:15)
+      at warmKeys (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:250:18)
+      at warmOnDemand (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:418:31)
+      at warmOnDemand (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/src/lib/cache/warming.ts:406:22)
+
+[CacheWarmer] Batch 1/1 complete: 1/2 succeeded
+[CacheWarmer] On-demand warming complete: 1 queries warmed in 0ms
+[CacheWarmer] Starting on-demand warming for 1 queries...
+[CacheWarmer] Batch 1/1 complete: 1/1 succeeded
+[CacheWarmer] On-demand warming complete: 1 queries warmed in 0ms
+[CacheWarmer] Starting on-demand warming for 1 queries...
+[CacheWarmer] Batch 1/1 complete: 1/1 succeeded
+[CacheWarmer] On-demand warming complete: 1 queries warmed in 0ms
+[CacheWarmer] Starting periodic warming every 50ms
+[CacheWarmer] Starting periodic warming for 20 queries...
+[CacheWarmer] Periodic warming stopped
+[CacheWarmer] Periodic warming complete: 0 queries warmed in 0ms
+
+test/cache/lru-cache.test.ts:
+225 |   it("should generate schema cache keys", () => {
+226 |     const { generateSchemaCacheKey } = require("../../src/lib/cache/key-generator");
+227 | 
+228 |     const key = generateSchemaCacheKey("default", "users");
+229 | 
+230 |     expect(key).toBe("schema:default:users");
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: "schema:default:users"
+Received: "v1:schema:default:users"
+
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/lru-cache.test.ts:230:17)
+(fail) key-generator > should generate schema cache keys
+
+test/cache/redis-cache.test.ts:
+[test-cache] Redis get failed for key "key1": 71 |     });
+72 |   });
+73 | 
+74 |   describe("error handling", () => {
+75 |     it("should handle Redis errors gracefully", async () => {
+76 |       mockRedis.get.mockRejectedValue(new Error("Redis connection failed"));
+                                               ^
+error: Redis connection failed
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:76:43)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:75:49)
+
+[test-cache] Redis unavailable, using fallback only
+[test-cache] Redis set failed for key "key1": 87 |       const result = await cache.get("fallback-key");
+88 |       expect(result).toEqual({ data: "fallback-value" });
+89 |     });
+90 | 
+91 |     it("should handle set errors gracefully", async () => {
+92 |       mockRedis.setEx.mockRejectedValue(new Error("Redis error"));
+                                                 ^
+error: Redis error
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:92:45)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:91:47)
+
+[test-cache] Redis delete failed for key "key1": 94 |       const result = await cache.set("key1", { data: "value" });
+95 |       expect(result).toBe(false);
+96 |     });
+97 | 
+98 |     it("should handle delete errors gracefully", async () => {
+99 |       mockRedis.del.mockRejectedValue(new Error("Redis error"));
+                                               ^
+error: Redis error
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:99:43)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:98:50)
+
+[test-cache] Redis clear failed: 182 |       expect(result).toBe(true);
+183 |       expect(mockRedis.del).toHaveBeenCalled();
+184 |     });
+185 | 
+186 |     it("should handle clear errors gracefully", async () => {
+187 |       mockRedis.keys.mockRejectedValue(new Error("Redis error"));
+                                                 ^
+error: Redis error
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:187:44)
+      at <anonymous> (/home/kiennt98/Workspace/github.com/ntk148v/clicklens/test/cache/redis-cache.test.ts:186:49)
+
+[test-cache] Redis unavailable, using fallback only
+[test-cache] Redis unavailable, using fallback only
+[test-cache] Redis unavailable, using fallback only
+[test-cache] Redis unavailable, using fallback only
+
+test/cache/invalidation.test.ts:
+[CacheInvalidator] Cleared all cache entries
+[CacheInvalidator] Cleared all cache entries
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for database "db1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated 2 keys matching pattern "*schema*"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Cleared all cache entries
+[CacheInvalidator] Invalidated 2 keys matching pattern "query:db1:table1:*"
+[CacheInvalidator] Invalidated 4 keys matching pattern "query:*"
+[CacheInvalidator] Invalidated 0 keys matching pattern "nonexistent:*"
+[CacheInvalidator] Invalidated cache for database "db1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated 1 keys matching pattern "histogram:*"
+[CacheInvalidator] invalidateByTags requires cache metadata support - not implemented
+[CacheInvalidator] Invalidated 1 keys matching pattern "query:db1:*"
+[CacheInvalidator] Invalidated cache for database "db1"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+[CacheInvalidator] Invalidated 0 keys matching pattern ""
+[CacheInvalidator] Invalidated 2 keys matching pattern "*"
+[CacheInvalidator] Invalidated cache for table "mydb.users"
+[CacheInvalidator] Invalidated cache for table "db1.table1"
+
+ 227 pass
+ 1 fail
+ 449 expect() calls
+Ran 228 tests across 6 files. [1215.00ms]
