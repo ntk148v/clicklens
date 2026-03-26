@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { QueryCache } from "./query-cache";
+import { createQueryCache, QueryCache } from "./query-cache";
 
 describe("QueryCache", () => {
   let cache: QueryCache;
 
   beforeEach(() => {
-    cache = new QueryCache();
+    cache = createQueryCache();
   });
 
   afterEach(async () => {

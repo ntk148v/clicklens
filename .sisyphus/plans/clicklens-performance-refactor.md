@@ -3476,7 +3476,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `refactor(api): update routes for hybrid queries`
 
-- [ ] 37. **RBAC Integration with New Architecture**
+- [x] 37. **RBAC Integration with New Architecture**
 
   **What to do**: Integrate existing RBAC with new architecture (ensure all queries still pass RBAC checks)
   **Category**: `quick`, **Skills**: []
