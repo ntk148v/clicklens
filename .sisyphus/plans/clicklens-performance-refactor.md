@@ -3080,7 +3080,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `src/app/api/clickhouse/discover/route.ts`, `src/app/api/clickhouse/query/route.ts`
   - Pre-commit: `bun test test/cache/lru-integration.test.ts`
 
-- [ ] 29. **Redis Cache Integration**
+- [x] 29. **Redis Cache Integration**
 
   **What to do**:
   - Integrate Redis cache into query routes (already implemented in Task 6)
@@ -3197,7 +3197,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `src/app/api/clickhouse/discover/route.ts`, `src/app/api/clickhouse/query/route.ts`
   - Pre-commit: `bun test test/cache/redis-integration.test.ts`
 
-- [ ] 30. **Cache Key Generation**
+- [x] 30. **Cache Key Generation**
 
   **What to do**:
   - Verify cache key generation works correctly (already implemented in Task 5)
@@ -3299,7 +3299,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Files: `test/cache/key-generator.test.ts`
   - Pre-commit: `bun test test/cache/key-generator.test.ts`
 
-- [ ] 31. **Cache Invalidation**
+- [x] 31. **Cache Invalidation**
 
   **What to do**: Implement cache invalidation strategies (TTL-based, manual invalidation)
   **Category**: `deep`, **Skills**: []
@@ -3336,7 +3336,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `feat(cache): implement cache invalidation`
 
-- [ ] 32. **Redis Fallback**
+- [x] 32. **Redis Fallback**
 
   **What to do**: Implement Redis fallback to LRU when Redis unavailable
   **Category**: `quick`, **Skills`: []
@@ -3360,7 +3360,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `feat(cache): add Redis fallback`
 
-- [ ] 33. **Cache Warming**
+- [x] 33. **Cache Warming**
 
   **What to do**: Implement cache warming for frequent queries
   **Category**: `quick`, **Skills`: []
@@ -3385,7 +3385,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `feat(cache): implement cache warming`
 
-- [ ] 34. **Discover Page Migration to New Architecture**
+- [x] 34. **Discover Page Migration to New Architecture**
 
   **What to do**: Migrate Discover page to use Zustand stores, virtualized tables, hybrid queries, caching
   **Category**: `deep`, **Skills`: []

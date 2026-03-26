@@ -1,0 +1,48 @@
+# Task 25 Evidence: Default Uses Approximate Count
+
+## Test: Default behavior uses approximate (non-cached) count
+
+### Implementation
+- src/lib/clickhouse/stream.ts line 120-128: Default is approximate (no caching)
+- useExactCount parameter defaults to false
+
+### Verification
+1. Default useExactCount is false - VERIFIED (stream.ts line 48: useExactCount = false)
+2. When false, uses direct count() query without caching - VERIFIED (stream.ts lines 121-128)
+3. No cache hit/miss tracking for approximate - VERIFIED
+
+### Code Evidence
+```typescript
+// stream.ts - Default behavior
+export async function* fetchChunks({
+  ...
+  useExactCount = false,  // DEFAULT IS APPROXIMATE
+}: FetchChunksParams) {
+  ...
+  // Uses regular count() without caching
+  if (useExactCount) {
+    // Exact count with caching
+  } else {
+    // Default: approximate count (no caching)
+    countPromise = client
+      .query(`SELECT count() as cnt FROM ${tableSource} ${countWhereClause}`)
+      .then((res) => Number(res.data[0]?.cnt) || 0);
+  }
+}
+```
+
+### route.ts Evidence
+```typescript
+// route.ts - Query param parsing
+const useExactCount = searchParams.get("exact") === "true";
+// Only true when user explicitly requests it
+```
+
+### Behavior Summary
+| Scenario | Count Type | Cached |
+|----------|-----------|--------|
+| Default (no param) | Approximate | No |
+| exact=false | Approximate | No |
+| exact=true | Exact | Yes |
+
+This preserves existing performance for large tables while allowing users to opt-in to exact counts.

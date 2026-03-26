@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { Header } from "@/components/layout";
 import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
-import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
+import { VirtualizedDiscoverGrid } from "@/components/discover/VirtualizedDiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
 import { CacheIndicator } from "@/components/discover/CacheIndicator";
@@ -17,12 +17,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { FilterX, Database, Table2, AlertCircle } from "lucide-react";
+import { FilterX, Database, Table2 } from "lucide-react";
 import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
 import { parseError } from "@/lib/clickhouse/error-parser";
 import { AccessDenied } from "@/components/ui/access-denied";
 import { useAuth } from "@/components/auth";
-import { useDiscoverState } from "@/lib/hooks/use-discover-state";
+import { useDiscoverPage } from "@/lib/hooks/use-discover-page";
 
 function DiscoverPageContent() {
   const { permissions, isLoading: authLoading } = useAuth();
@@ -72,7 +72,7 @@ function DiscoverPageContent() {
     resetColumns,
     filterForValue,
     filterOutValue,
-  } = useDiscoverState();
+  } = useDiscoverPage();
 
   // Keyboard shortcuts: Cmd/Ctrl+Enter to execute, Esc to cancel (P8)
   useEffect(() => {
@@ -298,7 +298,7 @@ function DiscoverPageContent() {
                   </span>
                 </div>
                 <div className="flex-1 overflow-auto relative">
-                  <DiscoverGrid
+                  <VirtualizedDiscoverGrid
                     rows={rows}
                     columns={schema.columns}
                     selectedColumns={selectedColumns}
