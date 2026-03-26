@@ -2740,7 +2740,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): implement parallel aggregation queries`
   - Files: `src/app/api/clickhouse/discover/route.ts`
 
-- [ ] 24. **Approximate Count Queries (HLL)**
+- [x] 24. **Approximate Count Queries (HLL)**
 
   **What to do**:
   - Implement approximate count using ClickHouse HLL functions
@@ -2846,7 +2846,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
   - Message: `feat(query): add exact count query option`
   - Files: `src/lib/clickhouse/exact-count.ts`
 
-- [ ] 26. **Query Cancellation with AbortController**
+- [x] 26. **Query Cancellation with AbortController**
 
   **What to do**:
   - Implement query cancellation using AbortController
@@ -3527,7 +3527,7 @@ WAVE FINAL (4 tasks, DEPENDS ON: T34-39):
 
   **Commit**: YES, Message: `feat(rbac): integrate RBAC with new architecture`
 
-- [ ] 38. **Error Handling and Graceful Degradation**
+- [x] 38. **Error Handling and Graceful Degradation**
 
   **What to do**: Implement comprehensive error handling and graceful degradation for new architecture
   **Category**: `deep`, **Skills**: []
