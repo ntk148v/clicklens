@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
-import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
-import { MetadataCache } from "@/lib/clickhouse/metadata-cache";
+import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
 import { useQueryStore } from "@/stores/discover/query-store";
 import { createDiscoverDataStore } from "@/stores/discover/data-store";
+import { useDiscoverURL, parseTimeRangeFromURL } from "./use-discover-url";
+import { useDiscoverSchema, loadColumnPrefs, saveColumnPrefs, removeColumnPrefs } from "./use-discover-schema";
+import { useDiscoverFetch } from "./use-discover-fetch";
+import { useDiscoverHistogram } from "./use-discover-histogram";
+import { useDiscoverCacheTracking } from "./use-discover-cache-tracking";
 import type {
   TableSchema,
   DiscoverRow,
@@ -21,94 +25,15 @@ import {
   getMinTimeFromRange,
 } from "@/lib/types/discover";
 
-const COLUMN_PREFS_PREFIX = "clicklens_discover_columns_";
 const DEFAULT_PAGE_SIZE = 100;
 const DEFAULT_COLUMN_COUNT = 10;
 
-interface CacheMetadata {
+export interface CacheMetadata {
   isCached: boolean;
   cacheAge: number;
   hitRate: number;
   totalHits: number;
   totalMisses: number;
-}
-
-interface CacheTrackingState {
-  totalHits: number;
-  totalMisses: number;
-  lastQueryKey: string | null;
-  lastCacheTimestamp: number | null;
-}
-
-const VALID_RELATIVE_RANGES = new Set([
-  "5m",
-  "15m",
-  "30m",
-  "1h",
-  "3h",
-  "6h",
-  "12h",
-  "24h",
-  "3d",
-  "7d",
-]);
-
-function parseTimeRangeFromURL(
-  params: URLSearchParams,
-): FlexibleTimeRange | null {
-  const t = params.get("t");
-  if (t && VALID_RELATIVE_RANGES.has(t)) {
-    return getFlexibleRangeFromEnum(t as TimeRange);
-  }
-
-  const start = params.get("start");
-  const end = params.get("end");
-  if (start) {
-    const from = start;
-    const to = end || "now";
-    try {
-      const fromDate = new Date(from);
-      const toDate = to === "now" ? new Date() : new Date(to);
-      if (isNaN(fromDate.getTime())) return null;
-      return {
-        type: "absolute",
-        from,
-        to,
-        label: `${format(fromDate, "MMM d, HH:mm")} to ${format(toDate, "MMM d, HH:mm")}`,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-}
-
-function loadColumnPrefs(
-  db: string,
-  table: string,
-): { columns: string[]; timeColumn: string } | null {
-  try {
-    const raw = localStorage.getItem(`${COLUMN_PREFS_PREFIX}${db}.${table}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveColumnPrefs(
-  db: string,
-  table: string,
-  columns: string[],
-  timeColumn: string,
-): void {
-  try {
-    localStorage.setItem(
-      `${COLUMN_PREFS_PREFIX}${db}.${table}`,
-      JSON.stringify({ columns, timeColumn }),
-    );
-  } catch {
-  }
 }
 
 export interface DiscoverPageState {
@@ -129,6 +54,8 @@ export interface DiscoverPageState {
   refreshInterval: number;
   rows: DiscoverRow[];
   totalHits: number;
+  isApproximate: boolean;
+  accuracy?: number;
   histogramData: { time: string; count: number }[];
   isLoading: boolean;
   histLoading: boolean;
@@ -164,8 +91,6 @@ const dataStore = createDiscoverDataStore();
 
 export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
 
   const hydratedRef = useRef(false);
 
@@ -176,25 +101,13 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
   const [tables, setTables] = useState<{ name: string; engine: string }[]>([]);
   const [selectedDatabase, setSelectedDatabaseRaw] = useState("");
   const [selectedTable, setSelectedTable] = useState("");
-  const [schema, setSchema] = useState<TableSchema | null>(null);
-  const [schemaLoading, setSchemaLoading] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const schemaCache = useMemo(() => new MetadataCache(), []);
+  const cancellationManager = useMemo(() => new QueryCancellationManager(), []);
 
-  const [cacheMetadata, setCacheMetadata] = useState<CacheMetadata | undefined>();
-  const cacheTrackingRef = useRef<CacheTrackingState>({
-    totalHits: 0,
-    totalMisses: 0,
-    lastQueryKey: null,
-    lastCacheTimestamp: null,
-  });
-
-  const dataAbortRef = useRef<AbortController | null>(null);
-  const histAbortRef = useRef<AbortController | null>(null);
-
+  // Calculate active time bounds from flexible range
   const { activeMinTime, activeMaxTime } = useMemo(() => {
     if (queryStore.flexibleRange.type === "absolute") {
       return {
@@ -211,6 +124,78 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     };
   }, [queryStore.flexibleRange]);
 
+  // URL management hook
+  const { urlParams, syncToURL } = useDiscoverURL({
+    selectedDatabase,
+    selectedTable,
+    appliedFilter: queryStore.appliedFilter,
+    flexibleRange: queryStore.flexibleRange,
+    page,
+  });
+
+  // Schema management hook
+  const {
+    schema,
+    schemaLoading,
+    loadColumnPreferences,
+    applyDefaultColumns,
+    selectDefaultTimeColumn,
+  } = useDiscoverSchema({
+    selectedDatabase,
+    selectedTable,
+  });
+
+  // Cache tracking hook
+  const { cacheMetadata, trackQuery } = useDiscoverCacheTracking({
+    lastExecutedParams: queryStore.lastExecutedParams,
+  });
+
+  // Data fetching hook
+  const { fetchData, cancelQuery: cancelDataQuery } = useDiscoverFetch({
+    cancellationManager,
+    onRowsReceived: useCallback((rows: DiscoverRow[]) => {
+      dataStore.getState().appendRows(rows);
+    }, []),
+    onClearRows: useCallback(() => {
+      dataStore.getState().setRows([]);
+    }, []),
+    onMetaReceived: useCallback((meta) => {
+      if (typeof meta.totalHits === "number") {
+        dataStore.getState().setTotalCount(meta.totalHits);
+      }
+      if (typeof meta.isApproximate === "boolean") {
+        dataStore.getState().setIsApproximate(meta.isApproximate);
+      }
+      if (typeof meta.accuracy === "number") {
+        dataStore.getState().setAccuracy(meta.accuracy);
+      }
+    }, []),
+    onLoadingChange: useCallback((loading: boolean) => {
+      dataStore.getState().setDataLoading(loading);
+    }, []),
+    onError: useCallback((error: string | null) => {
+      dataStore.getState().setError(error);
+    }, []),
+  });
+
+  // Histogram fetching hook
+  const { fetchHistogram, cancelHistogram } = useDiscoverHistogram({
+    cancellationManager,
+    onHistogramDataReceived: useCallback((data) => {
+      dataStore.getState().setHistogramData(data);
+    }, []),
+    onLoadingChange: useCallback((loading: boolean) => {
+      dataStore.getState().setHistogramLoading(loading);
+    }, []),
+  });
+
+  // Combined cancel function
+  const cancelQuery = useCallback(() => {
+    cancelDataQuery();
+    cancelHistogram();
+  }, [cancelDataQuery, cancelHistogram]);
+
+  // Set selected columns with localStorage persistence
   const setSelectedColumns = useCallback(
     (cols: string[]) => {
       queryStore.setSelectedColumns(cols);
@@ -226,6 +211,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     [selectedDatabase, selectedTable, queryStore],
   );
 
+  // Set selected time column with localStorage persistence
   const setSelectedTimeColumn = useCallback(
     (col: string) => {
       queryStore.setSelectedTimeColumn(col);
@@ -236,6 +222,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     [selectedDatabase, selectedTable, queryStore],
   );
 
+  // Set group by with automatic count column handling
   const setGroupBy = useCallback((newGroupBy: string[]) => {
     queryStore.setGroupBy(newGroupBy);
 
@@ -249,174 +236,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     }
   }, [queryStore]);
 
-  const cancelQuery = useCallback(() => {
-    dataAbortRef.current?.abort();
-    dataAbortRef.current = null;
-    histAbortRef.current?.abort();
-    histAbortRef.current = null;
-    dataStore.getState().setDataLoading(false);
-    dataStore.getState().setHistogramLoading(false);
-  }, []);
-
-  const fetchData = useCallback(async () => {
-    if (!selectedDatabase || !selectedTable) return;
-
-    dataAbortRef.current?.abort();
-    const controller = new AbortController();
-    dataAbortRef.current = controller;
-
-    dataStore.getState().setDataLoading(true);
-    dataStore.getState().setError(null);
-    dataStore.getState().setRows([]);
-
-    try {
-      const offset = (page - 1) * pageSize;
-      const params = new URLSearchParams({
-        database: selectedDatabase,
-        table: selectedTable,
-        mode: "data",
-        limit: String(pageSize),
-        offset: String(offset),
-      });
-
-      if (queryStore.selectedColumns.length > 0) {
-        params.set("columns", queryStore.selectedColumns.join(","));
-      }
-      if (queryStore.selectedTimeColumn) {
-        params.set("timeColumn", queryStore.selectedTimeColumn);
-      }
-      if (activeMinTime) {
-        params.set("minTime", activeMinTime);
-      }
-      if (activeMaxTime) {
-        params.set("maxTime", activeMaxTime);
-      }
-      if (queryStore.appliedFilter.trim()) {
-        params.set("filter", queryStore.appliedFilter.trim());
-      }
-      if (queryStore.sorting.length > 0) {
-        const sortStr = queryStore.sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(",");
-        params.set("orderBy", sortStr);
-      }
-      if (queryStore.groupBy.length > 0) {
-        params.set("groupBy", queryStore.groupBy.join(","));
-      }
-
-      const res = await fetch(`/api/clickhouse/discover?${params}`, {
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        let msg = res.statusText;
-        try {
-          const err = await res.json();
-          msg = err.error || msg;
-        } catch {
-        }
-        throw new Error(msg);
-      }
-
-      if (!res.body) throw new Error("No response body");
-
-      await parseNDJSONStream<DiscoverRow>(
-        res.body,
-        {
-          onMeta: (meta) => {
-            if (typeof meta.totalHits === "number") {
-              dataStore.getState().setTotalCount(meta.totalHits);
-            }
-          },
-          onBatch: (batch) => {
-            dataStore.getState().appendRows(batch);
-          },
-          onError: (errMsg) => {
-            toast({
-              variant: "destructive",
-              title: "Stream Error",
-              description: errMsg,
-            });
-          },
-        },
-        controller.signal,
-      );
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch data";
-      dataStore.getState().setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Query Error",
-        description: errorMessage,
-      });
-    } finally {
-      if (!controller.signal.aborted) {
-        dataStore.getState().setDataLoading(false);
-      }
-    }
-  }, [
-    selectedDatabase,
-    selectedTable,
-    queryStore.selectedColumns,
-    queryStore.selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    queryStore.appliedFilter,
-    page,
-    pageSize,
-    queryStore.sorting,
-    queryStore.groupBy,
-  ]);
-
-  const fetchHistogram = useCallback(async () => {
-    if (!selectedDatabase || !selectedTable || !queryStore.selectedTimeColumn) {
-      dataStore.getState().setHistogramData([]);
-      return;
-    }
-
-    histAbortRef.current?.abort();
-    const controller = new AbortController();
-    histAbortRef.current = controller;
-
-    dataStore.getState().setHistogramLoading(true);
-
-    try {
-      const params = new URLSearchParams({
-        database: selectedDatabase,
-        table: selectedTable,
-        mode: "histogram",
-        timeColumn: queryStore.selectedTimeColumn,
-      });
-
-      if (activeMinTime) params.set("minTime", activeMinTime);
-      if (activeMaxTime) params.set("maxTime", activeMaxTime);
-      if (queryStore.appliedFilter.trim()) params.set("filter", queryStore.appliedFilter.trim());
-
-      const res = await fetch(`/api/clickhouse/discover?${params}`, {
-        signal: controller.signal,
-      });
-      const data = await res.json();
-
-      if (data.success && data.histogram) {
-        dataStore.getState().setHistogramData(data.histogram);
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      console.error("Failed to fetch histogram:", err);
-    } finally {
-      if (!controller.signal.aborted) {
-        dataStore.getState().setHistogramLoading(false);
-      }
-    }
-  }, [
-    selectedDatabase,
-    selectedTable,
-    queryStore.selectedTimeColumn,
-    activeMinTime,
-    activeMaxTime,
-    queryStore.appliedFilter,
-  ]);
-
+  // Handle search with cache tracking
   const handleSearch = useCallback(
     (filterOverride?: string | unknown) => {
       const filterToApply =
@@ -429,7 +249,8 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
         queryStore.setQuery(filterOverride);
       }
 
-      const queryKey = JSON.stringify({
+      // Track query for cache metadata
+      trackQuery({
         filter: filterToApply,
         flexibleRange: queryStore.flexibleRange,
         columns: queryStore.selectedColumns,
@@ -438,58 +259,50 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
         groupBy: queryStore.groupBy,
       });
 
-      const isFromCache =
-        queryStore.lastExecutedParams !== null &&
-        JSON.stringify(queryStore.lastExecutedParams) === queryKey;
-
-      const now = Date.now();
-      if (cacheTrackingRef.current.lastQueryKey !== queryKey) {
-        cacheTrackingRef.current.lastQueryKey = queryKey;
-        cacheTrackingRef.current.totalHits = 0;
-        cacheTrackingRef.current.totalMisses = 0;
-        cacheTrackingRef.current.lastCacheTimestamp = null;
-      }
-
-      if (isFromCache) {
-        cacheTrackingRef.current.totalHits++;
-      } else {
-        cacheTrackingRef.current.totalMisses++;
-        cacheTrackingRef.current.lastCacheTimestamp = now;
-      }
-
-      const cacheAge = cacheTrackingRef.current.lastCacheTimestamp
-        ? now - cacheTrackingRef.current.lastCacheTimestamp
-        : 0;
-
-      const total = cacheTrackingRef.current.totalHits + cacheTrackingRef.current.totalMisses;
-      const hitRate = total === 0 ? 0 : Math.round((cacheTrackingRef.current.totalHits / total) * 100);
-
-      setCacheMetadata({
-        isCached: isFromCache,
-        cacheAge,
-        hitRate,
-        totalHits: cacheTrackingRef.current.totalHits,
-        totalMisses: cacheTrackingRef.current.totalMisses,
-      });
-
       queryStore.markClean();
-
       queryStore.setAppliedFilter(filterToApply);
+
       if (page !== 1) {
         setPage(1);
       } else if (filterToApply === queryStore.appliedFilter) {
-        fetchData();
-        fetchHistogram();
+        fetchData({
+          selectedDatabase,
+          selectedTable,
+          selectedColumns: queryStore.selectedColumns,
+          selectedTimeColumn: queryStore.selectedTimeColumn,
+          activeMinTime,
+          activeMaxTime,
+          appliedFilter: filterToApply,
+          sorting: queryStore.sorting,
+          groupBy: queryStore.groupBy,
+          page,
+          pageSize,
+        });
+        fetchHistogram({
+          selectedDatabase,
+          selectedTable,
+          selectedTimeColumn: queryStore.selectedTimeColumn,
+          activeMinTime,
+          activeMaxTime,
+          appliedFilter: filterToApply,
+        });
       }
     },
     [
       page,
+      pageSize,
+      selectedDatabase,
+      selectedTable,
+      activeMinTime,
+      activeMaxTime,
+      queryStore,
+      trackQuery,
       fetchData,
       fetchHistogram,
-      queryStore,
     ],
   );
 
+  // Handle histogram bar click
   const handleHistogramBarClick = useCallback(
     (startTime: string, endTime?: string) => {
       if (!endTime) return;
@@ -506,18 +319,18 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     [queryStore],
   );
 
+  // Set selected database
   const setSelectedDatabase = useCallback((db: string) => {
     setSelectedDatabaseRaw(db);
     setSelectedTable("");
-    setSchema(null);
     dataStore.getState().setRows([]);
     dataStore.getState().setHistogramData([]);
     setTables([]);
   }, []);
 
+  // Handle table change
   const handleTableChange = useCallback((table: string) => {
     setSelectedTable(table);
-    setSchema(null);
     queryStore.setSelectedColumns([]);
     dataStore.getState().setRows([]);
     dataStore.getState().setHistogramData([]);
@@ -527,6 +340,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     queryStore.setGroupBy([]);
   }, [queryStore]);
 
+  // Build filter clause helper
   const buildFilterClause = useCallback(
     (column: string, value: unknown, operator: "=" | "!="): string => {
       if (value === null || value === undefined) {
@@ -541,6 +355,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     [],
   );
 
+  // Filter for value
   const filterForValue = useCallback(
     (column: string, value: unknown) => {
       const clause = buildFilterClause(column, value, "=");
@@ -553,6 +368,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     [buildFilterClause, handleSearch, queryStore],
   );
 
+  // Filter out value
   const filterOutValue = useCallback(
     (column: string, value: unknown) => {
       const clause = buildFilterClause(column, value, "!=");
@@ -565,30 +381,18 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     [buildFilterClause, handleSearch, queryStore],
   );
 
+  // Reset columns to defaults
   const resetColumns = useCallback(() => {
     if (!schema) return;
-    const defaultCols = schema.columns
-      .slice(0, DEFAULT_COLUMN_COUNT)
-      .map((c: ColumnMetadata) => c.name);
+    const defaultCols = applyDefaultColumns(schema);
     queryStore.setSelectedColumns(defaultCols);
 
     if (selectedDatabase && selectedTable) {
-      try {
-        localStorage.removeItem(
-          `${COLUMN_PREFS_PREFIX}${selectedDatabase}.${selectedTable}`,
-        );
-      } catch {
-      }
+      removeColumnPrefs(selectedDatabase, selectedTable);
     }
-  }, [schema, selectedDatabase, selectedTable, queryStore]);
+  }, [schema, selectedDatabase, selectedTable, queryStore, applyDefaultColumns]);
 
-  useEffect(() => {
-    if (selectedDatabase && selectedTable) {
-      const cacheKey = `${selectedDatabase}.${selectedTable}`;
-      schemaCache.invalidate(cacheKey);
-    }
-  }, [selectedDatabase, selectedTable, schemaCache]);
-
+  // Initial load: databases and URL params
   useEffect(() => {
     const urlDb = searchParams.get("db");
     const urlTable = searchParams.get("table");
@@ -639,6 +443,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load tables when database changes
   useEffect(() => {
     if (!selectedDatabase) {
       setTables([]);
@@ -671,184 +476,94 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     loadTables();
 
     setSelectedTable("");
-    setSchema(null);
     dataStore.getState().setRows([]);
     dataStore.getState().setHistogramData([]);
   }, [selectedDatabase]);
 
+  // Apply schema when loaded
   useEffect(() => {
-    if (!selectedDatabase || !selectedTable) {
-      setSchema(null);
-      return;
-    }
+    if (!schema) return;
 
-    const cacheKey = `${selectedDatabase}.${selectedTable}`;
-
-    const loadSchema = async () => {
-      setSchemaLoading(true);
-      try {
-        const fetchSchema = async () => {
-          const res = await fetch(
-            `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(selectedDatabase)}&table=${encodeURIComponent(selectedTable)}`,
-          );
-          const data = await res.json();
-          if (data.success && data.data) {
-            return data.data;
-          } else if (data.error) {
-            throw new Error(data.error.userMessage || data.error);
-          }
-          throw new Error("Failed to load schema");
-        };
-
-        const tableSchema = await schemaCache.getOrFetch(cacheKey, fetchSchema);
-        applySchema(tableSchema);
-      } catch (err) {
-        console.error("Failed to load schema:", err);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to load table schema",
-        });
-        setSchema(null);
-      } finally {
-        setSchemaLoading(false);
-      }
-    };
-    loadSchema();
-
-    function applySchema(tableSchema: TableSchema) {
-      setSchema(tableSchema);
-
-      const prefs = loadColumnPrefs(selectedDatabase, selectedTable);
-      if (prefs) {
-        const validCols = prefs.columns.filter((c: string) =>
-          tableSchema.columns.some((sc: ColumnMetadata) => sc.name === c),
-        );
-        queryStore.setSelectedColumns(
-          validCols.length > 0
-            ? validCols
-            : tableSchema.columns
-                .slice(0, DEFAULT_COLUMN_COUNT)
-                .map((c: ColumnMetadata) => c.name),
-        );
-
-        const timeValid = tableSchema.timeColumns.some(
-          (tc: TimeColumnCandidate) => tc.name === prefs.timeColumn,
-        );
-        if (timeValid) {
-          queryStore.setSelectedTimeColumn(prefs.timeColumn);
-        } else {
-          setDefaultTimeColumn(tableSchema);
-        }
-      } else {
-        queryStore.setSelectedColumns(
-          tableSchema.columns
-            .slice(0, DEFAULT_COLUMN_COUNT)
-            .map((c: ColumnMetadata) => c.name),
-        );
-        setDefaultTimeColumn(tableSchema);
-      }
-
-      setSchemaLoading(false);
-    }
-
-    function setDefaultTimeColumn(tableSchema: TableSchema) {
-      const primaryDateTime = tableSchema.timeColumns.find(
-        (tc: TimeColumnCandidate) =>
-          tc.isPrimary &&
-          (tc.type.startsWith("DateTime") || tc.type.startsWith("DateTime64")),
+    const prefs = loadColumnPreferences(selectedDatabase, selectedTable);
+    if (prefs) {
+      const validCols = prefs.columns.filter((c: string) =>
+        schema.columns.some((sc: ColumnMetadata) => sc.name === c),
       );
-      if (primaryDateTime) {
-        queryStore.setSelectedTimeColumn(primaryDateTime.name);
-        return;
+      
+      const newCols = validCols.length > 0 ? validCols : applyDefaultColumns(schema);
+      if (JSON.stringify(queryStore.selectedColumns) !== JSON.stringify(newCols)) {
+        queryStore.setSelectedColumns(newCols);
       }
 
-      const primary = tableSchema.timeColumns.find(
-        (tc: TimeColumnCandidate) => tc.isPrimary,
+      const timeValid = schema.timeColumns.some(
+        (tc: TimeColumnCandidate) => tc.name === prefs.timeColumn,
       );
-      if (primary) {
-        queryStore.setSelectedTimeColumn(primary.name);
-        return;
+      
+      const newTimeCol = timeValid ? prefs.timeColumn : selectDefaultTimeColumn(schema);
+      if (queryStore.selectedTimeColumn !== newTimeCol) {
+        queryStore.setSelectedTimeColumn(newTimeCol);
       }
-
-      const anyDateTime = tableSchema.timeColumns.find(
-        (tc: TimeColumnCandidate) =>
-          tc.type.startsWith("DateTime") || tc.type.startsWith("DateTime64"),
-      );
-      if (anyDateTime) {
-        queryStore.setSelectedTimeColumn(anyDateTime.name);
-        return;
+    } else {
+      const newCols = applyDefaultColumns(schema);
+      if (JSON.stringify(queryStore.selectedColumns) !== JSON.stringify(newCols)) {
+        queryStore.setSelectedColumns(newCols);
       }
-
-      if (tableSchema.timeColumns.length > 0) {
-        queryStore.setSelectedTimeColumn(tableSchema.timeColumns[0].name);
-      } else {
-        queryStore.setSelectedTimeColumn("");
+      
+      const newTimeCol = selectDefaultTimeColumn(schema);
+      if (queryStore.selectedTimeColumn !== newTimeCol) {
+        queryStore.setSelectedTimeColumn(newTimeCol);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDatabase, selectedTable]);
+  }, [schema, selectedDatabase, selectedTable, queryStore, loadColumnPreferences, applyDefaultColumns, selectDefaultTimeColumn]);
 
+  // Fetch data when schema is ready
   useEffect(() => {
-    if (schema) fetchData();
-  }, [schema, fetchData]);
+    if (schema) {
+      fetchData({
+        selectedDatabase,
+        selectedTable,
+        selectedColumns: queryStore.selectedColumns,
+        selectedTimeColumn: queryStore.selectedTimeColumn,
+        activeMinTime,
+        activeMaxTime,
+        appliedFilter: queryStore.appliedFilter,
+        sorting: queryStore.sorting,
+        groupBy: queryStore.groupBy,
+        page,
+        pageSize,
+      });
+    }
+  }, [schema, selectedDatabase, selectedTable, activeMinTime, activeMaxTime, page, pageSize, queryStore, fetchData]);
 
+  // Fetch histogram when schema is ready
   useEffect(() => {
-    if (schema) fetchHistogram();
-  }, [schema, fetchHistogram]);
+    if (schema) {
+      fetchHistogram({
+        selectedDatabase,
+        selectedTable,
+        selectedTimeColumn: queryStore.selectedTimeColumn,
+        activeMinTime,
+        activeMaxTime,
+        appliedFilter: queryStore.appliedFilter,
+      });
+    }
+  }, [schema, selectedDatabase, selectedTable, activeMinTime, activeMaxTime, queryStore, fetchHistogram]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      dataAbortRef.current?.abort();
-      histAbortRef.current?.abort();
+      cancellationManager.cancelAll();
     };
-  }, []);
+  }, [cancellationManager]);
 
-  const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // Sync to URL when state changes
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (hydratedRef.current) {
+      syncToURL();
+    }
+  }, [syncToURL, selectedDatabase, selectedTable, queryStore.appliedFilter, queryStore.flexibleRange, page]);
 
-    if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
-    urlSyncTimerRef.current = setTimeout(() => {
-      const params = new URLSearchParams();
-      if (selectedDatabase) params.set("db", selectedDatabase);
-      if (selectedTable) params.set("table", selectedTable);
-      if (queryStore.appliedFilter) params.set("filter", queryStore.appliedFilter);
-
-      if (queryStore.flexibleRange.type === "relative") {
-        const rangeKey = queryStore.flexibleRange.from.replace("now-", "");
-        params.set("t", rangeKey);
-      } else {
-        params.set("start", queryStore.flexibleRange.from);
-        if (queryStore.flexibleRange.to !== "now") {
-          params.set("end", queryStore.flexibleRange.to);
-        }
-      }
-
-      if (page > 1) params.set("page", String(page));
-
-      const newSearch = params.toString();
-      const currentSearch = searchParams.toString();
-      if (newSearch !== currentSearch) {
-        router.replace(`${pathname}?${newSearch}`, { scroll: false });
-      }
-    }, 300);
-
-    return () => {
-      if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
-    };
-  }, [
-    selectedDatabase,
-    selectedTable,
-    queryStore.appliedFilter,
-    queryStore.flexibleRange,
-    page,
-    pathname,
-    router,
-    searchParams,
-  ]);
-
+  // Set sorting handler
   const setSorting = useCallback(
     (updaterOrValue: import("@tanstack/react-table").Updater<import("@tanstack/react-table").SortingState>) => {
       if (typeof updaterOrValue === "function") {
@@ -878,6 +593,8 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     refreshInterval,
     rows: dataState.rows,
     totalHits: dataState.totalCount,
+    isApproximate: dataState.isApproximate,
+    accuracy: dataState.accuracy,
     histogramData: dataState.histogramData,
     isLoading: dataState.loading.data,
     histLoading: dataState.loading.histogram,

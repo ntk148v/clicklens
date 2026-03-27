@@ -17,6 +17,7 @@ interface PaginationControlsProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  isApproximate?: boolean;
 }
 
 export function PaginationControls({
@@ -26,6 +27,7 @@ export function PaginationControls({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  isApproximate = false,
 }: PaginationControlsProps) {
   // If totalPages is -1 or undefined, we are in "unknown total" mode (server-side pagination without count)
   const isUnknownTotal = totalPages === -1 || totalPages === undefined;
@@ -51,7 +53,9 @@ export function PaginationControls({
           ) : (
             <span>
               Showing {start}-{Math.min(page * pageSize, totalItems)} of{" "}
+              {isApproximate && "~"}
               {totalItems}
+              {isApproximate && " (approx)"}
             </span>
           )}
         </div>
@@ -98,7 +102,10 @@ export function PaginationControls({
           variant="outline"
           size="sm"
           onClick={() => onPageChange(page + 1)}
-          disabled={!isUnknownTotal && page >= totalPages}
+          disabled={
+            (!isUnknownTotal && page >= totalPages) ||
+            (isUnknownTotal && totalItems < pageSize)
+          }
         >
           Next
           <ChevronRight className="h-4 w-4 ml-1" />

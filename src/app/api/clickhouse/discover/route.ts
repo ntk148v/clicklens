@@ -9,6 +9,7 @@ import {
 } from "@/lib/clickhouse/search";
 import { fetchChunks } from "@/lib/clickhouse/stream";
 import { executeExactCount } from "@/lib/clickhouse/exact-count";
+import { executeApproxCount } from "@/lib/clickhouse/approx-count";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 import { validateFilter } from "@/lib/clickhouse/sql-validator";
 import { getGlobalRateLimiter } from "@/lib/rate-limiter";
@@ -39,6 +40,29 @@ const LEGACY_SOURCES: Record<
     timeColumn: "event_time",
   },
 };
+
+async function getEstimatedRows(
+  client: any,
+  database: string,
+  table: string
+): Promise<number> {
+  try {
+    const safeDbStr = escapeSqlString(database);
+    const safeTableStr = escapeSqlString(table);
+    const query = `
+      SELECT sum(rows) as cnt
+      FROM system.parts
+      WHERE database = '${safeDbStr}'
+        AND table = '${safeTableStr}'
+        AND active = 1
+    `;
+    const result = await client.query(query);
+    return Number(result.data[0]?.cnt) || 0;
+  } catch (error) {
+    console.error("Failed to get estimated rows:", error);
+    return 0;
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -402,43 +426,83 @@ export async function GET(request: Request) {
         countQuery = `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${baseWhere.length > 0 ? `WHERE ${baseWhere.join(" AND ")}` : ""} ${groupByClause})`;
       }
 
-      let countPromise: Promise<number>;
+      let countPromise: Promise<{ count: number; isApproximate: boolean; accuracy?: number }>;
       if (useExactCount) {
-        // Use exact count with caching
         countPromise = executeExactCount(client, {
           database,
           table,
           whereConditions: baseWhere,
           clusterName,
           isDistributed,
-        }).then((result) => result.count);
+        }).then((result) => ({
+          count: result.count,
+          isApproximate: !result.isExact,
+          accuracy: result.isExact ? 1.0 : undefined,
+        }));
       } else {
-        // Default: approximate count (no caching)
-        countPromise = client
-          .query(countQuery)
-          .then((res) => Number(res.data[0]?.cnt) || 0);
+        const estimatedRows = await getEstimatedRows(client, database, table);
+        countPromise = executeApproxCount(client, {
+          database,
+          table,
+          estimatedRows,
+          whereConditions: baseWhere,
+          clusterName,
+          isDistributed,
+        }).then((result) => ({
+          count: result.count,
+          isApproximate: result.isApproximate,
+          accuracy: result.accuracy,
+        }));
       }
 
       countPromise = countPromise.catch((e) => {
         console.error("Count query failed", e);
-        return 0;
+        return { count: 0, isApproximate: false, accuracy: 1.0 };
       });
 
       // Create direct NDJSON stream for aggregation / specific order / specific pagination
+      // GROUP BY results are typically small (aggregated), so buffering is acceptable.
+      // True streaming is only used for non-aggregated data queries via fetchChunks().
+      // If GROUP BY results exceed 10,000 rows, consider implementing chunked emission.
       const stream = new ReadableStream({
           async start(controller) {
             try {
-              controller.enqueue(JSON.stringify({ meta: { totalHits: -1 } }) + "\n");
-              
+              controller.enqueue(
+                JSON.stringify({
+                  meta: {
+                    totalHits: -1,
+                    isApproximate: false,
+                    accuracy: 1.0,
+                  },
+                }) + "\n"
+              );
+
               // Run actual query
               const rs = await client.query(query);
               const rows = rs.data;
+
+              // Optional safety check for large GROUP BY results
+              if (rows.length > 10000) {
+                console.warn(
+                  `[Discover API] Large GROUP BY result: ${rows.length} rows. ` +
+                  `Consider implementing chunked emission for better memory efficiency.`
+                );
+              }
+
               for (const row of rows) {
                 controller.enqueue(JSON.stringify(row) + "\n");
               }
               
-              const totalHits = await countPromise;
-              controller.enqueue(JSON.stringify({ meta: { totalHits } }) + "\n");
+              const countResult = await countPromise;
+              controller.enqueue(
+                JSON.stringify({
+                  meta: {
+                    totalHits: countResult.count,
+                    isApproximate: countResult.isApproximate,
+                    accuracy: countResult.accuracy,
+                  },
+                }) + "\n"
+              );
             } catch (err) {
               controller.enqueue(JSON.stringify({ error: String(err) }) + "\n");
             } finally {

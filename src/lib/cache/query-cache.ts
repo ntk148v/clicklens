@@ -3,6 +3,49 @@
  *
  * Provides caching for ClickHouse query results with LRU backend.
  * Integrates with Discover API and SQL Console query routes.
+ *
+ * ## When to use QueryCache:
+ *
+ * Use QueryCache for **client query result caching** where you need:
+ * - Synchronous operations for maximum performance
+ * - Automatic cache key generation for complex query parameters
+ * - Rich cache metadata (hit/miss tracking, TTL info)
+ * - Short-lived request-specific data (default TTL: 5 minutes)
+ *
+ * ## Typical use cases:
+ * - Discover API query results
+ * - SQL Console query results
+ * - Any user-executed query results that need caching
+ *
+ * ## Key features:
+ * - **Synchronous API**: Fast in-memory access without async overhead
+ * - **Key generation**: Built-in helpers for generating cache keys from query params
+ * - **Pattern invalidation**: Support for wildcard-based cache invalidation
+ * - **Metadata tracking**: Cache hit/miss stats, age, remaining TTL
+ *
+ * ## Example usage:
+ * ```typescript
+ * import { getQueryCache, executeWithCache } from "@/lib/cache/query-cache";
+ *
+ * const queryCache = getQueryCache();
+ *
+ * // Generate cache key for discover query
+ * const cacheKey = queryCache.generateDiscoverKey({
+ *   database: "mydb",
+ *   table: "mytable",
+ *   filter: "status = 'active'",
+ *   timeRange: { minTime: "2024-01-01", maxTime: "2024-01-31" },
+ * });
+ *
+ * // Execute with caching
+ * const result = await executeWithCache(
+ *   queryCache,
+ *   cacheKey,
+ *   async () => executeClickHouseQuery(sql)
+ * );
+ * ```
+ *
+ * @see {@link ./README.md} for detailed usage guidelines
  */
 
 import { LRUCacheImpl, CacheStats } from "./lru-cache";
@@ -43,7 +86,39 @@ export interface CacheMetadata {
 }
 
 /**
- * Query Cache class for managing query result caching
+ * QueryCache provides synchronous caching for ClickHouse query results.
+ *
+ * **Architecture:**
+ * - In-memory LRU is the primary cache (fast synchronous access)
+ * - Redis fallback is optional (for distributed scenarios)
+ *
+ * **Key characteristics:**
+ * - Synchronous API for maximum performance
+ * - Built-in key generation for complex query parameters
+ * - Rich metadata tracking (hits, age, TTL)
+ * - Pattern-based invalidation support
+ *
+ * **Differences from HybridCache:**
+ * - QueryCache is sync-first (memory primary), HybridCache is async-first (Redis primary)
+ * - QueryCache has built-in key generators, HybridCache uses manual keys
+ * - QueryCache tracks rich metadata, HybridCache provides basic stats
+ *
+ * @example
+ * ```typescript
+ * const cache = createQueryCache({
+ *   maxEntries: 500,
+ *   ttl: 300_000,  // 5 minutes
+ *   name: "query-cache"
+ * });
+ *
+ * // Generate key automatically
+ * const key = cache.generateSqlKey("SELECT * FROM users", "mydb");
+ *
+ * // Use executeWithCache helper for consistent patterns
+ * const result = await executeWithCache(cache, key, async () => {
+ *   return await runQuery();
+ * });
+ * ```
  */
 export class QueryCache {
   private cache: LRUCacheImpl;

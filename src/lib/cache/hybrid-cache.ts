@@ -6,6 +6,36 @@
  * - In-memory LRU: Local fallback when Redis unavailable
  *
  * All operations are async for consistency.
+ *
+ * ## When to use HybridCache:
+ *
+ * Use HybridCache for **server-side metadata caching** where data should be:
+ * - Shared across multiple server instances (via Redis)
+ * - Long-lived (TTL: 30 seconds to 10 minutes)
+ * - Accessible via async interface
+ *
+ * ## Typical use cases:
+ * - Database/table/column metadata
+ * - Monitoring and dashboard data
+ * - Table explorer data (parts, mutations, merges)
+ *
+ * ## Pre-configured instances:
+ * - `metadataCache` - For databases, tables, columns (500 entries, 30s/60s TTL)
+ * - `monitoringCache` - For metrics and dashboards (100 entries, 10s/30s TTL)
+ * - `tablesCache` - For table parts and mutations (200 entries, 5min/10min TTL)
+ *
+ * ## Example usage:
+ * ```typescript
+ * import { metadataCache, getOrSet } from "@/lib/cache";
+ *
+ * const databases = await getOrSet(
+ *   metadataCache,
+ *   "databases",
+ *   async () => fetchDatabasesFromClickHouse()
+ * );
+ * ```
+ *
+ * @see {@link ./README.md} for detailed usage guidelines
  */
 
 import { LRUCache } from "lru-cache";
@@ -21,6 +51,32 @@ export interface HybridCacheOptions {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CacheValue = Record<string, any>;
 
+/**
+ * HybridCache provides Redis-backed caching with in-memory LRU fallback.
+ *
+ * **Architecture:**
+ * - Redis is the primary cache (shared across server instances)
+ * - In-memory LRU is the local fallback (when Redis is unavailable)
+ *
+ * **Key characteristics:**
+ * - All operations are async
+ * - Writes go to both memory and Redis
+ * - Reads check memory first, then Redis
+ * - Automatic fallback to memory if Redis fails
+ *
+ * @example
+ * ```typescript
+ * const cache = new HybridCache({
+ *   name: "my-cache",
+ *   max: 500,
+ *   ttl: 30000,      // 30 seconds in memory
+ *   redisTTL: 60     // 60 seconds in Redis
+ * });
+ *
+ * await cache.set("key", { data: "value" });
+ * const value = await cache.get("key");
+ * ```
+ */
 export class HybridCache {
   private memoryCache: LRUCache<string, CacheValue>;
   private options: Required<HybridCacheOptions>;

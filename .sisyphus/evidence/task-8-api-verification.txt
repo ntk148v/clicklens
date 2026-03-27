@@ -1,0 +1,38 @@
+useDiscoverPage API verification:
+
+export interface CacheMetadata {
+export interface DiscoverPageState {
+export interface DiscoverPageActions {
+export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
+
+State properties:
+  isCached: boolean;
+  cacheAge: number;
+  hitRate: number;
+  totalHits: number;
+  totalMisses: number;
+  databases: string[];
+  tables: { name: string; engine: string }[];
+  selectedDatabase: string;
+  selectedTable: string;
+  schema: TableSchema | null;
+  schemaLoading: boolean;
+  selectedColumns: string[];
+  selectedTimeColumn: string;
+  customFilter: string;
+  appliedFilter: string;
+  isQueryDirty: boolean;
+  flexibleRange: FlexibleTimeRange;
+  activeMinTime: string | undefined;
+  activeMaxTime: string | undefined;
+  refreshInterval: number;
+  rows: DiscoverRow[];
+  totalHits: number;
+  isApproximate: boolean;
+  histogramData: { time: string; count: number }[];
+  isLoading: boolean;
+  histLoading: boolean;
+  error: string | null;
+  page: number;
+  pageSize: number;
+  sorting: import("@tanstack/react-table").SortingState;
