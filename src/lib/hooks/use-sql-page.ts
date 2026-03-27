@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useAuth } from "@/components/auth";
 import { generateUUID } from "@/lib/utils";
-import { useSqlQueryStore } from "@/stores/sql/query-store";
-import { createSqlDataStore } from "@/stores/sql/data-store";
-import { useSqlUIStore } from "@/stores/sql/ui-store";
+import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
 import type { ExplainType } from "@/components/sql";
 
 interface ApiError {
@@ -119,7 +117,7 @@ export interface SqlPageState {
   saveDialogOpen: boolean;
   cursorPosition: number;
   tabPagination: Record<string, { page: number; pageSize: number }>;
-  queryHistory: ReturnType<typeof useSqlQueryStore.getState>["queryHistory"];
+  queryHistory: ReturnType<typeof useTabsStore.getState>["history"];
 }
 
 export interface SqlPageActions {
@@ -143,9 +141,8 @@ export interface SqlPageActions {
   clearHistory: () => void;
 }
 
-const dataStore = createSqlDataStore();
-
 export function useSqlPage(): SqlPageState & SqlPageActions {
+  const cancellationManager = useMemo(() => new QueryCancellationManager(), []);
   const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory, clearHistory } =
     useTabsStore();
   const { selectedDatabase, databases, tables, getColumnsForTable } =
@@ -161,9 +158,6 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
   const [tabPagination, setTabPagination] = useState<
     Record<string, { page: number; pageSize: number }>
   >({});
-
-  const queryStore = useSqlQueryStore();
-  const uiStore = useSqlUIStore();
 
   useEffect(() => {
     initializeTabs();
@@ -214,6 +208,8 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
             return;
           }
 
+          const controller = cancellationManager.createController(queryId);
+
           const response = await fetch("/api/clickhouse/query", {
             method: "POST",
             headers: {
@@ -228,6 +224,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
               database: selectedDatabase,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             }),
+            signal: controller.signal,
           });
 
           if (!response.ok) {
@@ -377,16 +374,6 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
             memoryUsage: lastSelectResult.statistics.memory_usage,
             user: user?.username,
           });
-
-          queryStore.addToHistory({
-            sql,
-            duration: totalElapsed,
-            rowsReturned: lastSelectResult.rows,
-            rowsRead: lastSelectResult.statistics.rows_read,
-            bytesRead: lastSelectResult.statistics.bytes_read,
-            memoryUsage: lastSelectResult.statistics.memory_usage,
-            user: user?.username,
-          });
         } else {
           updateTab(tab.id, {
             isRunning: false,
@@ -416,15 +403,6 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
             bytesRead: 0,
             user: user?.username,
           });
-
-          queryStore.addToHistory({
-            sql,
-            duration: totalElapsed,
-            rowsReturned: 0,
-            rowsRead: 0,
-            bytesRead: 0,
-            user: user?.username,
-          });
         }
       } catch (error) {
         const errorInfo = getErrorInfo(error);
@@ -445,14 +423,9 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
           sql,
           error: errorInfo.userMessage,
         });
-
-        queryStore.addToHistory({
-          sql,
-          error: errorInfo.userMessage,
-        });
       }
     },
-    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase, csrfToken, queryStore],
+    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase, csrfToken, cancellationManager],
   );
 
   const handlePageChange = useCallback(
@@ -474,39 +447,27 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
     const tab = getActiveQueryTab();
     if (!tab || !tab.isRunning || !tab.queryId) return;
 
-    try {
-      await fetch("/api/clickhouse/kill", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": csrfToken || "",
-        },
-        body: JSON.stringify({ queryId: tab.queryId }),
-      });
+    cancellationManager.cancel(tab.queryId);
 
-      updateTab(tab.id, {
-        isRunning: false,
-        queryId: undefined,
-        error: {
-          code: 0,
-          message: "Query cancelled by user",
-          type: "CANCELLED",
-          userMessage: "Query cancelled by user",
-        },
-      });
-    } catch (e) {
-      console.error("Failed to cancel query", e);
-    }
-  }, [getActiveQueryTab, updateTab, csrfToken]);
+    updateTab(tab.id, {
+      isRunning: false,
+      queryId: undefined,
+      error: {
+        code: 0,
+        message: "Query cancelled by user",
+        type: "CANCELLED",
+        userMessage: "Query cancelled by user",
+      },
+    });
+  }, [getActiveQueryTab, updateTab, cancellationManager]);
 
   const handleSqlChange = useCallback(
     (value: string) => {
       if (activeTabId && activeQueryTab) {
         updateTab(activeTabId, { sql: value });
-        queryStore.setQuery(value);
       }
     },
-    [activeTabId, activeQueryTab, updateTab, queryStore],
+    [activeTabId, activeQueryTab, updateTab],
   );
 
   const handleCursorChange = useCallback((position: number) => {
@@ -529,6 +490,8 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
     updateTab(tab.id, { isRunning: true, error: null, queryId });
 
     try {
+      const controller = cancellationManager.createController(queryId);
+
       const response = await fetch("/api/clickhouse/query", {
         method: "POST",
         headers: {
@@ -541,6 +504,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
           database: selectedDatabase,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -667,16 +631,6 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
         memoryUsage: 0,
         user: user?.username,
       });
-
-      queryStore.addToHistory({
-        sql: statement,
-        duration: currentStatistics.elapsed,
-        rowsReturned: currentData.length,
-        rowsRead: currentStatistics.rows_read,
-        bytesRead: currentStatistics.bytes_read,
-        memoryUsage: 0,
-        user: user?.username,
-      });
     } catch (error) {
       const errorInfo = getErrorInfo(error);
       updateTab(tab.id, {
@@ -696,11 +650,6 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
         sql: statement,
         error: errorInfo.userMessage,
       });
-
-      queryStore.addToHistory({
-        sql: statement,
-        error: errorInfo.userMessage,
-      });
     }
   }, [
     getActiveQueryTab,
@@ -710,7 +659,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
     cursorPosition,
     selectedDatabase,
     csrfToken,
-    queryStore,
+    cancellationManager,
   ]);
 
   const handleExplain = useCallback(
@@ -891,26 +840,27 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
         (hasTrailingSemi ? ";" : "");
 
       updateTab(tab.id, { sql: newSql });
-      queryStore.setQuery(newSql);
 
       toast({
         title: "Time range inserted",
         description: `Using column '${safeColumn}'. Applied correctly to query structure.`,
       });
     },
-    [getActiveQueryTab, updateTab, queryStore],
+    [getActiveQueryTab, updateTab],
   );
 
   const handleHistorySelect = useCallback(
     (sql: string) => {
       if (activeTabId && activeQueryTab) {
         updateTab(activeTabId, { sql });
-        queryStore.setQuery(sql);
         setHistoryOpen(false);
       }
     },
-    [activeTabId, activeQueryTab, updateTab, queryStore],
+    [activeTabId, activeQueryTab, updateTab],
   );
+
+  // Get history from useTabsStore
+  const { history: queryHistory } = useTabsStore();
 
   return {
     tabs,
@@ -930,7 +880,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
     saveDialogOpen,
     cursorPosition,
     tabPagination,
-    queryHistory: queryStore.queryHistory,
+    queryHistory,
 
     updateTab,
     getActiveQueryTab,

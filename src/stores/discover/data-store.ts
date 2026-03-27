@@ -16,6 +16,8 @@ export interface DiscoverDataState {
   rows: DiscoverRow[];
   columns: string[];
   totalCount: number;
+  isApproximate: boolean;
+  accuracy?: number;
   histogramData: HistogramDataPoint[];
   loading: LoadingState;
   error: string | null;
@@ -26,6 +28,8 @@ export interface DiscoverDataActions {
   appendRows: (rows: DiscoverRow[]) => void;
   setColumns: (columns: string[]) => void;
   setTotalCount: (count: number) => void;
+  setIsApproximate: (isApproximate: boolean) => void;
+  setAccuracy: (accuracy?: number) => void;
   setHistogramData: (data: HistogramDataPoint[]) => void;
   setDataLoading: (loading: boolean) => void;
   setHistogramLoading: (loading: boolean) => void;
@@ -42,6 +46,8 @@ const initialState: DiscoverDataState = {
   rows: [],
   columns: [],
   totalCount: 0,
+  isApproximate: false,
+  accuracy: 1.0,
   histogramData: [],
   loading: {
     data: false,
@@ -71,6 +77,12 @@ export const createDiscoverDataStore = () =>
 
         setTotalCount: (totalCount) =>
           set({ totalCount }, false, "setTotalCount"),
+
+        setIsApproximate: (isApproximate) =>
+          set({ isApproximate }, false, "setIsApproximate"),
+
+        setAccuracy: (accuracy) =>
+          set({ accuracy }, false, "setAccuracy"),
 
         setHistogramData: (histogramData) =>
           set({ histogramData }, false, "setHistogramData"),

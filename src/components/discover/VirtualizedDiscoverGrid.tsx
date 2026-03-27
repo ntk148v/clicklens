@@ -48,6 +48,7 @@ interface VirtualizedDiscoverGridProps {
   page: number;
   pageSize: number;
   totalHits: number;
+  isApproximate?: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onFilterForValue?: (column: string, value: unknown) => void;
@@ -160,6 +161,7 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
   page,
   pageSize,
   totalHits,
+  isApproximate = false,
   onPageChange,
   onPageSizeChange,
   onFilterForValue,
@@ -364,14 +366,6 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
     return <DiscoverGridSkeleton />;
   }
 
-  if (!isLoading && rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        No data found. Try adjusting your filters or time range.
-      </div>
-    );
-  }
-
   const displayValue = (val: unknown): string => {
     if (val === null || val === undefined) return "null";
     if (typeof val === "object") return JSON.stringify(val);
@@ -426,7 +420,13 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
                   "opacity-50 pointer-events-none select-none transition-opacity duration-200",
               )}
             >
-              {isVirtualizing
+              {!isLoading && rows.length === 0 ? (
+                <tr>
+                  <td colSpan={tableColumns.length + 1} className="h-64 text-center align-middle text-muted-foreground">
+                    No data found. Try adjusting your filters or time range.
+                  </td>
+                </tr>
+              ) : isVirtualizing
                 ? (() => {
                     const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start || 0 : 0;
                     const paddingBottom = virtualRows.length > 0
@@ -578,6 +578,7 @@ export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
           pageSize={pageSize}
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
+          isApproximate={isApproximate}
         />
       </div>
 

@@ -52,6 +52,8 @@ function DiscoverPageContent() {
     refreshInterval,
     rows,
     totalHits,
+    isApproximate,
+    accuracy,
     histogramData,
     isLoading,
     histLoading,
@@ -349,6 +351,7 @@ function DiscoverPageContent() {
                     page={page}
                     pageSize={pageSize}
                     totalHits={totalHits}
+                    isApproximate={isApproximate}
                     onPageChange={setPage}
                     onPageSizeChange={setPageSize}
                     onFilterForValue={filterForValue}

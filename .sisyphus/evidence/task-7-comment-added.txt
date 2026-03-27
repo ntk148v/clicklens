@@ -1,0 +1,39 @@
+TASK 7: Document/Improve GROUP BY Streaming
+=============================================
+
+COMPLETED: Added explanatory comment to GROUP BY streaming implementation
+
+LOCATION: src/app/api/clickhouse/discover/route.ts (lines 464-466)
+
+COMMENT ADDED:
+--------------
+// GROUP BY results are typically small (aggregated), so buffering is acceptable.
+// True streaming is only used for non-aggregated data queries via fetchChunks().
+// If GROUP BY results exceed 10,000 rows, consider implementing chunked emission.
+
+RATIONALE:
+----------
+1. GROUP BY queries aggregate data, resulting in significantly fewer rows than raw data queries
+2. The current implementation buffers all GROUP BY results before streaming (lines 478-482)
+3. Non-GROUP BY queries use fetchChunks() for true streaming with time-based chunking (line 511)
+4. This design is acceptable because GROUP BY results are typically small (< 10,000 rows)
+
+VERIFICATION:
+-------------
+- Comment accurately describes the two-path design:
+  * Path 1 (lines 354-508): Buffered path for GROUP BY or custom ORDER BY
+  * Path 2 (lines 510-542): Streaming path using fetchChunks() for non-aggregated queries
+- fetchChunks() implements time-based chunking for efficient deep pagination
+- Unit tests pass: bun test src/lib/clickhouse/queries/discover.test.ts (18 pass)
+
+OPTIONAL IMPROVEMENT ADDED:
+---------------------------
+Added safety check (lines 483-488) to log warning when GROUP BY results exceed 10,000 rows:
+  if (rows.length > 10000) {
+    console.warn(
+      `[Discover API] Large GROUP BY result: ${rows.length} rows. ` +
+      `Consider implementing chunked emission for better memory efficiency.`
+    );
+  }
+
+This provides visibility into edge cases where the buffering assumption may not hold.

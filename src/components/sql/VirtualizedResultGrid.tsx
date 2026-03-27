@@ -296,14 +296,6 @@ size: 180,
     };
   }, [cellSelection, handleCopySelection]);
 
-  if (data.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground">
-        No results
-      </div>
-    );
-  }
-
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {statistics && (
@@ -403,7 +395,14 @@ size: 180,
                     "opacity-50 pointer-events-none select-none transition-opacity duration-200"
                 )}
               >
-                {(() => {
+                {data.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length} className="h-32 text-center align-middle text-muted-foreground">
+                      No results
+                    </td>
+                  </tr>
+                ) : (
+                  (() => {
                     const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start || 0 : 0;
                     const paddingBottom = virtualRows.length > 0
                       ? totalSize - (virtualRows[virtualRows.length - 1]?.end || 0)
@@ -476,7 +475,8 @@ size: 180,
                 )}
               </>
               );
-            })()}
+            })()
+                )}
               </tbody>
             </table>
           </div>

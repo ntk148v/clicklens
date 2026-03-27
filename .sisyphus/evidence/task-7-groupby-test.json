@@ -1,0 +1,37 @@
+{
+  "task": "Task 7: Document/Improve GROUP BY Streaming",
+  "test_file": "src/lib/clickhouse/queries/discover.test.ts",
+  "test_command": "bun test src/lib/clickhouse/queries/discover.test.ts",
+  "timestamp": "2026-03-27",
+  "results": {
+    "total_tests": 18,
+    "passed": 18,
+    "failed": 0,
+    "expect_calls": 58,
+    "duration_ms": 353
+  },
+  "relevant_tests": [
+    {
+      "name": "buildDataQuery with GROUP BY",
+      "line": 122,
+      "verifies": "GROUP BY clause is correctly added to query"
+    },
+    {
+      "name": "buildDataQuery validates ORDER BY when GROUP BY is active",
+      "line": 137,
+      "verifies": "ORDER BY validation works correctly with GROUP BY"
+    },
+    {
+      "name": "buildDataQuery allows aggregate functions in ORDER BY with GROUP BY",
+      "line": 153,
+      "verifies": "Aggregate functions in ORDER BY work with GROUP BY"
+    },
+    {
+      "name": "buildDataQuery countQuery with GROUP BY",
+      "line": 234,
+      "verifies": "Count query correctly handles GROUP BY"
+    }
+  ],
+  "status": "PASS",
+  "notes": "All GROUP BY-related tests pass. The documentation comment added to route.ts does not affect query building logic."
+}
