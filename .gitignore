@@ -84,3 +84,7 @@ tags
 [._]*.un~
 
 /.plans/
+
+# Dependencies
+.sisyphus/*
+!.sisyphus/rules/
