@@ -16,7 +16,7 @@ describe("Streaming Implementation", () => {
       
       // Override query to simulate slow query but fast meta emission
       let queryCount = 0;
-      (mockClient as any).query = async (sql: string) => {
+      (mockClient as unknown as { query: (sql: string) => Promise<unknown> }).query = async (sql: string) => {
         queryCount++;
         if (sql.includes("count()")) {
           // Slow count query
@@ -58,12 +58,12 @@ describe("Streaming Implementation", () => {
     it("should stream data chunks before count resolves", async () => {
       const dataChunks: string[] = [];
       
-      const mockClient = {} as any;
+      const mockClient = {} as { query: (sql: string) => Promise<unknown> };
       
       // Use a flag to control count query behavior
-      let countQueryDelay = 50;
+      const countQueryDelay = 50;
       
-      (mockClient as any).query = async (sql: string) => {
+      (mockClient as unknown as { query: (sql: string) => Promise<unknown> }).query = async (sql: string) => {
         if (sql.includes("count()")) {
           // Delayed count query
           await new Promise(resolve => setTimeout(resolve, countQueryDelay));
@@ -105,7 +105,7 @@ describe("Streaming Implementation", () => {
 
     it("should emit NDJSON format correctly", async () => {
       const mockClient = createMockClickHouseClient();
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (sql: string) => Promise<unknown> }).query = async () => {
         return createMockQueryResult(mockRows, [
           { name: "id", type: "UInt32" },
           { name: "name", type: "String" },
@@ -137,7 +137,7 @@ describe("Streaming Implementation", () => {
 
     it("should handle queries without time column (fallback mode)", async () => {
       const mockClient = createMockClickHouseClient();
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (sql: string) => Promise<unknown> }).query = async () => {
         return createMockQueryResult(mockRows, [
           { name: "id", type: "UInt32" },
         ]);
@@ -191,7 +191,7 @@ describe("Streaming Implementation", () => {
     it("should start count query in parallel with data query", async () => {
       const queryOrder: string[] = [];
       
-      const mockClient = {} as any;
+      const mockClient = {} as { query: (sql: string) => Promise<unknown> };
       mockClient.query = async (sql: string) => {
         if (sql.includes("count()")) {
           queryOrder.push("count_start");

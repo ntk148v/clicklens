@@ -191,8 +191,8 @@ describe("CircuitBreakerState", () => {
 });
 
 describe("Integration with QueryCache", () => {
-  it("should create query cache with fallback support", () => {
-    const { createQueryCache, createQueryCacheWithFallback } = require("../../src/lib/cache/query-cache");
+  it("should create query cache with fallback support", async () => {
+    const { createQueryCacheWithFallback } = await import("../../src/lib/cache/query-cache");
     const cache = createQueryCacheWithFallback({
       maxEntries: 100,
       ttl: 60_000,
@@ -204,8 +204,8 @@ describe("Integration with QueryCache", () => {
     expect(cache.getCircuitBreakerState).toBeDefined();
   });
 
-  it("should initialize fallback manager when enabled", () => {
-    const { createQueryCacheWithFallback } = require("../../src/lib/cache/query-cache");
+  it("should initialize fallback manager when enabled", async () => {
+    const { createQueryCacheWithFallback } = await import("../../src/lib/cache/query-cache");
     const cache = createQueryCacheWithFallback({
       maxEntries: 100,
       ttl: 60_000,
@@ -219,8 +219,8 @@ describe("Integration with QueryCache", () => {
     expect(status).not.toBeNull();
   });
 
-  it("should return null fallback status when not initialized", () => {
-    const { createQueryCache } = require("../../src/lib/cache/query-cache");
+  it("should return null fallback status when not initialized", async () => {
+    const { createQueryCache } = await import("../../src/lib/cache/query-cache");
     const cache = createQueryCache({
       maxEntries: 100,
       ttl: 60_000,

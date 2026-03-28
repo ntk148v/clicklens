@@ -128,7 +128,7 @@ describe("exact-count", () => {
         data: [{ cnt: 12345 }],
       });
 
-      const result = await executeExactCount(mockClient as any, {
+      const result = await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
@@ -142,7 +142,7 @@ describe("exact-count", () => {
     test("returns 0 when query returns no data", async () => {
       mockClient.query.mockResolvedValue({ data: [] });
 
-      const result = await executeExactCount(mockClient as any, {
+      const result = await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
@@ -153,12 +153,12 @@ describe("exact-count", () => {
     test("caches result on first call", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 100 }] });
 
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
 
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
@@ -169,11 +169,11 @@ describe("exact-count", () => {
     test("returns cached result on second call", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 100 }] });
 
-      const result1 = await executeExactCount(mockClient as any, {
+      const result1 = await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
-      const result2 = await executeExactCount(mockClient as any, {
+      const result2 = await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
@@ -186,15 +186,15 @@ describe("exact-count", () => {
     test("bypasses cache when useCache is false", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 100 }] });
 
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       }, false);
@@ -205,7 +205,7 @@ describe("exact-count", () => {
     test("applies WHERE conditions", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 50 }] });
 
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
         whereConditions: ["level = 'error'"],
@@ -221,7 +221,7 @@ describe("exact-count", () => {
     test("uses system.parts for approximate count", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 99999 }] });
 
-      const result = await executeApproximateCount(mockClient as any, {
+      const result = await executeApproximateCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
@@ -257,7 +257,7 @@ describe("exact-count", () => {
     test("clearExactCountCache clears cache", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 100 }] });
 
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
@@ -270,15 +270,15 @@ describe("exact-count", () => {
     test("getExactCountCacheStats returns stats", async () => {
       mockClient.query.mockResolvedValue({ data: [{ cnt: 100 }] });
 
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "logs",
       });
-      await executeExactCount(mockClient as any, {
+      await executeExactCount(mockClient as unknown as { query: (sql: string) => Promise<unknown> }, {
         database: "mydb",
         table: "events",
       });

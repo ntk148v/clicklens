@@ -31,7 +31,7 @@ describe("executeApproxCount", () => {
   describe("basic functionality", () => {
     it("should return approximate count with uniqCombined64 for large tables", async () => {
       let capturedQuery: string | undefined;
-      (mockClient as any).query = async (query: string) => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async (query: string) => {
         capturedQuery = query;
         return { data: [{ cnt: "1000000" }] };
       };
@@ -52,7 +52,7 @@ describe("executeApproxCount", () => {
 
     it("should use count() with SAMPLE for small tables (< 100K rows)", async () => {
       let capturedQuery: string | undefined;
-      (mockClient as any).query = async (query: string) => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async (query: string) => {
         capturedQuery = query;
         return { data: [{ cnt: "50000" }] };
       };
@@ -73,7 +73,7 @@ describe("executeApproxCount", () => {
     });
 
     it("should handle zero count", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "0" }] };
       };
 
@@ -93,7 +93,7 @@ describe("executeApproxCount", () => {
   describe("WHERE conditions", () => {
     it("should apply WHERE conditions to the query", async () => {
       let capturedQuery: string | undefined;
-      (mockClient as any).query = async (query: string) => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async (query: string) => {
         capturedQuery = query;
         return { data: [{ cnt: "100000" }] };
       };
@@ -115,7 +115,7 @@ describe("executeApproxCount", () => {
 
     it("should work without WHERE conditions", async () => {
       let capturedQuery: string | undefined;
-      (mockClient as any).query = async (query: string) => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async (query: string) => {
         capturedQuery = query;
         return { data: [{ cnt: "500000" }] };
       };
@@ -136,7 +136,7 @@ describe("executeApproxCount", () => {
   describe("distributed tables", () => {
     it("should use clusterAllReplicas for clustered non-distributed tables", async () => {
       let capturedQuery: string | undefined;
-      (mockClient as any).query = async (query: string) => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async (query: string) => {
         capturedQuery = query;
         return { data: [{ cnt: "2000000" }] };
       };
@@ -158,7 +158,7 @@ describe("executeApproxCount", () => {
 
     it("should not use clusterAllReplicas for distributed tables", async () => {
       let capturedQuery: string | undefined;
-      (mockClient as any).query = async (query: string) => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async (query: string) => {
         capturedQuery = query;
         return { data: [{ cnt: "3000000" }] };
       };
@@ -180,7 +180,7 @@ describe("executeApproxCount", () => {
 
   describe("accuracy indicators", () => {
     it("should return 0.97 accuracy for uniqCombined64", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "1000000" }] };
       };
 
@@ -196,7 +196,7 @@ describe("executeApproxCount", () => {
     });
 
     it("should return 1.0 accuracy for small tables with SAMPLE", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "50000" }] };
       };
 
@@ -214,7 +214,7 @@ describe("executeApproxCount", () => {
 
   describe("error handling", () => {
     it("should throw error when query fails", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         throw new Error("Connection failed");
       };
 
@@ -230,7 +230,7 @@ describe("executeApproxCount", () => {
     });
 
     it("should handle null/undefined data gracefully", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [] };
       };
 
@@ -246,7 +246,7 @@ describe("executeApproxCount", () => {
     });
 
     it("should handle invalid count values", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "invalid" }] };
       };
 
@@ -264,7 +264,7 @@ describe("executeApproxCount", () => {
 
   describe("execution time tracking", () => {
     it("should track execution time", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return { data: [{ cnt: "1000000" }] };
       };
@@ -284,7 +284,7 @@ describe("executeApproxCount", () => {
 
   describe("edge cases", () => {
     it("should handle very large counts", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "999999999999" }] };
       };
 
@@ -300,7 +300,7 @@ describe("executeApproxCount", () => {
     });
 
     it("should handle boundary at 1M rows", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "1000000" }] };
       };
 
@@ -317,7 +317,7 @@ describe("executeApproxCount", () => {
     });
 
     it("should handle boundary at 100K rows", async () => {
-      (mockClient as any).query = async () => {
+      (mockClient as unknown as { query: (query: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> }).query = async () => {
         return { data: [{ cnt: "100000" }] };
       };
 

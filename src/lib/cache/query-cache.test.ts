@@ -227,13 +227,13 @@ describe("QueryCache", () => {
 });
 
 describe("QueryCache singleton", () => {
-  afterEach(() => {
-    const { resetQueryCache } = require("./query-cache");
+  afterEach(async () => {
+    const { resetQueryCache } = await import("./query-cache");
     resetQueryCache();
   });
 
-  test("getQueryCache returns same instance", () => {
-    const { getQueryCache } = require("./query-cache");
+  test("getQueryCache returns same instance", async () => {
+    const { getQueryCache } = await import("./query-cache");
     const cache1 = getQueryCache();
     const cache2 = getQueryCache();
 
@@ -241,7 +241,7 @@ describe("QueryCache singleton", () => {
   });
 
   test("resetQueryCache clears and resets singleton", async () => {
-    const { getQueryCache, resetQueryCache } = require("./query-cache");
+    const { getQueryCache, resetQueryCache } = await import("./query-cache");
     const cache1 = getQueryCache();
     await cache1.set("test", { data: "test" });
 
@@ -252,8 +252,8 @@ describe("QueryCache singleton", () => {
     expect(cache2.size).toBe(0);
   });
 
-  test("createQueryCacheWithFallback enables Redis fallback", () => {
-    const { createQueryCacheWithFallback } = require("./query-cache");
+  test("createQueryCacheWithFallback enables Redis fallback", async () => {
+    const { createQueryCacheWithFallback } = await import("./query-cache");
     const cache = createQueryCacheWithFallback();
 
     expect(cache.isUsingFallback()).toBe(false); // Initially not using fallback

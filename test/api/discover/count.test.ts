@@ -12,7 +12,7 @@ describe("Count Query Execution", () => {
   it("should run count query in parallel with data", async () => {
     const executionTimes: { query: string; start: number; end: number }[] = [];
     
-    const mockClient = {} as any;
+    const mockClient = {} as { query: (sql: string) => Promise<unknown> };
     mockClient.query = async (sql: string) => {
       const queryType = sql.includes("count()") ? "count" : "data";
       const start = Date.now();
@@ -64,7 +64,7 @@ describe("Count Query Execution", () => {
 
   it("should return -1 initially then update with actual count", async () => {
     const mockClient = createMockClickHouseClient({ queryDelay: 50 });
-    (mockClient as any).query = async (sql: string) => {
+    (mockClient as unknown as { query: (sql: string) => Promise<unknown> }).query = async (sql: string) => {
       if (sql.includes("count()")) {
         await new Promise(resolve => setTimeout(resolve, 50));
         return createMockQueryResult([{ cnt: 42 }], [{ name: "cnt", type: "UInt64" }]);
@@ -100,7 +100,7 @@ describe("Count Query Execution", () => {
 
   it("should handle count query failure gracefully", async () => {
     let shouldFailCount = true;
-    const mockClient = {} as any;
+    const mockClient = {} as { query: (sql: string) => Promise<unknown> };
     mockClient.query = async (sql: string) => {
       if (sql.includes("count()")) {
         if (shouldFailCount) {
@@ -139,7 +139,7 @@ describe("Count Query Execution", () => {
   it("should include count in WHERE clause when conditions exist", async () => {
     let lastCountQuery = "";
     
-    const mockClient = {} as any;
+    const mockClient = {} as { query: (sql: string) => Promise<unknown> };
     mockClient.query = async (sql: string) => {
       if (sql.includes("count()")) {
         lastCountQuery = sql;

@@ -42,7 +42,7 @@ const LEGACY_SOURCES: Record<
 };
 
 async function getEstimatedRows(
-  client: any,
+  client: { query: (sql: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> },
   database: string,
   table: string
 ): Promise<number> {

@@ -166,9 +166,9 @@ describe("Histogram Mode (Aggregations)", () => {
     it("GROUP BY mode also uses parallel count", async () => {
       // Lines 355-361 show parallel count for GROUP BY mode
       const mockClient = createMockClickHouseClient({ queryDelay: 50 });
-      let countStartedBeforeData = false;
+      const countStartedBeforeData = false;
       
-      (mockClient as any).query = async (sql: string) => {
+      (mockClient as unknown as { query: (sql: string) => Promise<unknown> }).query = async (sql: string) => {
         if (sql.includes("count()")) {
           await new Promise(resolve => setTimeout(resolve, 50));
           return createMockQueryResult([{ cnt: 10 }], [{ name: "cnt", type: "UInt64" }]);

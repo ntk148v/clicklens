@@ -196,8 +196,8 @@ describe("LRUCacheImpl", () => {
 });
 
 describe("key-generator", () => {
-  it("should generate consistent keys", () => {
-    const { generateCacheKey } = require("../../src/lib/cache/key-generator");
+  it("should generate consistent keys", async () => {
+    const { generateCacheKey } = await import("../../src/lib/cache/key-generator");
     
     const key1 = generateCacheKey("query", { database: "test", limit: 10 });
     const key2 = generateCacheKey("query", { database: "test", limit: 10 });
@@ -205,8 +205,8 @@ describe("key-generator", () => {
     expect(key1).toBe(key2);
   });
 
-  it("should generate different keys for different params", () => {
-    const { generateCacheKey } = require("../../src/lib/cache/key-generator");
+  it("should generate different keys for different params", async () => {
+    const { generateCacheKey } = await import("../../src/lib/cache/key-generator");
     
     const key1 = generateCacheKey("query", { database: "test", limit: 10 });
     const key2 = generateCacheKey("query", { database: "test", limit: 20 });
@@ -214,16 +214,16 @@ describe("key-generator", () => {
     expect(key1).not.toBe(key2);
   });
 
-  it("should generate query cache keys", () => {
-    const { generateQueryCacheKey } = require("../../src/lib/cache/key-generator");
+  it("should generate query cache keys", async () => {
+    const { generateQueryCacheKey } = await import("../../src/lib/cache/key-generator");
     
     const key = generateQueryCacheKey("SELECT * FROM users", { database: "test", limit: 10 });
     
     expect(key).toContain("query:");
   });
 
-  it("should generate schema cache keys", () => {
-    const { generateSchemaCacheKey } = require("../../src/lib/cache/key-generator");
+  it("should generate schema cache keys", async () => {
+    const { generateSchemaCacheKey } = await import("../../src/lib/cache/key-generator");
     
     const key = generateSchemaCacheKey("default", "users");
     
