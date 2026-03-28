@@ -1,103 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useAuth } from "@/components/auth";
-import { generateUUID } from "@/lib/utils";
 import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
+import { useSqlExecution } from "./use-sql-execution";
+import { useSqlPagination } from "./use-sql-pagination";
+import { useSqlUI } from "./use-sql-ui";
+import { useSqlCursor } from "./use-sql-cursor";
+import { useSqlExplain } from "./use-sql-explain";
 import type { ExplainType } from "@/components/sql";
-
-interface ApiError {
-  code: number;
-  type: string;
-  category?: string;
-  message: string;
-  userMessage: string;
-  hint?: string;
-}
-
-interface QueryResult {
-  data: unknown[];
-  meta: Array<{ name: string; type: string }>;
-  rows: number;
-  rows_before_limit_at_least?: number;
-  statistics: {
-    elapsed: number;
-    rows_read: number;
-    bytes_read: number;
-    memory_usage?: number;
-  };
-}
-
-const getErrorInfo = (error: unknown): ApiError => {
-  if (
-    error &&
-    typeof error === "object" &&
-    "userMessage" in error &&
-    "message" in error
-  ) {
-    return error as ApiError;
-  }
-
-  if (error instanceof TypeError) {
-    return {
-      code: 0,
-      message: error.message,
-      type: "NETWORK_ERROR",
-      category: "NETWORK",
-      userMessage: "Network error",
-      hint: "Unable to connect to the server. Please check your connection.",
-    };
-  }
-
-  if (error instanceof Error) {
-    const message = error.message;
-
-    if (
-      message.includes("Failed to fetch") ||
-      message.includes("NetworkError")
-    ) {
-      return {
-        code: 0,
-        message: message,
-        type: "NETWORK_ERROR",
-        category: "NETWORK",
-        userMessage: "Network error",
-        hint: "Unable to connect to the server. Please check your connection.",
-      };
-    }
-
-    if (message.includes("aborted") || message.includes("AbortError")) {
-      return {
-        code: 0,
-        message: message,
-        type: "ABORTED",
-        category: "NETWORK",
-        userMessage: "Request was aborted",
-      };
-    }
-
-    return {
-      code: 0,
-      message: message,
-      type: "UNKNOWN_ERROR",
-      category: "UNKNOWN",
-      userMessage: "Query execution failed",
-      hint: message,
-    };
-  }
-
-  return {
-    code: 0,
-    message: String(error),
-    type: "UNKNOWN_ERROR",
-    category: "UNKNOWN",
-    userMessage: "An unexpected error occurred",
-  };
-};
 
 export interface SqlPageState {
   tabs: ReturnType<typeof useTabsStore.getState>["tabs"];
@@ -142,27 +57,19 @@ export interface SqlPageActions {
 }
 
 export function useSqlPage(): SqlPageState & SqlPageActions {
+  // External dependencies
   const cancellationManager = useMemo(() => new QueryCancellationManager(), []);
-  const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory, clearHistory } =
-    useTabsStore();
-  const { selectedDatabase, databases, tables, getColumnsForTable } =
-    useSqlBrowserStore();
+  const { tabs, activeTabId, updateTab, getActiveQueryTab, addToHistory, clearHistory } = useTabsStore();
+  const { selectedDatabase, databases, tables, getColumnsForTable } = useSqlBrowserStore();
   const { user, permissions, isLoading: authLoading, csrfToken } = useAuth();
   const router = useRouter();
 
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState(0);
-
-  const [tabPagination, setTabPagination] = useState<
-    Record<string, { page: number; pageSize: number }>
-  >({});
-
+  // Initialize tabs on mount
   useEffect(() => {
     initializeTabs();
   }, []);
 
+  // Redirect if no execute permission
   useEffect(() => {
     if (!authLoading && !permissions?.canExecuteQueries) {
       router.push("/");
@@ -172,277 +79,72 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeQueryTab = activeTab?.type === "query" ? activeTab : undefined;
 
+  // Compose focused hooks
+  const { execute, isExecuting } = useSqlExecution({
+    cancellationManager,
+    csrfToken,
+    selectedDatabase,
+    user,
+    updateTab,
+    getActiveQueryTab,
+    addToHistory,
+  });
+
+  // Wrapper to match original interface (no sql parameter)
   const handleExecute = useCallback(
     async (page: number = 0, pageSize: number = 100) => {
       const tab = getActiveQueryTab();
-      if (!tab || tab.isRunning) return;
-
-      const sql = tab.sql.trim();
-      if (!sql) return;
-
-      const { splitSqlStatements } = await import("@/lib/sql");
-      const statements = splitSqlStatements(sql);
-
-      if (statements.length === 0) return;
-
-      const queryId = generateUUID();
-      updateTab(tab.id, { isRunning: true, error: null, queryId });
-
-      setTabPagination((prev) => ({
-        ...prev,
-        [tab.id]: { page, pageSize },
-      }));
-
-      let lastSelectResult: QueryResult | null = null;
-      let executedCount = 0;
-      let totalElapsed = 0;
-
-      try {
-        for (const statement of statements) {
-          const currentTab = getActiveQueryTab();
-          if (
-            !currentTab ||
-            currentTab.id !== tab.id ||
-            !currentTab.isRunning
-          ) {
-            return;
-          }
-
-          const controller = cancellationManager.createController(queryId);
-
-          const response = await fetch("/api/clickhouse/query", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-csrf-token": csrfToken || "",
-            },
-            body: JSON.stringify({
-              sql: statement,
-              query_id: queryId,
-              page: page,
-              pageSize: pageSize,
-              database: selectedDatabase,
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            }),
-            signal: controller.signal,
-          });
-
-          if (!response.ok) {
-            let errorDetails: ApiError = {
-              code: response.status,
-              message: response.statusText || `HTTP ${response.status} error`,
-              type: "HTTP_ERROR",
-              userMessage: `Request failed with status ${response.status}`,
-            };
-            try {
-              const errorData = await response.json();
-              if (errorData.error) {
-                errorDetails = errorData.error;
-              }
-            } catch {
-              // Use default errorDetails
-            }
-
-            throw errorDetails;
-          }
-
-          if (!response.body) {
-            throw {
-              code: 0,
-              message: "Response body is empty",
-              type: "EMPTY_RESPONSE",
-              userMessage: "Server returned an empty response",
-            } as ApiError;
-          }
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-
-          let currentMeta: Array<{ name: string; type: string }> = [];
-          const currentData: Record<string, unknown>[] = [];
-          let currentStatistics = {
-            elapsed: 0,
-            rows_read: 0,
-            bytes_read: 0,
-          };
-          let limitReached = false;
-          let queryError = null;
-          let isSelect = false;
-          let lastUpdate = 0;
-
-          let buffer = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              if (!line.trim()) continue;
-
-              try {
-                const event = JSON.parse(line);
-
-                if (event.type === "meta") {
-                  currentMeta = event.data;
-                  isSelect = true;
-                } else if (event.type === "data") {
-                  currentData.push(...event.data);
-
-                  const now = Date.now();
-                  if (now - lastUpdate > 200) {
-                    updateTab(tab.id, {
-                      isRunning: true,
-                      result: {
-                        data: [...currentData],
-                        meta: currentMeta,
-                        rows: currentData.length,
-                        statistics: {
-                          ...currentStatistics,
-                          rows_read: event.rows_count,
-                        },
-                      },
-                    });
-                    lastUpdate = now;
-                  }
-                } else if (event.type === "progress") {
-                  currentStatistics.rows_read = event.rows_read;
-                  updateTab(tab.id, {
-                    result: {
-                      data: currentData,
-                      meta: currentMeta,
-                      rows: currentData.length,
-                      statistics: currentStatistics,
-                    } as unknown as QueryResult,
-                  });
-                } else if (event.type === "done") {
-                  limitReached = event.limit_reached;
-                  if (event.statistics) {
-                    currentStatistics = {
-                      ...currentStatistics,
-                      ...event.statistics,
-                    };
-                  }
-                } else if (event.type === "error") {
-                  queryError = event.error;
-                }
-              } catch (e) {
-                console.error("Error parsing chunk", e);
-              }
-            }
-          }
-
-          if (queryError) {
-            throw queryError;
-          }
-
-          executedCount++;
-          totalElapsed += currentStatistics.elapsed;
-
-          if (isSelect) {
-            lastSelectResult = {
-              data: currentData,
-              meta: currentMeta,
-              rows: currentData.length,
-              statistics: currentStatistics,
-              rows_before_limit_at_least: limitReached ? 500000 : undefined,
-            };
-          }
-        }
-
-        const currentTab = getActiveQueryTab();
-        if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning) {
-          return;
-        }
-
-        if (lastSelectResult) {
-          updateTab(tab.id, {
-            isRunning: false,
-            result: lastSelectResult,
-            error: null,
-            queryId: undefined,
-          });
-
-          addToHistory({
-            sql,
-            duration: totalElapsed,
-            rowsReturned: lastSelectResult.rows,
-            rowsRead: lastSelectResult.statistics.rows_read,
-            bytesRead: lastSelectResult.statistics.bytes_read,
-            memoryUsage: lastSelectResult.statistics.memory_usage,
-            user: user?.username,
-          });
-        } else {
-          updateTab(tab.id, {
-            isRunning: false,
-            result: {
-              data: [
-                {
-                  message: `${executedCount} statement(s) executed successfully`,
-                },
-              ],
-              meta: [{ name: "message", type: "String" }],
-              rows: 1,
-              statistics: {
-                elapsed: totalElapsed,
-                rows_read: 0,
-                bytes_read: 0,
-              },
-            },
-            error: null,
-            queryId: undefined,
-          });
-
-          addToHistory({
-            sql,
-            duration: totalElapsed,
-            rowsReturned: 0,
-            rowsRead: 0,
-            bytesRead: 0,
-            user: user?.username,
-          });
-        }
-      } catch (error) {
-        const errorInfo = getErrorInfo(error);
-        updateTab(tab.id, {
-          isRunning: false,
-          result: null,
-          error: errorInfo,
-          queryId: undefined,
-        });
-
-        toast({
-          variant: "destructive",
-          title: errorInfo.userMessage,
-          description: errorInfo.hint || errorInfo.message,
-        });
-
-        addToHistory({
-          sql,
-          error: errorInfo.userMessage,
-        });
-      }
+      if (!tab) return;
+      await execute(tab.sql, page, pageSize);
     },
-    [getActiveQueryTab, updateTab, addToHistory, user, selectedDatabase, csrfToken, cancellationManager],
+    [execute, getActiveQueryTab]
   );
 
+  const { pagination, handlePageChange: paginationPageChange, handlePageSizeChange: paginationPageSizeChange } = useSqlPagination({
+    activeTabId,
+    onPageChange: async (page, size) => {
+      const tab = getActiveQueryTab();
+      if (tab) {
+        await execute(tab.sql, page, size);
+      }
+    },
+  });
+
+  // Wrappers to match original interface (void return)
   const handlePageChange = useCallback(
     (page: number) => {
-      const currentSize = tabPagination[activeTabId || ""]?.pageSize || 100;
-      handleExecute(page - 1, currentSize);
+      paginationPageChange(page);
     },
-    [handleExecute, tabPagination, activeTabId],
+    [paginationPageChange]
   );
 
   const handlePageSizeChange = useCallback(
     (size: number) => {
-      handleExecute(0, size);
+      paginationPageSizeChange(size);
     },
-    [handleExecute],
+    [paginationPageSizeChange]
   );
 
+  const { historyOpen, savedQueriesOpen, saveDialogOpen, setHistoryOpen, setSavedQueriesOpen, setSaveDialogOpen } = useSqlUI();
+
+  const { cursorPosition, handleCursorChange, executeAtCursor } = useSqlCursor({
+    cancellationManager,
+    csrfToken,
+    selectedDatabase,
+    user,
+    updateTab,
+    getActiveQueryTab,
+    addToHistory,
+  });
+
+  const { explain, isExplaining } = useSqlExplain({
+    csrfToken,
+    selectedDatabase,
+    updateTab,
+    getActiveQueryTab,
+  });
+
+  // Orchestrator-only handlers
   const handleCancel = useCallback(async () => {
     const tab = getActiveQueryTab();
     if (!tab || !tab.isRunning || !tab.queryId) return;
@@ -467,326 +169,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
         updateTab(activeTabId, { sql: value });
       }
     },
-    [activeTabId, activeQueryTab, updateTab],
-  );
-
-  const handleCursorChange = useCallback((position: number) => {
-    setCursorPosition(position);
-  }, []);
-
-  const handleExecuteAtCursor = useCallback(async () => {
-    const tab = getActiveQueryTab();
-    if (!tab || tab.isRunning) return;
-
-    const sql = tab.sql.trim();
-    if (!sql) return;
-
-    const { findStatementAtPosition } = await import("@/lib/sql");
-    const statement = findStatementAtPosition(tab.sql, cursorPosition);
-
-    if (!statement) return;
-
-    const queryId = generateUUID();
-    updateTab(tab.id, { isRunning: true, error: null, queryId });
-
-    try {
-      const controller = cancellationManager.createController(queryId);
-
-      const response = await fetch("/api/clickhouse/query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": csrfToken || "",
-        },
-        body: JSON.stringify({
-          sql: statement,
-          query_id: queryId,
-          database: selectedDatabase,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        let errorDetails: ApiError = {
-          code: response.status,
-          message: response.statusText || `HTTP ${response.status} error`,
-          type: "HTTP_ERROR",
-          userMessage: `Request failed with status ${response.status}`,
-        };
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorDetails = errorData.error;
-          }
-        } catch {
-          // Use default errorDetails
-        }
-
-        throw errorDetails;
-      }
-
-      if (!response.body) {
-        throw {
-          code: 0,
-          message: "Response body is empty",
-          type: "EMPTY_RESPONSE",
-          userMessage: "Server returned an empty response",
-        } as ApiError;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      let currentMeta: Array<{ name: string; type: string }> = [];
-      const currentData: Record<string, unknown>[] = [];
-      let currentStatistics = {
-        elapsed: 0,
-        rows_read: 0,
-        bytes_read: 0,
-      };
-      let limitReached = false;
-      let queryError = null;
-      let lastUpdate = 0;
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-
-            if (event.type === "meta") {
-              currentMeta = event.data;
-            } else if (event.type === "data") {
-              currentData.push(...event.data);
-
-              const now = Date.now();
-              if (now - lastUpdate > 200) {
-                updateTab(tab.id, {
-                  isRunning: true,
-                  result: {
-                    data: [...currentData],
-                    meta: currentMeta,
-                    rows: currentData.length,
-                    statistics: {
-                      ...currentStatistics,
-                      rows_read: event.rows_count,
-                    },
-                  },
-                });
-                lastUpdate = now;
-              }
-            } else if (event.type === "done") {
-              limitReached = event.limit_reached;
-              if (event.statistics) {
-                currentStatistics = {
-                  ...currentStatistics,
-                  ...event.statistics,
-                };
-              }
-            } else if (event.type === "error") {
-              queryError = event.error;
-            }
-          } catch (e) {
-            console.error("Error parsing chunk", e, line);
-          }
-        }
-      }
-
-      if (queryError) {
-        throw queryError;
-      }
-
-      const currentTab = getActiveQueryTab();
-      if (!currentTab || currentTab.id !== tab.id || !currentTab.isRunning)
-        return;
-
-      updateTab(tab.id, {
-        isRunning: false,
-        result: {
-          data: currentData,
-          meta: currentMeta,
-          rows: currentData.length,
-          rows_before_limit_at_least: limitReached ? 500000 : undefined,
-          statistics: currentStatistics,
-        },
-        error: null,
-        queryId: undefined,
-      });
-
-      addToHistory({
-        sql: statement,
-        duration: currentStatistics.elapsed,
-        rowsReturned: currentData.length,
-        rowsRead: currentStatistics.rows_read,
-        bytesRead: currentStatistics.bytes_read,
-        memoryUsage: 0,
-        user: user?.username,
-      });
-    } catch (error) {
-      const errorInfo = getErrorInfo(error);
-      updateTab(tab.id, {
-        isRunning: false,
-        result: null,
-        error: errorInfo,
-        queryId: undefined,
-      });
-
-      toast({
-        variant: "destructive",
-        title: errorInfo.userMessage,
-        description: errorInfo.hint || errorInfo.message,
-      });
-
-      addToHistory({
-        sql: statement,
-        error: errorInfo.userMessage,
-      });
-    }
-  }, [
-    getActiveQueryTab,
-    updateTab,
-    addToHistory,
-    user,
-    cursorPosition,
-    selectedDatabase,
-    csrfToken,
-    cancellationManager,
-  ]);
-
-  const handleExplain = useCallback(
-    async (type: ExplainType) => {
-      const tab = getActiveQueryTab();
-      if (!tab || tab.isRunning) return;
-
-      const sql = tab.sql.trim();
-      if (!sql) return;
-
-      const { splitSqlStatements } = await import("@/lib/sql");
-      const statements = splitSqlStatements(sql);
-      const statement = statements[0];
-
-      if (!statement) return;
-
-      updateTab(tab.id, {
-        isRunning: true,
-        error: null,
-        result: null,
-        explainResult: null,
-      });
-
-      try {
-        let query = "";
-
-        const cleanStatement = statement.replace(/^EXPLAIN\s+(\w+\s+)?/i, "");
-        query = `EXPLAIN ${type} ${cleanStatement}`;
-
-        const response = await fetch("/api/clickhouse/query", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-csrf-token": csrfToken || "",
-          },
-          body: JSON.stringify({
-            sql: query,
-            database: selectedDatabase,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          }),
-        });
-
-        if (!response.ok) {
-          let errorDetails: ApiError = {
-            code: response.status,
-            message: response.statusText || `HTTP ${response.status} error`,
-            type: "HTTP_ERROR",
-            userMessage: `Request failed with status ${response.status}`,
-          };
-          try {
-            const errorData = await response.json();
-            if (errorData.error) {
-              errorDetails = errorData.error;
-            }
-          } catch {
-            // Use default errorDetails
-          }
-          throw errorDetails;
-        }
-
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let resultData = "";
-
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            resultData += decoder.decode(value, { stream: true });
-          }
-        }
-
-        let finalData: string | object = resultData;
-
-        const lines = resultData.split("\n");
-        let capturedText = "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            if (event.type === "data") {
-              if (Array.isArray(event.data)) {
-                for (const row of event.data) {
-                  const colVal =
-                    row[Object.keys(row)[0]] || Object.values(row)[0];
-                  capturedText += colVal + "\n";
-                }
-              }
-            } else if (event.type === "error") {
-              throw new Error(event.error.message);
-            }
-          } catch {
-            // ignore
-          }
-        }
-        finalData = capturedText || resultData;
-
-        updateTab(tab.id, {
-          isRunning: false,
-          explainResult: { type, data: finalData },
-        });
-      } catch (error) {
-        const errorInfo = getErrorInfo(error);
-        const userMessage =
-          errorInfo.userMessage === "Query execution failed"
-            ? "Failed to explain query"
-            : errorInfo.userMessage;
-        updateTab(tab.id, {
-          isRunning: false,
-          error: {
-            code: errorInfo.code,
-            message: errorInfo.message,
-            type: "EXPLAIN_ERROR",
-            userMessage,
-            category: errorInfo.category,
-            hint: errorInfo.hint,
-          },
-        });
-
-        toast({
-          variant: "destructive",
-          title: userMessage,
-          description: errorInfo.hint || errorInfo.message,
-        });
-      }
-    },
-    [getActiveQueryTab, updateTab, selectedDatabase, csrfToken],
+    [activeTabId, activeQueryTab, updateTab]
   );
 
   const handleApplyTimeRange = useCallback(
@@ -797,7 +180,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
       const formatSqlDate = (d: Date) => {
         const pad = (n: number) => n.toString().padStart(2, "0");
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-          d.getDate(),
+          d.getDate()
         )} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       };
 
@@ -846,7 +229,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
         description: `Using column '${safeColumn}'. Applied correctly to query structure.`,
       });
     },
-    [getActiveQueryTab, updateTab],
+    [getActiveQueryTab, updateTab]
   );
 
   const handleHistorySelect = useCallback(
@@ -856,13 +239,14 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
         setHistoryOpen(false);
       }
     },
-    [activeTabId, activeQueryTab, updateTab],
+    [activeTabId, activeQueryTab, updateTab, setHistoryOpen]
   );
 
   // Get history from useTabsStore
   const { history: queryHistory } = useTabsStore();
 
   return {
+    // State from stores
     tabs,
     activeTabId,
     activeTab,
@@ -875,29 +259,32 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
     permissions,
     authLoading,
     csrfToken,
+    // State from hooks
     historyOpen,
     savedQueriesOpen,
     saveDialogOpen,
     cursorPosition,
-    tabPagination,
+    tabPagination: pagination,
     queryHistory,
 
+    // Actions from stores
     updateTab,
     getActiveQueryTab,
     addToHistory,
     clearHistory,
+    // Actions from hooks
     setHistoryOpen,
     setSavedQueriesOpen,
     setSaveDialogOpen,
-    setCursorPosition,
+    setCursorPosition: handleCursorChange,
     handleExecute,
     handlePageChange,
     handlePageSizeChange,
     handleCancel,
     handleSqlChange,
     handleCursorChange,
-    handleExecuteAtCursor,
-    handleExplain,
+    handleExecuteAtCursor: executeAtCursor,
+    handleExplain: explain,
     handleApplyTimeRange,
     handleHistorySelect,
   };
