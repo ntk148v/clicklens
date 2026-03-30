@@ -15,7 +15,7 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = 5; // Max 5 requests per window
+const RATE_LIMIT_MAX_REQUESTS = process.env.RATE_LIMIT_LOGIN ? parseInt(process.env.RATE_LIMIT_LOGIN) : 10;
 const CLEANUP_INTERVAL_MS = 60 * 1000; // Cleanup every minute
 
 // Periodic cleanup of expired entries

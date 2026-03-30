@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 const MAX_ROWS = 500000;
 const MAX_QUERY_TIMEOUT_MS = 300000;
 const QUERY_ID_PREFIX = "clicklens-";
-const QUERY_RATE_LIMIT = 60;
+const QUERY_RATE_LIMIT = process.env.RATE_LIMIT_QUERY ? parseInt(process.env.RATE_LIMIT_QUERY) : 120;
 const QUERY_RATE_WINDOW_MS = 60000;
 
 export async function POST(request: NextRequest) {

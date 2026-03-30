@@ -17,7 +17,7 @@ export class RateLimiter {
     windowMs?: number;
     maxCacheSize?: number;
   } = {}) {
-    this.maxRequests = options.maxRequests ?? 10;
+    this.maxRequests = options.maxRequests ?? (process.env.RATE_LIMIT_GLOBAL ? parseInt(process.env.RATE_LIMIT_GLOBAL) : 200);
     this.windowMs = options.windowMs ?? 60 * 1000; // 1 minute default
     this.cache = new LRUCache({
       max: options.maxCacheSize ?? 1000,

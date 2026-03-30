@@ -20,7 +20,7 @@ interface KillResponse {
   error?: string;
 }
 
-const KILL_RATE_LIMIT = 20;
+const KILL_RATE_LIMIT = process.env.RATE_LIMIT_KILL ? parseInt(process.env.RATE_LIMIT_KILL) : 20;
 const KILL_RATE_WINDOW_MS = 60000;
 
 export async function POST(
