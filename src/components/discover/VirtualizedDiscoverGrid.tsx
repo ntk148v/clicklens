@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, useRef, memo, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,6 +10,7 @@ import {
   SortingState,
   ColumnDef,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,8 +28,19 @@ import { cn, formatDateTime, formatDate } from "@/lib/utils";
 import { TruncatedCell } from "@/components/monitoring";
 import { PaginationControls } from "@/components/monitoring";
 import { DiscoverGridSkeleton } from "./DiscoverGridSkeleton";
+import { DEFAULT_ROW_HEIGHT, DEFAULT_OVERSCAN } from "@/lib/virtual/virtual.config";
+import {
+  type CellSelection,
+  isCellInSelection,
+  extractSelectedCells,
+  selectionToTsv,
+  isCopyShortcut,
+  validateSelection,
+  formatCellValueForCopy,
+} from "@/lib/virtual/edge-cases";
+import { copyToClipboard } from "@/lib/utils";
 
-interface DiscoverGridProps {
+interface VirtualizedDiscoverGridProps {
   rows: DiscoverRow[];
   columns: ColumnMetadata[];
   selectedColumns: string[];
@@ -36,6 +48,7 @@ interface DiscoverGridProps {
   page: number;
   pageSize: number;
   totalHits: number;
+  isApproximate?: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onFilterForValue?: (column: string, value: unknown) => void;
@@ -89,7 +102,7 @@ function formatCellValue(value: unknown, type: string): React.ReactNode {
   }
 
   return (
-    <TruncatedCell value={displayValue} className={className} maxWidth={300} />
+    <TruncatedCell value={displayValue} className={className} maxWidth={280} />
   );
 }
 
@@ -140,7 +153,7 @@ interface CellContextMenuState {
   y: number;
 }
 
-export const DiscoverGrid = memo(function DiscoverGrid({
+export const VirtualizedDiscoverGrid = memo(function VirtualizedDiscoverGrid({
   rows,
   columns: columnMetadata,
   selectedColumns,
@@ -148,6 +161,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   page,
   pageSize,
   totalHits,
+  isApproximate = false,
   onPageChange,
   onPageSizeChange,
   onFilterForValue,
@@ -155,13 +169,17 @@ export const DiscoverGrid = memo(function DiscoverGrid({
   sorting,
   onSortingChange,
   updateRowWindow,
-}: DiscoverGridProps) {
+}: VirtualizedDiscoverGridProps) {
   const [selectedRow, setSelectedRow] = useState<DiscoverRow | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<CellContextMenuState | null>(
     null,
   );
+  const [cellSelection, setCellSelection] = useState<CellSelection | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const columnTypes = useMemo(() => {
     const types: Record<string, string> = {};
@@ -188,6 +206,80 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     [onFilterForValue, onFilterOutValue],
   );
 
+  const handleCellMouseDown = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      setIsSelecting(true);
+      setCellSelection({
+        startRow: rowIndex,
+        endRow: rowIndex,
+        startCol: colIndex,
+        endCol: colIndex,
+      });
+    },
+    []
+  );
+
+  const handleCellMouseEnter = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (!isSelecting || !cellSelection) return;
+      setCellSelection((prev) =>
+        prev
+          ? {
+              ...prev,
+              endRow: rowIndex,
+              endCol: colIndex,
+            }
+          : null
+      );
+    },
+    [isSelecting, cellSelection]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsSelecting(false);
+  }, []);
+
+  const handleCopySelection = useCallback(async () => {
+    if (!cellSelection) return;
+
+    const columnsToShow =
+      selectedColumns.length > 0 ? selectedColumns : Object.keys(rows[0] || {});
+    const validated = validateSelection(
+      cellSelection,
+      rows.length,
+      columnsToShow.length
+    );
+    const selectedData = extractSelectedCells(
+      rows,
+      columnsToShow,
+      validated,
+      (row, column) => row[column]
+    );
+    const tsv = selectionToTsv(selectedData);
+    await copyToClipboard(tsv);
+  }, [cellSelection, rows, selectedColumns]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isCopyShortcut(e) && cellSelection) {
+        e.preventDefault();
+        handleCopySelection();
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      setIsSelecting(false);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mouseup", handleGlobalMouseUp);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [cellSelection, handleCopySelection]);
+
   const tableColumns = useMemo(() => {
     const columnsToShow =
       selectedColumns.length > 0 ? selectedColumns : Object.keys(rows[0] || {});
@@ -200,6 +292,10 @@ export const DiscoverGrid = memo(function DiscoverGrid({
 
         return columnHelper.accessor((row) => row[colName], {
           id: colName,
+          size: 150,
+          minSize: 80,
+          maxSize: 500,
+          enableResizing: true,
           header: ({ column }) => (
             <Button
               variant="ghost"
@@ -248,6 +344,18 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     getSortedRowModel: getSortedRowModel(),
   });
 
+  const rowVirtualizer = useVirtualizer({
+    count: table.getRowModel().rows.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => DEFAULT_ROW_HEIGHT,
+    overscan: DEFAULT_OVERSCAN,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+
+  const isVirtualizing = scrollContainerRef.current !== null;
+
   const handleRowClick = (row: DiscoverRow, index: number) => {
     setSelectedRow(row);
     setSelectedRowIndex(index);
@@ -258,25 +366,19 @@ export const DiscoverGrid = memo(function DiscoverGrid({
     return <DiscoverGridSkeleton />;
   }
 
-  if (!isLoading && rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        No data found. Try adjusting your filters or time range.
-      </div>
-    );
-  }
-
   const displayValue = (val: unknown): string => {
     if (val === null || val === undefined) return "null";
     if (typeof val === "object") return JSON.stringify(val);
     return String(val);
   };
 
+  const tableRows = table.getRowModel().rows;
+
   return (
     <>
       <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-auto">
-          <table className="w-full caption-bottom text-sm">
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto">
+          <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'auto' }}>
             <thead className="sticky top-0 bg-background z-10 shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b">
@@ -318,42 +420,153 @@ export const DiscoverGrid = memo(function DiscoverGrid({
                   "opacity-50 pointer-events-none select-none transition-opacity duration-200",
               )}
             >
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  data-slot="table-row"
-                  className={cn(
-                    "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
-                    selectedRow === row.original && sheetOpen && "bg-muted",
-                  )}
-                  onClick={() => handleRowClick(row.original, row.index)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0"
-                      style={{
-                        width: cell.column.getSize(),
-                      }}
-                      onContextMenu={(e) =>
-                        handleCellContextMenu(
-                          e,
-                          cell.column.id,
-                          cell.getValue(),
-                        )
-                      }
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </td>
-                  ))}
-                  <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
-                    <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              {!isLoading && rows.length === 0 ? (
+                <tr>
+                  <td colSpan={tableColumns.length + 1} className="h-64 text-center align-middle text-muted-foreground">
+                    No data found. Try adjusting your filters or time range.
                   </td>
                 </tr>
-              ))}
+              ) : isVirtualizing
+                ? (() => {
+                    const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start || 0 : 0;
+                    const paddingBottom = virtualRows.length > 0
+                      ? totalSize - (virtualRows[virtualRows.length - 1]?.end || 0)
+                      : 0;
+
+                    return (
+                      <>
+                        {paddingTop > 0 && (
+                          <tr>
+                            <td
+                              style={{ height: `${paddingTop}px` }}
+                              colSpan={tableColumns.length + 1}
+                            />
+                          </tr>
+                        )}
+                        {virtualRows.map((virtualRow) => {
+                          const row = tableRows[virtualRow.index];
+                          if (!row) return null;
+
+                          return (
+                            <tr
+                              key={row.id}
+                              data-slot="table-row"
+                              className={cn(
+                                "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
+                                selectedRow === row.original && sheetOpen && "bg-muted",
+                              )}
+                              style={{ height: `${virtualRow.size}px` }}
+                              onClick={() => handleRowClick(row.original, row.index)}
+                            >
+                        {row.getVisibleCells().map((cell, cellIndex) => {
+                          const isSelected = isCellInSelection(
+                            virtualRow.index,
+                            cellIndex,
+                            cellSelection
+                          );
+                          return (
+                            <td
+                              key={cell.id}
+                              className={cn(
+                                "p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0 cursor-cell select-none",
+                                isSelected && "bg-primary/20 ring-1 ring-inset ring-primary"
+                              )}
+                              style={{
+                                width: cell.column.getSize(),
+                              }}
+                              onMouseDown={() =>
+                                handleCellMouseDown(virtualRow.index, cellIndex)
+                              }
+                              onMouseEnter={() =>
+                                handleCellMouseEnter(virtualRow.index, cellIndex)
+                              }
+                              onMouseUp={handleMouseUp}
+                              onContextMenu={(e) =>
+                                handleCellContextMenu(
+                                  e,
+                                  cell.column.id,
+                                  cell.getValue(),
+                                )
+                              }
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
+                          <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {paddingBottom > 0 && (
+                    <tr>
+                      <td
+                        style={{ height: `${paddingBottom}px` }}
+                        colSpan={tableColumns.length + 1}
+                      />
+                    </tr>
+                  )}
+                </>
+                );
+              })()
+                : tableRows.map((row, rowIndex) => (
+                    <tr
+                      key={row.id}
+                      data-slot="table-row"
+                      className={cn(
+                        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors cursor-pointer group",
+                        selectedRow === row.original && sheetOpen && "bg-muted",
+                      )}
+                      style={{ height: `${DEFAULT_ROW_HEIGHT}px` }}
+                      onClick={() => handleRowClick(row.original, row.index)}
+                    >
+                      {row.getVisibleCells().map((cell, cellIndex) => {
+                        const isSelected = isCellInSelection(
+                          rowIndex,
+                          cellIndex,
+                          cellSelection
+                        );
+                        return (
+                          <td
+                            key={cell.id}
+                            className={cn(
+                              "p-2 align-middle whitespace-nowrap font-mono data-table-cell last:border-r-0 cursor-cell select-none",
+                              isSelected && "bg-primary/20 ring-1 ring-primary"
+                            )}
+                            style={{
+                              width: cell.column.getSize(),
+                            }}
+                            onMouseDown={() =>
+                              handleCellMouseDown(rowIndex, cellIndex)
+                            }
+                            onMouseEnter={() =>
+                              handleCellMouseEnter(rowIndex, cellIndex)
+                            }
+                            onMouseUp={handleMouseUp}
+                            onContextMenu={(e) =>
+                              handleCellContextMenu(
+                                e,
+                                cell.column.id,
+                                cell.getValue(),
+                              )
+                            }
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="p-2 align-middle w-8 sticky right-0 bg-background group-hover:bg-muted/50 transition-colors">
+                        <Expand className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
@@ -365,6 +578,7 @@ export const DiscoverGrid = memo(function DiscoverGrid({
           pageSize={pageSize}
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
+          isApproximate={isApproximate}
         />
       </div>
 
@@ -377,7 +591,6 @@ export const DiscoverGrid = memo(function DiscoverGrid({
         rowIndex={selectedRowIndex ?? undefined}
       />
 
-      {/* Context menu for click-to-filter */}
       {contextMenu && (
         <DropdownMenu
           open={true}

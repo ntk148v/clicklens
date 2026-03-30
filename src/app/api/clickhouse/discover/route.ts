@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, checkPermission } from "@/lib/auth";
 import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getTableEngine } from "@/lib/clickhouse/schema";
@@ -8,9 +8,12 @@ import {
   ColumnDefinition,
 } from "@/lib/clickhouse/search";
 import { fetchChunks } from "@/lib/clickhouse/stream";
+import { executeExactCount } from "@/lib/clickhouse/exact-count";
+import { executeApproxCount } from "@/lib/clickhouse/approx-count";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
 import { validateFilter } from "@/lib/clickhouse/sql-validator";
 import { getGlobalRateLimiter } from "@/lib/rate-limiter";
+import { getQueryCache } from "@/lib/cache/query-cache";
 
 // ... Legacy sources handling could be preserved or refactored.
 // For this major refactor, I will keep legacy support but adapt it to the new structure where possible.
@@ -38,11 +41,38 @@ const LEGACY_SOURCES: Record<
   },
 };
 
+async function getEstimatedRows(
+  client: { query: (sql: string) => Promise<{ data: Array<{ cnt: string | number | null }> }> },
+  database: string,
+  table: string
+): Promise<number> {
+  try {
+    const safeDbStr = escapeSqlString(database);
+    const safeTableStr = escapeSqlString(table);
+    const query = `
+      SELECT sum(rows) as cnt
+      FROM system.parts
+      WHERE database = '${safeDbStr}'
+        AND table = '${safeTableStr}'
+        AND active = 1
+    `;
+    const result = await client.query(query);
+    return Number(result.data[0]?.cnt) || 0;
+  } catch (error) {
+    console.error("Failed to get estimated rows:", error);
+    return 0;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
     const { config } = auth;
+
+    // RBAC: Check canDiscover permission
+    const permissionError = await checkPermission("canDiscover");
+    if (permissionError) return permissionError;
 
     // Rate limiting check
     const rateLimiter = getGlobalRateLimiter();
@@ -107,9 +137,16 @@ export async function GET(request: Request) {
 
     const orderByParam = searchParams.get("orderBy");
     const groupByParam = searchParams.get("groupBy");
+    // exact count toggle: when true, use exact count() with caching
+    // default is approximate (no cache) for better performance on large tables
+    const useExactCount = searchParams.get("exact") === "true";
 
     const client = createClient(config);
     const clusterName = await getClusterName(client);
+
+    // Initialize query cache
+    const queryCache = getQueryCache();
+    const cacheEnabled = searchParams.get("cache") !== "false";
 
     const quotedDb = quoteIdentifier(database);
     const quotedTable = quoteIdentifier(table);
@@ -189,7 +226,44 @@ export async function GET(request: Request) {
         histogramQuery = `SELECT toStartOfInterval(${quotedTimeCol}, INTERVAL ${interval}) as time, count() as count FROM ${tableSource} ${whereClause} GROUP BY time ORDER BY time`;
       }
 
+      // Check cache for histogram query
+      if (cacheEnabled) {
+        const cacheKey = queryCache.generateDiscoverKey({
+          database,
+          table,
+          filter,
+          timeRange: { minTime: minTime || undefined, maxTime: maxTime || undefined },
+          columns,
+          groupBy: groupByParam || undefined,
+          orderBy: orderByParam || undefined,
+        });
+        const cachedResult = queryCache.getCachedQuery(cacheKey);
+        if (cachedResult) {
+          return NextResponse.json({ 
+            success: true, 
+            histogram: cachedResult.data,
+            cacheHit: true,
+            cacheAge: Date.now() - cachedResult.timestamp,
+          });
+        }
+      }
+
       const histRes = await client.query(histogramQuery);
+      
+      // Store histogram result in cache
+      if (cacheEnabled) {
+        const cacheKey = queryCache.generateDiscoverKey({
+          database,
+          table,
+          filter,
+          timeRange: { minTime: minTime || undefined, maxTime: maxTime || undefined },
+          columns,
+          groupBy: groupByParam || undefined,
+          orderBy: orderByParam || undefined,
+        });
+        queryCache.setCachedQuery(cacheKey, histRes.data);
+      }
+      
       return NextResponse.json({ success: true, histogram: histRes.data });
     }
 
@@ -344,7 +418,7 @@ export async function GET(request: Request) {
         ${offset > 0 ? `OFFSET ${offset}` : ""}
       `;
 
-      // Run count query in parallel
+      // Run count query in parallel (use exact count with caching when requested)
       let countQuery = `SELECT count() as cnt FROM ${tableSource}`;
       if (baseWhere.length > 0) countQuery += ` WHERE ${baseWhere.join(" AND ")}`;
       if (groupByClause) {
@@ -352,29 +426,83 @@ export async function GET(request: Request) {
         countQuery = `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${baseWhere.length > 0 ? `WHERE ${baseWhere.join(" AND ")}` : ""} ${groupByClause})`;
       }
 
-      const countPromise = client
-        .query(countQuery)
-        .then((res) => Number(res.data[0]?.cnt) || 0)
-        .catch((e) => {
-          console.error("Count query failed", e);
-          return 0;
-        });
+      let countPromise: Promise<{ count: number; isApproximate: boolean; accuracy?: number }>;
+      if (useExactCount) {
+        countPromise = executeExactCount(client, {
+          database,
+          table,
+          whereConditions: baseWhere,
+          clusterName,
+          isDistributed,
+        }).then((result) => ({
+          count: result.count,
+          isApproximate: !result.isExact,
+          accuracy: result.isExact ? 1.0 : undefined,
+        }));
+      } else {
+        const estimatedRows = await getEstimatedRows(client, database, table);
+        countPromise = executeApproxCount(client, {
+          database,
+          table,
+          estimatedRows,
+          whereConditions: baseWhere,
+          clusterName,
+          isDistributed,
+        }).then((result) => ({
+          count: result.count,
+          isApproximate: result.isApproximate,
+          accuracy: result.accuracy,
+        }));
+      }
+
+      countPromise = countPromise.catch((e) => {
+        console.error("Count query failed", e);
+        return { count: 0, isApproximate: false, accuracy: 1.0 };
+      });
 
       // Create direct NDJSON stream for aggregation / specific order / specific pagination
+      // GROUP BY results are typically small (aggregated), so buffering is acceptable.
+      // True streaming is only used for non-aggregated data queries via fetchChunks().
+      // If GROUP BY results exceed 10,000 rows, consider implementing chunked emission.
       const stream = new ReadableStream({
           async start(controller) {
             try {
-              controller.enqueue(JSON.stringify({ meta: { totalHits: -1 } }) + "\n");
-              
+              controller.enqueue(
+                JSON.stringify({
+                  meta: {
+                    totalHits: -1,
+                    isApproximate: false,
+                    accuracy: 1.0,
+                  },
+                }) + "\n"
+              );
+
               // Run actual query
               const rs = await client.query(query);
               const rows = rs.data;
+
+              // Optional safety check for large GROUP BY results
+              if (rows.length > 10000) {
+                console.warn(
+                  `[Discover API] Large GROUP BY result: ${rows.length} rows. ` +
+                  `Consider implementing chunked emission for better memory efficiency.`
+                );
+              }
+
               for (const row of rows) {
                 controller.enqueue(JSON.stringify(row) + "\n");
               }
               
-              const totalHits = await countPromise;
-              controller.enqueue(JSON.stringify({ meta: { totalHits } }) + "\n");
+              const countResult = await countPromise;
+              controller.enqueue(
+                JSON.stringify({
+                  meta: {
+                    totalHits: countResult.count,
+                    isApproximate: countResult.isApproximate,
+                    accuracy: countResult.accuracy,
+                  },
+                }) + "\n"
+              );
             } catch (err) {
               controller.enqueue(JSON.stringify({ error: String(err) }) + "\n");
             } finally {
@@ -404,6 +532,7 @@ export async function GET(request: Request) {
       selectClause,
       orderByClause,
       safeTimeCol: quotedTimeSortCol,
+      useExactCount,
     });
 
     const stream = new ReadableStream({

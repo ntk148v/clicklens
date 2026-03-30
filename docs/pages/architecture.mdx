@@ -470,6 +470,64 @@ ClickLens implements defense-in-depth security through multiple layers.
 3. **CSRF Protection**: SameSite cookie policies and explicit Double-Submit Cookie token (`x-csrf-token` header) for state-mutating API routes
 4. **CORS Control**: Configured API access policies
 
+## Error Handling Architecture
+
+ClickLens implements centralized error handling through `@/lib/errors` to provide consistent, user-friendly error messages while maintaining security.
+
+### Error Categorization
+
+All ClickHouse errors are categorized into specific types for appropriate handling and user feedback.
+
+| Error Type | Description | User Experience |
+| ---------- | ----------- | --------------- |
+| **SYNTAX** | Invalid SQL syntax, typos, malformed queries | Shows syntax error with line/column information and suggestion |
+| **SCHEMA** | Table/database not found, column doesn't exist | Lists available tables/columns, suggests similar names |
+| **PERMISSION** | User lacks required grants for operation | Explains required permission, suggests contacting admin |
+| **TIMEOUT** | Query exceeded execution time limit | Shows timeout duration, suggests optimizing query |
+| **NETWORK** | Connection issues, ClickHouse unreachable | Displays connection status, retry option |
+| **SYSTEM** | ClickHouse internal errors, resource limits | Shows system error details, suggests checking cluster health |
+
+### Error Response Format
+
+All API errors follow a consistent structure:
+
+```typescript
+{
+  success: false;
+  error: {
+    code: number;           // HTTP status or error code
+    type: string;           // "SYNTAX", "SCHEMA", "PERMISSION", etc.
+    message: string;        // Technical details (sanitized in production)
+    userMessage: string;    // User-friendly explanation
+    hint?: string;          // Optional actionable suggestion
+  };
+}
+```
+
+### Security Considerations
+
+- **Production Sanitization**: File paths, IP addresses, credentials, and stack traces are removed from error responses
+- **Server-Side Logging**: Full error details logged server-side for debugging
+- **User-Friendly Messages**: Technical errors translated to actionable guidance
+- **Hint System**: Contextual suggestions help users resolve issues independently
+
+### Usage Pattern
+
+```typescript
+import { formatQueryError } from "@/lib/errors";
+
+try {
+  const result = await clickHouseClient.query({ query: sql });
+  return result;
+} catch (error) {
+  const formatted = formatQueryError(error, undefined, true);
+  return NextResponse.json(
+    { success: false, error: formatted },
+    { status: 500 },
+  );
+}
+```
+
 ## Performance Optimizations
 
 ClickLens incorporates several performance optimizations to ensure responsiveness even with large datasets.
@@ -482,6 +540,22 @@ ClickLens incorporates several performance optimizations to ensure responsivenes
 6. **Standalone Build**: Optimized serverless deployment
 7. **Query Timeout Enforcement**: Prevents runaway queries (default 60s, max 300s)
 8. **Metadata Caching**: Table schemas and column information cached to reduce database load
+
+#### Virtualized Components
+
+ClickLens implements virtualized rendering for large datasets to maintain smooth performance even with millions of rows.
+
+| Component | Location | Purpose | Key Features |
+| --------- | -------- | ------- | ------------ |
+| **VirtualizedResultGrid** | `src/components/sql/VirtualizedResultGrid.tsx` | SQL Console query results | Windowed rendering, dynamic row heights, smooth scrolling, column resizing, row selection |
+| **VirtualizedDiscoverGrid** | `src/components/discover/VirtualizedDiscoverGrid.tsx` | Discover feature data exploration | Same features as ResultGrid, optimized for time-series data with expandable rows |
+
+**Technical Implementation**:
+- Uses TanStack Table with virtualization plugin
+- Renders only visible rows (typically 20-50) regardless of total dataset size
+- Maintains scroll position and selection state efficiently
+- Supports dynamic row heights for expandable content
+- Implements column resizing with persisted preferences
 
 ## Deployment Architecture
 
@@ -536,6 +610,25 @@ ClickLens supports optional Redis caching to improve performance for frequently 
 - Redis is optional - if `REDIS_URL` is not set, caching is disabled
 - Connection string format: `redis://[password@]host:port[/db]`
 - Example: `redis://localhost:6379` or `redis://:password@redis.example.com:6379/0`
+
+**Cache Key Patterns**:
+
+| Data Type | Key Pattern | TTL |
+| --------- | ----------- | --- |
+| Table schema | `clicklens:schema:{database}:{table}` | 5 minutes |
+| Table parts | `clicklens:parts:{database}:{table}` | 1 minute |
+| Monitoring metrics | `clicklens:metrics:{metric_name}` | 30 seconds |
+| Query analytics | `clicklens:analytics:{time_range}` | 1 minute |
+| Time-series data | `clicklens:timeseries:{metric}:{start}:{end}` | 2 minutes |
+
+**Cache Invalidation Strategies**:
+
+| Strategy | Description | Use Case |
+| --------- | ----------- | -------- |
+| **TTL-based** | Automatic expiration after configured time-to-live | Most monitoring data, schema information |
+| **Event-driven** | Invalidate on specific events (e.g., table DDL) | Table Explorer data after schema changes |
+| **Pattern-based** | Bulk invalidation using key patterns | Clear all monitoring data on cluster restart |
+| **Selective** | Manual invalidation via API endpoints | Force refresh after data updates |
 
 **Benefits**:
 - Reduced ClickHouse query load

@@ -38,10 +38,10 @@ clicklens/
 ├── src/
 │   ├── app/           # Next.js App Router (74 files)
 │   │   ├── (app)/     # Authenticated routes
-│   │   ├── api/       # API routes (41 files)
+│   │   ├── api/       # API routes (43 files)
 │   │   └── login/     # Public login page
-│   ├── components/    # Reusable UI components (88 files)
-│   └── lib/           # Core libraries (31 files)
+│   ├── components/    # Reusable UI components (109 files)
+│   └── lib/           # Core libraries (128 files)
 ├── docs/              # Documentation (Nextra)
 ├── e2e/               # Playwright E2E tests
 ├── scripts/           # Build and utility scripts
@@ -321,11 +321,28 @@ src/lib/
 | **useTabsStore**       | `tabs.ts`        | Query tabs, history              | localStorage |
 | **useAccessStore**     | `access.ts`      | Access control UI state          | None         |
 
-#### Tab Store Features
+#### useSqlBrowserStore Features
+
+- **Databases**: List of all databases with loading state
+- **Tables**: Cached table metadata grouped by database
+- **Columns Cache**: Autocomplete column info with 5-minute TTL
+- **Table Preview**: Data and structure preview for selected tables
+- **Optimized Selectors**: `useDatabases()`, `useTables()`, `useSidebarState()`, `useColumnsForAutocomplete()`
+
+#### useTabsStore Features
 
 - Persists query tabs (SQL only, not results)
 - History entries: `{ sql, timestamp, duration, rowsRead, bytesRead, memoryUsage, user, error }`
 - Maximum 100 history entries
+- Supports both query tabs and table tabs
+- Optimized selectors: `useTabsOnly()`, `useTabActions()`, `useQueryHistory()`, `useActiveTab()`, `useActiveQueryTab()`
+
+#### useAccessStore Features
+
+- Manages users, roles, grants, and role grants
+- Lazy loading with `fetchAll()` and `refresh()` methods
+- Prevents redundant fetches with `lastFetched` timestamp
+- Error handling with loading state
 
 ---
 
@@ -660,17 +677,92 @@ Built on shadcn/ui patterns with Radix primitives:
 - Uses `class-variance-authority` for variants
 - Custom components: `TruncatedCell`, `JsonViewer`, `RecordDetailSheet`, `AccessDenied`
 
+### Virtualized Components
+
+High-performance virtualized data grids for large datasets:
+
+| Component                  | File                                      | Purpose                           |
+| -------------------------- | ----------------------------------------- | --------------------------------- |
+| **VirtualizedResultGrid**  | `src/components/sql/VirtualizedResultGrid.tsx` | SQL query results with virtual scrolling |
+| **VirtualizedDiscoverGrid**| `src/components/discover/VirtualizedDiscoverGrid.tsx` | Discover feature data with virtual scrolling |
+| **VirtualizedDataTable**   | `src/components/logging/VirtualizedDataTable.tsx` | Logging data with virtual scrolling |
+
+**Features:**
+- Efficient rendering of large datasets (10,000+ rows)
+- Graceful degradation to simple table on virtualization failure
+- Memory-efficient with row virtualization
+- Maintains scroll position and selection state
+
+### Error Handling
+
+Centralized error handling system in `src/lib/error/handling.ts`:
+
+**Error Types:**
+- **Query Errors** (`formatQueryError`): ClickHouse query errors with categorization (SYNTAX, SCHEMA, TYPE, PERMISSION, RESOURCE, FUNCTION, SYSTEM, NETWORK, UNKNOWN)
+- **API Errors** (`apiError`): HTTP error responses with standardized format
+- **Cache Errors** (`RedisFallbackManager`): Redis failures with circuit breaker pattern
+- **Virtualization Errors** (`VirtualizationError`): Virtualization failures with graceful degradation
+- **Network Errors** (`NetworkError`): Network failures with retry logic
+
+**Key Features:**
+- **Unified Error Interface**: `createUnifiedError()` provides consistent error structure with severity levels (low, medium, high, critical)
+- **Retry Logic**: `withRetry()` implements exponential backoff with jitter for retryable errors
+- **Virtualization Fallback**: `withVirtualizationFallback()` wraps virtualization operations with graceful degradation
+- **Error Boundary Helpers**: `handleErrorBoundary()` for React error boundaries
+- **Environment-Aware Sanitization**: Sensitive data (file paths, IPs, credentials) sanitized in production
+
+**Retry Configuration:**
+- Default: 3 retries with exponential backoff (1s base, 30s max)
+- Retryable status codes: 408, 429, 500, 502, 503, 504
+- Jitter factor: 0.1 for randomness
+
+### Caching
+
+Two-tier caching system with Redis integration:
+
+**Cache Types:**
+
+| Cache          | Purpose                          | Storage Priority | Interface | TTL Range       |
+| -------------- | -------------------------------- | ---------------- | --------- | --------------- |
+| **HybridCache** | Metadata, monitoring, tables    | Redis primary    | Async     | 30s - 10min     |
+| **QueryCache**  | Query results                    | Memory primary   | Sync      | 5min default    |
+
+**HybridCache** (`src/lib/cache/hybrid-cache.ts`):
+- Pre-configured instances: `metadataCache` (500 entries), `monitoringCache` (100 entries), `tablesCache` (200 entries)
+- Redis as primary storage with in-memory LRU fallback
+- Separate TTLs for memory and Redis layers
+- Built-in deduplication to prevent thundering herd
+- Use for: databases, tables, columns, monitoring data, table explorer data
+
+**QueryCache** (`src/lib/cache/query-cache.ts`):
+- In-memory LRU cache with optional Redis fallback
+- Automatic cache key generation for complex query parameters
+- Cache metadata: hit/miss tracking, age, remaining TTL
+- Use for: Discover queries, SQL Console results
+
+**Redis Integration** (`src/lib/cache/redis-cache.ts`):
+- Pure Redis cache with get/set/delete operations
+- TTL support with configurable defaults
+- Graceful fallback to in-memory cache on Redis failure
+- Circuit breaker pattern (`RedisFallbackManager`) for automatic failover
+- Key prefixing for namespacing
+
+**Cache Invalidation:**
+- Pattern-based invalidation with wildcards (`*`, `?`)
+- Manual invalidation via `invalidateCache()` and `clearCache()`
+- Automatic TTL expiration
+
 ---
 
 ## Summary Statistics
 
 | Metric                | Count |
 | --------------------- | ----- |
-| Total Source Files    | ~180  |
+| Total Source Files    | ~280  |
 | App Routes (pages)    | 28    |
-| API Endpoints         | 41    |
-| UI Components         | 80    |
-| Lib Modules           | 31    |
+| API Endpoints         | 43    |
+| UI Components         | 109   |
+| Lib Modules           | 128   |
 | Environment Variables | 10    |
 | Feature Roles         | 6     |
 | Permission Types      | 12    |

@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { Header } from "@/components/layout";
 import { DiscoverHistogram } from "@/components/discover/DiscoverHistogram";
-import { DiscoverGrid } from "@/components/discover/DiscoverGrid";
+import { VirtualizedDiscoverGrid } from "@/components/discover/VirtualizedDiscoverGrid";
 import { QueryBar } from "@/components/discover/QueryBar";
 import { FieldsSidebar } from "@/components/discover/FieldsSidebar";
 import { CacheIndicator } from "@/components/discover/CacheIndicator";
@@ -17,12 +17,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { FilterX, Database, Table2, AlertCircle } from "lucide-react";
+import {
+  StreamingProgressIndicator,
+  CountProgressIndicator,
+  AggregationProgressIndicator,
+  CombinedProgressIndicator,
+  LoadingOverlay,
+} from "@/components/ui/loading";
+import { FilterX, Database, Table2, Hash, BarChart3 } from "lucide-react";
 import { getFlexibleRangeFromEnum } from "@/lib/types/discover";
 import { parseError } from "@/lib/clickhouse/error-parser";
 import { AccessDenied } from "@/components/ui/access-denied";
 import { useAuth } from "@/components/auth";
-import { useDiscoverState } from "@/lib/hooks/use-discover-state";
+import { useDiscoverPage } from "@/lib/hooks/use-discover-page";
 
 function DiscoverPageContent() {
   const { permissions, isLoading: authLoading } = useAuth();
@@ -45,6 +52,8 @@ function DiscoverPageContent() {
     refreshInterval,
     rows,
     totalHits,
+    isApproximate,
+    accuracy,
     histogramData,
     isLoading,
     histLoading,
@@ -72,7 +81,32 @@ function DiscoverPageContent() {
     resetColumns,
     filterForValue,
     filterOutValue,
-  } = useDiscoverState();
+  } = useDiscoverPage();
+
+  const isCountPending = totalHits === -1;
+  const isStreaming = isLoading && rows.length > 0;
+  const showCombinedProgress = isLoading && histLoading;
+
+  const combinedOperations = useMemo(() => [
+    {
+      id: "streaming",
+      label: "Streaming data",
+      isActive: isLoading,
+      icon: <Database className="h-3.5 w-3.5 animate-pulse" />,
+    },
+    {
+      id: "count",
+      label: "Counting hits",
+      isActive: isCountPending,
+      icon: <Hash className="h-3.5 w-3.5 animate-pulse" />,
+    },
+    {
+      id: "histogram",
+      label: "Building histogram",
+      isActive: histLoading,
+      icon: <BarChart3 className="h-3.5 w-3.5 animate-pulse" />,
+    },
+  ], [isLoading, isCountPending, histLoading]);
 
   // Keyboard shortcuts: Cmd/Ctrl+Enter to execute, Esc to cancel (P8)
   useEffect(() => {
@@ -195,6 +229,11 @@ function DiscoverPageContent() {
           />
         )}
 
+        {/* Combined progress for parallel operations */}
+        {showCombinedProgress && (
+          <CombinedProgressIndicator operations={combinedOperations} />
+        )}
+
         {/* Inline error display (P7) */}
         {error && !isLoading && (
           <ErrorDisplay
@@ -245,11 +284,13 @@ function DiscoverPageContent() {
                     </Button>
                   )}
                 </div>
-                <DiscoverHistogram
-                  data={histogramData}
-                  isLoading={histLoading}
-                  onBarClick={handleHistogramBarClick}
-                />
+                <LoadingOverlay isLoading={histLoading} message="Building histogram...">
+                  <DiscoverHistogram
+                    data={histogramData}
+                    isLoading={false}
+                    onBarClick={handleHistogramBarClick}
+                  />
+                </LoadingOverlay>
               </div>
             )}
 
@@ -285,6 +326,10 @@ function DiscoverPageContent() {
                       {rows.length.toLocaleString()} of{" "}
                       {totalHits.toLocaleString()} hits
                     </span>
+                    <CountProgressIndicator
+                      isCounting={isCountPending}
+                      currentCount={rows.length}
+                    />
                     <CacheIndicator
                       isCached={cacheMetadata?.isCached || false}
                       cacheAge={cacheMetadata?.cacheAge}
@@ -298,7 +343,7 @@ function DiscoverPageContent() {
                   </span>
                 </div>
                 <div className="flex-1 overflow-auto relative">
-                  <DiscoverGrid
+                  <VirtualizedDiscoverGrid
                     rows={rows}
                     columns={schema.columns}
                     selectedColumns={selectedColumns}
@@ -306,6 +351,7 @@ function DiscoverPageContent() {
                     page={page}
                     pageSize={pageSize}
                     totalHits={totalHits}
+                    isApproximate={isApproximate}
                     onPageChange={setPage}
                     onPageSizeChange={setPageSize}
                     onFilterForValue={filterForValue}
@@ -313,11 +359,12 @@ function DiscoverPageContent() {
                     sorting={sorting}
                     onSortingChange={setSorting}
                   />
-                  {isLoading && rows.length > 0 && (
-                    <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    </div>
-                  )}
+                  <StreamingProgressIndicator
+                    isStreaming={isStreaming}
+                    rowCount={rows.length}
+                    totalHits={totalHits}
+                    className="absolute bottom-4 left-4 right-4 z-10"
+                  />
                 </div>
               </div>
             </div>

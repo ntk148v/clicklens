@@ -1,4 +1,5 @@
 import { describe, expect, it, mock, beforeEach } from "bun:test";
+import { NextResponse } from "next/server";
 import { GET } from "./route";
 
 // Mock dependencies
@@ -6,10 +7,22 @@ const mockGetSession = mock();
 const mockGetUserConfig = mock();
 const mockCreateClient = mock();
 const mockQuery = mock();
+const mockCheckPermission = mock();
 
 // Mock module imports
 mock.module("@/lib/auth", () => ({
   getSession: mockGetSession,
+  checkPermission: mockCheckPermission,
+  requireAuth: async () => {
+    const session = await mockGetSession();
+    if (!session.isLoggedIn || !session.user) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 },
+      );
+    }
+    return { session, config: mockGetUserConfig() };
+  },
 }));
 
 mock.module("@/lib/clickhouse", () => ({
@@ -50,7 +63,8 @@ describe("Discover API Route", () => {
     mockGetUserConfig.mockReset();
     mockCreateClient.mockReset();
     mockQuery.mockReset();
-    mockQuery.mockResolvedValue({ data: [] }); // Default empty result
+    mockCheckPermission.mockReset();
+    mockQuery.mockResolvedValue({ data: [] });
 
     // Default valid session
     mockGetSession.mockResolvedValue({
@@ -63,6 +77,9 @@ describe("Discover API Route", () => {
       host: "localhost",
       username: "testuser",
     });
+
+    // Default: permission granted
+    mockCheckPermission.mockResolvedValue(null);
 
     // Default client mock
     mockCreateClient.mockReturnValue({
@@ -96,9 +113,9 @@ describe("Discover API Route", () => {
       data: [{ engine: "MergeTree" }],
     });
 
-    // Mock metadata query response (count)
+    // Mock getEstimatedRows (called by executeApproxCount)
     mockQuery.mockResolvedValueOnce({
-      data: [{ cnt: 100 }],
+      data: [{ cnt: 1000000 }],
     });
 
     // Mock data query response
@@ -110,9 +127,9 @@ describe("Discover API Route", () => {
       data: mockRows,
     });
 
-    // Added timeColumn to trigger Chunking Path (which calls Count)
+    // Use 30-min range (below 24h threshold) to avoid time windowing
     const req = createRequest(
-      "http://localhost/api/clickhouse/discover?database=system&table=logs&limit=10&timeColumn=event_time&minTime=2024-01-01T00:00:00Z&maxTime=2025-01-01T00:00:00Z",
+      "http://localhost/api/clickhouse/discover?database=system&table=logs&limit=10&timeColumn=event_time&minTime=2024-01-01T09:00:00Z&maxTime=2024-01-01T09:30:00Z",
     );
     const res = await GET(req);
 
@@ -135,7 +152,7 @@ describe("Discover API Route", () => {
     expect(row1.message).toBe("Error 1");
 
     const trailingMeta = JSON.parse(lines[3]);
-    expect(trailingMeta.meta.totalHits).toBe(100);
+    expect(trailingMeta.meta.totalHits).toBe(1000000);
   });
 
   it("should handle Smart Search parameters", async () => {
@@ -152,35 +169,37 @@ describe("Discover API Route", () => {
       ],
     });
 
-    // Mock count
-    mockQuery.mockResolvedValueOnce({ data: [{ cnt: 5 }] });
+    // Mock getEstimatedRows (called by executeApproxCount)
+    mockQuery.mockResolvedValueOnce({
+      data: [{ cnt: 1000000 }],
+    });
 
     // Mock data
     mockQuery.mockResolvedValueOnce({ data: [] });
 
-    // Added timeColumn and consumed stream
+    // Use 30-min range to avoid windowing
     const req = createRequest(
-      "http://localhost/api/clickhouse/discover?database=sys&table=logs&limit=10&timeColumn=event_time&search=error&minTime=2024-01-01T00:00:00Z",
+      "http://localhost/api/clickhouse/discover?database=sys&table=logs&limit=10&timeColumn=event_time&search=error&minTime=2024-01-01T09:00:00Z&maxTime=2024-01-01T09:30:00Z",
     );
     const res = await GET(req);
     await consumeStream(res);
 
     const calls = mockQuery.mock.calls;
 
-    if (calls.length < 3) {
+    if (calls.length < 4) {
       console.error(
         "Smart Search Failed. Calls:",
         JSON.stringify(calls, null, 2),
       );
     }
 
-    // We expect at least 3 calls
-    expect(calls.length).toBeGreaterThanOrEqual(3);
+    expect(calls.length).toBeGreaterThanOrEqual(4);
 
-    // Call 0: Columns
-    // Call 1: Count
-    // Call 2: Data
-    const dataQueryArg = calls[2] ? calls[2][0] : "";
+    // Call 0: getTableEngine
+    // Call 1: columns query
+    // Call 2: getEstimatedRows
+    // Call 3: chunk data query (with hasToken)
+    const dataQueryArg = calls[3] ? calls[3][0] : "";
 
     expect(dataQueryArg).toContain("WHERE");
     expect(dataQueryArg).toContain("hasToken");
