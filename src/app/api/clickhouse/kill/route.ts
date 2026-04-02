@@ -28,7 +28,10 @@ export async function POST(
 ): Promise<NextResponse<KillResponse>> {
   try {
     const clientId = getClientIdentifier(request);
-    const rateLimit = checkRateLimit(`kill:${clientId}`, KILL_RATE_LIMIT, KILL_RATE_WINDOW_MS);
+    const rateLimit = await checkRateLimit(`kill:${clientId}`, {
+      maxRequests: KILL_RATE_LIMIT,
+      windowMs: KILL_RATE_WINDOW_MS,
+    });
     if (!rateLimit.success) {
       return NextResponse.json(
         { success: false, error: "Too many kill requests. Please slow down." },

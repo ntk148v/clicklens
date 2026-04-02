@@ -1,105 +1,22 @@
 /**
- * Simple in-memory rate limiter using sliding window algorithm
+ * Rate Limiter - Re-exports from hybrid implementation
  *
- * Used to protect login endpoint from brute-force attacks.
- * Note: In production with multiple instances, consider using Redis.
+ * @deprecated Use @/lib/cache/rate-limit directly for new code
  */
 
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
-
-// In-memory store for rate limit tracking
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-// Configuration
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = process.env.RATE_LIMIT_LOGIN ? parseInt(process.env.RATE_LIMIT_LOGIN) : 10;
-const CLEANUP_INTERVAL_MS = 60 * 1000; // Cleanup every minute
-
-// Periodic cleanup of expired entries
-let cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
-function startCleanup() {
-  if (cleanupInterval) return;
-
-  cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitStore.entries()) {
-      if (now > entry.resetTime) {
-        rateLimitStore.delete(key);
-      }
-    }
-  }, CLEANUP_INTERVAL_MS);
-
-  // Don't prevent process from exiting
-  if (cleanupInterval.unref) {
-    cleanupInterval.unref();
-  }
-}
-
-export interface RateLimitResult {
-  success: boolean;
-  remaining: number;
-  resetIn: number; // milliseconds until reset
-}
-
-/**
- * Check if a request should be rate limited
- *
- * @param identifier - Unique identifier for the client (e.g., IP address)
- * @param maxRequests - Maximum requests allowed in window (default: 5)
- * @param windowMs - Time window in milliseconds (default: 60000)
- * @returns RateLimitResult with success status and remaining attempts
- */
-export function checkRateLimit(
-  identifier: string,
-  maxRequests: number = RATE_LIMIT_MAX_REQUESTS,
-  windowMs: number = RATE_LIMIT_WINDOW_MS,
-): RateLimitResult {
-  // Start cleanup on first use
-  startCleanup();
-
-  const now = Date.now();
-  const entry = rateLimitStore.get(identifier);
-
-  // No existing entry or window expired
-  if (!entry || now > entry.resetTime) {
-    const resetTime = now + windowMs;
-    rateLimitStore.set(identifier, { count: 1, resetTime });
-    return {
-      success: true,
-      remaining: maxRequests - 1,
-      resetIn: windowMs,
-    };
-  }
-
-  // Within window, check count
-  if (entry.count >= maxRequests) {
-    return {
-      success: false,
-      remaining: 0,
-      resetIn: entry.resetTime - now,
-    };
-  }
-
-  // Increment counter
-  entry.count++;
-  rateLimitStore.set(identifier, entry);
-
-  return {
-    success: true,
-    remaining: maxRequests - entry.count,
-    resetIn: entry.resetTime - now,
-  };
-}
+export {
+  checkRateLimit,
+  resetRateLimit,
+  clearAllRateLimits,
+  getRateLimitStoreSize,
+  type RateLimitResult,
+} from "@/lib/cache/rate-limit";
 
 /**
  * Get list of trusted proxy IPs from environment.
  * Set TRUSTED_PROXY_IPS env var to a comma-separated list of proxy IPs.
  */
-function getTrustedProxies(): string[] {
+export function getTrustedProxies(): string[] {
   const ips = process.env.TRUSTED_PROXY_IPS;
   return ips ? ips.split(",").map((ip) => ip.trim()) : [];
 }
@@ -107,7 +24,7 @@ function getTrustedProxies(): string[] {
 /**
  * Check if an IP is in the trusted proxy list.
  */
-function isTrustedProxy(ip: string): boolean {
+export function isTrustedProxy(ip: string): boolean {
   const trustedProxies = getTrustedProxies();
   return trustedProxies.includes(ip);
 }
@@ -168,25 +85,4 @@ function simpleHash(str: string): string {
     hash = ((hash << 5) - hash + char) | 0;
   }
   return hash.toString(36);
-}
-
-/**
- * Reset rate limit for an identifier (useful for testing)
- */
-export function resetRateLimit(identifier: string): void {
-  rateLimitStore.delete(identifier);
-}
-
-/**
- * Clear all rate limits (useful for testing)
- */
-export function clearAllRateLimits(): void {
-  rateLimitStore.clear();
-}
-
-/**
- * Get current store size (useful for monitoring)
- */
-export function getRateLimitStoreSize(): number {
-  return rateLimitStore.size;
 }
