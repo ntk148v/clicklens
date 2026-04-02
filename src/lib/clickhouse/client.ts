@@ -15,8 +15,8 @@ import { ClickHouseClientImpl } from "./clients/client";
 export * from "./clients/types";
 export { ClickHouseClientImpl } from "./clients/client";
 
-const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_CACHED_CLIENTS = 50; // Reduced from 100
+const CLIENT_CACHE_TTL_MS = parseInt(process.env.CLIENT_CACHE_TTL_MS || "300000", 10); // 5 minutes default
+const MAX_CACHED_CLIENTS = parseInt(process.env.MAX_CACHED_CLIENTS || "50", 10);
 const CLEANUP_INTERVAL_MS = 60 * 1000; // Cleanup every minute
 
 interface CachedEntry {
