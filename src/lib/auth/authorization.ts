@@ -18,6 +18,10 @@ import {
   probeUserDatabaseAccess,
   probeUserTableAccess,
 } from "@/lib/clickhouse/grants";
+import {
+  getCachedPermissions,
+  setCachedPermissions,
+} from "@/lib/cache/auth-cache";
 
 /**
  * Available permission types
@@ -68,37 +72,29 @@ export async function checkPermission(
     );
   }
 
-  const client = createClient(config);
   const username = config.username;
 
   try {
-    // Get effective roles for the user
-    const effectiveRoles = await getEffectiveRoles(username);
+    const cached = await getCachedPermissions();
+    let permissions = cached.permissions;
+    const isCacheHit = cached.backend !== "fresh";
 
-    // Check if user has global access
-    const hasGlobalAccess = await checkGlobalAccess(username);
-
-    // Check the specific permission
-    const hasPermission = await checkSpecificPermission(
-      client,
-      config,
-      permission,
-      effectiveRoles,
-      hasGlobalAccess,
-      username,
-    );
-
-    if (!hasPermission) {
-      return NextResponse.json<AuthErrorResponse>(
-        {
-          success: false,
-          error: `Permission denied: ${permission} required`,
-        },
-        { status: 403 },
-      );
+    if (!isCacheHit) {
+      permissions = await computeAllPermissions(config, username);
+      await setCachedPermissions(permissions);
     }
 
-    return null; // Authorized
+    if (permissions.has(permission)) {
+      return null;
+    }
+
+    return NextResponse.json<AuthErrorResponse>(
+      {
+        success: false,
+        error: `Permission denied: ${permission} required`,
+      },
+      { status: 403 },
+    );
   } catch {
     console.error("Authorization check failed for session");
     return NextResponse.json<AuthErrorResponse>(
@@ -106,6 +102,117 @@ export async function checkPermission(
       { status: 500 },
     );
   }
+}
+
+/**
+ * Compute all permissions for a user (called when cache misses)
+ */
+async function computeAllPermissions(
+  config: import("@/lib/clickhouse").ClickHouseConfig,
+  username: string,
+): Promise<Set<string>> {
+  const permissions = new Set<string>();
+
+  const effectiveRoles = await getEffectiveRoles(username);
+  const hasGlobalAccess = await checkGlobalAccess(username);
+  const client = createClient(config);
+
+  const permissionChecks: Array<{ permission: Permission; check: () => Promise<boolean> }> = [
+    { permission: "canManageUsers", check: async () => {
+      if (effectiveRoles.has("clicklens_user_admin")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SHOW CREATE USER CURRENT_USER");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canViewProcesses", check: async () => {
+      if (effectiveRoles.has("clicklens_query_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SELECT 1 FROM system.processes LIMIT 1");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canKillQueries", check: async () => {
+      if (effectiveRoles.has("clicklens_user_admin")) return true;
+      if (effectiveRoles.has("clicklens_query_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SHOW CREATE USER CURRENT_USER");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canViewCluster", check: async () => {
+      if (effectiveRoles.has("clicklens_cluster_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SELECT 1 FROM system.metrics LIMIT 1");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canBrowseTables", check: async () => {
+      if (effectiveRoles.has("clicklens_table_explorer")) return true;
+      if (hasGlobalAccess) return true;
+      return await probeUserTableAccess(config);
+    }},
+    { permission: "canExecuteQueries", check: async () => {
+      if (hasGlobalAccess) return true;
+      if (await hasAccessibleDatabases(username)) return true;
+      const probeResult = await probeUserDatabaseAccess(config);
+      return probeResult.hasAccess;
+    }},
+    { permission: "canDiscover", check: async () => {
+      if (hasGlobalAccess) return true;
+      if (await hasAccessibleDatabases(username)) return true;
+      const probeResult = await probeUserDatabaseAccess(config);
+      return probeResult.hasAccess;
+    }},
+    { permission: "canViewSettings", check: async () => {
+      if (effectiveRoles.has("clicklens_settings_admin")) return true;
+      return hasGlobalAccess;
+    }},
+    { permission: "canViewSystemLogs", check: async () => {
+      if (effectiveRoles.has("clicklens_cluster_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SELECT 1 FROM system.text_log LIMIT 1");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canViewServerLogs", check: async () => {
+      if (effectiveRoles.has("clicklens_cluster_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SELECT 1 FROM system.text_log LIMIT 1");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canViewCrashLogs", check: async () => {
+      if (effectiveRoles.has("clicklens_cluster_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SELECT 1 FROM system.crash_log LIMIT 1");
+        return true;
+      } catch { return false; }
+    }},
+    { permission: "canViewSessionLogs", check: async () => {
+      if (effectiveRoles.has("clicklens_cluster_monitor")) return true;
+      if (hasGlobalAccess) return true;
+      try {
+        await client.query("SELECT 1 FROM system.session_log LIMIT 1");
+        return true;
+      } catch { return false; }
+    }},
+  ];
+
+  for (const { permission, check } of permissionChecks) {
+    if (await check()) {
+      permissions.add(permission);
+    }
+  }
+
+  return permissions;
 }
 
 /**
