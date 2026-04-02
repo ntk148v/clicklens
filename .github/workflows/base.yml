@@ -117,6 +117,11 @@ jobs:
         if: ${{ inputs.job-type == 'lint' }}
         run: bun run lint
 
+      # === Type Checking ===
+      - name: Type Check
+        if: ${{ inputs.job-type == 'lint' }}
+        run: bun run typecheck
+
       # === Tests ===
       - name: Run Tests
         if: ${{ inputs.job-type == 'test' }}
