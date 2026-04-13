@@ -264,29 +264,30 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
 
       if (page !== 1) {
         setPage(1);
-      } else if (filterToApply === queryStore.appliedFilter) {
-        fetchData({
-          selectedDatabase,
-          selectedTable,
-          selectedColumns: queryStore.selectedColumns,
-          selectedTimeColumn: queryStore.selectedTimeColumn,
-          activeMinTime,
-          activeMaxTime,
-          appliedFilter: filterToApply,
-          sorting: queryStore.sorting,
-          groupBy: queryStore.groupBy,
-          page,
-          pageSize,
-        });
-        fetchHistogram({
-          selectedDatabase,
-          selectedTable,
-          selectedTimeColumn: queryStore.selectedTimeColumn,
-          activeMinTime,
-          activeMaxTime,
-          appliedFilter: filterToApply,
-        });
       }
+
+      // Always fetch when user explicitly searches
+      fetchData({
+        selectedDatabase,
+        selectedTable,
+        selectedColumns: queryStore.selectedColumns,
+        selectedTimeColumn: queryStore.selectedTimeColumn,
+        activeMinTime,
+        activeMaxTime,
+        appliedFilter: filterToApply,
+        sorting: queryStore.sorting,
+        groupBy: queryStore.groupBy,
+        page,
+        pageSize,
+      });
+      fetchHistogram({
+        selectedDatabase,
+        selectedTable,
+        selectedTimeColumn: queryStore.selectedTimeColumn,
+        activeMinTime,
+        activeMaxTime,
+        appliedFilter: filterToApply,
+      });
     },
     [
       page,
@@ -516,9 +517,12 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
     }
   }, [schema, selectedDatabase, selectedTable, queryStore, loadColumnPreferences, applyDefaultColumns, selectDefaultTimeColumn]);
 
-  // Fetch data when schema is ready
+  // Fetch data when schema is ready (initial load only)
+  // Subsequent searches are triggered explicitly via handleSearch
+  const initialFetchRef = useRef(false);
   useEffect(() => {
-    if (schema) {
+    if (schema && !initialFetchRef.current) {
+      initialFetchRef.current = true;
       fetchData({
         selectedDatabase,
         selectedTable,
@@ -533,11 +537,31 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
         pageSize,
       });
     }
-  }, [schema, selectedDatabase, selectedTable, activeMinTime, activeMaxTime, page, pageSize, queryStore, fetchData]);
+  }, [schema, selectedDatabase, selectedTable]);
 
-  // Fetch histogram when schema is ready
+  // Refetch when pagination, sorting, or time range changes
   useEffect(() => {
-    if (schema) {
+    if (!schema || !initialFetchRef.current) return;
+    fetchData({
+      selectedDatabase,
+      selectedTable,
+      selectedColumns: queryStore.selectedColumns,
+      selectedTimeColumn: queryStore.selectedTimeColumn,
+      activeMinTime,
+      activeMaxTime,
+      appliedFilter: queryStore.appliedFilter,
+      sorting: queryStore.sorting,
+      groupBy: queryStore.groupBy,
+      page,
+      pageSize,
+    });
+  }, [page, pageSize, queryStore.sorting, queryStore.groupBy, activeMinTime, activeMaxTime]);
+
+  // Fetch histogram when schema is ready (initial load)
+  const initialHistogramRef = useRef(false);
+  useEffect(() => {
+    if (schema && !initialHistogramRef.current) {
+      initialHistogramRef.current = true;
       fetchHistogram({
         selectedDatabase,
         selectedTable,
@@ -547,7 +571,20 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
         appliedFilter: queryStore.appliedFilter,
       });
     }
-  }, [schema, selectedDatabase, selectedTable, activeMinTime, activeMaxTime, queryStore, fetchHistogram]);
+  }, [schema, selectedDatabase, selectedTable]);
+
+  // Refetch histogram when time range, filter, or time column changes
+  useEffect(() => {
+    if (!schema || !initialHistogramRef.current) return;
+    fetchHistogram({
+      selectedDatabase,
+      selectedTable,
+      selectedTimeColumn: queryStore.selectedTimeColumn,
+      activeMinTime,
+      activeMaxTime,
+      appliedFilter: queryStore.appliedFilter,
+    });
+  }, [activeMinTime, activeMaxTime, queryStore.appliedFilter, queryStore.selectedTimeColumn]);
 
   // Cleanup on unmount
   useEffect(() => {
