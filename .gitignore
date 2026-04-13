@@ -88,3 +88,7 @@ tags
 # Dependencies
 .sisyphus/*
 !.sisyphus/rules/
+
+.gemini/
+.qwen/
+.agent/
