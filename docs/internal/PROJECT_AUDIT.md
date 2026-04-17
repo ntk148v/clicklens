@@ -437,15 +437,15 @@ Feature roles are ClickHouse roles prefixed with `clicklens_`. Defined in `src/l
 
 **Table Explorer Endpoints:**
 
-| Endpoint                                       | Method | Description              |
-| ---------------------------------------------- | ------ | ------------------------ |
-| `/api/clickhouse/tables/explorer`              | GET    | Table explorer data      |
-| `/api/clickhouse/tables/explorer/columns`      | GET    | Table columns            |
-| `/api/clickhouse/tables/explorer/parts`        | GET    | Table parts              |
-| `/api/clickhouse/tables/explorer/merges`       | GET    | Active merges            |
-| `/api/clickhouse/tables/explorer/mutations`    | GET    | Pending mutations        |
-| `/api/clickhouse/tables/explorer/replicas`     | GET    | Replica status           |
-| `/api/clickhouse/tables/explorer/dependencies` | GET    | Table dependency graph   |
+| Endpoint                                       | Method | Description            |
+| ---------------------------------------------- | ------ | ---------------------- |
+| `/api/clickhouse/tables/explorer`              | GET    | Table explorer data    |
+| `/api/clickhouse/tables/explorer/columns`      | GET    | Table columns          |
+| `/api/clickhouse/tables/explorer/parts`        | GET    | Table parts            |
+| `/api/clickhouse/tables/explorer/merges`       | GET    | Active merges          |
+| `/api/clickhouse/tables/explorer/mutations`    | GET    | Pending mutations      |
+| `/api/clickhouse/tables/explorer/replicas`     | GET    | Replica status         |
+| `/api/clickhouse/tables/explorer/dependencies` | GET    | Table dependency graph |
 
 **Monitoring Endpoints:**
 
@@ -681,13 +681,14 @@ Built on shadcn/ui patterns with Radix primitives:
 
 High-performance virtualized data grids for large datasets:
 
-| Component                  | File                                      | Purpose                           |
-| -------------------------- | ----------------------------------------- | --------------------------------- |
-| **VirtualizedResultGrid**  | `src/components/sql/VirtualizedResultGrid.tsx` | SQL query results with virtual scrolling |
-| **VirtualizedDiscoverGrid**| `src/components/discover/VirtualizedDiscoverGrid.tsx` | Discover feature data with virtual scrolling |
-| **VirtualizedDataTable**   | `src/components/logging/VirtualizedDataTable.tsx` | Logging data with virtual scrolling |
+| Component                   | File                                                  | Purpose                                      |
+| --------------------------- | ----------------------------------------------------- | -------------------------------------------- |
+| **VirtualizedResultGrid**   | `src/components/sql/VirtualizedResultGrid.tsx`        | SQL query results with virtual scrolling     |
+| **VirtualizedDiscoverGrid** | `src/components/discover/VirtualizedDiscoverGrid.tsx` | Discover feature data with virtual scrolling |
+| **VirtualizedDataTable**    | `src/components/logging/VirtualizedDataTable.tsx`     | Logging data with virtual scrolling          |
 
 **Features:**
+
 - Efficient rendering of large datasets (10,000+ rows)
 - Graceful degradation to simple table on virtualization failure
 - Memory-efficient with row virtualization
@@ -698,6 +699,7 @@ High-performance virtualized data grids for large datasets:
 Centralized error handling system in `src/lib/error/handling.ts`:
 
 **Error Types:**
+
 - **Query Errors** (`formatQueryError`): ClickHouse query errors with categorization (SYNTAX, SCHEMA, TYPE, PERMISSION, RESOURCE, FUNCTION, SYSTEM, NETWORK, UNKNOWN)
 - **API Errors** (`apiError`): HTTP error responses with standardized format
 - **Cache Errors** (`RedisFallbackManager`): Redis failures with circuit breaker pattern
@@ -705,6 +707,7 @@ Centralized error handling system in `src/lib/error/handling.ts`:
 - **Network Errors** (`NetworkError`): Network failures with retry logic
 
 **Key Features:**
+
 - **Unified Error Interface**: `createUnifiedError()` provides consistent error structure with severity levels (low, medium, high, critical)
 - **Retry Logic**: `withRetry()` implements exponential backoff with jitter for retryable errors
 - **Virtualization Fallback**: `withVirtualizationFallback()` wraps virtualization operations with graceful degradation
@@ -712,6 +715,7 @@ Centralized error handling system in `src/lib/error/handling.ts`:
 - **Environment-Aware Sanitization**: Sensitive data (file paths, IPs, credentials) sanitized in production
 
 **Retry Configuration:**
+
 - Default: 3 retries with exponential backoff (1s base, 30s max)
 - Retryable status codes: 408, 429, 500, 502, 503, 504
 - Jitter factor: 0.1 for randomness
@@ -722,12 +726,13 @@ Two-tier caching system with Redis integration:
 
 **Cache Types:**
 
-| Cache          | Purpose                          | Storage Priority | Interface | TTL Range       |
-| -------------- | -------------------------------- | ---------------- | --------- | --------------- |
-| **HybridCache** | Metadata, monitoring, tables    | Redis primary    | Async     | 30s - 10min     |
-| **QueryCache**  | Query results                    | Memory primary   | Sync      | 5min default    |
+| Cache           | Purpose                      | Storage Priority | Interface | TTL Range    |
+| --------------- | ---------------------------- | ---------------- | --------- | ------------ |
+| **HybridCache** | Metadata, monitoring, tables | Redis primary    | Async     | 30s - 10min  |
+| **QueryCache**  | Query results                | Memory primary   | Sync      | 5min default |
 
 **HybridCache** (`src/lib/cache/hybrid-cache.ts`):
+
 - Pre-configured instances: `metadataCache` (500 entries), `monitoringCache` (100 entries), `tablesCache` (200 entries)
 - Redis as primary storage with in-memory LRU fallback
 - Separate TTLs for memory and Redis layers
@@ -735,12 +740,14 @@ Two-tier caching system with Redis integration:
 - Use for: databases, tables, columns, monitoring data, table explorer data
 
 **QueryCache** (`src/lib/cache/query-cache.ts`):
+
 - In-memory LRU cache with optional Redis fallback
 - Automatic cache key generation for complex query parameters
 - Cache metadata: hit/miss tracking, age, remaining TTL
 - Use for: Discover queries, SQL Console results
 
 **Redis Integration** (`src/lib/cache/redis-cache.ts`):
+
 - Pure Redis cache with get/set/delete operations
 - TTL support with configurable defaults
 - Graceful fallback to in-memory cache on Redis failure
@@ -748,6 +755,7 @@ Two-tier caching system with Redis integration:
 - Key prefixing for namespacing
 
 **Cache Invalidation:**
+
 - Pattern-based invalidation with wildcards (`*`, `?`)
 - Manual invalidation via `invalidateCache()` and `clearCache()`
 - Automatic TTL expiration

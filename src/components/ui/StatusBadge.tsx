@@ -66,22 +66,23 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 font-medium rounded-full",
+        "inline-flex items-center gap-1.5 font-medium rounded-full uppercase tracking-wider",
         config.bgColor,
         config.color,
         sizes.badge,
         className
       )}
+      style={{ fontSize: size === "sm" ? "10px" : "11px" }}
     >
       {showDot && (
         <span
           className={cn(
-            "rounded-full",
+            "rounded-full shrink-0",
             sizes.dot,
             status === "ok" && "bg-green-500",
             status === "warning" && "bg-yellow-500",
             status === "critical" && "bg-red-500",
-            status === "unknown" && "bg-gray-500"
+            status === "unknown" && "bg-gray-400"
           )}
         />
       )}
@@ -101,9 +102,9 @@ export function StatusDot({
   className?: string;
 }) {
   const sizes = {
-    sm: "w-2 h-2",
-    md: "w-3 h-3",
-    lg: "w-4 h-4",
+    sm: "w-1.5 h-1.5",
+    md: "w-2.5 h-2.5",
+    lg: "w-3.5 h-3.5",
   };
 
   return (
@@ -114,7 +115,7 @@ export function StatusDot({
         status === "ok" && "bg-green-500",
         status === "warning" && "bg-yellow-500",
         status === "critical" && "bg-red-500",
-        status === "unknown" && "bg-gray-500",
+        status === "unknown" && "bg-gray-400",
         className
       )}
       title={statusConfig[status].label}

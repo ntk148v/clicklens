@@ -4,10 +4,10 @@ This directory contains the caching infrastructure for ClickLens. We maintain **
 
 ## Overview
 
-| Cache | Purpose | Storage | Interface | TTL |
-|-------|---------|---------|-----------|-----|
-| **HybridCache** | Metadata, monitoring, tables | Redis + In-memory LRU | Async | Longer (30s - 10min) |
-| **QueryCache** | Query results | In-memory LRU + Redis fallback | Sync | Shorter (5min default) |
+| Cache           | Purpose                      | Storage                        | Interface | TTL                    |
+| --------------- | ---------------------------- | ------------------------------ | --------- | ---------------------- |
+| **HybridCache** | Metadata, monitoring, tables | Redis + In-memory LRU          | Async     | Longer (30s - 10min)   |
+| **QueryCache**  | Query results                | In-memory LRU + Redis fallback | Sync      | Shorter (5min default) |
 
 ## When to Use Each Cache
 
@@ -21,14 +21,13 @@ This directory contains the caching infrastructure for ClickLens. We maintain **
 - You need **longer TTL** (30 seconds to 10 minutes)
 
 **Example:**
+
 ```typescript
 import { metadataCache, getOrSet } from "@/lib/cache";
 
 // Cache database list
-const databases = await getOrSet(
-  metadataCache,
-  "databases",
-  async () => fetchDatabasesFromClickHouse()
+const databases = await getOrSet(metadataCache, "databases", async () =>
+  fetchDatabasesFromClickHouse(),
 );
 ```
 
@@ -41,6 +40,7 @@ const databases = await getOrSet(
 - Data is **request-specific** and short-lived
 
 **Example:**
+
 ```typescript
 import { getQueryCache, executeWithCache } from "@/lib/cache/query-cache";
 
@@ -55,10 +55,8 @@ const cacheKey = queryCache.generateDiscoverKey({
 });
 
 // Execute with caching
-const result = await executeWithCache(
-  queryCache,
-  cacheKey,
-  async () => executeClickHouseQuery(sql)
+const result = await executeWithCache(queryCache, cacheKey, async () =>
+  executeClickHouseQuery(sql),
 );
 ```
 
@@ -92,19 +90,20 @@ const customCache = createQueryCache({
 
 ## Key Differences
 
-| Aspect | HybridCache | QueryCache |
-|--------|-------------|------------|
-| **Primary Use** | Server-side metadata | Client query results |
-| **Interface** | Async (`async get/set`) | Sync (`get/set`) |
-| **Storage Priority** | Redis primary, memory fallback | Memory primary, Redis optional |
-| **Key Generation** | Manual | Automatic (built-in generators) |
-| **TTL Strategy** | Separate memory/Redis TTL | Single TTL |
-| **Thundering Herd** | Built-in deduplication | Via `executeWithCache` helper |
-| **Cache Metadata** | Basic (size, keys) | Rich (hit/miss, age, remaining TTL) |
+| Aspect               | HybridCache                    | QueryCache                          |
+| -------------------- | ------------------------------ | ----------------------------------- |
+| **Primary Use**      | Server-side metadata           | Client query results                |
+| **Interface**        | Async (`async get/set`)        | Sync (`get/set`)                    |
+| **Storage Priority** | Redis primary, memory fallback | Memory primary, Redis optional      |
+| **Key Generation**   | Manual                         | Automatic (built-in generators)     |
+| **TTL Strategy**     | Separate memory/Redis TTL      | Single TTL                          |
+| **Thundering Herd**  | Built-in deduplication         | Via `executeWithCache` helper       |
+| **Cache Metadata**   | Basic (size, keys)             | Rich (hit/miss, age, remaining TTL) |
 
 ## Cache Invalidation
 
 ### HybridCache
+
 ```typescript
 import { invalidateCache, clearCache } from "@/lib/cache";
 
@@ -116,6 +115,7 @@ await clearCache(metadataCache);
 ```
 
 ### QueryCache
+
 ```typescript
 import { getQueryCache } from "@/lib/cache/query-cache";
 
@@ -159,10 +159,12 @@ src/lib/cache/
 If you're considering consolidating these caches:
 
 **DO NOT consolidate** - They serve fundamentally different purposes:
+
 - HybridCache is optimized for **shared, long-lived metadata** with Redis as primary
 - QueryCache is optimized for **fast, request-specific results** with memory as primary
 
 Consolidating would require compromising on either:
+
 - Performance (making QueryCache async)
 - Sharing (removing Redis from HybridCache)
 - TTL flexibility (unifying TTL strategies)

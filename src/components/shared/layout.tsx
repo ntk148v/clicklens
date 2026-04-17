@@ -55,7 +55,9 @@ interface FlexBetweenProps {
  */
 export function FlexBetween({ children, className }: FlexBetweenProps) {
   return (
-    <div className={cn("layout-flex-between", className)}>{children}</div>
+    <div className={cn("flex items-center justify-between gap-4", className)}>
+      {children}
+    </div>
   );
 }
 
@@ -67,10 +69,6 @@ interface CardContainerProps {
 
 /**
  * Reusable card container with consistent styling
- * @example
- * <CardContainer variant="hover">
- *   <CardContent />
- * </CardContainer>
  */
 export function CardContainer({
   children,
@@ -78,9 +76,9 @@ export function CardContainer({
   variant = "default",
 }: CardContainerProps) {
   const variants = {
-    default: "card-default",
-    muted: "card-muted",
-    hover: "card-hover",
+    default: "bg-card shadow-stack rounded-lg",
+    muted: "bg-muted shadow-border rounded-lg",
+    hover: "bg-card shadow-stack rounded-lg hover:shadow-lg transition-all",
   };
 
   return <div className={cn(variants[variant], className)}>{children}</div>;
@@ -95,10 +93,6 @@ interface ScrollableContainerProps {
 
 /**
  * Scrollable container with custom scrollbar styling
- * @example
- * <ScrollableContainer direction="y" maxHeight="400px">
- *   <LongContent />
- * </ScrollableContainer>
  */
 export function ScrollableContainer({
   children,
@@ -107,9 +101,9 @@ export function ScrollableContainer({
   maxHeight,
 }: ScrollableContainerProps) {
   const directions = {
-    y: "scrollable-y",
-    x: "scrollable-x",
-    both: "scrollable-both",
+    y: "overflow-y-auto scrollbar-thin",
+    x: "overflow-x-auto scrollbar-thin",
+    both: "overflow-auto scrollbar-thin",
   };
 
   return (
@@ -131,19 +125,19 @@ interface TextProps {
  * Monospace text for data/code display
  */
 export function TextMono({ children, className }: TextProps) {
-  return <span className={cn("text-mono-data", className)}>{children}</span>;
+  return <span className={cn("font-mono text-sm tracking-tight", className)}>{children}</span>;
 }
 
 /**
  * Small muted text for secondary information
  */
 export function TextMuted({ children, className }: TextProps) {
-  return <span className={cn("text-muted-small", className)}>{children}</span>;
+  return <span className={cn("text-xs text-muted-foreground", className)}>{children}</span>;
 }
 
 /**
  * Small heading text
  */
 export function HeadingSm({ children, className }: TextProps) {
-  return <span className={cn("text-heading-sm", className)}>{children}</span>;
+  return <span className={cn("text-sm font-semibold tracking-tight", className)}>{children}</span>;
 }

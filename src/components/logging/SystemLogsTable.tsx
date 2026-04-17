@@ -19,44 +19,44 @@ function getLevelBadge(level: string) {
   switch (l) {
     case "fatal":
       return (
-        <Badge className="bg-red-900 text-red-100 hover:bg-red-900 border-0">
+        <Badge className="bg-red-500/10 text-red-600 shadow-border border-0 uppercase">
           Fatal
         </Badge>
       );
     case "error":
       return (
-        <Badge className="bg-red-600 text-white hover:bg-red-600 border-0">
+        <Badge className="bg-red-500/10 text-red-600 shadow-border border-0 uppercase">
           Error
         </Badge>
       );
     case "warning":
       return (
-        <Badge className="bg-yellow-500 text-yellow-950 hover:bg-yellow-500 border-0">
+        <Badge className="bg-yellow-500/10 text-yellow-600 shadow-border border-0 uppercase">
           Warning
         </Badge>
       );
     case "information":
     case "info":
       return (
-        <Badge className="bg-blue-500 text-white hover:bg-blue-500 border-0">
+        <Badge className="bg-blue-500/10 text-blue-600 shadow-border border-0 uppercase">
           Info
         </Badge>
       );
     case "debug":
       return (
-        <Badge className="bg-gray-500 text-white hover:bg-gray-500 border-0">
+        <Badge className="bg-gray-500/10 text-gray-600 shadow-border border-0 uppercase">
           Debug
         </Badge>
       );
     case "trace":
       return (
-        <Badge className="bg-gray-400 text-gray-900 hover:bg-gray-400 border-0">
+        <Badge className="bg-gray-400/10 text-gray-600 shadow-border border-0 uppercase">
           Trace
         </Badge>
       );
     default:
       return (
-        <Badge variant="outline" className="text-muted-foreground">
+        <Badge variant="outline" className="text-muted-foreground uppercase">
           {level}
         </Badge>
       );

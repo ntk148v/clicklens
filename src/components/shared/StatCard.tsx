@@ -54,7 +54,7 @@ export function StatCard({
               <div className="flex items-baseline gap-2">
                 <p
                   className={cn(
-                    "text-2xl font-bold",
+                    "text-2xl font-semibold tracking-tight",
                     status && statusColors[status]
                   )}
                 >

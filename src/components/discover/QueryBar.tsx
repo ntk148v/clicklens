@@ -138,11 +138,11 @@ export function QueryBar({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={cn(
-            "pl-10 pr-20 font-mono text-sm",
-            error && "border-destructive focus-visible:ring-destructive",
+            "pl-10 pr-20 font-mono text-sm shadow-border dark:shadow-border-dark border-none",
+            error && "shadow-[0_0_0_1px_var(--destructive)] focus-visible:ring-destructive",
             isDirty &&
               !error &&
-              "border-yellow-500/50 focus-visible:ring-yellow-500/50",
+              "shadow-[0_0_0_1px_var(--primary)] focus-visible:ring-primary/50",
           )}
           disabled={isLoading}
         />
@@ -247,7 +247,7 @@ export function QueryBar({
         <Button
           variant="destructive"
           onClick={onCancel}
-          className="shrink-0"
+          className="shrink-0 font-medium"
         >
           <Square className="mr-2 h-4 w-4" />
           Cancel
@@ -256,9 +256,9 @@ export function QueryBar({
         <Button
           onClick={handleExecute}
           className={cn(
-            "shrink-0",
+            "shrink-0 font-medium shadow-stack dark:shadow-stack-dark",
             isDirty &&
-              "ring-2 ring-yellow-500/50 ring-offset-1 ring-offset-background",
+              "ring-2 ring-primary ring-offset-2 ring-offset-background",
           )}
         >
           <Search className="mr-2 h-4 w-4" />

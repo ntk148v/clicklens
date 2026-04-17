@@ -39,92 +39,102 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Custom radii from DESIGN.md */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 64px;
+  --radius-full: 9999px;
+
+  /* Custom shadow tokens */
+  --shadow-border: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  --shadow-border-dark: 0 0 0 1px rgba(255, 255, 255, 0.14);
+  --shadow-stack:
+    0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 2px rgba(0, 0, 0, 0.04),
+    0 8px 8px -8px rgba(0, 0, 0, 0.04), 0 0 0 1px #fafafa;
+  --shadow-stack-dark:
+    0 0 0 1px rgba(255, 255, 255, 0.14), 0 2px 2px rgba(0, 0, 0, 0.2),
+    0 8px 8px -8px rgba(0, 0, 0, 0.2), 0 0 0 1px #1d1d1d;
 }
 
-/* Light theme (default) - Clean and minimal */
+/* Light theme (Vercel-inspired + Yellow Primary) */
 :root {
   --radius: 0.5rem;
 
   --background: #ffffff;
-  --foreground: #0a0a0a;
+  --foreground: #171717;
   --card: #ffffff;
-  --card-foreground: #0a0a0a;
+  --card-foreground: #171717;
   --popover: #ffffff;
-  --popover-foreground: #0a0a0a;
-  --primary: #171717;
-  --primary-foreground: #fafafa;
-  --secondary: #f5f5f5;
+  --popover-foreground: #171717;
+  --primary: #4d4d4d;
+  --primary-foreground: #ffffff;
+  --secondary: #fafafa;
   --secondary-foreground: #171717;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --accent: #f5f5f5;
+  --muted: #fafafa;
+  --muted-foreground: #666666;
+  --accent: #fafafa;
   --accent-foreground: #171717;
-  --destructive: #ef4444;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #171717;
+  --destructive: #4d4d4d;
+  --border: #ebebeb;
+  --input: #ebebeb;
+  --ring: #0072f5;
 
   /* Chart colors */
-  --chart-1: #0ea5e9;
-  --chart-2: #22c55e;
+  --chart-1: #0a72ef;
+  --chart-2: #de1d8d;
   --chart-3: #f59e0b;
-  --chart-4: #8b5cf6;
+  --chart-4: #22c55e;
   --chart-5: #ec4899;
 
   /* Sidebar */
   --sidebar: #fafafa;
-  --sidebar-foreground: #0a0a0a;
+  --sidebar-foreground: #4d4d4d;
   --sidebar-primary: #171717;
-  --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: #f5f5f5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ebebeb;
   --sidebar-accent-foreground: #171717;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #171717;
+  --sidebar-border: #ebebeb;
+  --sidebar-ring: #0072f5;
+
+  /* Typography variables */
+  --tracking-display: -0.05em;
+  --tracking-heading: -0.04em;
+  --tracking-subheading: -0.02em;
 }
 
-/* Dark theme - ClickHouse inspired (black + yellow) */
+/* Dark theme (ClickLens Black + Yellow Primary + Vercel Depth) */
 .dark {
-  --background: #1d1d1d;
+  --background: #0a0a0a;
   --foreground: #fafafa;
-  --card: #141414;
+  --card: #111111;
   --card-foreground: #fafafa;
-  --popover: #141414;
+  --popover: #111111;
   --popover-foreground: #fafafa;
   --primary: #faff69;
-  --primary-foreground: #1d1d1d;
-  --secondary: #1f1f1f;
+  --primary-foreground: #0a0a0a;
+  --secondary: #171717;
   --secondary-foreground: #fafafa;
-  --muted: #1f1f1f;
-  --muted-foreground: #a3a3a3;
-  --accent: #1f1f1f;
+  --muted: #171717;
+  --muted-foreground: #a1a1a1;
+  --accent: #171717;
   --accent-foreground: #fafafa;
   --destructive: #dc2626;
-  --border: #2a2a2a;
-  --input: #2a2a2a;
+  --border: #262626;
+  --input: #262626;
   --ring: #faff69;
 
-  /* Chart colors */
-  --chart-1: #faff69;
-  --chart-2: #22c55e;
-  --chart-3: #3b82f6;
-  --chart-4: #a855f7;
-  --chart-5: #ec4899;
-
   /* Sidebar */
-  --sidebar: #1d1d1d;
-  --sidebar-foreground: #fafafa;
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #a1a1a1;
   --sidebar-primary: #faff69;
-  --sidebar-primary-foreground: #1d1d1d;
-  --sidebar-accent: #1f1f1f;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #171717;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #2a2a2a;
+  --sidebar-border: #262626;
   --sidebar-ring: #faff69;
 }
 
@@ -135,17 +145,43 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: "liga" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  .text-display {
+    @apply font-semibold;
+    letter-spacing: var(--tracking-display);
+    line-height: 1.1;
+  }
+
+  h2,
+  .text-heading {
+    @apply font-semibold;
+    letter-spacing: var(--tracking-heading);
+    line-height: 1.2;
+  }
+
+  h3,
+  .text-title {
+    @apply font-semibold;
+    letter-spacing: var(--tracking-subheading);
+    line-height: 1.33;
   }
 
   /* Monospace font for code/SQL */
   pre,
   code,
   .font-mono {
-    font-family: "ui-monospace, monospace";
+    font-family: var(--font-mono);
+    font-feature-settings:
+      "liga" 1,
+      "tnum" 1;
   }
 }
 
-/* Custom scrollbar */
+/* Custom design system utilities */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -163,190 +199,57 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
   }
 
-  /* Status Colors theme */
+  /* Shadow Border System */
+  .shadow-border {
+    box-shadow: var(--shadow-border);
+  }
+
+  .dark .shadow-border {
+    box-shadow: var(--shadow-border-dark);
+  }
+
+  .shadow-stack {
+    box-shadow: var(--shadow-stack);
+  }
+
+  .dark .shadow-stack {
+    box-shadow: var(--shadow-stack-dark);
+  }
+
+  /* Status Colors */
   .status-ok {
     @apply text-green-500;
   }
-
   .bg-status-ok {
     @apply bg-green-500/10;
   }
-
-  .border-status-ok {
-    @apply border-green-500/50;
-  }
-
   .status-warning {
     @apply text-yellow-500;
   }
-
   .bg-status-warning {
     @apply bg-yellow-500/10;
   }
-
-  .border-status-warning {
-    @apply border-yellow-500/50;
-  }
-
   .status-critical {
     @apply text-red-500;
   }
-
   .bg-status-critical {
     @apply bg-red-500/10;
   }
 
-  .border-status-critical {
-    @apply border-red-500/50;
-  }
-
-  .monitor-card {
-    @apply p-4 rounded-lg bg-card border shadow-sm;
-  }
-
-  /* Shared Data Table Styles */
+  /* Data Table Styles (retained for consistency) */
   .data-table-cell {
     @apply py-1.5 px-4 font-mono text-xs;
   }
 
-  /* ============================================
-     LAYOUT UTILITIES
-     ============================================ */
-
-  .layout-flex-center {
-    @apply flex items-center gap-2;
-  }
-
-  .layout-flex-between {
-    @apply flex items-center justify-between;
-  }
-
-  .layout-flex-col-full {
-    @apply flex flex-col h-full;
-  }
-
-  .layout-flex-wrap {
-    @apply flex flex-wrap gap-2;
-  }
-
-  /* ============================================
-     CARD PATTERNS
-     ============================================ */
-
-  .card-default {
-    @apply p-4 rounded-lg bg-card border shadow-sm;
-  }
-
-  .card-muted {
-    @apply p-4 rounded-lg bg-muted border;
-  }
-
-  .card-hover {
-    @apply p-4 rounded-lg bg-card border shadow-sm transition-colors hover:bg-muted/50;
-  }
-
-  /* ============================================
-     TEXT PATTERNS
-     ============================================ */
-
-  .text-mono-data {
-    @apply font-mono text-xs;
-  }
-
-  .text-mono-sm {
-    @apply font-mono text-sm;
-  }
-
-  .text-muted-small {
-    @apply text-muted-foreground text-sm;
-  }
-
-  .text-muted-xs {
-    @apply text-muted-foreground text-xs;
-  }
-
-  .text-heading-sm {
-    @apply text-sm font-medium;
-  }
-
-  .text-heading-base {
-    @apply text-base font-semibold;
-  }
-
-  /* ============================================
-     SCROLLABLE CONTAINERS
-     ============================================ */
-
-  .scrollable-y {
-    @apply overflow-y-auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--background);
-  }
-
-  .scrollable-x {
-    @apply overflow-x-auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--background);
-  }
-
-  .scrollable-both {
-    @apply overflow-auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--background);
-  }
-
-  /* ============================================
-     TABLE PATTERNS
-     ============================================ */
-
-  .table-container {
-    @apply relative overflow-auto border rounded-md;
-  }
-
-  .table-header-row {
-    @apply bg-muted/50 border-b;
-  }
-
-  .table-row-hover {
-    @apply hover:bg-muted/50 transition-colors;
-  }
-
-  /* ============================================
-     FORM PATTERNS
-     ============================================ */
-
-  .input-group {
-    @apply flex items-center gap-2;
-  }
-
-  .input-with-icon {
-    @apply pl-9;
-  }
-
-  /* ============================================
-     STATUS INDICATORS
-     ============================================ */
-
-  .badge-status {
-    @apply inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium;
-  }
-
-  /* ============================================
-     ANIMATION UTILITIES
-     ============================================ */
-
-  .animate-fade-in {
-    @apply animate-in fade-in duration-200;
-  }
-
-  .animate-slide-in {
-    @apply animate-in slide-in-from-bottom-2 duration-200;
+  /* Data Table Styles (retained for consistency) */
+  .data-table-cell {
+    @apply py-1.5 px-4 font-mono text-xs;
   }
 }

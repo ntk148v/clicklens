@@ -66,6 +66,7 @@ Full documentation is available at **[https://ntk148v.github.io/clicklens](https
 | [Contributing](https://ntk148v.github.io/clicklens/contributing)       | Development setup, code guidelines   |
 
 AI generated documentation:
+
 - <https://zread.ai/ntk148v/clicklens>
 - <https://deepwiki.com/ntk148v/clicklens>
 
