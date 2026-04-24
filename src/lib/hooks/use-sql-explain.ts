@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { toast } from "@/components/ui/use-toast";
+import { fetchApi } from "@/lib/api/client";
 import type { QueryTab } from "@/lib/store/tabs";
+import { toast } from "@/components/ui/use-toast";
 
 export type ExplainType = "AST" | "SYNTAX" | "PLAN" | "PIPELINE";
 
@@ -160,7 +161,7 @@ export function useSqlExplain(
         const cleanStatement = statement.replace(/^EXPLAIN\s+(\w+\s+)?/i, "");
         query = `EXPLAIN ${type} ${cleanStatement}`;
 
-        const response = await fetch("/api/clickhouse/query", {
+        const response = await fetchApi("/api/clickhouse/query", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

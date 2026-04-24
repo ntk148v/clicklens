@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { fetchApi } from "@/lib/api/client";
 import { useAuth } from "@/components/auth";
 
 export interface ClickHouseSetting {
@@ -51,7 +52,7 @@ export function useSettings(
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(
+      const response = await fetchApi(
         `/api/clickhouse/settings?search=${encodeURIComponent(
           debouncedSearch
         )}&scope=${scope}`
@@ -76,7 +77,7 @@ export function useSettings(
 
   const updateSetting = async (name: string, value: string | number) => {
     try {
-      const response = await fetch("/api/clickhouse/settings", {
+      const response = await fetchApi("/api/clickhouse/settings", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

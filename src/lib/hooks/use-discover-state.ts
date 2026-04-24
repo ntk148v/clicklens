@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { format } from "date-fns";
-import { toast } from "@/components/ui/use-toast";
-import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
+import { fetchApi } from "@/lib/api/client";
 import { MetadataCache } from "@/lib/clickhouse/metadata-cache";
+import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
 import type {
   TableSchema,
   DiscoverRow,
@@ -18,6 +18,7 @@ import {
   getFlexibleRangeFromEnum,
   getMinTimeFromRange,
 } from "@/lib/types/discover";
+import { toast } from "@/components/ui/use-toast";
 
 const COLUMN_PREFS_PREFIX = "clicklens_discover_columns_";
 const DEFAULT_PAGE_SIZE = 100;
@@ -450,7 +451,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
         params.set("groupBy", groupBy.join(","));
       }
 
-      const res = await fetch(`/api/clickhouse/discover?${params}`, {
+      const res = await fetchApi(`/api/clickhouse/discover?${params}`, {
         signal: controller.signal,
       });
 
@@ -541,7 +542,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       if (activeMaxTime) params.set("maxTime", activeMaxTime);
       if (appliedFilter.trim()) params.set("filter", appliedFilter.trim());
 
-      const res = await fetch(`/api/clickhouse/discover?${params}`, {
+      const res = await fetchApi(`/api/clickhouse/discover?${params}`, {
         signal: controller.signal,
       });
       const data = await res.json();
@@ -773,7 +774,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
 
     const loadDatabases = async () => {
       try {
-        const res = await fetch("/api/clickhouse/databases");
+        const res = await fetchApi("/api/clickhouse/databases");
         const data = await res.json();
         if (data.success && data.data) {
           const dbNames = data.data.map((d: { name: string }) => d.name);
@@ -826,7 +827,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
 
     const loadTables = async () => {
       try {
-        const res = await fetch(
+        const res = await fetchApi(
           `/api/clickhouse/tables?database=${encodeURIComponent(selectedDatabase)}`,
         );
         const data = await res.json();
@@ -868,7 +869,7 @@ export function useDiscoverState(): DiscoverState & DiscoverActions {
       setSchemaLoading(true);
       try {
         const fetchSchema = async () => {
-          const res = await fetch(
+          const res = await fetchApi(
             `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(selectedDatabase)}&table=${encodeURIComponent(selectedTable)}`,
           );
           const data = await res.json();

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bookmark, Play } from "lucide-react";
+import { type SavedQuery } from "@/app/api/saved-queries/route";
+import { fetchApi } from "@/lib/api/client";
+import { useTabsStore } from "@/lib/store/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bookmark, Play } from "lucide-react";
-import { useTabsStore } from "@/lib/store/tabs";
-import { type SavedQuery } from "@/app/api/saved-queries/route";
-
 interface SavedQueriesProps {
   onSelect?: (sql: string) => void;
 }
@@ -20,7 +20,7 @@ export function SavedQueries({ onSelect }: SavedQueriesProps) {
   const fetchQueries = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/saved-queries");
+      const res = await fetchApi("/api/saved-queries");
       const data = await res.json();
       if (data.success) {
         setQueries(data.data);

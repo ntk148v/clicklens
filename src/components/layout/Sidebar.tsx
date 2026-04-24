@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/utils";
 import {
   Database,
@@ -307,7 +308,11 @@ export function Sidebar() {
         <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
           <Link href="/" className="flex items-center gap-2 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg" />
+            <img
+              src={withBasePath("/logo.png")}
+              alt="Logo"
+              className="w-8 h-8 rounded-lg"
+            />
             {!collapsed && (
               <span className="font-semibold text-sidebar-foreground whitespace-nowrap">
                 ClickLens

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { toast } from "@/components/ui/use-toast";
-import { generateUUID } from "@/lib/utils";
-import { findStatementAtPosition } from "@/lib/sql";
+import { fetchApi } from "@/lib/api/client";
 import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
+import { findStatementAtPosition } from "@/lib/sql";
 import type { QueryTab, QueryHistoryEntry } from "@/lib/store/tabs";
+import { generateUUID } from "@/lib/utils";
+import { toast } from "@/components/ui/use-toast";
 
 interface User {
   host: string;
@@ -137,7 +138,7 @@ export function useSqlCursor({
     try {
       const controller = cancellationManager.createController(queryId);
 
-      const response = await fetch("/api/clickhouse/query", {
+      const response = await fetchApi("/api/clickhouse/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

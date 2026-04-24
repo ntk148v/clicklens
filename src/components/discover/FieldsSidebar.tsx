@@ -22,6 +22,7 @@ import {
   FolderGit2,
   X,
 } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
 import type { ColumnMetadata, TimeColumnCandidate } from "@/lib/types/discover";
 import { cn } from "@/lib/utils";
 import { TruncatedCell } from "@/components/monitoring";
@@ -181,7 +182,7 @@ export function FieldsSidebar({
         if (fieldValuesParams.filter)
           params.set("filter", fieldValuesParams.filter);
 
-        const res = await fetch(
+        const res = await fetchApi(
           `/api/clickhouse/discover/field-values?${params}`,
         );
         const data = await res.json();

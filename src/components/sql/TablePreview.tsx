@@ -16,6 +16,7 @@ import {
   ClickableTableRow,
 } from "@/components/ui/table";
 import { Database, Columns } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
 import { cn, formatDateTime } from "@/lib/utils";
 import { PaginationControls, TruncatedCell } from "../monitoring";
 
@@ -68,7 +69,7 @@ export function TablePreview({ database, table }: TablePreviewProps) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await fetch(
+        const res = await fetchApi(
           `/api/clickhouse/tables/${encodeURIComponent(
             table
           )}?database=${encodeURIComponent(
