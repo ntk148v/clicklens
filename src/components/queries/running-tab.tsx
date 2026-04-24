@@ -10,11 +10,17 @@ import {
   ArrowDown,
   ArrowUpDown,
 } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
+import {
+  useRunningQueries,
+  type RunningQuery,
+} from "@/lib/hooks/use-query-analytics";
+import { formatBytes } from "@/lib/hooks/use-monitoring";
+import { cn } from "@/lib/utils";
 // Table imports removed as we use VirtualizedDataTable
 import { VirtualizedDataTable } from "@/components/logging/VirtualizedDataTable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 import {
   AlertDialog,
@@ -28,10 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import { useRunningQueries } from "@/lib/hooks/use-query-analytics";
-import { formatBytes } from "@/lib/hooks/use-monitoring";
 import { TruncatedCell } from "@/components/shared/TruncatedCell";
-import type { RunningQuery } from "@/lib/hooks/use-query-analytics";
 import { useAuth } from "@/components/auth";
 
 interface RunningTabProps {
@@ -74,7 +77,7 @@ export function RunningTab({ refreshInterval }: RunningTabProps) {
   const handleKillQuery = async (queryId: string) => {
     setKillingId(queryId);
     try {
-      const response = await fetch("/api/clickhouse/kill", {
+      const response = await fetchApi("/api/clickhouse/kill", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

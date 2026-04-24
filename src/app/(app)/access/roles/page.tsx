@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { fetchApi } from "@/lib/api/client";
 import { Header } from "@/components/layout";
 import { useAuth } from "@/components/auth";
 
@@ -191,7 +192,7 @@ export default function RolesPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/clickhouse/access/roles");
+      const response = await fetchApi("/api/clickhouse/access/roles");
       const data = await response.json();
 
       if (data.success) {
@@ -213,7 +214,7 @@ export default function RolesPage() {
     setLoadingSchema(true);
     try {
       // Fetch databases
-      const dbResponse = await fetch("/api/clickhouse/databases");
+      const dbResponse = await fetchApi("/api/clickhouse/databases");
       const dbData = await dbResponse.json();
       if (dbData.success && dbData.data) {
         // Filter out restricted databases
@@ -226,7 +227,7 @@ export default function RolesPage() {
         const allTables: TableInfo[] = [];
         const tablePromises = filteredDbs.map(async (db: DatabaseInfo) => {
           try {
-            const tablesResponse = await fetch(
+            const tablesResponse = await fetchApi(
               `/api/clickhouse/tables?database=${encodeURIComponent(db.name)}`
             );
             const tablesData = await tablesResponse.json();
@@ -325,7 +326,7 @@ export default function RolesPage() {
       const endpoint = "/api/clickhouse/access/roles";
       const method = isEditing ? "PUT" : "POST";
 
-      const response = await fetch(endpoint, {
+      const response = await fetchApi(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -365,7 +366,7 @@ export default function RolesPage() {
     setDeleting(roleName);
 
     try {
-      const response = await fetch("/api/clickhouse/access/roles", {
+      const response = await fetchApi("/api/clickhouse/access/roles", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

@@ -15,10 +15,11 @@ import {
   List,
   Layers,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard, StatusBadge } from "@/components/monitoring";
+import { fetchApi } from "@/lib/api/client";
 import { formatNumber } from "@/lib/hooks/use-monitoring";
 import type { MonitoringApiResponse } from "@/lib/clickhouse/monitoring";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard, StatusBadge } from "@/components/monitoring";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { ErrorDisplay } from "@/components/ui/error-display";
 
@@ -61,7 +62,7 @@ export function KeeperTab({ refreshInterval = 30000 }: KeeperTabProps) {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch("/api/clickhouse/monitoring/keeper");
+      const response = await fetchApi("/api/clickhouse/monitoring/keeper");
       const result: MonitoringApiResponse<KeeperData> = await response.json();
 
       if (result.success && result.data) {

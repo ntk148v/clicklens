@@ -7,15 +7,19 @@ import {
   Network,
   XCircle,
 } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
+import { useHealthChecks } from "@/lib/hooks/use-monitoring";
+import {
+  getMinTimeFromRange,
+  type FlexibleTimeRange,
+  type TimeRange,
+} from "@/lib/types/discover";
+import { MonitoringService, type DashboardResponse } from "@/services/monitoring";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { MonitoringOverviewSkeleton } from "@/components/monitoring/MonitoringOverviewSkeleton";
-import { useHealthChecks } from "@/lib/hooks/use-monitoring";
-import type { FlexibleTimeRange } from "@/lib/types/discover";
-import { getMinTimeFromRange, type TimeRange } from "@/lib/types/discover";
-import { MonitoringService, type DashboardResponse } from "@/services/monitoring";
 import { ClusterInfo, NodeInfo, HealthSummary, MetricsGrid } from "@/components/monitoring/dashboard";
 
 interface OverviewTabProps {
@@ -82,7 +86,7 @@ export function OverviewTab({ timeRange, initialData }: OverviewTabProps) {
           params.set("minTime", lastFetchTimeRef.current);
       }
 
-      const response = await fetch(
+      const response = await fetchApi(
         `/api/clickhouse/monitoring/dashboard?${params.toString()}`,
       );
       const result = await response.json();

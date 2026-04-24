@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchApi } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth";
 import {
@@ -44,7 +45,7 @@ export function SaveQueryDialog({
     setError(null);
 
     try {
-      const res = await fetch("/api/saved-queries", {
+      const res = await fetchApi("/api/saved-queries", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Code, Copy, Check } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
+import { copyToClipboard } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TableExplorerSkeleton } from "@/components/tables/TableExplorerSkeleton";
-import { copyToClipboard } from "@/lib/utils";
 import { useAuth } from "@/components/auth";
 
 interface DdlTabProps {
@@ -27,7 +28,7 @@ export function DdlTab({ database, table }: DdlTabProps) {
       setError(null);
 
       try {
-        const response = await fetch("/api/clickhouse/query", {
+        const response = await fetchApi("/api/clickhouse/query", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

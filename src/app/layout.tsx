@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { withBasePath } from "@/lib/base-path";
 import { ThemeProvider } from "@/components/theme";
 import { Toaster } from "@/components/ui/toaster";
 import { headers } from "next/headers";
@@ -28,21 +29,21 @@ export const metadata: Metadata = {
     "analytics",
   ],
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/apple-touch-icon.png",
+    icon: withBasePath("/logo.png"),
+    shortcut: withBasePath("/logo.png"),
+    apple: withBasePath("/apple-touch-icon.png"),
     other: [
       {
         rel: "icon",
         type: "image/png",
         sizes: "192x192",
-        url: "/android-chrome-192x192.png",
+        url: withBasePath("/android-chrome-192x192.png"),
       },
       {
         rel: "icon",
         type: "image/png",
         sizes: "512x512",
-        url: "/android-chrome-512x512.png",
+        url: withBasePath("/android-chrome-512x512.png"),
       },
     ],
   },

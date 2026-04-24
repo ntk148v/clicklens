@@ -9,6 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { fetchApi } from "@/lib/api/client";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useTabsStore } from "@/lib/store/tabs";
 
@@ -80,7 +81,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const fetchPermissions = useCallback(async () => {
     try {
-      const response = await fetch("/api/auth/permissions");
+      const response = await fetchApi("/api/auth/permissions");
       const data = await response.json();
 
       if (data.success && data.permissions) {
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/api/auth/session");
+      const response = await fetchApi("/api/auth/session");
       const data = await response.json();
 
       if (data.isLoggedIn && data.user) {
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = useCallback(
     async (credentials: LoginCredentials) => {
       try {
-        const response = await fetch("/api/auth/login", {
+        const response = await fetchApi("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(credentials),
@@ -171,7 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetchApi("/api/auth/logout", { method: "POST" });
       setUser(null);
       setPermissions(null);
       setCsrfToken(null);

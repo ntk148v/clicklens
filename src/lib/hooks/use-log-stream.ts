@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { fetchApi } from "@/lib/api/client";
 import type { LogEntry } from "./use-logs";
 
 interface UseLogStreamConfig<P> {
@@ -55,7 +56,7 @@ export function useLogStream<P extends Record<string, unknown>>({
       abortControllerRef.current = new AbortController();
 
       try {
-        const res = await fetch(`${fetchUrl}?${params.toString()}`, {
+        const res = await fetchApi(`${fetchUrl}?${params.toString()}`, {
           signal: abortControllerRef.current.signal,
         });
 
