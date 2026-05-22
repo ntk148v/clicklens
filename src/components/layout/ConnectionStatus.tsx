@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Circle } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -8,7 +10,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Circle } from "lucide-react";
 
 interface ConnectionStatus {
   connected: boolean;
@@ -27,7 +28,7 @@ export function ConnectionStatus() {
     const checkConnection = async () => {
       setStatus((prev) => ({ ...prev, loading: true }));
       try {
-        const response = await fetch("/api/clickhouse/ping");
+        const response = await fetchApi("/api/clickhouse/ping");
         const data = await response.json();
         setStatus({
           connected: data.connected,

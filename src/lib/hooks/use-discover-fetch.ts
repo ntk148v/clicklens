@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
-import { toast } from "@/components/ui/use-toast";
-import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
-import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
-import type { DiscoverRow } from "@/lib/types/discover";
 import type { SortingState } from "@tanstack/react-table";
+import { fetchApi } from "@/lib/api/client";
+import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
+import { parseNDJSONStream } from "@/lib/streams/ndjson-parser";
+import type { DiscoverRow } from "@/lib/types/discover";
+import { toast } from "@/components/ui/use-toast";
 
 export interface FetchDataParams {
   selectedDatabase: string;
@@ -111,7 +112,7 @@ export function useDiscoverFetch(options: UseDiscoverFetchOptions): UseDiscoverF
           urlParams.set("groupBy", groupBy.join(","));
         }
 
-        const res = await fetch(`/api/clickhouse/discover?${urlParams}`, {
+        const res = await fetchApi(`/api/clickhouse/discover?${urlParams}`, {
           signal: controller.signal,
         });
 

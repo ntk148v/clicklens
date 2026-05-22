@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { fetchApi } from "@/lib/api/client";
 import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
 import type { HistogramDataPoint } from "@/stores/discover/data-store";
 
@@ -64,7 +65,7 @@ export function useDiscoverHistogram(options: UseDiscoverHistogramOptions): UseD
         if (activeMaxTime) urlParams.set("maxTime", activeMaxTime);
         if (appliedFilter.trim()) urlParams.set("filter", appliedFilter.trim());
 
-        const res = await fetch(`/api/clickhouse/discover?${urlParams}`, {
+        const res = await fetchApi(`/api/clickhouse/discover?${urlParams}`, {
           signal: controller.signal,
         });
         const data = await res.json();

@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -48,7 +49,7 @@ export function PasswordChangeForm() {
   async function onSubmit(data: PasswordFormValues) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/password", {
+      const response = await fetchApi("/api/auth/password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

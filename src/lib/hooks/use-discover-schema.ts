@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { toast } from "@/components/ui/use-toast";
+import { fetchApi } from "@/lib/api/client";
 import { MetadataCache } from "@/lib/clickhouse/metadata-cache";
 import type {
   TableSchema,
   ColumnMetadata,
   TimeColumnCandidate,
 } from "@/lib/types/discover";
+import { toast } from "@/components/ui/use-toast";
 
 const COLUMN_PREFS_PREFIX = "clicklens_discover_columns_";
 const DEFAULT_COLUMN_COUNT = 10;
@@ -111,7 +112,7 @@ export function useDiscoverSchema(options: UseDiscoverSchemaOptions): UseDiscove
       setSchemaLoading(true);
       try {
         const fetchSchema = async () => {
-          const res = await fetch(
+          const res = await fetchApi(
             `/api/clickhouse/schema/table-columns?database=${encodeURIComponent(selectedDatabase)}&table=${encodeURIComponent(selectedTable)}`,
           );
           const data = await res.json();

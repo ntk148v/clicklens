@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { toast } from "@/components/ui/use-toast";
+import { fetchApi } from "@/lib/api/client";
 import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
 import { useQueryStore } from "@/stores/discover/query-store";
 import { createDiscoverDataStore } from "@/stores/discover/data-store";
@@ -24,6 +24,7 @@ import {
   getFlexibleRangeFromEnum,
   getMinTimeFromRange,
 } from "@/lib/types/discover";
+import { toast } from "@/components/ui/use-toast";
 
 const DEFAULT_PAGE_SIZE = 100;
 const DEFAULT_COLUMN_COUNT = 10;
@@ -403,7 +404,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
 
     const loadDatabases = async () => {
       try {
-        const res = await fetch("/api/clickhouse/databases");
+        const res = await fetchApi("/api/clickhouse/databases");
         const data = await res.json();
         if (data.success && data.data) {
           const dbNames = data.data.map((d: { name: string }) => d.name);
@@ -453,7 +454,7 @@ export function useDiscoverPage(): DiscoverPageState & DiscoverPageActions {
 
     const loadTables = async () => {
       try {
-        const res = await fetch(
+        const res = await fetchApi(
           `/api/clickhouse/tables?database=${encodeURIComponent(selectedDatabase)}`,
         );
         const data = await res.json();

@@ -1,4 +1,15 @@
+import { withBasePath } from "@/lib/base-path";
 import { toast } from "@/components/ui/use-toast";
+
+/**
+ * Same-origin `fetch` with `basePath` applied (client-side relative URLs).
+ */
+export function fetchApi(
+  input: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return fetch(withBasePath(input), init);
+}
 
 /**
  * Standard API error response interface
@@ -20,7 +31,7 @@ export async function fetchClient<T = unknown>(
   url: string,
   options?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(url, options);
+  const response = await fetchApi(url, options);
 
   // Handle errors based on status code
   if (!response.ok) {
@@ -53,7 +64,7 @@ export async function fetchClient<T = unknown>(
           // Delay slightly to let toast render, or just redirect
           // For immediate security, redirecting is better.
           // App Router handling might be cleaner with a hook, but this function is a utility.
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(
+          window.location.href = `${withBasePath("/login")}?callbackUrl=${encodeURIComponent(
             window.location.pathname + window.location.search,
           )}`;
         }

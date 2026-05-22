@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { fetchApi } from "@/lib/api/client";
 import type { SystemUser, SystemRole, SystemGrant } from "@/lib/clickhouse";
 
 interface RoleGrant {
@@ -46,10 +47,10 @@ export const useAccessStore = create<AccessState>()((set, get) => ({
 
     try {
       const results = await Promise.allSettled([
-        fetch("/api/clickhouse/access/users").then((r) => r.json()),
-        fetch("/api/clickhouse/access/roles").then((r) => r.json()),
-        fetch("/api/clickhouse/access/grants").then((r) => r.json()),
-        fetch("/api/clickhouse/access/role-grants").then((r) => r.json()),
+        fetchApi("/api/clickhouse/access/users").then((r) => r.json()),
+        fetchApi("/api/clickhouse/access/roles").then((r) => r.json()),
+        fetchApi("/api/clickhouse/access/grants").then((r) => r.json()),
+        fetchApi("/api/clickhouse/access/role-grants").then((r) => r.json()),
       ]);
 
       const [usersResult, rolesResult, grantsResult, roleGrantsResult] = results;

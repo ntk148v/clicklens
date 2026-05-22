@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { fetchApi } from "@/lib/api/client";
+import { withBasePath } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,7 +33,7 @@ export default function LoginPage() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch("/api/auth/session");
+        const response = await fetchApi("/api/auth/session");
         const data = await response.json();
         if (data.isLoggedIn) {
           router.push("/");
@@ -51,7 +53,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetchApi("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -95,7 +97,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.png"
+              src={withBasePath("/logo.png")}
               alt="ClickLens Logo"
               className="w-full h-full object-contain"
             />

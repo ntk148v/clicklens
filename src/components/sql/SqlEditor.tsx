@@ -24,6 +24,7 @@ import {
   bracketMatching,
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
+import { fetchApi } from "@/lib/api/client";
 
 // ClickHouse SQL dialect with common functions and keywords
 const clickhouseDialect = SQLDialect.define({
@@ -491,7 +492,7 @@ function createSchemaCompletionSource(
       if (matchingDb) {
         // Fetch tables for this specific database from API
         try {
-          const res = await fetch(
+          const res = await fetchApi(
             `/api/clickhouse/tables?database=${encodeURIComponent(matchingDb)}`,
           );
           const data = await res.json();

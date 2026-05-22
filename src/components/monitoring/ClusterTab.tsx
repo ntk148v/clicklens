@@ -9,6 +9,13 @@ import {
   AlertTriangle,
   Layers,
 } from "lucide-react";
+import { fetchApi } from "@/lib/api/client";
+import type {
+  MonitoringApiResponse,
+  ClusterInfo,
+  ClusterSummary,
+  ClusterNode,
+} from "@/lib/clickhouse/monitoring";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tooltip,
@@ -19,12 +26,6 @@ import {
 import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { Badge } from "@/components/ui/badge";
 import { StatCard, StatusDot } from "@/components/monitoring";
-import type {
-  MonitoringApiResponse,
-  ClusterInfo,
-  ClusterSummary,
-  ClusterNode,
-} from "@/lib/clickhouse/monitoring";
 
 interface ClusterTabProps {
   refreshInterval?: number;
@@ -45,7 +46,7 @@ export function ClusterTab({ refreshInterval = 30000 }: ClusterTabProps) {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch("/api/clickhouse/monitoring/cluster");
+      const response = await fetchApi("/api/clickhouse/monitoring/cluster");
       const result: MonitoringApiResponse<ClusterNodesResponse> =
         await response.json();
 

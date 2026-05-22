@@ -19,8 +19,8 @@ describe("fetchClient", () => {
   // Save original global.fetch
   const originalFetch = global.fetch;
   const originalWindow = global.window;
-
   beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_BASE_PATH;
     // Reset mocks
     (toast as jest.Mock).mockClear();
 
@@ -37,20 +37,40 @@ describe("fetchClient", () => {
   afterEach(() => {
     global.fetch = originalFetch;
     global.window = originalWindow;
+    delete process.env.NEXT_PUBLIC_BASE_PATH;
   });
 
   it("should return data on successful response (200)", async () => {
     const mockData = { id: 1, name: "test" };
-    global.fetch = jest.fn(() =>
+    const fetchMock = jest.fn(() =>
       Promise.resolve({
         ok: true,
         status: 200,
         json: () => Promise.resolve(mockData),
       } as Response),
     );
+    global.fetch = fetchMock;
 
     const result = await fetchClient("/api/test");
     expect(result).toEqual(mockData);
+    expect(fetchMock).toHaveBeenCalledWith("/api/test", undefined);
+  });
+
+  it("should prefix API paths when NEXT_PUBLIC_BASE_PATH is set", async () => {
+    process.env.NEXT_PUBLIC_BASE_PATH = "/lens";
+    const mockData = { ok: true };
+    const fetchMock = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockData),
+      } as Response),
+    );
+    global.fetch = fetchMock;
+
+    const result = await fetchClient("/api/test");
+    expect(result).toEqual(mockData);
+    expect(fetchMock).toHaveBeenCalledWith("/lens/api/test", undefined);
   });
 
   it("should return data unwrapped if wrapped in { success: true, data: ... }", async () => {
@@ -90,6 +110,26 @@ describe("fetchClient", () => {
     );
 
     expect(global.window.location.href).toContain("/login");
+  });
+
+  it("should redirect to login under base path on 401 when NEXT_PUBLIC_BASE_PATH is set", async () => {
+    process.env.NEXT_PUBLIC_BASE_PATH = "/lens";
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        json: () => Promise.resolve({ error: { message: "Auth required" } }),
+      } as Response),
+    );
+
+    try {
+      await fetchClient("/api/test");
+    } catch (error) {
+      expect((error as { status: number }).status).toBe(401);
+    }
+
+    expect(global.window.location.href).toContain("/lens/login");
   });
 
   it("should handle 403 Forbidden by toasting 'Permission Denied'", async () => {

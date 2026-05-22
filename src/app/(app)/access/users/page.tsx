@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { fetchApi } from "@/lib/api/client";
 import { Header } from "@/components/layout";
 import { useAuth } from "@/components/auth";
 
@@ -150,8 +151,8 @@ export default function UsersPage() {
     setError(null);
     try {
       const [usersRes, rolesRes] = await Promise.all([
-        fetch("/api/clickhouse/access/users"),
-        fetch("/api/clickhouse/access/roles"),
+        fetchApi("/api/clickhouse/access/users"),
+        fetchApi("/api/clickhouse/access/roles"),
       ]);
 
       const usersData = await usersRes.json();
@@ -233,7 +234,7 @@ export default function UsersPage() {
             roles: formData.selectedRoles,
           };
 
-      const response = await fetch(endpoint, {
+      const response = await fetchApi(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -269,7 +270,7 @@ export default function UsersPage() {
     setDeleting(userName);
 
     try {
-      const response = await fetch("/api/clickhouse/access/users", {
+      const response = await fetchApi("/api/clickhouse/access/users", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

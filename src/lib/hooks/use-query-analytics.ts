@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
+import { fetchApi } from "@/lib/api/client";
+
 // Types
 import type { RunningQuery } from "@/app/api/clickhouse/queries/running/route";
 import type { QueryHistoryEntry } from "@/app/api/clickhouse/queries/history/route";
@@ -47,7 +49,7 @@ function useQueryData<T>(
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(endpoint, { signal: controller.signal });
+      const response = await fetchApi(endpoint, { signal: controller.signal });
       const result = await response.json();
 
       if (result.success && result.data) {

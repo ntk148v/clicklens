@@ -27,6 +27,18 @@ ClickLens is configured entirely through environment variables. Here's the compl
 | `NODE_ENV`                | `development`                   | Set to `production` for production deployments                              |
 | `DISABLE_SECURE_COOKIES`  | `false`                         | Set to `true` if running behind a non-HTTPS proxy                           |
 | `NEXT_PUBLIC_APP_VERSION` | From Git (tag + commit hash)    | Override the displayed app version. By default, falls back to Git metadata. |
+| `CLICKLENS_BASE_PATH`     | (empty)                         | Sub-path the app is served under (e.g. `/clicklens` for `https://host/clicklens/…`). **Must be set at build time** (see callout below). A trailing `/` is stripped. |
+| `CLICKLENS_TRAILING_SLASH` | (empty)                        | Set to `true` or `1` to use trailing slashes on app routes (Next.js [`trailingSlash`](https://nextjs.org/docs/app/api-reference/config/next-config-js/trailingSlash)). Any other value (or unset) is treated as `false`. |
+
+<Callout type="info">
+  **Sub-path (`CLICKLENS_BASE_PATH`)** is a **build-time** setting. Set it
+  in the same environment you use for `next build`, your Docker `docker build`, or
+  your CI image build. It is compiled into the client as `NEXT_PUBLIC_BASE_PATH` so
+  the browser can load `/api/…` routes and static assets under the same prefix. Your
+  reverse proxy (or Kubernetes ingress) path must **match** this value (e.g. both use
+  `/clicklens`). The production sample below keeps the app at the site root; for a
+  sub-path, see **§5.2** below.
+</Callout>
 
 <Callout type="warning">
   **Security:** The `SESSION_SECRET` must be at least 32 characters. In
@@ -119,6 +131,10 @@ LENS_PASSWORD=your-password
 
 # Session Secret (required for production)
 SESSION_SECRET=complex_password_at_least_32_characters_long_for_security
+
+# Optional — Next.js public URL (build-time: use when running `next build` / custom Docker build)
+# CLICKLENS_BASE_PATH=/clicklens
+# CLICKLENS_TRAILING_SLASH=false
 ```
 
 ## 3. Docker Deployment
@@ -187,6 +203,33 @@ docker build \
   -t clicklens:custom \
   .
 ```
+
+`CLICKLENS_BASE_PATH` and `CLICKLENS_TRAILING_SLASH` are read when **`next
+build` runs** inside the image. The stock `Dockerfile` in this repo only wires
+`APP_VERSION`; to bake a sub-path or trailing-slash setting into a custom
+image, add `ARG` / `ENV` lines **before** `RUN bun run build` in the builder
+stage, then pass them at `docker build` time, for example:
+
+```dockerfile
+# In Dockerfile — builder stage, before `RUN bun run build`:
+ARG CLICKLENS_BASE_PATH=
+ARG CLICKLENS_TRAILING_SLASH=
+ENV CLICKLENS_BASE_PATH=$CLICKLENS_BASE_PATH
+ENV CLICKLENS_TRAILING_SLASH=$CLICKLENS_TRAILING_SLASH
+```
+
+```bash
+docker build \
+  -t clicklens:subpath \
+  --build-arg APP_VERSION=1.0.0 \
+  --build-arg CLICKLENS_BASE_PATH=/clicklens \
+  --build-arg CLICKLENS_TRAILING_SLASH=true \
+  .
+```
+
+Pre-built images on the registry are normally built for the **site root**
+(`/`). Use a sub-path only when you build the image (or the static export)
+yourself with these variables set.
 
 ## 4. RBAC Configuration
 
@@ -326,12 +369,47 @@ server {
   session cookies work over the HTTP connection between proxy and app.
 </Callout>
 
+### 5.2. Nginx: serving ClickLens under a sub-path
+
+If the UI is not at the site root, set **`CLICKLENS_BASE_PATH` to the same
+prefix** when you build the app (e.g. `/clicklens`), and route that prefix to the
+container. Example: app listens on `localhost:3000` with `CLICKLENS_BASE_PATH=/clicklens`:
+
+```nginx
+server {
+    listen 80;
+    server_name clicklens.example.com;
+
+    location /clicklens/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+The Next.js server will serve pages and `/_next` assets under `/clicklens/…` when
+`CLICKLENS_BASE_PATH` is set; do not strip the prefix in Nginx in a way that
+differs from that value.
+
 ## 6. Health Checks
 
-ClickLens provides a health check endpoint:
+ClickLens provides a health check endpoint.
+
+At the **site root** (no `CLICKLENS_BASE_PATH`):
 
 ```bash
 curl http://localhost:3000/api/clickhouse/ping
+```
+
+With **`CLICKLENS_BASE_PATH`** (e.g. `/clicklens`), **prefix the same path** on
+the public URL the app is mounted at:
+
+```bash
+curl http://localhost:3000/clicklens/api/clickhouse/ping
 ```
 
 Response (healthy):
@@ -370,3 +448,9 @@ Use this endpoint for:
 
 - Set `CLICKHOUSE_VERIFY=false` for self-signed certificates
 - Or install the CA certificate in the container
+
+**404 on pages, assets, or `/api/…` when using a sub-path:**
+
+- `CLICKLENS_BASE_PATH` must be set when you **build** the app, and the same
+  prefix must be used in your reverse proxy (see **§5.2**).
+- Health check URL must include the prefix, e.g. `…/clicklens/api/clickhouse/ping` (see **§6**).
