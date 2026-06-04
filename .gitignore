@@ -92,3 +92,7 @@ tags
 .gemini/
 .qwen/
 .agent/
+.agents/
+
+graphify-out/
+src/graphify-out/
