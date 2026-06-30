@@ -11,7 +11,10 @@ let cachedAt = 0;
 export async function getClusterName(
   client: ClickHouseClient,
 ): Promise<string | undefined> {
-  if (cachedClusterName !== null && Date.now() - cachedAt < CLUSTER_CACHE_TTL_MS) {
+  if (
+    cachedClusterName !== null &&
+    Date.now() - cachedAt < CLUSTER_CACHE_TTL_MS
+  ) {
     return cachedClusterName || undefined;
   }
 
@@ -19,6 +22,9 @@ export async function getClusterName(
     const response = await client.query<{ cluster: string }>(`
       SELECT cluster FROM system.clusters
       WHERE cluster NOT IN ('test')
+        AND cluster NOT IN (
+          SELECT name FROM system.databases WHERE engine = 'Replicated'
+        )
       ORDER BY cluster != 'default' DESC, cluster ASC
       LIMIT 1
     `);
