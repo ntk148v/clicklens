@@ -125,14 +125,16 @@ GRANT SELECT ON system.* TO lensuser;
 GRANT SHOW DATABASES ON *.* TO lensuser;
 GRANT SHOW TABLES ON *.* TO lensuser;
 GRANT SHOW COLUMNS ON *.* TO lensuser;
+GRANT REMOTE ON *.* TO lensuser;
 
 -- Cluster
-CREATE USER lensuser ON CLUSTER cluster-name IDENTIFIED BY 'password';
-GRANT ACCESS MANAGEMENT ON *.* ON CLUSTER cluster-name TO lensuser;
-GRANT SELECT ON system.* ON CLUSTER cluster-name TO lensuser;
-GRANT SHOW DATABASES ON *.* ON CLUSTER cluster-name TO lensuser;
-GRANT SHOW TABLES ON *.* ON CLUSTER cluster-name TO lensuser;
-GRANT SHOW COLUMNS ON *.* ON CLUSTER cluster-name TO lensuser;
+CREATE USER lensuser ON CLUSTER your_cluster_name IDENTIFIED BY 'password';
+GRANT ACCESS MANAGEMENT ON *.* ON CLUSTER your_cluster_name TO lensuser;
+GRANT SELECT ON system.* ON CLUSTER your_cluster_name TO lensuser;
+GRANT SHOW DATABASES ON *.* ON CLUSTER your_cluster_name TO lensuser;
+GRANT SHOW TABLES ON *.* ON CLUSTER your_cluster_name TO lensuser;
+GRANT SHOW COLUMNS ON *.* ON CLUSTER your_cluster_name TO lensuser;
+GRANT REMOTE ON *.* ON CLUSTER your_cluster_name TO lensuser;
 ```
 
 ### 3.2. User Client (Session Credentials)
