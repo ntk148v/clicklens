@@ -135,7 +135,7 @@ export function useTableColumns(database: string | null, table: string | null) {
 }
 
 export interface ReplicasData {
-  replica: ReplicaInfo | null;
+  replicas: ReplicaInfo[];
   is_replicated: boolean;
 }
 

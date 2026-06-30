@@ -67,7 +67,15 @@ export function ReplicasTab({ database, table }: ReplicasTabProps) {
     );
   }
 
-  const replica = data.replica!;
+  const replica = data.replicas[0];
+  if (!replica) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        <Server className="h-12 w-12 mb-4 opacity-50" />
+        <p>No replica data available</p>
+      </div>
+    );
+  }
   const hasIssues =
     replica.is_readonly === 1 ||
     replica.is_session_expired === 1 ||
