@@ -213,7 +213,7 @@ export function FieldsSidebar({
       )}
     >
       {/* Header */}
-      <div className="p-3 border-b space-y-3">
+      <div className="p-3 border-b space-y-3 shrink-0">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">Fields</h3>
           <div className="flex gap-1 text-xs">
@@ -326,7 +326,7 @@ export function FieldsSidebar({
       </div>
 
       {/* Column list */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0" type="auto">
         <div className="p-2 space-y-0.5">
           {filteredColumns.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">
@@ -479,7 +479,7 @@ export function FieldsSidebar({
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-2 border-t text-xs text-muted-foreground">
+      <div className="p-2 border-t text-xs text-muted-foreground shrink-0">
         {selectedColumns.length} of {columns.length} fields selected
       </div>
     </div>
