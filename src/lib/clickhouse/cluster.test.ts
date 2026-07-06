@@ -32,18 +32,15 @@ function createClient(
 
 describe("getClusterName", () => {
   beforeEach(() => {
+    delete process.env.CLICKHOUSE_CLUSTER;
     resetClusterCache();
   });
 
-  it("excludes replicated database names from cluster detection", async () => {
+  it("filters out replicated database auto-clusters", async () => {
     const client = createClient((sql) => {
-      if (
-        sql.includes("system.databases") &&
-        sql.includes("engine = 'Replicated'")
-      ) {
+      if (sql.includes("nullIf")) {
         return queryResult([{ cluster: "real_cluster" }]);
       }
-
       return queryResult([{ cluster: "ch_bronze_company" }]);
     });
 
@@ -56,8 +53,24 @@ describe("getClusterName", () => {
     expect(clusterName).toBe("real_cluster");
     expect(client.query).toHaveBeenCalledTimes(1);
     expect(normalizedSql).toContain(
-      "cluster NOT IN ( SELECT name FROM system.databases WHERE engine = 'Replicated' )",
+      "nullIf(database_replica_name, '')",
     );
+  });
+
+  it("keeps a real cluster when a replicated database has the same name", async () => {
+    const client = createClient(() => queryResult([{ cluster: "default" }]));
+
+    const clusterName = await getClusterName(client);
+    const sql = String(
+      (client.query as ReturnType<typeof mock>).mock.calls[0][0],
+    );
+    const normalizedSql = sql.replace(/\s+/g, " ");
+
+    expect(clusterName).toBe("default");
+    expect(normalizedSql).toContain(
+      "nullIf(database_replica_name, '') IS NULL",
+    );
+    expect(normalizedSql).not.toContain("system.databases");
   });
 
   it("falls back to local queries when no usable cluster is detected", async () => {

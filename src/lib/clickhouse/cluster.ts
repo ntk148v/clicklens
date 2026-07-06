@@ -22,9 +22,8 @@ export async function getClusterName(
     const response = await client.query<{ cluster: string }>(`
       SELECT cluster FROM system.clusters
       WHERE cluster NOT IN ('test')
-        AND cluster NOT IN (
-          SELECT name FROM system.databases WHERE engine = 'Replicated'
-        )
+        AND nullIf(database_replica_name, '') IS NULL
+      GROUP BY cluster
       ORDER BY cluster != 'default' DESC, cluster ASC
       LIMIT 1
     `);
