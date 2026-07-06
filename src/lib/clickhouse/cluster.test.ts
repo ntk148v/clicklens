@@ -38,7 +38,7 @@ describe("getClusterName", () => {
 
   it("filters out replicated database auto-clusters", async () => {
     const client = createClient((sql) => {
-      if (sql.includes("nullIf")) {
+      if (sql.includes("empty(")) {
         return queryResult([{ cluster: "real_cluster" }]);
       }
       return queryResult([{ cluster: "ch_bronze_company" }]);
@@ -53,7 +53,7 @@ describe("getClusterName", () => {
     expect(clusterName).toBe("real_cluster");
     expect(client.query).toHaveBeenCalledTimes(1);
     expect(normalizedSql).toContain(
-      "nullIf(database_replica_name, '')",
+      "empty(database_replica_name)",
     );
   });
 
@@ -68,7 +68,7 @@ describe("getClusterName", () => {
 
     expect(clusterName).toBe("default");
     expect(normalizedSql).toContain(
-      "nullIf(database_replica_name, '') IS NULL",
+      "empty(database_replica_name)",
     );
     expect(normalizedSql).not.toContain("system.databases");
   });
@@ -77,5 +77,22 @@ describe("getClusterName", () => {
     const client = createClient(() => queryResult([]));
 
     await expect(getClusterName(client)).resolves.toBeUndefined();
+  });
+
+  it("uses CLICKHOUSE_CLUSTER when configured", async () => {
+    process.env.CLICKHOUSE_CLUSTER = "default";
+    const client = createClient(() => queryResult([{ cluster: "ignored" }]));
+
+    await expect(getClusterName(client)).resolves.toBe("default");
+    expect(client.query).not.toHaveBeenCalled();
+  });
+
+  it("ignores blank CLICKHOUSE_CLUSTER", async () => {
+    process.env.CLICKHOUSE_CLUSTER = "   ";
+    const client = createClient(() => queryResult([{ cluster: "ch_bronze_company" }]));
+
+    const clusterName = await getClusterName(client);
+    expect(clusterName).toBe("ch_bronze_company");
+    expect(client.query).toHaveBeenCalledTimes(1);
   });
 });
