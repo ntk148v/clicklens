@@ -13,6 +13,17 @@
  * The native TCP protocol (ports 9000/9440) is NOT supported.
  */
 
+export interface ClusterDefinition {
+  id: string;
+  label: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  verifySsl: boolean;
+  lensUser: string;
+  lensPassword: string;
+}
+
 export interface ClickHouseConfig {
   host: string;
   port: number;
@@ -25,6 +36,118 @@ export interface ClickHouseConfig {
   database: string;
   /** ClickHouse query settings to apply to all queries */
   settings?: Record<string, unknown>;
+}
+
+/**
+ * Parse CLICKHOUSE_CLUSTERS JSON env var into a map of cluster definitions.
+ * Validates each entry, rejects duplicates and invalid fields.
+ */
+export function parseClusterRegistry(): Map<string, ClusterDefinition> {
+  const json = process.env.CLICKHOUSE_CLUSTERS;
+  if (!json) return new Map();
+
+  let entries: unknown[];
+  try {
+    entries = JSON.parse(json);
+  } catch {
+    throw new Error(`CLICKHOUSE_CLUSTERS is not valid JSON: ${json}`);
+  }
+
+  if (!Array.isArray(entries)) {
+    throw new Error("CLICKHOUSE_CLUSTERS must be a JSON array");
+  }
+
+  const registry = new Map<string, ClusterDefinition>();
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") {
+      throw new Error(`Invalid cluster entry in CLICKHOUSE_CLUSTERS: ${JSON.stringify(entry)}`);
+    }
+
+    const e = entry as Record<string, unknown>;
+
+    if (!e.id || typeof e.id !== "string" || !e.id.trim()) {
+      throw new Error(`Cluster entry missing 'id': ${JSON.stringify(entry)}`);
+    }
+    const id = e.id.trim();
+    if (/\s/.test(id)) {
+      throw new Error(`Cluster ID must not contain whitespace: '${id}'`);
+    }
+    if (registry.has(id)) {
+      throw new Error(`Duplicate cluster ID: '${id}'`);
+    }
+
+    if (!e.label || typeof e.label !== "string") {
+      throw new Error(`Cluster '${id}' is missing 'label'`);
+    }
+    if (!e.host || typeof e.host !== "string") {
+      throw new Error(`Cluster '${id}' is missing 'host'`);
+    }
+    if (!e.lensUser || typeof e.lensUser !== "string") {
+      throw new Error(`Cluster '${id}' is missing 'lensUser'`);
+    }
+    if (!e.lensPassword || typeof e.lensPassword !== "string") {
+      throw new Error(`Cluster '${id}' is missing 'lensPassword'`);
+    }
+
+    const secure = e.secure === true;
+    const port =
+      e.port !== undefined
+        ? parseInt(String(e.port), 10)
+        : secure
+          ? 8443
+          : 8123;
+
+    registry.set(id, {
+      id,
+      label: String(e.label),
+      host: String(e.host),
+      port: isNaN(port) ? (secure ? 8443 : 8123) : port,
+      secure,
+      verifySsl: e.verifySsl !== false,
+      lensUser: String(e.lensUser),
+      lensPassword: String(e.lensPassword),
+    });
+  }
+
+  return registry;
+}
+
+/**
+ * Get public-safe list of configured clusters (id + label only).
+ * Includes the legacy "default" cluster when CLICKHOUSE_HOST is set,
+ * unless CLICKHOUSE_CLUSTERS explicitly defines a "default" entry.
+ */
+export function getConfiguredClusters(): { id: string; label: string }[] {
+  const registry = parseClusterRegistry();
+  const hasLegacy = !!process.env.CLICKHOUSE_HOST && !!process.env.LENS_USER;
+
+  const clusters = [...registry.values()].map((c) => ({
+    id: c.id,
+    label: c.label,
+  }));
+
+  if (hasLegacy && !registry.has("default")) {
+    clusters.unshift({ id: "default", label: "default" });
+  }
+
+  return clusters;
+}
+
+/**
+ * Return the ID of the first configured cluster, or null if none.
+ */
+export function getDefaultClusterId(): string | null {
+  const clusters = getConfiguredClusters();
+  return clusters.length > 0 ? clusters[0].id : null;
+}
+
+/**
+ * Check whether a given cluster ID is configured.
+ */
+export function isClusterConfigured(clusterId: string): boolean {
+  if (clusterId === "default" && !!process.env.CLICKHOUSE_HOST) return true;
+  return parseClusterRegistry().has(clusterId);
 }
 
 /**
@@ -65,10 +188,29 @@ export function buildConnectionUrl(
 }
 
 /**
- * Get lens user config for metadata queries
+ * Get lens user config for metadata queries.
+ * When clusterId is provided (and not "default"), resolves from CLICKHOUSE_CLUSTERS.
+ * Otherwise falls back to legacy CLICKHOUSE_HOST / LENS_USER env vars.
+ *
  * Lens user has read access to system.* tables
  */
-export function getLensConfig(): ClickHouseConfig | null {
+export function getLensConfig(clusterId?: string): ClickHouseConfig | null {
+  if (clusterId && clusterId !== "default") {
+    const registry = parseClusterRegistry();
+    const def = registry.get(clusterId);
+    if (!def) return null;
+    return {
+      host: def.host,
+      port: def.port,
+      secure: def.secure,
+      verifySsl: def.verifySsl,
+      username: def.lensUser,
+      password: def.lensPassword,
+      database: "default",
+    };
+  }
+
+  // Fallback to legacy env
   const server = getServerConnection();
   const lensUser = process.env.LENS_USER;
 
@@ -85,14 +227,64 @@ export function getLensConfig(): ClickHouseConfig | null {
 }
 
 /**
- * Get user config by combining server connection with session credentials
+ * Overload signatures for getUserConfig
  */
 export function getUserConfig(credentials: {
   username: string;
   password: string;
   database?: string;
-}): ClickHouseConfig | null {
+}): ClickHouseConfig | null;
+export function getUserConfig(
+  clusterId: string,
+  credentials: {
+    username: string;
+    password: string;
+    database?: string;
+  },
+): ClickHouseConfig | null;
+
+/**
+ * Get user config by combining a cluster definition with session credentials.
+ *
+ * Two call signatures:
+ * - `getUserConfig(clusterId, credentials)` — cluster-aware path
+ * - `getUserConfig(credentials)` — legacy path using CLICKHOUSE_HOST env var
+ */
+export function getUserConfig(
+  clusterIdOrCredentials:
+    | string
+    | { username: string; password: string; database?: string },
+  credentials?: { username: string; password: string; database?: string },
+): ClickHouseConfig | null {
+  // Cluster-aware path
+  if (typeof clusterIdOrCredentials === "string") {
+    const clusterId = clusterIdOrCredentials;
+    const creds = credentials!;
+    if (clusterId && clusterId !== "default") {
+      const registry = parseClusterRegistry();
+      const def = registry.get(clusterId);
+      if (!def) return null;
+      return {
+        host: def.host,
+        port: def.port,
+        secure: def.secure,
+        verifySsl: def.verifySsl,
+        username: creds.username,
+        password: creds.password,
+        database: creds.database || "default",
+      };
+    }
+    // For "default" cluster, fall through to legacy path
+  }
+
+  // Legacy path
   const server = getServerConnection();
+  const creds = credentials ??
+    (clusterIdOrCredentials as {
+      username: string;
+      password: string;
+      database?: string;
+    });
 
   if (!server) {
     return null;
@@ -100,9 +292,9 @@ export function getUserConfig(credentials: {
 
   return {
     ...server,
-    username: credentials.username,
-    password: credentials.password,
-    database: credentials.database || "default",
+    username: creds.username,
+    password: creds.password,
+    database: creds.database || "default",
   };
 }
 

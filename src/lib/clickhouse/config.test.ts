@@ -7,6 +7,10 @@ import {
   buildAuthHeaders,
   isLensUserConfigured,
   type ClickHouseConfig,
+  parseClusterRegistry,
+  getConfiguredClusters,
+  getDefaultClusterId,
+  isClusterConfigured,
 } from "./config";
 
 describe("clickhouse/config", () => {
@@ -277,6 +281,128 @@ describe("clickhouse/config", () => {
       process.env.CLICKHOUSE_HOST = "";
       process.env.LENS_USER = "";
       expect(isLensUserConfigured()).toBe(false);
+    });
+  });
+
+  describe("multi-cluster registry", () => {
+    test("returns empty when CLICKHOUSE_CLUSTERS is not set and no legacy env", () => {
+      delete process.env.CLICKHOUSE_CLUSTERS;
+      delete process.env.CLICKHOUSE_HOST;
+      expect(getConfiguredClusters()).toEqual([]);
+      expect(getDefaultClusterId()).toBeNull();
+    });
+
+    test("legacy env vars work as implicit default cluster", () => {
+      process.env.CLICKHOUSE_HOST = "ch1.example.com";
+      process.env.LENS_USER = "lens";
+      process.env.LENS_PASSWORD = "pass";
+      const clusters = getConfiguredClusters();
+      expect(clusters).toHaveLength(1);
+      expect(clusters[0].id).toBe("default");
+      expect(clusters[0].label).toBe("default");
+    });
+
+    test("parses CLICKHOUSE_CLUSTERS JSON correctly", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "prod", label: "Production", host: "prod.example.com", lensUser: "lens", lensPassword: "secret" },
+        { id: "staging", label: "Staging", host: "staging.example.com", port: 8443, secure: true, lensUser: "lens", lensPassword: "secret" },
+      ]);
+      const clusters = getConfiguredClusters();
+      expect(clusters).toHaveLength(2);
+      expect(clusters[0].id).toBe("prod");
+      expect(clusters[1].id).toBe("staging");
+    });
+
+    test("CLICKHOUSE_CLUSTERS and legacy env vars coexist", () => {
+      process.env.CLICKHOUSE_HOST = "old.example.com";
+      process.env.LENS_USER = "lens";
+      process.env.LENS_PASSWORD = "pass";
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "prod", label: "Prod", host: "prod.example.com", lensUser: "lens", lensPassword: "x" },
+      ]);
+      const clusters = getConfiguredClusters();
+      expect(clusters).toHaveLength(2);
+      expect(clusters[0].id).toBe("default");
+      expect(clusters[1].id).toBe("prod");
+    });
+
+    test("getLensConfig with clusterId returns correct config", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "prod", label: "Prod", host: "prod.example.com", lensUser: "lens", lensPassword: "sekret" },
+      ]);
+      const config = getLensConfig("prod");
+      expect(config).not.toBeNull();
+      expect(config!.host).toBe("prod.example.com");
+      expect(config!.username).toBe("lens");
+      expect(config!.password).toBe("sekret");
+      expect(config!.port).toBe(8123);
+    });
+
+    test("getLensConfig without clusterId falls back to legacy", () => {
+      process.env.CLICKHOUSE_HOST = "legacy.example.com";
+      process.env.LENS_USER = "legacyUser";
+      const config = getLensConfig();
+      expect(config).not.toBeNull();
+      expect(config!.host).toBe("legacy.example.com");
+    });
+
+    test("getUserConfig with clusterId merges cluster definition with user credentials", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "prod", label: "Prod", host: "prod.example.com", lensUser: "lens", lensPassword: "x" },
+      ]);
+      const config = getUserConfig("prod", { username: "alice", password: "alicepass", database: "mydb" });
+      expect(config).not.toBeNull();
+      expect(config!.host).toBe("prod.example.com");
+      expect(config!.username).toBe("alice");
+      expect(config!.password).toBe("alicepass");
+      expect(config!.database).toBe("mydb");
+    });
+
+    test("getUserConfig with unknown cluster returns null", () => {
+      expect(getUserConfig("nonexistent", { username: "u", password: "p" })).toBeNull();
+    });
+
+    test("getUserConfig legacy path still works", () => {
+      process.env.CLICKHOUSE_HOST = "legacy.example.com";
+      const config = getUserConfig({ username: "user", password: "pass" });
+      expect(config).not.toBeNull();
+      expect(config!.host).toBe("legacy.example.com");
+    });
+
+    test("rejects duplicate cluster IDs", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "prod", label: "Prod", host: "a.com", lensUser: "l", lensPassword: "p" },
+        { id: "prod", label: "Dupe", host: "b.com", lensUser: "l", lensPassword: "p" },
+      ]);
+      expect(() => parseClusterRegistry()).toThrow(/duplicate|prod/i);
+    });
+
+    test("rejects missing id in cluster entry", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { label: "NoID", host: "x.com", lensUser: "u", lensPassword: "p" },
+      ]);
+      expect(() => parseClusterRegistry()).toThrow(/missing.*id/i);
+    });
+
+    test("rejects whitespace in cluster ID", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "bad id", label: "Bad", host: "x.com", lensUser: "u", lensPassword: "p" },
+      ]);
+      expect(() => parseClusterRegistry()).toThrow(/whitespace/i);
+    });
+
+    test("isClusterConfigured returns true for valid cluster", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "qa", label: "QA", host: "qa.example.com", lensUser: "l", lensPassword: "p" },
+      ]);
+      expect(isClusterConfigured("qa")).toBe(true);
+      expect(isClusterConfigured("fake")).toBe(false);
+    });
+
+    test("isClusterConfigured returns true for default with legacy env", () => {
+      process.env.CLICKHOUSE_HOST = "ch.local";
+      process.env.LENS_USER = "lens";
+      expect(isClusterConfigured("default")).toBe(true);
     });
   });
 });
