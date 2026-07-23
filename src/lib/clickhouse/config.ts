@@ -329,5 +329,5 @@ export function buildAuthHeaders(
  * Check if lens user is configured
  */
 export function isLensUserConfigured(): boolean {
-  return !!process.env.CLICKHOUSE_HOST && !!process.env.LENS_USER;
+  return (!!process.env.CLICKHOUSE_HOST && !!process.env.LENS_USER) || !!process.env.CLICKHOUSE_CLUSTERS;
 }

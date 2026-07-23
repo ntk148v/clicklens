@@ -282,6 +282,13 @@ describe("clickhouse/config", () => {
       process.env.LENS_USER = "";
       expect(isLensUserConfigured()).toBe(false);
     });
+
+    test("returns true when CLICKHOUSE_CLUSTERS is set without legacy vars", () => {
+      process.env.CLICKHOUSE_CLUSTERS = "[{\"id\":\"ch\",\"label\":\"CH\",\"host\":\"h\",\"lensUser\":\"u\",\"lensPassword\":\"p\"}]";
+      delete process.env.CLICKHOUSE_HOST;
+      delete process.env.LENS_USER;
+      expect(isLensUserConfigured()).toBe(true);
+    });
   });
 
   describe("multi-cluster registry", () => {

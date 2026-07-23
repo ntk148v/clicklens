@@ -73,7 +73,7 @@ export async function POST(
         {
           success: false,
           error:
-            "Server not configured. Please set CLICKHOUSE_HOST and LENS_USER environment variables.",
+            "Server not configured. Set CLICKHOUSE_HOST + LENS_USER or CLICKHOUSE_CLUSTERS.",
         },
         { status: 500 },
       );
