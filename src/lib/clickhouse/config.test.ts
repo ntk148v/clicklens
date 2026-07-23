@@ -411,5 +411,74 @@ describe("clickhouse/config", () => {
       process.env.LENS_USER = "lens";
       expect(isClusterConfigured("default")).toBe(true);
     });
+
+    test("resolves an explicit default registry entry without legacy vars", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "default", label: "Primary", host: "primary", port: 8123, lensUser: "lens", lensPassword: "secret" },
+      ]);
+      delete process.env.CLICKHOUSE_HOST;
+      delete process.env.LENS_USER;
+
+      const lensConfig = getLensConfig("default");
+      expect(lensConfig).not.toBeNull();
+      expect(lensConfig!.host).toBe("primary");
+      expect(lensConfig!.username).toBe("lens");
+      expect(lensConfig!.clusterId).toBe("default");
+
+      const userConfig = getUserConfig("default", { username: "alice", password: "pw" });
+      expect(userConfig).not.toBeNull();
+      expect(userConfig!.host).toBe("primary");
+      expect(userConfig!.username).toBe("alice");
+      expect(userConfig!.clusterId).toBe("default");
+    });
+
+    test("registry default entry overrides legacy env for getLensConfig", () => {
+      process.env.CLICKHOUSE_HOST = "legacy.example.com";
+      process.env.LENS_USER = "legacyUser";
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "default", label: "Registry", host: "registry", port: 8123, lensUser: "lensReg", lensPassword: "regSecret" },
+      ]);
+
+      const config = getLensConfig("default");
+      expect(config).not.toBeNull();
+      expect(config!.host).toBe("registry");
+      expect(config!.username).toBe("lensReg");
+    });
+
+    test("registry default entry overrides legacy env for getUserConfig", () => {
+      process.env.CLICKHOUSE_HOST = "legacy.example.com";
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "default", label: "Registry", host: "registry", port: 8123, lensUser: "l", lensPassword: "p" },
+      ]);
+
+      const config = getUserConfig("default", { username: "bob", password: "bobpass" });
+      expect(config).not.toBeNull();
+      expect(config!.host).toBe("registry");
+      expect(config!.username).toBe("bob");
+      expect(config!.clusterId).toBe("default");
+    });
+
+    test("does not include registry secrets in parse errors", () => {
+      process.env.CLICKHOUSE_CLUSTERS = "not-json-secret";
+      expect(() => parseClusterRegistry()).toThrow("CLICKHOUSE_CLUSTERS");
+      expect(() => parseClusterRegistry()).not.toThrow("not-json-secret");
+    });
+
+    test("parse errors do not include registry entry contents", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "x", label: "X", host: "x", lensUser: "u", lensPassword: "super-secret-password" },
+        null,
+      ]);
+      expect(() => parseClusterRegistry()).toThrow(/cluster entry/i);
+      expect(() => parseClusterRegistry()).not.toThrow("super-secret-password");
+    });
+
+    test("isClusterConfigured returns true for explicit default registry entry", () => {
+      process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+        { id: "default", label: "Primary", host: "primary", port: 8123, lensUser: "lens", lensPassword: "secret" },
+      ]);
+      delete process.env.CLICKHOUSE_HOST;
+      expect(isClusterConfigured("default")).toBe(true);
+    });
   });
 });

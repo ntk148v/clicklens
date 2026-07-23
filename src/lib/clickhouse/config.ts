@@ -52,7 +52,7 @@ export function parseClusterRegistry(): Map<string, ClusterDefinition> {
   try {
     entries = JSON.parse(json);
   } catch {
-    throw new Error(`CLICKHOUSE_CLUSTERS is not valid JSON: ${json}`);
+    throw new Error("CLICKHOUSE_CLUSTERS is not valid JSON");
   }
 
   if (!Array.isArray(entries)) {
@@ -63,13 +63,13 @@ export function parseClusterRegistry(): Map<string, ClusterDefinition> {
 
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") {
-      throw new Error(`Invalid cluster entry in CLICKHOUSE_CLUSTERS: ${JSON.stringify(entry)}`);
+      throw new Error(`Invalid cluster entry at index ${registry.size}`);
     }
 
     const e = entry as Record<string, unknown>;
 
     if (!e.id || typeof e.id !== "string" || !e.id.trim()) {
-      throw new Error(`Cluster entry missing 'id': ${JSON.stringify(entry)}`);
+      throw new Error(`Cluster entry missing 'id' at index ${registry.size}`);
     }
     const id = e.id.trim();
     if (/\s/.test(id)) {
@@ -191,26 +191,29 @@ export function buildConnectionUrl(
 
 /**
  * Get lens user config for metadata queries.
- * When clusterId is provided (and not "default"), resolves from CLICKHOUSE_CLUSTERS.
- * Otherwise falls back to legacy CLICKHOUSE_HOST / LENS_USER env vars.
+ * Resolves registered cluster IDs (including "default") from CLICKHOUSE_CLUSTERS first.
+ * Falls back to legacy CLICKHOUSE_HOST / LENS_USER env vars when no ID or unknown ID.
  *
  * Lens user has read access to system.* tables
  */
 export function getLensConfig(clusterId?: string): ClickHouseConfig | null {
-  if (clusterId && clusterId !== "default") {
+  // Try registry first for any clusterId (including "default")
+  if (clusterId) {
     const registry = parseClusterRegistry();
     const def = registry.get(clusterId);
-    if (!def) return null;
-    return {
-      host: def.host,
-      port: def.port,
-      secure: def.secure,
-      verifySsl: def.verifySsl,
-      username: def.lensUser,
-      password: def.lensPassword,
-      database: "default",
-      clusterId: def.id,
-    };
+    if (def) {
+      return {
+        host: def.host,
+        port: def.port,
+        secure: def.secure,
+        verifySsl: def.verifySsl,
+        username: def.lensUser,
+        password: def.lensPassword,
+        database: "default",
+        clusterId: def.id,
+      };
+    }
+    // Unknown registry ID — try legacy as fallback
   }
 
   // Fallback to legacy env
@@ -259,26 +262,27 @@ export function getUserConfig(
     | { username: string; password: string; database?: string },
   credentials?: { username: string; password: string; database?: string },
 ): ClickHouseConfig | null {
-  // Cluster-aware path
+  // Cluster-aware path — try registry first even for "default"
   if (typeof clusterIdOrCredentials === "string") {
     const clusterId = clusterIdOrCredentials;
     const creds = credentials!;
-    if (clusterId && clusterId !== "default") {
+    if (clusterId) {
       const registry = parseClusterRegistry();
       const def = registry.get(clusterId);
-      if (!def) return null;
-      return {
-        host: def.host,
-        port: def.port,
-        secure: def.secure,
-        verifySsl: def.verifySsl,
-        username: creds.username,
-        password: creds.password,
-        database: creds.database || "default",
-        clusterId: def.id,
-      };
+      if (def) {
+        return {
+          host: def.host,
+          port: def.port,
+          secure: def.secure,
+          verifySsl: def.verifySsl,
+          username: creds.username,
+          password: creds.password,
+          database: creds.database || "default",
+          clusterId: def.id,
+        };
+      }
+      // Unknown registry ID or "default" without registry entry — fall through
     }
-    // For "default" cluster, fall through to legacy path
   }
 
   // Legacy path
