@@ -379,7 +379,8 @@ export async function GET(
     const client = createClient(lensConfig);
     const safeDatabase = escapeSqlString(database);
 
-    const cacheKey = `tables:dependencies:${database}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    const cacheKey = `tables:dependencies:${cacheScope}:${database}`;
 
     const data = await getOrSet(
       tablesCache,

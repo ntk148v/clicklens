@@ -117,7 +117,8 @@ export async function GET(
     const clusterName = await getClusterName(client);
 
     // Cache key includes database and table for proper isolation
-    const cacheKey = `tables:mutations:${database}:${table}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    const cacheKey = `tables:mutations:${cacheScope}:${database}:${table}`;
 
     const data = await getOrSet(
       tablesCache,

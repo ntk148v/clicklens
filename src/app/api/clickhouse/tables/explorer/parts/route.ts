@@ -120,8 +120,9 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    // Cache key includes database and table for proper isolation
-    const cacheKey = `tables:parts:${database}:${table}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    // Cache key includes database, table, and cluster for proper isolation
+    const cacheKey = `tables:parts:${cacheScope}:${database}:${table}`;
 
     const data = await getOrSet(
       tablesCache,

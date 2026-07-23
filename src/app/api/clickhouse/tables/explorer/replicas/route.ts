@@ -116,7 +116,8 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const cacheKey = `tables:replicas:${database}:${table}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    const cacheKey = `tables:replicas:${cacheScope}:${database}:${table}`;
 
     const data = await getOrSet(
       tablesCache,
