@@ -7,6 +7,13 @@ import { withBasePath } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -28,6 +35,8 @@ export default function LoginPage() {
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [clusters, setClusters] = useState<{ id: string; label: string }[]>([]);
+  const [selectedCluster, setSelectedCluster] = useState<string>("");
 
   // Check if already logged in
   useEffect(() => {
@@ -45,6 +54,21 @@ export default function LoginPage() {
       }
     };
     checkSession();
+
+    // Fetch available clusters
+    fetchApi("/api/auth/clusters")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.clusters) {
+          setClusters(data.clusters);
+          if (data.defaultClusterId) {
+            setSelectedCluster(data.defaultClusterId);
+          }
+        }
+      })
+      .catch(() => {
+        // Cluster table not available — single-cluster setup
+      });
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,6 +83,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
+          clusterId: selectedCluster || undefined,
         }),
       });
 
@@ -155,6 +180,29 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
+
+            {clusters.length > 1 && (
+              <div>
+                <Label htmlFor="cluster" className="block mb-3">
+                  Cluster
+                </Label>
+                <Select
+                  value={selectedCluster}
+                  onValueChange={setSelectedCluster}
+                >
+                  <SelectTrigger id="cluster">
+                    <SelectValue placeholder="Select a cluster" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clusters.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (

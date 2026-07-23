@@ -19,12 +19,16 @@ import {
   getUserConfig,
   buildConnectionUrl,
   isLensUserConfigured,
+  isClusterConfigured,
+  type ClickHouseConfig,
 } from "@/lib/clickhouse";
 import https from "https";
 
 export interface LoginRequest {
   username: string;
   password: string;
+  /** Optional cluster ID from CLICKHOUSE_CLUSTERS. When omitted, falls back to legacy "default" cluster. */
+  clusterId?: string;
 }
 
 export interface LoginResponse {
@@ -77,6 +81,16 @@ export async function POST(
 
     const body: LoginRequest = await request.json();
 
+    const clusterId = body.clusterId || "default";
+
+    // Validate clusterId early
+    if (!isClusterConfigured(clusterId)) {
+      return NextResponse.json(
+        { success: false, error: "Selected cluster is not configured" },
+        { status: 400 },
+      );
+    }
+
     if (!body.username) {
       return NextResponse.json(
         { success: false, error: "Username is required" },
@@ -102,10 +116,18 @@ export async function POST(
     }
 
     // Get config with user credentials
-    const config = getUserConfig({
-      username: body.username,
-      password: body.password || "",
-    });
+    let config: ClickHouseConfig | null;
+    if (clusterId && clusterId !== "default") {
+      config = getUserConfig(clusterId, {
+        username: body.username,
+        password: body.password || "",
+      });
+    } else {
+      config = getUserConfig({
+        username: body.username,
+        password: body.password || "",
+      });
+    }
 
     if (!config) {
       return NextResponse.json(
@@ -172,6 +194,7 @@ export async function POST(
       password: body.password || "",
       host: config.host || process.env.CLICKHOUSE_HOST,
       database: config.database || "default",
+      clusterId,
     });
 
     session.isLoggedIn = true;
