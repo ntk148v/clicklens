@@ -7,10 +7,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
 import {
   createClient,
-  getUserConfig,
   isClickHouseError,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
@@ -74,10 +73,7 @@ export async function GET(
     }
 
     // Use the session user's credentials
-    const config = getUserConfig({
-      username: session.user.username,
-      password: session.user.password,
-    });
+    const config = await getSessionClickHouseConfig();
 
     if (!config) {
       return NextResponse.json(
