@@ -142,7 +142,7 @@ export async function GET(request: Request) {
     const useExactCount = searchParams.get("exact") === "true";
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
 
     // Initialize query cache
     const queryCache = getQueryCache();

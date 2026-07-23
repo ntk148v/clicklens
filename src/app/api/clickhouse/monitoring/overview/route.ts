@@ -188,7 +188,7 @@ export async function GET(
 
     // Auto-detect cluster if not specified
     if (!clusterName) {
-      clusterName = await getClusterName(client);
+      clusterName = await getClusterName(client, config.clusterId);
     }
 
     // Cache check: key includes timeRange and cluster for overview data
