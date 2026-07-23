@@ -77,7 +77,8 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
     }
 
     // Cache key includes username for per-user RBAC filtering
-    const cacheKey = `databases:${session.user.username}`;
+    const clusterSuffix = session.user.clusterId ? `:${session.user.clusterId}` : '';
+    const cacheKey = `databases:${session.user.username}${clusterSuffix}`;
     const cachedData = await metadataCache.get(cacheKey) as
       | Array<{ name: string }>
       | undefined;

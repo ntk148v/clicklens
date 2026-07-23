@@ -22,8 +22,10 @@ const inMemoryCache = new Map<string, CachedPermissions>();
 const inMemoryCacheOrder: string[] = [];
 const MAX_IN_MEMORY_ENTRIES = 1000;
 
-function getCacheKey(username: string): string {
-  return `auth:perms:${username}`;
+function getCacheKey(username: string, clusterId?: string): string {
+  return clusterId
+    ? `auth:perms:${clusterId}:${username}`
+    : `auth:perms:${username}`;
 }
 
 function setInMemoryCache(key: string, value: CachedPermissions): void {
@@ -53,6 +55,7 @@ function getInMemoryCache(key: string): CachedPermissions | null {
 
 async function getRedisPermissions(
   username: string,
+  clusterId?: string,
 ): Promise<CachedPermissions | null> {
   if (!isRedisAvailable()) {
     return null;
@@ -60,7 +63,7 @@ async function getRedisPermissions(
 
   try {
     const redis = await getRedisClient();
-    const key = getCacheKey(username);
+    const key = getCacheKey(username, clusterId);
     const cached = await redis.get(key);
 
     if (!cached) return null;
@@ -81,12 +84,13 @@ async function getRedisPermissions(
 async function setRedisPermissions(
   username: string,
   permissions: Set<string>,
+  clusterId?: string,
 ): Promise<void> {
   if (!isRedisAvailable()) return;
 
   try {
     const redis = await getRedisClient();
-    const key = getCacheKey(username);
+    const key = getCacheKey(username, clusterId);
     const value = JSON.stringify({
       permissions: Array.from(permissions),
       timestamp: Date.now(),
@@ -110,20 +114,21 @@ export async function getCachedPermissions(): Promise<PermissionSet> {
   }
 
   const username = session.user.username;
+  const clusterId = session.user.clusterId;
   if (!username) {
     return { permissions: new Set(), backend: "fresh" };
   }
 
-  const cacheKey = getCacheKey(username);
+  const cacheKey = getCacheKey(username, clusterId);
 
-  const redisCached = await getRedisPermissions(username);
+  const redisCached = await getRedisPermissions(username, clusterId);
   if (redisCached) {
     return { permissions: redisCached.permissions, backend: "redis" };
   }
 
   const memoryCached = getInMemoryCache(cacheKey);
   if (memoryCached) {
-    setRedisPermissions(username, memoryCached.permissions).catch(() => {});
+    setRedisPermissions(username, memoryCached.permissions, clusterId).catch(() => {});
     return { permissions: memoryCached.permissions, backend: "memory" };
   }
 
@@ -139,18 +144,19 @@ export async function setCachedPermissions(
   }
 
   const username = session.user.username;
+  const clusterId = session.user.clusterId;
   if (!username) {
     return;
   }
 
-  const cacheKey = getCacheKey(username);
+  const cacheKey = getCacheKey(username, clusterId);
 
   setInMemoryCache(cacheKey, {
     permissions,
     timestamp: Date.now(),
   });
 
-  await setRedisPermissions(username, permissions);
+  await setRedisPermissions(username, permissions, clusterId);
 }
 
 export function invalidatePermissionCache(): void {
@@ -160,8 +166,9 @@ export function invalidatePermissionCache(): void {
 
 export async function invalidateUserPermissions(
   username: string,
+  clusterId?: string,
 ): Promise<void> {
-  const cacheKey = getCacheKey(username);
+  const cacheKey = getCacheKey(username, clusterId);
   inMemoryCache.delete(cacheKey);
   const idx = inMemoryCacheOrder.indexOf(cacheKey);
   if (idx !== -1) inMemoryCacheOrder.splice(idx, 1);

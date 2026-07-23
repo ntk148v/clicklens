@@ -104,7 +104,8 @@ export async function GET(
     }
 
     // Cache key includes username + database for per-user RBAC filtering
-    const cacheKey = `tables:${session.user.username}:${database ?? "_all"}`;
+    const clusterSuffix = session.user.clusterId ? `:${session.user.clusterId}` : "";
+    const cacheKey = `tables:${session.user.username}:${database ?? "_all"}${clusterSuffix}`;
     const cachedData = await metadataCache.get(cacheKey) as TableInfo[] | undefined;
     if (cachedData) {
       const resp = NextResponse.json({ success: true, data: cachedData });

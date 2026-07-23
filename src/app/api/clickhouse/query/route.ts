@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       : undefined;
 
     if (cacheEnabled && /^\s*SELECT\b/i.test(querySql)) {
-      const cacheKey = queryCache.generateSqlKey(querySql, reqBody.database);
+      const cacheKey = queryCache.generateSqlKey(querySql, reqBody.database, config.clusterId);
       const cachedResult = queryCache.getCachedQuery(cacheKey);
       
       if (cachedResult) {

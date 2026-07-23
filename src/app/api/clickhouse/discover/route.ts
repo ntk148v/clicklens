@@ -236,6 +236,7 @@ export async function GET(request: Request) {
           columns,
           groupBy: groupByParam || undefined,
           orderBy: orderByParam || undefined,
+          clusterId: config.clusterId,
         });
         const cachedResult = queryCache.getCachedQuery(cacheKey);
         if (cachedResult) {
@@ -260,6 +261,7 @@ export async function GET(request: Request) {
           columns,
           groupBy: groupByParam || undefined,
           orderBy: orderByParam || undefined,
+          clusterId: config.clusterId,
         });
         queryCache.setCachedQuery(cacheKey, histRes.data);
       }

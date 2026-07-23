@@ -117,7 +117,8 @@ export async function GET(
     const safeTable = escapeSqlString(table);
 
     // Cache key includes database and table
-    const cacheKey = `columns:${database}:${table}`;
+    const clusterSuffix = session.user.clusterId ? `:${session.user.clusterId}` : '';
+    const cacheKey = `columns:${database}:${table}${clusterSuffix}`;
     const cachedData = await metadataCache.get(cacheKey);
     if (cachedData) {
       const resp = NextResponse.json({

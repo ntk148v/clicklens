@@ -36,6 +36,8 @@ export interface ClickHouseConfig {
   database: string;
   /** ClickHouse query settings to apply to all queries */
   settings?: Record<string, unknown>;
+  /** Cluster ID this config belongs to (for cache key isolation) */
+  clusterId?: string;
 }
 
 /**
@@ -207,6 +209,7 @@ export function getLensConfig(clusterId?: string): ClickHouseConfig | null {
       username: def.lensUser,
       password: def.lensPassword,
       database: "default",
+      clusterId: def.id,
     };
   }
 
@@ -272,6 +275,7 @@ export function getUserConfig(
         username: creds.username,
         password: creds.password,
         database: creds.database || "default",
+        clusterId: def.id,
       };
     }
     // For "default" cluster, fall through to legacy path
@@ -295,6 +299,9 @@ export function getUserConfig(
     username: creds.username,
     password: creds.password,
     database: creds.database || "default",
+    clusterId: typeof clusterIdOrCredentials === "string" && clusterIdOrCredentials !== "default"
+      ? clusterIdOrCredentials
+      : undefined,
   };
 }
 

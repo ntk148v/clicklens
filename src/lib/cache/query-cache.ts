@@ -329,6 +329,7 @@ export class QueryCache {
     limit?: number;
     offset?: number;
     cursor?: string;
+    clusterId?: string;
   }): string {
     const queryParams: QueryParams = {
       database: params.database,
@@ -340,6 +341,7 @@ export class QueryCache {
       limit: params.limit,
       offset: params.offset,
       cursor: params.cursor,
+      clusterId: params.clusterId,
     };
 
     // Add time range as object (will be hashed by key-generator)
@@ -354,9 +356,10 @@ export class QueryCache {
   /**
    * Generate cache key for SQL query
    */
-  generateSqlKey(sql: string, database?: string): string {
+  generateSqlKey(sql: string, database?: string, clusterId?: string): string {
     const queryParams: QueryParams = {
       database,
+      clusterId,
     };
 
     return generateCacheKey(`sql:${sql}`, queryParams);
