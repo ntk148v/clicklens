@@ -20,6 +20,7 @@ import {
   buildConnectionUrl,
   isLensUserConfigured,
   isClusterConfigured,
+  getDefaultClusterId,
   type ClickHouseConfig,
 } from "@/lib/clickhouse";
 import https from "https";
@@ -81,7 +82,7 @@ export async function POST(
 
     const body: LoginRequest = await request.json();
 
-    const clusterId = body.clusterId || "default";
+    const clusterId = body.clusterId || getDefaultClusterId() || "default";
 
     // Validate clusterId early
     if (!isClusterConfigured(clusterId)) {

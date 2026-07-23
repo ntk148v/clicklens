@@ -63,6 +63,8 @@ export default function LoginPage() {
           setClusters(data.clusters);
           if (data.defaultClusterId) {
             setSelectedCluster(data.defaultClusterId);
+          } else if (data.clusters.length > 0) {
+            setSelectedCluster(data.clusters[0].id);
           }
         }
       })
