@@ -11,7 +11,7 @@ services:
       - NODE_ENV=production
       - DISABLE_SECURE_COOKIES=true
       - SESSION_SECRET=compose-secret-do-not-use-in-prod-32chars
-      - CLICKHOUSE_CLUSTERS=[{"id":"alpha","label":"Alpha","host":"clickhouse-alpha","port":8123,"lensUser":"default","lensPassword":"password"},{"id":"beta","label":"Beta","host":"clickhouse-beta","port":8123,"lensUser":"default","lensPassword":"password"}]
+      - CLICKHOUSE_CLUSTERS=[{"id":"alpha","label":"Alpha","host":"clickhouse-alpha","port":8123,"lensUser":"alpha_user","lensPassword":"alpha_pass"},{"id":"beta","label":"Beta","host":"clickhouse-beta","port":8123,"lensUser":"beta_user","lensPassword":"beta_pass"}]
     restart: unless-stopped
     depends_on:
       - clickhouse-alpha
@@ -24,8 +24,8 @@ services:
     hostname: clickhouse-alpha
     ports:
       - "127.0.0.1:8123:8123"
-    environment:
-      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - ./dev/multi-cluster/init-alpha.sh:/docker-entrypoint-initdb.d/init.sh
     restart: unless-stopped
 
   clickhouse-beta:
@@ -35,6 +35,6 @@ services:
     hostname: clickhouse-beta
     ports:
       - "127.0.0.1:8124:8123"
-    environment:
-      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - ./dev/multi-cluster/init-beta.sh:/docker-entrypoint-initdb.d/init.sh
     restart: unless-stopped

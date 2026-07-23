@@ -14,6 +14,7 @@ import { sessionOptions, type SessionData } from "@/lib/auth/session";
 const PUBLIC_ROUTES = new Set([
   "/api/auth/login",
   "/api/auth/session",
+  "/api/auth/clusters",
   "/api/clickhouse/ping",
 ]);
 

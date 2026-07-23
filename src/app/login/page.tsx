@@ -57,8 +57,12 @@ export default function LoginPage() {
 
     // Fetch available clusters
     fetchApi("/api/auth/clusters")
-      .then((r) => r.json())
-      .then((data) => {
+      .then(async (r) => {
+        if (!r.ok) {
+          // Server returned an error — single-cluster or misconfigured, no dropdown
+          return;
+        }
+        const data = await r.json();
         if (data.success && data.clusters) {
           setClusters(data.clusters);
           if (data.defaultClusterId) {
@@ -69,7 +73,7 @@ export default function LoginPage() {
         }
       })
       .catch(() => {
-        // Cluster table not available — single-cluster setup
+        // Network error — single-cluster setup, no dropdown
       });
   }, [router]);
 
