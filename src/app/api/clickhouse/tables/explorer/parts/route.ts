@@ -115,7 +115,7 @@ export async function GET(
     }
 
     const client = createClient(lensConfig);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, lensConfig.clusterId);
 
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, afterEach, describe, expect, it, mock } from "bun:test";
 
 import { getClusterName, resetClusterCache } from "./cluster";
 import type { ClickHouseClient, ClickHouseQueryResult } from "./clients/types";
@@ -34,6 +34,10 @@ describe("getClusterName", () => {
   beforeEach(() => {
     delete process.env.CLICKHOUSE_CLUSTER;
     resetClusterCache();
+  });
+
+  afterEach(() => {
+    delete process.env.CLICKHOUSE_CLUSTERS;
   });
 
   it("filters out replicated database auto-clusters", async () => {
@@ -94,5 +98,34 @@ describe("getClusterName", () => {
     const clusterName = await getClusterName(client);
     expect(clusterName).toBe("ch_bronze_company");
     expect(client.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("caches detected names separately for alpha and beta", async () => {
+    const alpha = createClient(() => queryResult([{ cluster: "alpha_ch" }]));
+    const beta = createClient(() => queryResult([{ cluster: "beta_ch" }]));
+
+    expect(await getClusterName(alpha, "alpha")).toBe("alpha_ch");
+    expect(await getClusterName(beta, "beta")).toBe("beta_ch");
+  });
+
+  it("CLICKHOUSE_CLUSTER only overrides legacy (no-ID) calls", async () => {
+    process.env.CLICKHOUSE_CLUSTER = "shared_override";
+    const alpha = createClient(() => queryResult([{ cluster: "ignored" }]));
+    const beta = createClient(() => queryResult([{ cluster: "also_ignored" }]));
+
+    // Legacy call without clusterId uses the global override
+    expect(await getClusterName(alpha)).toBe("shared_override");
+    // ID-scoped calls ignore the global override
+    expect(await getClusterName(beta, "beta")).not.toBe("shared_override");
+  });
+
+  it("uses per-registry clickhouseCluster override when defined", async () => {
+    process.env.CLICKHOUSE_CLUSTERS = JSON.stringify([
+      { id: "alpha", label: "Alpha", host: "a", port: 8123, lensUser: "u", lensPassword: "p", clickhouseCluster: "alpha_ch" },
+    ]);
+    const client = createClient(() => queryResult([{ cluster: "ignored" }]));
+
+    expect(await getClusterName(client, "alpha")).toBe("alpha_ch");
+    expect(client.query).not.toHaveBeenCalled();
   });
 });

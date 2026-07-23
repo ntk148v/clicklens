@@ -131,7 +131,7 @@ export async function POST(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";
@@ -256,7 +256,7 @@ export async function PUT(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";
@@ -429,7 +429,7 @@ export async function DELETE(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";

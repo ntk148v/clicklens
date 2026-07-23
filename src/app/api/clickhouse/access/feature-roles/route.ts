@@ -92,7 +92,7 @@ export async function POST(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
     const created: string[] = [];
 

@@ -22,6 +22,8 @@ export interface ClusterDefinition {
   verifySsl: boolean;
   lensUser: string;
   lensPassword: string;
+  /** Optional ClickHouse cluster name override for ON CLUSTER clauses */
+  clickhouseCluster?: string;
 }
 
 export interface ClickHouseConfig {
@@ -109,6 +111,9 @@ export function parseClusterRegistry(): Map<string, ClusterDefinition> {
       verifySsl: e.verifySsl !== false,
       lensUser: String(e.lensUser),
       lensPassword: String(e.lensPassword),
+      clickhouseCluster: typeof e.clickhouseCluster === "string" && e.clickhouseCluster.trim()
+        ? e.clickhouseCluster.trim()
+        : undefined,
     });
   }
 

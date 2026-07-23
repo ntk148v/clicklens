@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     const filter = searchParams.get("filter");
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
 
     const quotedDb = quoteIdentifier(database);
     const quotedTable = quoteIdentifier(table);

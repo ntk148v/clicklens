@@ -112,7 +112,7 @@ export async function PUT(request: NextRequest) {
     // Use ALTER USER to persist setting for the current user
     // Note: This requires privileges to ALTER USER
     // We sanitize input manually as the client wrapper expects a string
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
 
     const safeName = name.replace(/[^a-zA-Z0-9_.]/g, ""); // Strict allowlist for setting name

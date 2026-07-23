@@ -124,7 +124,7 @@ export async function GET(
       cacheKey,
       async () => {
         // Auto-detect cluster
-        const clusterName = await getClusterName(client);
+        const clusterName = await getClusterName(client, lensConfig.clusterId);
 
         const result = await client.query<ReplicaInfo>(
           getTableReplicasQuery(safeDatabase, safeTable, clusterName),

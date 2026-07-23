@@ -2,6 +2,7 @@
  * Cluster detection and management
  */
 import { ClickHouseClient } from "./clients/types";
+import { parseClusterRegistry } from "./config";
 
 const clusterCache = new Map<string, { name: string | undefined; at: number }>();
 const CLUSTER_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -10,9 +11,21 @@ export async function getClusterName(
   client: ClickHouseClient,
   clusterId?: string,
 ): Promise<string | undefined> {
-  const configuredCluster = process.env.CLICKHOUSE_CLUSTER?.trim();
-  if (configuredCluster) {
-    return configuredCluster;
+  // Per-registry clickhouseCluster override (only for registered IDs)
+  if (clusterId) {
+    const registry = parseClusterRegistry();
+    const def = registry.get(clusterId);
+    if (def?.clickhouseCluster) {
+      return def.clickhouseCluster;
+    }
+  }
+
+  // Global CLICKHOUSE_CLUSTER override — only for legacy (no-ID) calls
+  if (!clusterId) {
+    const configuredCluster = process.env.CLICKHOUSE_CLUSTER?.trim();
+    if (configuredCluster) {
+      return configuredCluster;
+    }
   }
 
   const cacheKey = clusterId || "__legacy__";

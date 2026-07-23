@@ -80,7 +80,7 @@ export async function GET(): Promise<NextResponse<RunningQueriesResponse>> {
     }
 
     const client = createClient(lensConfig);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, lensConfig.clusterId);
 
     const result = await client.query<RunningQuery>(
       getRunningQueriesQuery(clusterName)

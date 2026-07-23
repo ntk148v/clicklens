@@ -89,7 +89,7 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
 
     try {
       // Auto-detect cluster
-      const clusterName = await getClusterName(client);
+      const clusterName = await getClusterName(client, lensConfig.clusterId);
       const table = clusterName
         ? `clusterAllReplicas('${clusterName}', system.query_cache)`
         : "system.query_cache";

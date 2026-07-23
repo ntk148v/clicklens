@@ -201,7 +201,7 @@ export async function POST(
         : quoteIdentifier(body.granteeName);
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
 
     let sql = `GRANT${onCluster} ${body.accessType.toUpperCase()} ${target} TO ${grantee}`;
@@ -293,7 +293,7 @@ export async function DELETE(
         : quoteIdentifier(body.granteeName);
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName ? ` ON CLUSTER ${quoteIdentifier(clusterName)}` : "";
 
     const sql = `REVOKE${onCluster} ${body.accessType.toUpperCase()} ${target} FROM ${grantee}`;

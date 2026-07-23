@@ -114,7 +114,7 @@ export async function GET(
     const safeTable = escapeSqlString(table);
 
     // Auto-detect cluster
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, lensConfig.clusterId);
 
     // Cache key includes database and table for proper isolation
     const cacheScope = lensConfig.clusterId ?? "legacy";

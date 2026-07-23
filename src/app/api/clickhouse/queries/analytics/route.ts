@@ -109,7 +109,7 @@ export async function GET(
     }
 
     // Auto-detect cluster
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, lensConfig.clusterId);
     const table = clusterName
       ? `clusterAllReplicas('${clusterName}', system.query_log)`
       : "system.query_log";
