@@ -4,13 +4,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getRunningQueriesQuery } from "@/lib/clickhouse/monitoring/queries";
 
@@ -71,7 +66,7 @@ export async function GET(): Promise<NextResponse<RunningQueriesResponse>> {
       );
     }
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json({
         success: false,

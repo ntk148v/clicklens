@@ -77,15 +77,20 @@ export async function getSessionClickHouseConfig(): Promise<ClickHouseConfig | n
 /**
  * Get lens user config for the same cluster as the current session.
  * Used by API routes that need service-user operations tied to the user's cluster.
+ * Falls back to legacy getLensConfig() when no cluster is pinned on the session.
  */
 export async function getSessionLensConfig(): Promise<ClickHouseConfig | null> {
   const session = await getSession();
-  if (!session.isLoggedIn || !session.user || !session.user.clusterId) {
+  if (!session.isLoggedIn || !session.user) {
     return null;
   }
-  // Import lazily to avoid circular dependency at module level
+  if (session.user.clusterId) {
+    const { getLensConfig } = await import("@/lib/clickhouse");
+    return getLensConfig(session.user.clusterId);
+  }
+  // No cluster pinned — fall through to legacy env vars
   const { getLensConfig } = await import("@/lib/clickhouse");
-  return getLensConfig(session.user.clusterId);
+  return getLensConfig();
 }
 
 /**

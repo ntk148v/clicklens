@@ -4,13 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getQueryHistoryCountQuery, getQueryHistoryQuery } from "@/lib/clickhouse/queries/query-analysis";
@@ -93,7 +88,7 @@ export async function GET(
     const queryType = searchParams.get("queryType"); // SELECT, INSERT, etc.
     const fingerprint = searchParams.get("fingerprint");
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json({
         success: false,

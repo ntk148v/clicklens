@@ -8,11 +8,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
+import { getSession, getSessionClickHouseConfig, getSessionLensConfig } from "@/lib/auth";
 import { metadataCache } from "@/lib/cache";
 import {
   createClient,
-  getLensConfig,
   isLensUserConfigured,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
@@ -68,7 +67,7 @@ export async function GET(): Promise<NextResponse<DatabasesResponse>> {
       );
     }
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json({
         success: true,

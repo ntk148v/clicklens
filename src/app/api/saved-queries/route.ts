@@ -5,12 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { generateUUID } from "@/lib/utils";
 import {
@@ -41,7 +37,7 @@ export async function GET() {
   }
 
   try {
-    const config = getLensConfig();
+    const config = await getSessionLensConfig();
     const client = createClient(config!); // Checked by isLensUserConfigured
 
     // Ensure table exists (idempotent, fast enough to check or cache)
@@ -104,7 +100,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const config = getLensConfig();
+    const config = await getSessionLensConfig();
     if (!config) {
       return apiError(503, "INTERNAL_ERROR", "Metadata storage not configured", "Saved queries feature is not configured");
     }

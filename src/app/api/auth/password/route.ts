@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import { getUserConfig, getLensConfig, createClient } from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { getUserConfig, createClient } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 import { updateSessionPassword } from "@/lib/auth/storage";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Execution: Connect as lens_admin (service user) to perform the alteration
-    const adminConfig = getLensConfig();
+    const adminConfig = await getSessionLensConfig();
     if (!adminConfig) {
       return NextResponse.json(
         { success: false, error: "Server admin configuration missing" },

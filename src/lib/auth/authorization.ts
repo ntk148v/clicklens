@@ -6,11 +6,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession, getSessionClickHouseConfig } from "./index";
+import { getSession, getSessionClickHouseConfig, getSessionLensConfig } from "./index";
 import {
   createClient,
   isLensUserConfigured,
-  getLensConfig,
 } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import {
@@ -224,7 +223,7 @@ async function getEffectiveRoles(
   const effectiveRoles = new Set<string>();
 
   if (!isLensUserConfigured()) return effectiveRoles;
-  const lensConfig = getLensConfig();
+  const lensConfig = await getSessionLensConfig();
   if (!lensConfig) return effectiveRoles;
 
   try {
@@ -289,7 +288,7 @@ async function checkGlobalAccess(username: string): Promise<boolean> {
     return false;
   }
 
-  const lensConfig = getLensConfig();
+  const lensConfig = await getSessionLensConfig();
   if (!lensConfig) {
     return false;
   }
@@ -345,7 +344,7 @@ async function hasAccessibleDatabases(username: string): Promise<boolean> {
     return false;
   }
 
-  const lensConfig = getLensConfig();
+  const lensConfig = await getSessionLensConfig();
   if (!lensConfig) {
     return false;
   }
