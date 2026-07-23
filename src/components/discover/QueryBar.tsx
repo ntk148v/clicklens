@@ -228,6 +228,18 @@ export function QueryBar({
                         message ILIKE &apos;%timeout%&apos;
                       </code>
                     </li>
+                    <li>
+                      <code className="bg-muted px-1 rounded">
+                        hasToken(message, &apos;timeout&apos;)
+                      </code>
+                      <span className="text-xs ml-1">(whole-token match)</span>
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 rounded">
+                        hasTokenCaseInsensitive(host, &apos;api&apos;)
+                      </code>
+                      <span className="text-xs ml-1">(case-insensitive)</span>
+                    </li>
                   </ul>
                   <p className="text-muted-foreground text-xs">
                     Press <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px]">Enter</kbd> to execute

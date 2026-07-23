@@ -21,7 +21,7 @@ export function QueryBarAutocomplete({
   onChange,
   onExecute,
   columns,
-  placeholder = "Enter filter expression, e.g. status >= 400 AND host LIKE '%api%'",
+  placeholder = "Enter filter expression, e.g. status >= 400 AND hasToken(message, 'timeout')",
   isLoading = false,
   className,
 }: QueryBarAutocompleteProps) {
