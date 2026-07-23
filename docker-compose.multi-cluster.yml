@@ -1,0 +1,40 @@
+services:
+  clicklens:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kiennt26/clicklens:latest
+    container_name: clicklens
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DISABLE_SECURE_COOKIES=true
+      - SESSION_SECRET=compose-secret-do-not-use-in-prod-32chars
+      - CLICKHOUSE_CLUSTERS=[{"id":"alpha","label":"Alpha","host":"clickhouse-alpha","port":8123,"lensUser":"default","lensPassword":"password"},{"id":"beta","label":"Beta","host":"clickhouse-beta","port":8123,"lensUser":"default","lensPassword":"password"}]
+    restart: unless-stopped
+    depends_on:
+      - clickhouse-alpha
+      - clickhouse-beta
+
+  clickhouse-alpha:
+    image: clickhouse/clickhouse-server:latest
+    user: "101:101"
+    container_name: clickhouse-alpha
+    hostname: clickhouse-alpha
+    ports:
+      - "127.0.0.1:8123:8123"
+    environment:
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    restart: unless-stopped
+
+  clickhouse-beta:
+    image: clickhouse/clickhouse-server:latest
+    user: "101:101"
+    container_name: clickhouse-beta
+    hostname: clickhouse-beta
+    ports:
+      - "127.0.0.1:8124:8123"
+    environment:
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    restart: unless-stopped
