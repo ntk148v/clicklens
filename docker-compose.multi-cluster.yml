@@ -7,11 +7,12 @@ services:
     container_name: clicklens
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local
     environment:
       - NODE_ENV=production
+      # Localhost-only: allows HTTP cookies in dev
       - DISABLE_SECURE_COOKIES=true
-      - SESSION_SECRET=compose-secret-do-not-use-in-prod-32chars
-      - CLICKHOUSE_CLUSTERS=[{"id":"alpha","label":"Alpha","host":"clickhouse-alpha","port":8123,"lensUser":"alpha_user","lensPassword":"alpha_pass"},{"id":"beta","label":"Beta","host":"clickhouse-beta","port":8123,"lensUser":"beta_user","lensPassword":"beta_pass"}]
     restart: unless-stopped
     depends_on:
       - clickhouse-alpha
