@@ -22,7 +22,8 @@ ClickLens follows a layered architecture pattern with clear separation of concer
 
 ### Key Architectural Decisions
 
-- **Dual Client Model**: Separates privileged operations (via `LENS_USER`) from user-context queries (via session credentials)
+- **Dual Client Model**: Separates privileged operations (via `LENS_USER` / per-cluster `lensUser`) from user-context queries (via session credentials)
+- **Multi-Cluster Support**: Each login session is pinned to one registered cluster; caches and metadata lookups are isolated by `config.clusterId`
 - **Permission Derivation**: UI capabilities are computed from ClickHouse grants at login time, not stored separately
 - **NDJSON Streaming**: Large query results stream incrementally to avoid memory exhaustion
 - **Server Components First**: Next.js App Router with React Server Components for improved performance
@@ -31,20 +32,20 @@ ClickLens follows a layered architecture pattern with clear separation of concer
 
 ClickLens leverages modern web technologies optimized for performance and developer productivity.
 
-| Layer | Technology | Version | Purpose |
-| ----- | ---------- | ------- | ------- |
-| **Framework** | Next.js (App Router) | 16.1.1 | Server-side rendering, API routes, file-based routing |
-| **Runtime** | Bun (dev) / Node.js (prod) | 20.x | Fast development runtime, stable production runtime |
-| **UI Library** | React | 19.2.3 | Component-based user interface |
-| **Styling** | Tailwind CSS | 4.x | Utility-first CSS framework |
-| **ClickHouse Client** | @clickhouse/client (HTTP) | 1.15.0 | Official ClickHouse JavaScript HTTP client |
-| **State Management** | Zustand | 5.0.9 | Lightweight state management |
-| **Session** | iron-session | 8.0.4 | Secure cookie-based sessions |
-| **Forms** | React Hook Form + Zod | 7.x / 4.x | Form validation and management |
-| **Tables** | TanStack React Table | 8.21.3 | Advanced data table component |
-| **Charts** | Recharts | 3.6.0 | Data visualization |
-| **Editor** | CodeMirror 6 | 6.x | SQL code editor with syntax highlighting |
-| **Caching** | Redis | 6.x+ | Optional caching for improved performance |
+| Layer                 | Technology                 | Version   | Purpose                                               |
+| --------------------- | -------------------------- | --------- | ----------------------------------------------------- |
+| **Framework**         | Next.js (App Router)       | 16.1.1    | Server-side rendering, API routes, file-based routing |
+| **Runtime**           | Bun (dev) / Node.js (prod) | 20.x      | Fast development runtime, stable production runtime   |
+| **UI Library**        | React                      | 19.2.3    | Component-based user interface                        |
+| **Styling**           | Tailwind CSS               | 4.x       | Utility-first CSS framework                           |
+| **ClickHouse Client** | @clickhouse/client (HTTP)  | 1.15.0    | Official ClickHouse JavaScript HTTP client            |
+| **State Management**  | Zustand                    | 5.0.9     | Lightweight state management                          |
+| **Session**           | iron-session               | 8.0.4     | Secure cookie-based sessions                          |
+| **Forms**             | React Hook Form + Zod      | 7.x / 4.x | Form validation and management                        |
+| **Tables**            | TanStack React Table       | 8.21.3    | Advanced data table component                         |
+| **Charts**            | Recharts                   | 3.6.0     | Data visualization                                    |
+| **Editor**            | CodeMirror 6               | 6.x       | SQL code editor with syntax highlighting              |
+| **Caching**           | Redis                      | 6.x+      | Optional caching for improved performance             |
 
 ## Application Structure
 
@@ -66,7 +67,7 @@ src/
 │   │   ├── settings/       # Settings viewer
 │   │   └── profile/        # User profile management
 │   ├── api/                # API route handlers
-│   │   ├── auth/           # Authentication (5 endpoints)
+│   │   ├── auth/           # Authentication (6 endpoints)
 │   │   ├── clickhouse/     # ClickHouse operations (35+ endpoints)
 │   │   └── saved-queries/  # Saved queries CRUD
 │   └── login/              # Public login page
@@ -82,7 +83,7 @@ src/
 │   └── ui/                 # shadcn/ui primitives (30 components)
 └── lib/                    # Core business logic (31 files)
     ├── auth/               # Session management
-    ├── clickhouse/         # ClickHouse client & config
+    ├── clickhouse/         # ClickHouse client, config, **cluster registry**
     ├── hooks/              # Custom React hooks (6)
     ├── rbac/               # Feature roles and permissions
     ├── store/              # Zustand stores (3)
@@ -92,17 +93,17 @@ src/
 
 ### Feature Module Summary
 
-| Module | Route | Components | API Endpoints | Permission Required |
-| ------ | ----- | ---------- | ------------- | ------------------- |
-| **Dashboard** | `/` | Feature cards, hero section | N/A | Any authenticated user |
-| **Discover** | `/discover` | QueryBar, FieldsSidebar, DiscoverGrid, DiscoverHistogram | `/api/clickhouse/discover` | `canDiscover` |
-| **SQL Console** | `/sql` | SqlEditor (CodeMirror), ResultGrid (TanStack Table), QueryTabs, QueryHistory, SavedQueries | `/api/clickhouse/query`, `/api/clickhouse/kill`, `/api/saved-queries/*` | `canExecuteQueries` |
-| **Table Explorer** | `/tables` | 8 tab components (overview, columns, parts, merges, mutations, replicas, dependencies, DDL) | `/api/clickhouse/tables/explorer/*` (7 endpoints) | `canBrowseTables` |
-| **Monitoring** | `/monitoring/*` | 8 specialized dashboards | `/api/clickhouse/monitoring/*` (8 endpoints) | `canViewCluster` |
-| **Queries** | `/queries/*` | 4 views (running, history, analytics, cache) | `/api/clickhouse/queries/*` (4 endpoints) | `canViewProcesses` |
-| **Logging** | `/logging/*` | 3 log viewers | `/api/clickhouse/logging/*` (3 endpoints) | `canViewServerLogs`, `canViewSessionLogs`, `canViewCrashLogs` |
-| **Access** | `/access/*` | User management, role management | `/api/clickhouse/access/*` (12 endpoints) | `canManageUsers` |
-| **Settings** | `/settings/*` | Server settings viewer, session settings viewer | `/api/clickhouse/settings/*` (2 endpoints) | `canViewSettings` |
+| Module             | Route           | Components                                                                                  | API Endpoints                                                           | Permission Required                                           |
+| ------------------ | --------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Dashboard**      | `/`             | Feature cards, hero section                                                                 | N/A                                                                     | Any authenticated user                                        |
+| **Discover**       | `/discover`     | QueryBar, FieldsSidebar, DiscoverGrid, DiscoverHistogram                                    | `/api/clickhouse/discover`                                              | `canDiscover`                                                 |
+| **SQL Console**    | `/sql`          | SqlEditor (CodeMirror), ResultGrid (TanStack Table), QueryTabs, QueryHistory, SavedQueries  | `/api/clickhouse/query`, `/api/clickhouse/kill`, `/api/saved-queries/*` | `canExecuteQueries`                                           |
+| **Table Explorer** | `/tables`       | 8 tab components (overview, columns, parts, merges, mutations, replicas, dependencies, DDL) | `/api/clickhouse/tables/explorer/*` (7 endpoints)                       | `canBrowseTables`                                             |
+| **Monitoring**     | `/monitoring/*` | 8 specialized dashboards                                                                    | `/api/clickhouse/monitoring/*` (8 endpoints)                            | `canViewCluster`                                              |
+| **Queries**        | `/queries/*`    | 4 views (running, history, analytics, cache)                                                | `/api/clickhouse/queries/*` (4 endpoints)                               | `canViewProcesses`                                            |
+| **Logging**        | `/logging/*`    | 3 log viewers                                                                               | `/api/clickhouse/logging/*` (3 endpoints)                               | `canViewServerLogs`, `canViewSessionLogs`, `canViewCrashLogs` |
+| **Access**         | `/access/*`     | User management, role management                                                            | `/api/clickhouse/access/*` (12 endpoints)                               | `canManageUsers`                                              |
+| **Settings**       | `/settings/*`   | Server settings viewer, session settings viewer                                             | `/api/clickhouse/settings/*` (2 endpoints)                              | `canViewSettings`                                             |
 
 ## Core Architectural Patterns
 
@@ -112,10 +113,11 @@ ClickLens employs a sophisticated dual-client architecture that separates metada
 
 #### Lens Client (Service Account)
 
-- **Credentials**: From environment variables (`LENS_USER`, `LENS_PASSWORD`)
+- **Credentials**: From environment variables (`LENS_USER`, `LENS_PASSWORD`) or per-cluster `lensUser`/`lensPassword` in `CLICKHOUSE_CLUSTERS`
 - **Purpose**: Read-only metadata and monitoring operations that don't require user context
 - **Used By**: Permission derivation, schema introspection, monitoring dashboards, cluster topology
 - **Required Grants**: `SELECT ON system.*`, `SHOW DATABASES`, `SHOW TABLES`, `ACCESS MANAGEMENT` (for reading grants)
+- **Multi-Cluster**: Each registered cluster has its own Lens credentials; the correct one is selected based on the session's `clusterId`
 
 #### User Client (Session Credentials)
 
@@ -127,16 +129,16 @@ ClickLens employs a sophisticated dual-client architecture that separates metada
 
 #### When Each Client is Used
 
-| Operation | Client Type | Reason |
-| --------- | ----------- | ------ |
-| Execute user SQL query | User Client | Enforce user's actual permissions, audit as user |
-| Discover feature (data) | User Client | User must have SELECT on table |
-| Derive permissions at login | Lens Client | Need to query `system.grants` for any user |
-| Fetch database/table list | Lens Client | Consistent metadata regardless of user permissions |
-| Monitoring dashboards | Lens Client | Need consistent `system.*` access for all users |
-| Query history from `system.query_log` | Lens Client | Users may not have SELECT on system tables |
-| Kill running query | User Client | User must have `KILL QUERY` grant |
-| User/role management | User Client | User must have `ACCESS MANAGEMENT` grant |
+| Operation                             | Client Type | Reason                                             |
+| ------------------------------------- | ----------- | -------------------------------------------------- |
+| Execute user SQL query                | User Client | Enforce user's actual permissions, audit as user   |
+| Discover feature (data)               | User Client | User must have SELECT on table                     |
+| Derive permissions at login           | Lens Client | Need to query `system.grants` for any user         |
+| Fetch database/table list             | Lens Client | Consistent metadata regardless of user permissions |
+| Monitoring dashboards                 | Lens Client | Need consistent `system.*` access for all users    |
+| Query history from `system.query_log` | Lens Client | Users may not have SELECT on system tables         |
+| Kill running query                    | User Client | User must have `KILL QUERY` grant                  |
+| User/role management                  | User Client | User must have `ACCESS MANAGEMENT` grant           |
 
 ### State Management Architecture
 
@@ -149,11 +151,13 @@ ClickLens uses Zustand for client-side state management, organized into three di
 **Persistence**: localStorage (key: `clicklens-tabs-storage`)
 
 **State**:
+
 - `tabs`: Array of query and table tabs
 - `activeTabId`: Currently active tab
 - `history`: Last 100 query history entries
 
 **Persistence Strategy**:
+
 - Tabs are saved without `result` data (too large for localStorage)
 - History entries include: SQL, duration, rows, bytes, memory, user, error
 - Maximum 100 history entries retained (oldest pruned)
@@ -165,6 +169,7 @@ ClickLens uses Zustand for client-side state management, organized into three di
 **Persistence**: None (in-memory only)
 
 **State**:
+
 - `databases`: List of available databases
 - `selectedDatabase`: Currently selected database
 - `tables`: Table information
@@ -172,6 +177,7 @@ ClickLens uses Zustand for client-side state management, organized into three di
 - `columnsCache`: Cached column information with TTL
 
 **Caching Strategy**:
+
 - Tables are preloaded for all databases on mount
 - Columns have a 5-minute TTL cache
 - Cache keys use `database.table` format
@@ -183,6 +189,7 @@ ClickLens uses Zustand for client-side state management, organized into three di
 **Persistence**: None (transient state)
 
 **State**:
+
 - Editing state for users and roles
 - Form data for create/edit operations
 
@@ -211,13 +218,13 @@ sequenceDiagram
 
 **Stream Events (NDJSON Format)**:
 
-| Event Type | Description |
-| ---------- | ----------- |
-| `meta` | Column names and types |
-| `data` | Batches of result rows |
-| `progress` | Rows read, bytes processed |
-| `done` | Query complete with final statistics |
-| `error` | Error details if query fails |
+| Event Type | Description                          |
+| ---------- | ------------------------------------ |
+| `meta`     | Column names and types               |
+| `data`     | Batches of result rows               |
+| `progress` | Rows read, bytes processed           |
+| `done`     | Query complete with final statistics |
+| `error`    | Error details if query fails         |
 
 **Client-Side Processing**:
 
@@ -251,6 +258,7 @@ ClickLens implements a sophisticated permission derivation model that leverages 
 **Session Library**: iron-session
 
 **Configuration**:
+
 - Cookie Name: `clicklens-session`
 - Encryption: AES-256-GCM via iron-session
 - TTL: 24 hours
@@ -263,9 +271,10 @@ ClickLens implements a sophisticated permission derivation model that leverages 
 interface SessionData {
   isLoggedIn: boolean;
   sessionId?: string;
+  clusterId?: string; // Cluster ID from CLICKHOUSE_CLUSTERS registry
   user?: {
     username: string;
-    password: string;  // Encrypted in cookie
+    password: string; // Encrypted in cookie
     host?: string;
     database?: string;
   };
@@ -294,30 +303,30 @@ Permissions are not stored in ClickLens—they are dynamically derived from Clic
 
 **Grant-to-Permission Mapping**:
 
-| ClickHouse Grant | UI Permission | Feature Enabled |
-| ---------------- | ------------- | --------------- |
-| `ACCESS MANAGEMENT` | `canManageUsers` | User/Role Management |
-| `SELECT ON system.processes` | `canViewProcesses` | Query Monitoring |
-| `KILL QUERY` | `canKillQueries` | Query Termination |
-| `SHOW TABLES` | `canBrowseTables` | Table Explorer |
-| `SELECT ON *.*` | `canExecuteQueries` | SQL Console |
-| `SHOW TABLES + SELECT` | `canDiscover` | Discover Feature |
-| `SELECT ON system.clusters` | `canViewCluster` | Cluster Monitoring |
-| `SELECT ON system.settings` | `canViewSettings` | Settings Module |
-| `SELECT ON system.text_log` | `canViewServerLogs` | Server Logs Tab |
-| `SELECT ON system.session_log` | `canViewSessionLogs` | Session Logs Tab |
-| `SELECT ON system.crash_log` | `canViewCrashLogs` | Crash Logs Tab |
+| ClickHouse Grant               | UI Permission        | Feature Enabled      |
+| ------------------------------ | -------------------- | -------------------- |
+| `ACCESS MANAGEMENT`            | `canManageUsers`     | User/Role Management |
+| `SELECT ON system.processes`   | `canViewProcesses`   | Query Monitoring     |
+| `KILL QUERY`                   | `canKillQueries`     | Query Termination    |
+| `SHOW TABLES`                  | `canBrowseTables`    | Table Explorer       |
+| `SELECT ON *.*`                | `canExecuteQueries`  | SQL Console          |
+| `SHOW TABLES + SELECT`         | `canDiscover`        | Discover Feature     |
+| `SELECT ON system.clusters`    | `canViewCluster`     | Cluster Monitoring   |
+| `SELECT ON system.settings`    | `canViewSettings`    | Settings Module      |
+| `SELECT ON system.text_log`    | `canViewServerLogs`  | Server Logs Tab      |
+| `SELECT ON system.session_log` | `canViewSessionLogs` | Session Logs Tab     |
+| `SELECT ON system.crash_log`   | `canViewCrashLogs`   | Crash Logs Tab       |
 
 **Feature Roles**: ClickLens defines 6 predefined ClickHouse roles prefixed with `clicklens_*` that bundle common permission sets.
 
-| Feature Role | Purpose | Required Grants |
-| ------------ | ------- | --------------- |
-| `clicklens_table_explorer` | Browse schemas | `SHOW DATABASES`, `SHOW TABLES`, `SELECT ON system.{tables,columns,parts,replicas,mutations,merges}` |
-| `clicklens_query_monitor` | Monitor queries | `KILL QUERY`, `SELECT ON system.{processes,query_log,query_cache}` |
-| `clicklens_cluster_monitor` | Monitor cluster | `SELECT ON system.{clusters,replicas,metrics,events,disks,replication_queue,asynchronous_metrics}` |
-| `clicklens_user_admin` | Manage users/roles | `ACCESS MANAGEMENT ON *.*` |
-| `clicklens_table_admin` | DDL operations | `TRUNCATE`, `OPTIMIZE ON *.*` |
-| `clicklens_settings_admin` | View configuration | `SELECT ON system.{settings,server_settings}` |
+| Feature Role                | Purpose            | Required Grants                                                                                      |
+| --------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `clicklens_table_explorer`  | Browse schemas     | `SHOW DATABASES`, `SHOW TABLES`, `SELECT ON system.{tables,columns,parts,replicas,mutations,merges}` |
+| `clicklens_query_monitor`   | Monitor queries    | `KILL QUERY`, `SELECT ON system.{processes,query_log,query_cache}`                                   |
+| `clicklens_cluster_monitor` | Monitor cluster    | `SELECT ON system.{clusters,replicas,metrics,events,disks,replication_queue,asynchronous_metrics}`   |
+| `clicklens_user_admin`      | Manage users/roles | `ACCESS MANAGEMENT ON *.*`                                                                           |
+| `clicklens_table_admin`     | DDL operations     | `TRUNCATE`, `OPTIMIZE ON *.*`                                                                        |
+| `clicklens_settings_admin`  | View configuration | `SELECT ON system.{settings,server_settings}`                                                        |
 
 <Callout type="info">
   **XML-Configured Users (e.g., default user):** Some users receive access via
@@ -361,14 +370,14 @@ App (Root)
 
 The application uses six custom hooks to encapsulate complex logic and provide clean interfaces to components.
 
-| Hook | File | Purpose |
-| ---- | ---- | ------- |
+| Hook                 | File                      | Purpose                         |
+| -------------------- | ------------------------- | ------------------------------- |
 | `useIncrementalData` | `use-incremental-data.ts` | Polling with diff-based updates |
-| `useLogs` | `use-logs.ts` | Log fetching with filtering |
-| `useMonitoring` | `use-monitoring.ts` | Auto-refreshing monitoring data |
-| `useQueryAnalytics` | `use-query-analytics.ts` | Query performance aggregation |
-| `useSettings` | `use-settings.ts` | Settings management |
-| `useTableExplorer` | `use-table-explorer.ts` | Table browsing state |
+| `useLogs`            | `use-logs.ts`             | Log fetching with filtering     |
+| `useMonitoring`      | `use-monitoring.ts`       | Auto-refreshing monitoring data |
+| `useQueryAnalytics`  | `use-query-analytics.ts`  | Query performance aggregation   |
+| `useSettings`        | `use-settings.ts`         | Settings management             |
+| `useTableExplorer`   | `use-table-explorer.ts`   | Table browsing state            |
 
 ## API Architecture
 
@@ -377,24 +386,29 @@ ClickLens exposes 41+ API endpoints organized by functional area. All endpoints 
 ### API Endpoint Groups
 
 **Authentication** (`/api/auth/`):
+
 - `/api/auth/login` - Authenticate user, create session
 - `/api/auth/logout` - Destroy session
 - `/api/auth/session` - Get current session data
 - `/api/auth/permissions` - Derive UI permissions from grants
 - `/api/auth/password` - Change user password
+- `/api/auth/clusters` - List available clusters (multi-cluster mode, public endpoint)
 
 **Query Execution** (`/api/clickhouse/`):
+
 - `/api/clickhouse/query` - Execute SQL with NDJSON streaming
 - `/api/clickhouse/kill` - Kill running query by query_id
 - `/api/clickhouse/ping` - Health check
 
 **Schema & Metadata** (`/api/clickhouse/`):
+
 - `/api/clickhouse/databases` - List databases
 - `/api/clickhouse/tables` - List tables
 - `/api/clickhouse/schema/columns` - Get column metadata for autocomplete
 - `/api/clickhouse/schema/table-columns` - Get table columns with types
 
 **Table Explorer** (`/api/clickhouse/tables/explorer/`):
+
 - `/api/clickhouse/tables/explorer` - Table list with engine info
 - `/api/clickhouse/tables/explorer/columns` - Column definitions
 - `/api/clickhouse/tables/explorer/parts` - Data parts
@@ -405,6 +419,7 @@ ClickLens exposes 41+ API endpoints organized by functional area. All endpoints 
 - `/api/clickhouse/tables/explorer/ddl` - CREATE TABLE statement
 
 **Monitoring** (`/api/clickhouse/monitoring/`):
+
 - `/api/clickhouse/monitoring/overview` - Dashboard metrics
 - `/api/clickhouse/monitoring/dashboard` - Time-series charts
 - `/api/clickhouse/monitoring/metrics` - Current metrics
@@ -415,26 +430,31 @@ ClickLens exposes 41+ API endpoints organized by functional area. All endpoints 
 - `/api/clickhouse/monitoring/operations` - Merges/mutations
 
 **Query Analytics** (`/api/clickhouse/queries/`):
+
 - `/api/clickhouse/queries/running` - Active queries (system.processes)
 - `/api/clickhouse/queries/history` - Query log (system.query_log)
 - `/api/clickhouse/queries/analytics` - Top resource-consuming queries
 - `/api/clickhouse/queries/cache` - Query cache statistics
 
 **Access Management** (`/api/clickhouse/access/`):
+
 - `/api/clickhouse/access/users` - List/create users
 - `/api/clickhouse/access/users/[id]` - Update/delete user
 - `/api/clickhouse/access/roles` - List/create roles
 - `/api/clickhouse/access/roles/[id]` - Update/delete role
 
 **Discover Feature** (`/api/clickhouse/`):
+
 - `/api/clickhouse/discover` - Data or histogram query
 
 **Logging** (`/api/clickhouse/logging/`):
+
 - `/api/clickhouse/logging/server` - Server logs (system.text_log)
 - `/api/clickhouse/logging/session` - Session logs (system.session_log)
 - `/api/clickhouse/logging/crash` - Crash logs (system.crash_log)
 
 **Settings** (`/api/clickhouse/settings/`):
+
 - `/api/clickhouse/settings/server` - Server settings (system.server_settings)
 - `/api/clickhouse/settings/session` - Session settings (system.settings)
 
@@ -447,6 +467,7 @@ ClickLens exposes 41+ API endpoints organized by functional area. All endpoints 
 **Permission Checks**: Endpoints that require specific permissions check them via the User Client (e.g., attempting `KILL QUERY` will fail if user lacks the grant).
 
 **Client Selection**:
+
 - User-initiated queries: User Client
 - Metadata/monitoring: Lens Client
 - Access management: User Client (requires `ACCESS MANAGEMENT`)
@@ -478,14 +499,14 @@ ClickLens implements centralized error handling through `@/lib/errors` to provid
 
 All ClickHouse errors are categorized into specific types for appropriate handling and user feedback.
 
-| Error Type | Description | User Experience |
-| ---------- | ----------- | --------------- |
-| **SYNTAX** | Invalid SQL syntax, typos, malformed queries | Shows syntax error with line/column information and suggestion |
-| **SCHEMA** | Table/database not found, column doesn't exist | Lists available tables/columns, suggests similar names |
-| **PERMISSION** | User lacks required grants for operation | Explains required permission, suggests contacting admin |
-| **TIMEOUT** | Query exceeded execution time limit | Shows timeout duration, suggests optimizing query |
-| **NETWORK** | Connection issues, ClickHouse unreachable | Displays connection status, retry option |
-| **SYSTEM** | ClickHouse internal errors, resource limits | Shows system error details, suggests checking cluster health |
+| Error Type     | Description                                    | User Experience                                                |
+| -------------- | ---------------------------------------------- | -------------------------------------------------------------- |
+| **SYNTAX**     | Invalid SQL syntax, typos, malformed queries   | Shows syntax error with line/column information and suggestion |
+| **SCHEMA**     | Table/database not found, column doesn't exist | Lists available tables/columns, suggests similar names         |
+| **PERMISSION** | User lacks required grants for operation       | Explains required permission, suggests contacting admin        |
+| **TIMEOUT**    | Query exceeded execution time limit            | Shows timeout duration, suggests optimizing query              |
+| **NETWORK**    | Connection issues, ClickHouse unreachable      | Displays connection status, retry option                       |
+| **SYSTEM**     | ClickHouse internal errors, resource limits    | Shows system error details, suggests checking cluster health   |
 
 ### Error Response Format
 
@@ -545,12 +566,13 @@ ClickLens incorporates several performance optimizations to ensure responsivenes
 
 ClickLens implements virtualized rendering for large datasets to maintain smooth performance even with millions of rows.
 
-| Component | Location | Purpose | Key Features |
-| --------- | -------- | ------- | ------------ |
-| **VirtualizedResultGrid** | `src/components/sql/VirtualizedResultGrid.tsx` | SQL Console query results | Windowed rendering, dynamic row heights, smooth scrolling, column resizing, row selection |
-| **VirtualizedDiscoverGrid** | `src/components/discover/VirtualizedDiscoverGrid.tsx` | Discover feature data exploration | Same features as ResultGrid, optimized for time-series data with expandable rows |
+| Component                   | Location                                              | Purpose                           | Key Features                                                                              |
+| --------------------------- | ----------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
+| **VirtualizedResultGrid**   | `src/components/sql/VirtualizedResultGrid.tsx`        | SQL Console query results         | Windowed rendering, dynamic row heights, smooth scrolling, column resizing, row selection |
+| **VirtualizedDiscoverGrid** | `src/components/discover/VirtualizedDiscoverGrid.tsx` | Discover feature data exploration | Same features as ResultGrid, optimized for time-series data with expandable rows          |
 
 **Technical Implementation**:
+
 - Uses TanStack Table with virtualization plugin
 - Renders only visible rows (typically 20-50) regardless of total dataset size
 - Maintains scroll position and selection state efficiently
@@ -564,6 +586,7 @@ ClickLens is designed for containerized deployment with a multi-stage Docker bui
 ### Docker Build Stages
 
 **Build Optimizations**:
+
 - Multi-stage build for minimal image size
 - Standalone output for optimal startup
 - Runtime environment variables
@@ -574,12 +597,14 @@ ClickLens is designed for containerized deployment with a multi-stage Docker bui
 The application requires minimal configuration through environment variables:
 
 **Required**:
+
 - `CLICKHOUSE_HOST` - ClickHouse server address
 - `LENS_USER` - Service account username
 - `LENS_PASSWORD` - Service account password
 - `SESSION_SECRET` - Session encryption key (min 32 chars)
 
 **Optional**:
+
 - `CLICKHOUSE_PORT` - Default: `8123`
 - `CLICKHOUSE_SECURE` - Default: `false`
 - `CLICKHOUSE_VERIFY` - Default: `true`
@@ -596,50 +621,56 @@ ClickLens supports optional Redis caching to improve performance for frequently 
 **Purpose**: Cache query results and monitoring metrics to reduce ClickHouse load and improve response times.
 
 **Cached Data Types**:
+
 - Table Explorer data (schema information, parts, merges, mutations)
 - Monitoring metrics (system.metrics, system.asynchronous_metrics)
 - Query analytics data
 - Time-series chart data
 
 **Cache Strategy**: Stale-while-revalidate pattern
+
 - Serve cached data immediately
 - Refresh cache in background
 - Reduces perceived latency for users
 
 **Configuration**:
+
 - Redis is optional - if `REDIS_URL` is not set, caching is disabled
 - Connection string format: `redis://[password@]host:port[/db]`
 - Example: `redis://localhost:6379` or `redis://:password@redis.example.com:6379/0`
 
 **Cache Key Patterns**:
 
-| Data Type | Key Pattern | TTL |
-| --------- | ----------- | --- |
-| Table schema | `clicklens:schema:{database}:{table}` | 5 minutes |
-| Table parts | `clicklens:parts:{database}:{table}` | 1 minute |
-| Monitoring metrics | `clicklens:metrics:{metric_name}` | 30 seconds |
-| Query analytics | `clicklens:analytics:{time_range}` | 1 minute |
-| Time-series data | `clicklens:timeseries:{metric}:{start}:{end}` | 2 minutes |
+| Data Type          | Key Pattern                                               | TTL        |
+| ------------------ | --------------------------------------------------------- | ---------- |
+| Table schema       | `clicklens:schema:{clusterId}:{database}:{table}`         | 5 minutes  |
+| Table parts        | `clicklens:parts:{clusterId}:{database}:{table}`          | 1 minute   |
+| Monitoring metrics | `clicklens:metrics:{clusterId}:{metric_name}`             | 30 seconds |
+| Query analytics    | `clicklens:analytics:{clusterId}:{time_range}`            | 1 minute   |
+| Time-series data   | `clicklens:timeseries:{clusterId}:{metric}:{start}:{end}` | 2 minutes  |
+
+All cache keys include `{clusterId}` to isolate data between clusters when multi-cluster mode is active. Falls back to `"legacy"` for single-cluster deploys.
 
 **Cache Invalidation Strategies**:
 
-| Strategy | Description | Use Case |
-| --------- | ----------- | -------- |
-| **TTL-based** | Automatic expiration after configured time-to-live | Most monitoring data, schema information |
-| **Event-driven** | Invalidate on specific events (e.g., table DDL) | Table Explorer data after schema changes |
-| **Pattern-based** | Bulk invalidation using key patterns | Clear all monitoring data on cluster restart |
-| **Selective** | Manual invalidation via API endpoints | Force refresh after data updates |
+| Strategy          | Description                                        | Use Case                                     |
+| ----------------- | -------------------------------------------------- | -------------------------------------------- |
+| **TTL-based**     | Automatic expiration after configured time-to-live | Most monitoring data, schema information     |
+| **Event-driven**  | Invalidate on specific events (e.g., table DDL)    | Table Explorer data after schema changes     |
+| **Pattern-based** | Bulk invalidation using key patterns               | Clear all monitoring data on cluster restart |
+| **Selective**     | Manual invalidation via API endpoints              | Force refresh after data updates             |
 
 **Benefits**:
+
 - Reduced ClickHouse query load
 - Faster page loads for monitoring dashboards
 - Better user experience with instant data display
 - Lower resource consumption on ClickHouse server
 
 <Callout type="info">
-  Redis caching is completely optional. ClickLens functions normally without Redis,
-  but enabling it significantly improves performance for monitoring and table
-  browsing features.
+  Redis caching is completely optional. ClickLens functions normally without
+  Redis, but enabling it significantly improves performance for monitoring and
+  table browsing features.
 </Callout>
 
 ### ClickHouse Requirements
@@ -647,15 +678,18 @@ ClickLens supports optional Redis caching to improve performance for frequently 
 **Minimum Version**: 21.8+
 
 **Required Server Configuration** (`config.xml`):
+
 - HTTP interface enabled (port 8123 or 8443)
 - Access management improvements enabled
 
 **Optional System Tables** (enable in `config.xml`):
+
 - `system.text_log` - Server logs viewer
 - `system.session_log` - Session logs viewer
 - `system.metric_log` - Time-series monitoring charts
 
 **Lens Service Account Setup**:
+
 - Create user with `LENS_USER` and `LENS_PASSWORD`
 - Grant `SELECT ON system.*`
 - Grant `SHOW DATABASES`, `SHOW TABLES`, `SHOW COLUMNS`

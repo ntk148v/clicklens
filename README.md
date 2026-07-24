@@ -39,6 +39,7 @@ ClickHouse is an incredible analytical database, but managing it via CLI or basi
 - **Schema Explorer** - Navigate databases, tables, columns, parts, and more
 - **Access Control** - Manage users and roles directly from the UI
 - **Native RBAC** - Your UI permissions are derived directly from your ClickHouse grants
+- **Multi-Cluster** - Manage multiple ClickHouse clusters from a single UI
 
 ## 2. Features
 
@@ -52,8 +53,34 @@ ClickHouse is an incredible analytical database, but managing it via CLI or basi
 | **Logging**         | Server logs, session logs, and crash logs                                     |
 | **Access Control**  | User and role management with feature roles                                   |
 | **Settings**        | View server and session settings                                              |
+| **Multi-Cluster**   | Manage multiple ClickHouse clusters from a single login screen                |
 
-## 3. Documentation
+## 3. Multi-Cluster Support
+
+ClickLens supports connecting to multiple independent ClickHouse clusters from a single instance. Each cluster is registered in the `CLICKHOUSE_CLUSTERS` environment variable, and users select which cluster to log into from the login page.
+
+### Quick Start (Docker Compose)
+
+```bash
+cp env.sample .env.local
+# Edit .env.local with your cluster definitions
+docker compose -f docker-compose.multi-cluster.yml up --build -d
+```
+
+Each cluster entry in `CLICKHOUSE_CLUSTERS` requires:
+
+| Field          | Description                       |
+| -------------- | --------------------------------- |
+| `id`           | Unique identifier for the cluster |
+| `label`        | Display name shown in the UI      |
+| `host`         | ClickHouse HTTP host              |
+| `port`         | HTTP port (default 8123)          |
+| `lensUser`     | Service account for metadata ops  |
+| `lensPassword` | Service account password          |
+
+Once logged in, every authenticated request is pinned to the selected cluster — queries, monitoring, schema browsing, and access control all operate against that cluster.
+
+## 4. Documentation
 
 Full documentation is available at **[https://ntk148v.github.io/clicklens](https://ntk148v.github.io/clicklens)**.
 
@@ -138,6 +165,6 @@ AI generated documentation:
 | :---------------------------------------------: |
 | ![profile](docs/public/screenshots/profile.png) |
 
-## 5. License
+## 6. License
 
 [MIT](LICENSE)

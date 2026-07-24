@@ -12,32 +12,33 @@ ClickLens is configured entirely through environment variables. Here's the compl
 
 | Variable          | Description                                    | Example                               |
 | ----------------- | ---------------------------------------------- | ------------------------------------- |
-| `CLICKHOUSE_HOST` | ClickHouse server hostname                     | `clickhouse.example.com`              |
+| `CLICKHOUSE_HOST` | ClickHouse server hostname (single-cluster)    | `clickhouse.example.com`              |
 | `LENS_USER`       | Service account username for metadata queries  | `lensuser`                            |
 | `LENS_PASSWORD`   | `""`                                           | Password for the Lens service account |
 | `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...`     |
 
 ### 1.2. Optional Variables
 
-| Variable                  | Default                         | Description                                                                 |
-| ------------------------- | ------------------------------- | --------------------------------------------------------------------------- |
-| `CLICKHOUSE_PORT`         | `8123` (HTTP) or `8443` (HTTPS) | ClickHouse HTTP interface port                                              |
-| `CLICKHOUSE_SECURE`       | `false`                         | Set to `true` to use HTTPS                                                  |
-| `CLICKHOUSE_VERIFY`       | `true`                          | Set to `false` to skip SSL certificate verification (for self-signed certs) |
-| `NODE_ENV`                | `development`                   | Set to `production` for production deployments                              |
-| `DISABLE_SECURE_COOKIES`  | `false`                         | Set to `true` if running behind a non-HTTPS proxy                           |
-| `NEXT_PUBLIC_APP_VERSION` | From Git (tag + commit hash)    | Override the displayed app version. By default, falls back to Git metadata. |
-| `CLICKLENS_BASE_PATH`     | (empty)                         | Sub-path the app is served under (e.g. `/clicklens` for `https://host/clicklens/…`). **Must be set at build time** (see callout below). A trailing `/` is stripped. |
-| `CLICKLENS_TRAILING_SLASH` | (empty)                        | Set to `true` or `1` to use trailing slashes on app routes (Next.js [`trailingSlash`](https://nextjs.org/docs/app/api-reference/config/next-config-js/trailingSlash)). Any other value (or unset) is treated as `false`. |
+| Variable                   | Default                         | Description                                                                                                                                                                                                              |
+| -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CLICKHOUSE_PORT`          | `8123` (HTTP) or `8443` (HTTPS) | ClickHouse HTTP interface port                                                                                                                                                                                           |
+| `CLICKHOUSE_SECURE`        | `false`                         | Set to `true` to use HTTPS                                                                                                                                                                                               |
+| `CLICKHOUSE_VERIFY`        | `true`                          | Set to `false` to skip SSL certificate verification (for self-signed certs)                                                                                                                                              |
+| `NODE_ENV`                 | `development`                   | Set to `production` for production deployments                                                                                                                                                                           |
+| `DISABLE_SECURE_COOKIES`   | `false`                         | Set to `true` if running behind a non-HTTPS proxy                                                                                                                                                                        |
+| `NEXT_PUBLIC_APP_VERSION`  | From Git (tag + commit hash)    | Override the displayed app version. By default, falls back to Git metadata.                                                                                                                                              |
+| `CLICKLENS_BASE_PATH`      | (empty)                         | Sub-path the app is served under (e.g. `/clicklens` for `https://host/clicklens/…`). **Must be set at build time** (see callout below). A trailing `/` is stripped.                                                      |
+| `CLICKLENS_TRAILING_SLASH` | (empty)                         | Set to `true` or `1` to use trailing slashes on app routes (Next.js [`trailingSlash`](https://nextjs.org/docs/app/api-reference/config/next-config-js/trailingSlash)). Any other value (or unset) is treated as `false`. |
+| `CLICKHOUSE_CLUSTERS`      | (empty)                         | JSON array of cluster definitions for multi-cluster mode. Each entry: `id`, `label`, `host`, `port`, `lensUser`, `lensPassword`. Replaces legacy `CLICKHOUSE_HOST`/`LENS_USER`.                                          |
 
 <Callout type="info">
-  **Sub-path (`CLICKLENS_BASE_PATH`)** is a **build-time** setting. Set it
-  in the same environment you use for `next build`, your Docker `docker build`, or
-  your CI image build. It is compiled into the client as `NEXT_PUBLIC_BASE_PATH` so
-  the browser can load `/api/…` routes and static assets under the same prefix. Your
-  reverse proxy (or Kubernetes ingress) path must **match** this value (e.g. both use
-  `/clicklens`). The production sample below keeps the app at the site root; for a
-  sub-path, see **§5.2** below.
+  **Sub-path (`CLICKLENS_BASE_PATH`)** is a **build-time** setting. Set it in
+  the same environment you use for `next build`, your Docker `docker build`, or
+  your CI image build. It is compiled into the client as `NEXT_PUBLIC_BASE_PATH`
+  so the browser can load `/api/…` routes and static assets under the same
+  prefix. Your reverse proxy (or Kubernetes ingress) path must **match** this
+  value (e.g. both use `/clicklens`). The production sample below keeps the app
+  at the site root; for a sub-path, see **§5.2** below.
 </Callout>
 
 <Callout type="warning">
@@ -454,3 +455,59 @@ Use this endpoint for:
 - `CLICKLENS_BASE_PATH` must be set when you **build** the app, and the same
   prefix must be used in your reverse proxy (see **§5.2**).
 - Health check URL must include the prefix, e.g. `…/clicklens/api/clickhouse/ping` (see **§6**).
+
+## 8. Multi-Cluster Deployment
+
+ClickLens supports connecting to multiple independent ClickHouse clusters from a single instance.
+
+### 8.1. Configuration
+
+Instead of the legacy single-cluster env vars, define a `CLICKHOUSE_CLUSTERS` JSON array:
+
+```bash
+CLICKHOUSE_CLUSTERS='[
+  {"id":"prod","label":"Production","host":"clickhouse-prod.internal","port":8123,"lensUser":"lensuser","lensPassword":"password"},
+  {"id":"staging","label":"Staging","host":"clickhouse-staging.internal","port":8123,"lensUser":"lensuser","lensPassword":"password"}
+]'
+```
+
+Each entry:
+
+| Field               | Required | Description                                                        |
+| ------------------- | -------- | ------------------------------------------------------------------ |
+| `id`                | yes      | Unique identifier (e.g. `"prod"`, `"staging"`)                     |
+| `label`             | yes      | Display name shown in the login selector                           |
+| `host`              | yes      | ClickHouse HTTP hostname                                           |
+| `port`              | no       | Default: `8123` (or `8443` for HTTPS)                              |
+| `lensUser`          | yes      | Service account for metadata queries on this cluster               |
+| `lensPassword`      | yes      | Service account password                                           |
+| `secure`            | no       | Use HTTPS for this cluster                                         |
+| `verifySsl`         | no       | Verify SSL certificate (default: `true`)                           |
+| `clickhouseCluster` | no       | Explicit ClickHouse cluster name override for `ON CLUSTER` queries |
+
+### 8.2. Session Isolation
+
+Each login session is pinned to a single cluster. All queries, monitoring, schema browsing, and access control operations target that cluster. Caches are isolated per cluster by `config.clusterId`.
+
+### 8.3. Compatibility
+
+- Single-cluster mode (`CLICKHOUSE_HOST`/`LENS_USER`) still works as before
+- A registry entry with `id: "default"` overrides legacy env vars
+- The login page auto-detects multi-cluster mode from the `CLICKHOUSE_CLUSTERS` env var
+
+### 8.4. Demo (Docker Compose)
+
+A standalone demo compose file is available:
+
+```bash
+cp env.sample .env.local
+# Edit .env.local with your credentials
+docker compose -f docker-compose.multi-cluster.yml up --build -d
+```
+
+After changing init credentials, restart with fresh volumes:
+
+```bash
+docker compose -f docker-compose.multi-cluster.yml down -v
+docker compose -f docker-compose.multi-cluster.yml up --build -d
+```
