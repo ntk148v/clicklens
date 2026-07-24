@@ -10,11 +10,13 @@ ClickLens is configured entirely through environment variables. Here's the compl
 
 ### 1.1. Required Variables
 
-| Variable          | Description                                    | Example                               |
-| ----------------- | ---------------------------------------------- | ------------------------------------- |
-| `CLICKHOUSE_HOST` | ClickHouse server hostname (single-cluster)    | `clickhouse.example.com`              |
-| `LENS_USER`       | Service account username for metadata queries  | `lensuser`                            |
-| `LENS_PASSWORD`   | `""`                                           | Password for the Lens service account |
+| Variable                     | Description                                                                                        | Example                                                |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `CLICKHOUSE_CLUSTERS`        | JSON array of cluster definitions. One entry = single cluster, more = multi.                       | `[...]` (see example below)                            |
+| `SESSION_SECRET`             | Encryption key for session cookies (≥32 chars)                                                     | `your-32-character-secret-key...`                      |
+| `LENS_USER` *(deprecated)*   | Service account username. Migrate to `lensUser` in `CLICKHOUSE_CLUSTERS`.                          | `lensuser`                                             |
+| `LENS_PASSWORD` *(deprecated)* | Password for the Lens service account. Migrate to `lensPassword` in `CLICKHOUSE_CLUSTERS`.       |                                                        |
+| `CLICKHOUSE_HOST` *(deprecated)* | ClickHouse server hostname. Migrate to `host` in `CLICKHOUSE_CLUSTERS`.                         | `clickhouse.example.com`                               |""`                                           | Password for the Lens service account |
 | `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...`     |
 
 ### 1.2. Optional Variables
@@ -120,15 +122,11 @@ For cluster monitoring, ClickLens uses the `clusterAllReplicas()` function to ag
 ### 2.4. Sample `.env.local` File
 
 ```bash
-# ClickHouse Server Connection (required)
-CLICKHOUSE_HOST=localhost
-CLICKHOUSE_PORT=8123
-CLICKHOUSE_SECURE=false
-CLICKHOUSE_VERIFY=true
-
-# Lens Service User (for metadata queries)
-LENS_USER=lensuser
-LENS_PASSWORD=your-password
+# ClickHouse Cluster Configuration (required)
+# One entry = single cluster, more entries = multi-cluster
+CLICKHOUSE_CLUSTERS='[
+  {"id":"primary","label":"Primary","host":"localhost","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}
+]'
 
 # Session Secret (required for production)
 SESSION_SECRET=complex_password_at_least_32_characters_long_for_security
@@ -146,30 +144,24 @@ SESSION_SECRET=complex_password_at_least_32_characters_long_for_security
 docker run -d \
   --name clicklens \
   -p 3000:3000 \
-  -e CLICKHOUSE_HOST=your-clickhouse-host \
-  -e CLICKHOUSE_PORT=8123 \
-  -e LENS_USER=lensuser \
-  -e LENS_PASSWORD=your-password \
+  -e CLICKHOUSE_CLUSTERS='[{"id":"primary","label":"Primary","host":"your-clickhouse-host","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}]' \
   -e SESSION_SECRET=your-32-character-secret-key-here \
   -e NODE_ENV=production \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
+> **Legacy:** `CLICKHOUSE_HOST`/`LENS_USER` etc. are deprecated — see [deprecated env vars](#deprecated) below.
+
 ### 3.2. Docker Compose
 
 ```yaml
-version: "3.8"
-
 services:
   clicklens:
     image: ghcr.io/ntk148v/clicklens:latest
     ports:
       - "3000:3000"
     environment:
-      - CLICKHOUSE_HOST=clickhouse
-      - CLICKHOUSE_PORT=8123
-      - LENS_USER=lensuser
-      - LENS_PASSWORD=your-password
+      - CLICKHOUSE_CLUSTERS=[{"id":"primary","label":"Primary","host":"clickhouse","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}]
       - SESSION_SECRET=your-32-character-secret-key-here
       - NODE_ENV=production
       - DISABLE_SECURE_COOKIES=true
@@ -441,7 +433,7 @@ Use this endpoint for:
 
 **Connection refused to ClickHouse:**
 
-- Verify `CLICKHOUSE_HOST` and `CLICKHOUSE_PORT` are correct
+- Verify `CLICKHOUSE_CLUSTERS` host and port values are correct
 - Ensure the HTTP interface is enabled (not just native protocol)
 - Check firewall rules
 

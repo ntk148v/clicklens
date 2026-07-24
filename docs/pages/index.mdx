@@ -101,14 +101,13 @@ Ready to try ClickLens? Head to the [Getting Started](/getting-started) guide.
 docker run -d \
   --name clicklens \
   -p 3000:3000 \
-  -e CLICKHOUSE_HOST=your-clickhouse-host \
-  -e CLICKHOUSE_PORT=8123 \
-  -e LENS_USER=lensuser \
-  -e LENS_PASSWORD=your-password \
+  -e CLICKHOUSE_CLUSTERS='[{"id":"primary","label":"Primary","host":"your-clickhouse-host","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}]' \
   -e SESSION_SECRET=your-32-character-secret-key-here \
   -e NODE_ENV=production \
   ghcr.io/ntk148v/clicklens:latest
 ```
+
+> **Legacy deployment:** `CLICKHOUSE_HOST`, `LENS_USER`, etc. are deprecated. See the [deployment guide](/deployment) for migration.
 
 ## 7. Documentation Overview
 

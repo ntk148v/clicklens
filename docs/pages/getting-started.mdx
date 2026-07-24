@@ -33,16 +33,15 @@ The fastest way to run ClickLens is with Docker:
 docker run -d \
   --name clicklens \
   -p 3000:3000 \
-  -e CLICKHOUSE_HOST=your-clickhouse-host \
-  -e CLICKHOUSE_PORT=8123 \
-  -e LENS_USER=lensuser \
-  -e LENS_PASSWORD=your-password \
+  -e CLICKHOUSE_CLUSTERS='[{"id":"primary","label":"Primary","host":"your-clickhouse-host","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}]' \
   -e SESSION_SECRET=your-32-character-secret-key-here \
   -e REDIS_URL=redis://redis-host:6379 \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
 Then open [http://localhost:3000](http://localhost:3000) in your browser.
+
+> **Legacy:** `CLICKHOUSE_HOST`/`LENS_USER` are deprecated — see the [deployment guide](/deployment) for migration.
 
 ### 2.2. Option 2: Docker Compose
 
@@ -55,10 +54,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - CLICKHOUSE_HOST=your-clickhouse-host
-      - CLICKHOUSE_PORT=8123
-      - LENS_USER=lensuser
-      - LENS_PASSWORD=your-password
+      - CLICKHOUSE_CLUSTERS=[{"id":"primary","label":"Primary","host":"your-clickhouse-host","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}]
       - SESSION_SECRET=your-32-character-secret-key-here
       - NODE_ENV=production
       - DISABLE_SECURE_COOKIES=true
@@ -234,12 +230,12 @@ ClickLens can connect to multiple independent ClickHouse clusters from a single 
 Instead of `CLICKHOUSE_HOST`/`LENS_USER`, set `CLICKHOUSE_CLUSTERS`:
 
 ```bash
-# Single-cluster mode (legacy)
-CLICKHOUSE_HOST=clickhouse.example.com
-LENS_USER=lensuser
-LENS_PASSWORD=password
+# Deprecated: CLICKHOUSE_HOST/LENS_USER — migrate to CLICKHOUSE_CLUSTERS below
+# CLICKHOUSE_HOST=clickhouse.example.com
+# LENS_USER=lensuser
+# LENS_PASSWORD=password
 
-# Multi-cluster mode (use instead of the above)
+# Canonical: CLICKHOUSE_CLUSTERS (single or multi cluster)
 CLICKHOUSE_CLUSTERS='[
   {"id":"prod","label":"Production","host":"clickhouse-prod.internal","port":8123,"lensUser":"lensuser","lensPassword":"password"},
   {"id":"staging","label":"Staging","host":"clickhouse-staging.internal","port":8123,"lensUser":"lensuser","lensPassword":"password"}

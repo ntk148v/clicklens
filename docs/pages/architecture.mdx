@@ -598,10 +598,14 @@ The application requires minimal configuration through environment variables:
 
 **Required**:
 
-- `CLICKHOUSE_HOST` - ClickHouse server address
-- `LENS_USER` - Service account username
-- `LENS_PASSWORD` - Service account password
+- `CLICKHOUSE_CLUSTERS` - JSON array of cluster definitions. Each entry requires `id`, `label`, `host`, `lensUser`, `lensPassword`. One entry = single cluster, more = multi-cluster.
 - `SESSION_SECRET` - Session encryption key (min 32 chars)
+
+**Deprecated (migrate to `CLICKHOUSE_CLUSTERS` above)**:
+
+- `CLICKHOUSE_HOST` - ClickHouse server address (migrate to `host` in `CLICKHOUSE_CLUSTERS`)
+- `LENS_USER` - Service account username (migrate to `lensUser` in `CLICKHOUSE_CLUSTERS`)
+- `LENS_PASSWORD` - Service account password (migrate to `lensPassword` in `CLICKHOUSE_CLUSTERS`)
 
 **Optional**:
 
