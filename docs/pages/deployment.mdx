@@ -14,24 +14,31 @@ ClickLens is configured entirely through environment variables. Here's the compl
 | ---------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `CLICKHOUSE_CLUSTERS`        | JSON array of cluster definitions. One entry = single cluster, more = multi.                       | `[...]` (see example below)                            |
 | `SESSION_SECRET`             | Encryption key for session cookies (≥32 chars)                                                     | `your-32-character-secret-key...`                      |
-| `LENS_USER` *(deprecated)*   | Service account username. Migrate to `lensUser` in `CLICKHOUSE_CLUSTERS`.                          | `lensuser`                                             |
-| `LENS_PASSWORD` *(deprecated)* | Password for the Lens service account. Migrate to `lensPassword` in `CLICKHOUSE_CLUSTERS`.       |                                                        |
-| `CLICKHOUSE_HOST` *(deprecated)* | ClickHouse server hostname. Migrate to `host` in `CLICKHOUSE_CLUSTERS`.                         | `clickhouse.example.com`                               |""`                                           | Password for the Lens service account |
-| `SESSION_SECRET`  | Encryption key for session cookies (≥32 chars) | `your-32-character-secret-key...`     |
 
 ### 1.2. Optional Variables
 
 | Variable                   | Default                         | Description                                                                                                                                                                                                              |
 | -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CLICKHOUSE_PORT`          | `8123` (HTTP) or `8443` (HTTPS) | ClickHouse HTTP interface port                                                                                                                                                                                           |
-| `CLICKHOUSE_SECURE`        | `false`                         | Set to `true` to use HTTPS                                                                                                                                                                                               |
-| `CLICKHOUSE_VERIFY`        | `true`                          | Set to `false` to skip SSL certificate verification (for self-signed certs)                                                                                                                                              |
 | `NODE_ENV`                 | `development`                   | Set to `production` for production deployments                                                                                                                                                                           |
 | `DISABLE_SECURE_COOKIES`   | `false`                         | Set to `true` if running behind a non-HTTPS proxy                                                                                                                                                                        |
 | `NEXT_PUBLIC_APP_VERSION`  | From Git (tag + commit hash)    | Override the displayed app version. By default, falls back to Git metadata.                                                                                                                                              |
 | `CLICKLENS_BASE_PATH`      | (empty)                         | Sub-path the app is served under (e.g. `/clicklens` for `https://host/clicklens/…`). **Must be set at build time** (see callout below). A trailing `/` is stripped.                                                      |
 | `CLICKLENS_TRAILING_SLASH` | (empty)                         | Set to `true` or `1` to use trailing slashes on app routes (Next.js [`trailingSlash`](https://nextjs.org/docs/app/api-reference/config/next-config-js/trailingSlash)). Any other value (or unset) is treated as `false`. |
-| `CLICKHOUSE_CLUSTERS`      | (empty)                         | JSON array of cluster definitions for multi-cluster mode. Each entry: `id`, `label`, `host`, `port`, `lensUser`, `lensPassword`. Replaces legacy `CLICKHOUSE_HOST`/`LENS_USER`.                                          |
+
+### 1.3. Deprecated Variables
+
+These legacy environment variables still work when `CLICKHOUSE_CLUSTERS` is not set. A deprecation warning is printed once at startup. They will be removed in the next major release.
+
+| Variable             | Maps to in `CLICKHOUSE_CLUSTERS` |
+| -------------------- | -------------------------------- |
+| `CLICKHOUSE_HOST`    | `host`                           |
+| `CLICKHOUSE_PORT`    | `port`                           |
+| `CLICKHOUSE_SECURE`  | `secure`                         |
+| `CLICKHOUSE_VERIFY`  | `verifySsl`                      |
+| `LENS_USER`          | `lensUser`                       |
+| `LENS_PASSWORD`      | `lensPassword`                   |
+
+If both `CLICKHOUSE_CLUSTERS` and legacy vars are set, the registry takes precedence.
 
 <Callout type="info">
   **Sub-path (`CLICKLENS_BASE_PATH`)** is a **build-time** setting. Set it in
@@ -150,7 +157,7 @@ docker run -d \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
-> **Legacy:** `CLICKHOUSE_HOST`/`LENS_USER` etc. are deprecated — see [deprecated env vars](#deprecated) below.
+> **Legacy:** `CLICKHOUSE_HOST`/`LENS_USER` etc. are deprecated — see [deprecated variables](#13-deprecated-variables) below.
 
 ### 3.2. Docker Compose
 
@@ -454,7 +461,7 @@ ClickLens supports connecting to multiple independent ClickHouse clusters from a
 
 ### 8.1. Configuration
 
-Instead of the legacy single-cluster env vars, define a `CLICKHOUSE_CLUSTERS` JSON array:
+Define a `CLICKHOUSE_CLUSTERS` JSON array with one entry per cluster:
 
 ```bash
 CLICKHOUSE_CLUSTERS='[
@@ -483,9 +490,9 @@ Each login session is pinned to a single cluster. All queries, monitoring, schem
 
 ### 8.3. Compatibility
 
-- Single-cluster mode (`CLICKHOUSE_HOST`/`LENS_USER`) still works as before
+- Single-cluster mode via legacy env vars (`CLICKHOUSE_HOST`/`LENS_USER`) is still supported but deprecated — a `console.warn` is printed once at startup. Migrate to `CLICKHOUSE_CLUSTERS`.
 - A registry entry with `id: "default"` overrides legacy env vars
-- The login page auto-detects multi-cluster mode from the `CLICKHOUSE_CLUSTERS` env var
+- The login page shows a cluster selector when multiple clusters are registered
 
 ### 8.4. Demo (Docker Compose)
 

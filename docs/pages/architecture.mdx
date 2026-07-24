@@ -604,14 +604,14 @@ The application requires minimal configuration through environment variables:
 **Deprecated (migrate to `CLICKHOUSE_CLUSTERS` above)**:
 
 - `CLICKHOUSE_HOST` - ClickHouse server address (migrate to `host` in `CLICKHOUSE_CLUSTERS`)
+- `CLICKHOUSE_PORT` - Default: `8123` (migrate to `port` per registry entry)
+- `CLICKHOUSE_SECURE` - Default: `false` (migrate to `secure` per registry entry)
+- `CLICKHOUSE_VERIFY` - Default: `true` (migrate to `verifySsl` per registry entry)
 - `LENS_USER` - Service account username (migrate to `lensUser` in `CLICKHOUSE_CLUSTERS`)
 - `LENS_PASSWORD` - Service account password (migrate to `lensPassword` in `CLICKHOUSE_CLUSTERS`)
 
 **Optional**:
 
-- `CLICKHOUSE_PORT` - Default: `8123`
-- `CLICKHOUSE_SECURE` - Default: `false`
-- `CLICKHOUSE_VERIFY` - Default: `true`
 - `NODE_ENV` - Default: `development`
 - `DISABLE_SECURE_COOKIES` - Default: `false`
 - `REDIS_URL` - Redis connection URL for caching (e.g., `redis://localhost:6379`)
@@ -692,9 +692,7 @@ All cache keys include `{clusterId}` to isolate data between clusters when multi
 - `system.session_log` - Session logs viewer
 - `system.metric_log` - Time-series monitoring charts
 
-**Lens Service Account Setup**:
-
-- Create user with `LENS_USER` and `LENS_PASSWORD`
+**Lens Service Account Setup** (defined via `lensUser`/`lensPassword` in `CLICKHOUSE_CLUSTERS`, or the deprecated `LENS_USER`/`LENS_PASSWORD` env vars):
 - Grant `SELECT ON system.*`
 - Grant `SHOW DATABASES`, `SHOW TABLES`, `SHOW COLUMNS`
 - Grant `ACCESS MANAGEMENT` (for reading grants)

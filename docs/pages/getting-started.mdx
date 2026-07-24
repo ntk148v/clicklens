@@ -102,9 +102,9 @@ The app will be available at [http://localhost:3000](http://localhost:3000).
 
 ClickLens uses **two types of ClickHouse connections** to separate metadata operations from user queries:
 
-### 3.1. Lens Service User (Environment Credentials)
+### 3.1. Lens Service User (Cluster Registry Credentials)
 
-Configured via `LENS_USER` and `LENS_PASSWORD` environment variables. This service account is used for:
+Configured via `lensUser`/`lensPassword` in each `CLICKHOUSE_CLUSTERS` entry (or the deprecated `LENS_USER`/`LENS_PASSWORD` environment variables for single-cluster setups). This service account is used for:
 
 - Schema introspection and metadata queries
 - System table access for monitoring features
@@ -223,24 +223,22 @@ REDIS_URL=redis://localhost:6379
 
 ## 5. Multi-Cluster Support
 
-ClickLens can connect to multiple independent ClickHouse clusters from a single instance.
-
-### 5.1. Configuration
-
-Instead of `CLICKHOUSE_HOST`/`LENS_USER`, set `CLICKHOUSE_CLUSTERS`:
+ClickLens can connect to multiple independent ClickHouse clusters from a single instance. Set `CLICKHOUSE_CLUSTERS` with one entry per cluster:
 
 ```bash
-# Deprecated: CLICKHOUSE_HOST/LENS_USER — migrate to CLICKHOUSE_CLUSTERS below
-# CLICKHOUSE_HOST=clickhouse.example.com
-# LENS_USER=lensuser
-# LENS_PASSWORD=password
+# Single cluster:
+CLICKHOUSE_CLUSTERS='[
+  {"id":"primary","label":"Primary","host":"clickhouse.example.com","port":8123,"lensUser":"lensuser","lensPassword":"password"}
+]'
 
-# Canonical: CLICKHOUSE_CLUSTERS (single or multi cluster)
+# Multi cluster:
 CLICKHOUSE_CLUSTERS='[
   {"id":"prod","label":"Production","host":"clickhouse-prod.internal","port":8123,"lensUser":"lensuser","lensPassword":"password"},
   {"id":"staging","label":"Staging","host":"clickhouse-staging.internal","port":8123,"lensUser":"lensuser","lensPassword":"password"}
 ]'
 ```
+
+> **Note:** The deprecated `CLICKHOUSE_HOST`/`LENS_USER` env vars are still supported when `CLICKHOUSE_CLUSTERS` is not set. See the [deployment guide](/deployment) for migration.
 
 ### 5.2. Multi-Cluster Login
 
@@ -417,7 +415,7 @@ ClickLens defines 6 predefined ClickHouse roles that bundle common permission se
 
 **Solutions**:
 
-1. Verify `CLICKHOUSE_HOST` and `CLICKHOUSE_PORT` are correct
+1. Verify `CLICKHOUSE_CLUSTERS` host and port values are correct
 2. Ensure the HTTP interface is enabled (not just native protocol)
 3. Check firewall rules
 4. Verify ClickHouse is running: `curl http://localhost:8123/ping`
