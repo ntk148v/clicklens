@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import { getUserConfig, getLensConfig, createClient } from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { getUserConfig, createClient } from "@/lib/clickhouse";
 import { escapeSqlString, quoteIdentifier } from "@/lib/clickhouse/utils";
 import { updateSessionPassword } from "@/lib/auth/storage";
 import { checkRateLimit, getClientIdentifier } from "@/lib/auth/rate-limit";
@@ -72,9 +72,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Verify Verification: Connect as the user to prove they know the current password
-    // We cannot blindly trust session.user.password because sessions might persist after external password changes (edge case),
-    // and crucially we must verify the provided `currentPassword` is actually good.
-    const userUserConfig = getUserConfig({
+    const clusterId = session.user.clusterId;
+    if (!clusterId) {
+      return NextResponse.json(
+        { success: false, error: "Session missing cluster configuration" },
+        { status: 500 },
+      );
+    }
+
+    const userUserConfig = getUserConfig(clusterId, {
       username: session.user.username,
       password: currentPassword,
     });
@@ -99,7 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Execution: Connect as lens_admin (service user) to perform the alteration
-    const adminConfig = getLensConfig();
+    const adminConfig = await getSessionLensConfig();
     if (!adminConfig) {
       return NextResponse.json(
         { success: false, error: "Server admin configuration missing" },
@@ -108,7 +114,7 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createClient(adminConfig);
-    const clusterName = await getClusterName(adminClient);
+    const clusterName = await getClusterName(adminClient, adminConfig.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";

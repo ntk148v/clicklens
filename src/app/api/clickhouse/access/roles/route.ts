@@ -56,8 +56,9 @@ import { getClusterName } from "@/lib/clickhouse/cluster";
 // Ensure feature roles exist (auto-create on first access)
 async function ensureFeatureRoles(
   client: ReturnType<typeof createClient>,
+  clusterId?: string,
 ): Promise<void> {
-  const clusterName = await getClusterName(client);
+  const clusterName = await getClusterName(client, clusterId);
   const onCluster = clusterName
     ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
     : "";
@@ -137,7 +138,7 @@ export async function GET(): Promise<NextResponse<RolesResponse>> {
     const client = createClient(config);
 
     // Auto-create feature roles if missing
-    await ensureFeatureRoles(client);
+    await ensureFeatureRoles(client, config.clusterId);
 
     // Get all roles
     const rolesResult = await client.query<SystemRole>(ROLES_LIST_QUERY);
@@ -299,7 +300,7 @@ export async function POST(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";
@@ -449,7 +450,7 @@ export async function PUT(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";
@@ -615,7 +616,7 @@ export async function DELETE(
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";

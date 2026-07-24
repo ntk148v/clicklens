@@ -4,13 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getTableReplicasQuery } from "@/lib/clickhouse/queries/tables";
@@ -104,7 +99,7 @@ export async function GET(
       );
     }
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json({
         success: false,
@@ -121,14 +116,15 @@ export async function GET(
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    const cacheKey = `tables:replicas:${database}:${table}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    const cacheKey = `tables:replicas:${cacheScope}:${database}:${table}`;
 
     const data = await getOrSet(
       tablesCache,
       cacheKey,
       async () => {
         // Auto-detect cluster
-        const clusterName = await getClusterName(client);
+        const clusterName = await getClusterName(client, lensConfig.clusterId);
 
         const result = await client.query<ReplicaInfo>(
           getTableReplicasQuery(safeDatabase, safeTable, clusterName),

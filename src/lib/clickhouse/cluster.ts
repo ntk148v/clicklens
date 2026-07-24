@@ -2,25 +2,36 @@
  * Cluster detection and management
  */
 import { ClickHouseClient } from "./clients/types";
+import { parseClusterRegistry } from "./config";
 
+const clusterCache = new Map<string, { name: string | undefined; at: number }>();
 const CLUSTER_CACHE_TTL_MS = 5 * 60 * 1000;
-
-let cachedClusterName: string | undefined | null = null;
-let cachedAt = 0;
 
 export async function getClusterName(
   client: ClickHouseClient,
+  clusterId?: string,
 ): Promise<string | undefined> {
-  const configuredCluster = process.env.CLICKHOUSE_CLUSTER?.trim();
-  if (configuredCluster) {
-    return configuredCluster;
+  // Per-registry clickhouseCluster override (only for registered IDs)
+  if (clusterId) {
+    const registry = parseClusterRegistry();
+    const def = registry.get(clusterId);
+    if (def?.clickhouseCluster) {
+      return def.clickhouseCluster;
+    }
   }
 
-  if (
-    cachedClusterName !== null &&
-    Date.now() - cachedAt < CLUSTER_CACHE_TTL_MS
-  ) {
-    return cachedClusterName || undefined;
+  // Global CLICKHOUSE_CLUSTER override — only for legacy (no-ID) calls
+  if (!clusterId) {
+    const configuredCluster = process.env.CLICKHOUSE_CLUSTER?.trim();
+    if (configuredCluster) {
+      return configuredCluster;
+    }
+  }
+
+  const cacheKey = clusterId || "__legacy__";
+  const cached = clusterCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CLUSTER_CACHE_TTL_MS) {
+    return cached.name;
   }
 
   try {
@@ -34,18 +45,16 @@ export async function getClusterName(
     `);
 
     if (response.data && response.data.length > 0) {
-      cachedClusterName = response.data[0].cluster;
+      clusterCache.set(cacheKey, { name: response.data[0].cluster, at: Date.now() });
     } else {
-      cachedClusterName = undefined;
+      clusterCache.set(cacheKey, { name: undefined, at: Date.now() });
     }
-    cachedAt = Date.now();
   } catch (error) {
     console.warn("Failed to detect cluster name:", error);
-    cachedClusterName = undefined;
-    cachedAt = Date.now();
+    clusterCache.set(cacheKey, { name: undefined, at: Date.now() });
   }
 
-  return cachedClusterName || undefined;
+  return clusterCache.get(cacheKey)?.name;
 }
 
 /**
@@ -53,6 +62,5 @@ export async function getClusterName(
  * Useful for testing or if cluster configuration changes
  */
 export function resetClusterCache() {
-  cachedClusterName = null;
-  cachedAt = 0;
+  clusterCache.clear();
 }

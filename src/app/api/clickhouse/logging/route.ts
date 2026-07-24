@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     source = searchParams.get("source") || "text_log"; // "text_log" or "crash_log"
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
 
     // Determine Table and Columns
     const database = "system";

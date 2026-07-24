@@ -188,11 +188,12 @@ export async function GET(
 
     // Auto-detect cluster if not specified
     if (!clusterName) {
-      clusterName = await getClusterName(client);
+      clusterName = await getClusterName(client, config.clusterId);
     }
 
-    // Cache check: key includes timeRange and cluster for overview data
-    const cacheKey = `overview:${timeRange}:${clusterName ?? "_single"}`;
+    // Cache check: key includes timeRange and cluster scope for overview data
+    const cacheScope = config.clusterId ?? "legacy";
+    const cacheKey = `overview:${timeRange}:${cacheScope}`;
     const cached = await monitoringCache.get(cacheKey);
     if (cached) {
       const resp = NextResponse.json({

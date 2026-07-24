@@ -4,13 +4,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getQueryCacheQuery } from "@/lib/clickhouse/queries/query-analysis";
 
@@ -77,7 +72,7 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
       );
     }
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json({
         success: false,
@@ -94,7 +89,7 @@ export async function GET(): Promise<NextResponse<QueryCacheResponse>> {
 
     try {
       // Auto-detect cluster
-      const clusterName = await getClusterName(client);
+      const clusterName = await getClusterName(client, lensConfig.clusterId);
       const table = clusterName
         ? `clusterAllReplicas('${clusterName}', system.query_cache)`
         : "system.query_cache";

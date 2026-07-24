@@ -142,7 +142,7 @@ export async function GET(request: Request) {
     const useExactCount = searchParams.get("exact") === "true";
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
 
     // Initialize query cache
     const queryCache = getQueryCache();
@@ -236,6 +236,7 @@ export async function GET(request: Request) {
           columns,
           groupBy: groupByParam || undefined,
           orderBy: orderByParam || undefined,
+          clusterId: config.clusterId,
         });
         const cachedResult = queryCache.getCachedQuery(cacheKey);
         if (cachedResult) {
@@ -260,6 +261,7 @@ export async function GET(request: Request) {
           columns,
           groupBy: groupByParam || undefined,
           orderBy: orderByParam || undefined,
+          clusterId: config.clusterId,
         });
         queryCache.setCachedQuery(cacheKey, histRes.data);
       }

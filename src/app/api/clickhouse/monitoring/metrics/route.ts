@@ -44,8 +44,9 @@ export async function GET(
     const category = searchParams.get("category");
     const type = searchParams.get("type"); // metrics, async, events, or all
 
-    // Cache key includes category and type for proper cache isolation
-    const cacheKey = `metrics:${category ?? "_all"}:${type ?? "_all"}`;
+    const cacheScope = config.clusterId ?? "legacy";
+    // Cache key includes cluster, category and type for proper cache isolation
+    const cacheKey = `metrics:${cacheScope}:${category ?? "_all"}:${type ?? "_all"}`;
     const cached = await monitoringCache.get(cacheKey);
     if (cached) {
       const resp = NextResponse.json({

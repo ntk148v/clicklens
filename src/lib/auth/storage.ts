@@ -15,6 +15,8 @@ export interface UserSession {
   password: string;
   host?: string;
   database?: string;
+  /** The cluster ID this session is pinned to. Resolved from CLICKHOUSE_CLUSTERS or "default" for legacy env. */
+  clusterId?: string;
 }
 
 interface EncryptedPassword {

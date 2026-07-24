@@ -42,7 +42,7 @@ export async function GET(): Promise<
     }
 
     const client = createClient(config);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
 
     // Fetch replicas and summary in parallel
     const [replicasResult, summaryResult] = await Promise.all([

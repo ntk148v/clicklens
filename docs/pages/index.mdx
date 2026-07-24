@@ -16,6 +16,7 @@ ClickHouse is an incredible analytical database, but managing it via CLI or basi
 - **Schema Explorer** - Navigate databases, tables, columns, parts, and more
 - **Access Control** - Manage users and roles directly from the UI
 - **Native RBAC** - Your UI permissions are derived directly from your ClickHouse grants
+- **Multi-Cluster** - Manage multiple ClickHouse clusters from a single UI
 
 ## 2. Key Features
 
@@ -29,8 +30,34 @@ ClickHouse is an incredible analytical database, but managing it via CLI or basi
 | **Logging**         | Server logs, session logs, and crash logs                                     |
 | **Access Control**  | User and role management with feature roles                                   |
 | **Settings**        | View server and session settings                                              |
+| **Multi-Cluster**   | Manage multiple ClickHouse clusters from a single login screen                |
 
-## 3. Tech Stack
+## 3. Multi-Cluster Support
+
+ClickLens supports connecting to multiple independent ClickHouse clusters from a single instance. Each cluster is registered in the `CLICKHOUSE_CLUSTERS` environment variable, and users select which cluster to log into from the login page.
+
+### Quick Start (Docker Compose)
+
+```bash
+cp env.sample .env.local
+# Edit .env.local with your cluster definitions
+docker compose -f docker-compose.multi-cluster.yml up --build -d
+```
+
+Each cluster entry in `CLICKHOUSE_CLUSTERS` requires:
+
+| Field          | Description                       |
+| -------------- | --------------------------------- |
+| `id`           | Unique identifier for the cluster |
+| `label`        | Display name shown in the UI      |
+| `host`         | ClickHouse HTTP host              |
+| `port`         | HTTP port (default 8123)          |
+| `lensUser`     | Service account for metadata ops  |
+| `lensPassword` | Service account password          |
+
+Once logged in, every authenticated request is pinned to the selected cluster — queries, monitoring, schema browsing, and access control all operate against that cluster.
+
+## 4. Tech Stack
 
 ClickLens is built with modern technologies:
 
@@ -46,7 +73,7 @@ ClickLens is built with modern technologies:
 | **TanStack Table**     | 8.21.3  | Data tables                     |
 | **Recharts**           | 3.6.0   | Charts and histograms           |
 
-## 4. Security Model
+## 5. Security Model
 
 <Callout type="info">
   ClickLens adheres to strict RBAC principles. Your UI permissions are derived
@@ -66,7 +93,7 @@ This means:
 - Consistent access between CLI and UI
 - Full audit trail in ClickHouse
 
-## 5. Getting Started
+## 6. Getting Started
 
 Ready to try ClickLens? Head to the [Getting Started](/getting-started) guide.
 
@@ -74,16 +101,15 @@ Ready to try ClickLens? Head to the [Getting Started](/getting-started) guide.
 docker run -d \
   --name clicklens \
   -p 3000:3000 \
-  -e CLICKHOUSE_HOST=your-clickhouse-host \
-  -e CLICKHOUSE_PORT=8123 \
-  -e LENS_USER=lensuser \
-  -e LENS_PASSWORD=your-password \
+  -e CLICKHOUSE_CLUSTERS='[{"id":"primary","label":"Primary","host":"your-clickhouse-host","port":8123,"lensUser":"lensuser","lensPassword":"your-password"}]' \
   -e SESSION_SECRET=your-32-character-secret-key-here \
   -e NODE_ENV=production \
   ghcr.io/ntk148v/clicklens:latest
 ```
 
-## 6. Documentation Overview
+> **Legacy deployment:** `CLICKHOUSE_HOST`, `LENS_USER`, etc. are deprecated. See the [deployment guide](/deployment) for migration.
+
+## 7. Documentation Overview
 
 | Section                             | Audience     | Content                              |
 | ----------------------------------- | ------------ | ------------------------------------ |
@@ -92,3 +118,80 @@ docker run -d \
 | [Architecture](/architecture)       | Developers   | Tech stack, data flow, internals     |
 | [Deployment](/deployment)           | Operators    | Configuration, Docker, RBAC setup    |
 | [Contributing](/contributing)       | Contributors | Development setup, code guidelines   |
+
+AI generated documentation:
+
+- [https://zread.ai/ntk148v/clicklens](https://zread.ai/ntk148v/clicklens)
+- [https://deepwiki.com/ntk148v/clicklens](https://deepwiki.com/ntk148v/clicklens)
+
+## 8. Screenshots
+
+### Discovery
+
+|                          Overview                          |                         Filter                         |                             Expandable Row                             |
+| :--------------------------------------------------------: | :----------------------------------------------------: | :--------------------------------------------------------------------: |
+| ![discovery-overview](/screenshots/discovery-overview.png) | ![discovery-filter](/screenshots/discovery-filter.png) | ![discovery-expandable-row](/screenshots/discovery-expandable-row.png) |
+
+### SQL Console
+
+|                    Overview                    |              Run Query               |                      Results                       |
+| :--------------------------------------------: | :----------------------------------: | :------------------------------------------------: |
+| ![sql-overview](/screenshots/sql-overview.png) | ![sql-run](/screenshots/sql-run.png) | ![sql-run-result](/screenshots/sql-run-result.png) |
+
+|                   History                    |                              Time Range                              |                           Table Preview                            |
+| :------------------------------------------: | :------------------------------------------------------------------: | :----------------------------------------------------------------: |
+| ![sql-history](/screenshots/sql-history.png) | ![sql-time-range-selector](/screenshots/sql-time-range-selector.png) | ![sql-table-preview-data](/screenshots/sql-table-preview-data.png) |
+
+### Monitoring
+
+|                           Overview                           |                          Metrics                           |                             Async Metrics                              |
+| :----------------------------------------------------------: | :--------------------------------------------------------: | :--------------------------------------------------------------------: |
+| ![monitoring-overview](/screenshots/monitoring-overview.png) | ![monitoring-metrics](/screenshots/monitoring-metrics.png) | ![monitoring-async-metrics](/screenshots/monitoring-async-metrics.png) |
+
+|                        Disks                         |                           ZooKeeper                            |
+| :--------------------------------------------------: | :------------------------------------------------------------: |
+| ![monitoring-disk](/screenshots/monitoring-disk.png) | ![monitoring-zookeeper](/screenshots/monitoring-zookeeper.png) |
+
+### Queries
+
+|                       History                        |                           History Filter                           |                       Running                        |                        Analytics                         |
+| :--------------------------------------------------: | :----------------------------------------------------------------: | :--------------------------------------------------: | :------------------------------------------------------: |
+| ![queries-history](/screenshots/queries-history.png) | ![queries-history-filter](/screenshots/queries-history-filter.png) | ![queries-running](/screenshots/queries-running.png) | ![queries-analytics](/screenshots/queries-analytics.png) |
+
+### Access Control
+
+|                             Users                              |                        Create User                         |                       Edit User                        |
+| :------------------------------------------------------------: | :--------------------------------------------------------: | :----------------------------------------------------: |
+| ![access-user-overview](/screenshots/access-user-overview.png) | ![access-user-create](/screenshots/access-user-create.png) | ![access-user-edit](/screenshots/access-user-edit.png) |
+
+|                             Roles                              |                        Create Role                         |                              Feature Role                              |
+| :------------------------------------------------------------: | :--------------------------------------------------------: | :--------------------------------------------------------------------: |
+| ![access-role-overview](/screenshots/access-role-overview.png) | ![access-role-create](/screenshots/access-role-create.png) | ![access-role-feature-role](/screenshots/access-role-feature-role.png) |
+
+### Settings
+
+|                   Server Settings                    |                                 Server Expandable                                  |                    Session Settings                    |                                  Session Expandable                                  |
+| :--------------------------------------------------: | :--------------------------------------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------------------------------------: |
+| ![settings-server](/screenshots/settings-server.png) | ![settings-server-expandable-row](/screenshots/settings-server-expandable-row.png) | ![settings-session](/screenshots/settings-session.png) | ![settings-session-expandable-row](/screenshots/settings-session-expandable-row.png) |
+
+### Tables
+
+|                      Columns                       |                     Parts                      |
+| :------------------------------------------------: | :--------------------------------------------: |
+| ![tables-columns](/screenshots/tables-columns.png) | ![tables-parts](/screenshots/tables-parts.png) |
+
+### Logging
+
+|                    Server Logs                     |                    Crash Logs                    |
+| :------------------------------------------------: | :----------------------------------------------: |
+| ![logging-server](/screenshots/logging-server.png) | ![logging-crash](/screenshots/logging-crash.png) |
+
+### Profile
+
+|             User Profile             |
+| :----------------------------------: |
+| ![profile](/screenshots/profile.png) |
+
+## 9. License
+
+[MIT](https://github.com/ntk148v/clicklens/blob/master/LICENSE)

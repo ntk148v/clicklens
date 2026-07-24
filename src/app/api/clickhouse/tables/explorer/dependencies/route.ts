@@ -12,13 +12,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured, isClickHouseError } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getTableDependenciesQuery, ALL_SYSTEM_TABLES_QUERY } from "@/lib/clickhouse/queries/tables";
 import { getOrSet, tablesCache } from "@/lib/cache";
@@ -365,7 +360,7 @@ export async function GET(
       );
     }
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json(
         {
@@ -384,7 +379,8 @@ export async function GET(
     const client = createClient(lensConfig);
     const safeDatabase = escapeSqlString(database);
 
-    const cacheKey = `tables:dependencies:${database}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    const cacheKey = `tables:dependencies:${cacheScope}:${database}`;
 
     const data = await getOrSet(
       tablesCache,

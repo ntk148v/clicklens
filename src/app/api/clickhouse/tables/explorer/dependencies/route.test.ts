@@ -82,10 +82,10 @@ describe("Table Dependencies API Route", () => {
     mockGetLensConfig.mockReset();
     mockIsLensUserConfigured.mockReset();
 
-    // Default valid session
+    // Default valid session with clusterId
     mockGetSession.mockResolvedValue({
       isLoggedIn: true,
-      user: { username: "testuser" },
+      user: { username: "testuser", clusterId: "primary" },
     });
 
     // Default lens config
@@ -93,6 +93,7 @@ describe("Table Dependencies API Route", () => {
     mockGetLensConfig.mockReturnValue({
       host: "localhost",
       username: "lens",
+      clusterId: "primary",
     });
 
     // Default client mock

@@ -82,7 +82,7 @@ export async function GET(): Promise<
     const client = createClient(config);
 
     // Detect cluster
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
 
     // Fetch disks and parts in parallel
     const [disksResult, partsResult] = await Promise.all([

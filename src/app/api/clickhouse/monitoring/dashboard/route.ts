@@ -30,10 +30,11 @@ export async function GET(request: NextRequest) {
     const timeRangeParam = searchParams.get("timeRange");
     const timeRange = timeRangeParam ? parseInt(timeRangeParam, 10) : 60;
 
+    const cacheScope = config.clusterId ?? "legacy";
     // Only cache non-incremental (full) requests.
     // Incremental updates (minTime present) must always be fresh.
     const isIncremental = !!minTime;
-    const cacheKey = `dashboard:${timeRange}:${from ?? "_"}:${to ?? "_"}`;
+    const cacheKey = `dashboard:${cacheScope}:${timeRange}:${from ?? "_"}:${to ?? "_"}`;
 
     if (!isIncremental) {
       const cached = await monitoringCache.get(cacheKey);

@@ -18,6 +18,7 @@ export interface QueryExecutorOptions {
   pageSize?: number;
   cache?: boolean;
   queryId?: string;
+  clusterId?: string;
 }
 
 export interface QueryExecutorResult {
@@ -89,7 +90,7 @@ export function prepareQuery(options: QueryExecutorOptions): QueryExecutorResult
 
   if (useCache) {
     const queryCache = getQueryCache();
-    cacheKey = queryCache.generateSqlKey(querySql, database);
+    cacheKey = queryCache.generateSqlKey(querySql, database, options.clusterId);
   }
 
   return {

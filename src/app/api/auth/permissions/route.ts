@@ -7,12 +7,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession, getSessionClickHouseConfig } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-} from "@/lib/clickhouse";
+import { getSession, getSessionClickHouseConfig , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured } from "@/lib/clickhouse";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import {
   hasGlobalAccessViaShowGrants,
@@ -50,7 +46,7 @@ async function getEffectiveRoles(
   const effectiveRoles = new Set<string>();
 
   if (!isLensUserConfigured()) return effectiveRoles;
-  const lensConfig = getLensConfig();
+  const lensConfig = await getSessionLensConfig();
   if (!lensConfig) return effectiveRoles;
 
   const lensClient = createClient(lensConfig);
@@ -125,7 +121,7 @@ async function getAccessInfo(username: string): Promise<{
     return { databases: ["default"], hasGlobalAccess: false };
   }
 
-  const lensConfig = getLensConfig();
+  const lensConfig = await getSessionLensConfig();
   if (!lensConfig) {
     return { databases: ["default"], hasGlobalAccess: false };
   }

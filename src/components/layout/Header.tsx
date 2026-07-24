@@ -1,6 +1,7 @@
 "use client";
 
 import { ConnectionStatus } from "./ConnectionStatus";
+import { ClusterBadge } from "./ClusterBadge";
 import { ThemeToggle } from "@/components/theme";
 
 interface HeaderProps {
@@ -21,6 +22,7 @@ export function Header({ title, children, actions }: HeaderProps) {
       <div className="flex flex-wrap items-center gap-2">
         {actions}
         <ThemeToggle />
+        <ClusterBadge />
         <ConnectionStatus />
       </div>
     </header>

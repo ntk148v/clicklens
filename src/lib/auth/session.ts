@@ -22,6 +22,7 @@ export interface SessionData {
     password: string;
     host?: string;
     database?: string;
+    clusterId?: string;
   };
 }
 

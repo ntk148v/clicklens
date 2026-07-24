@@ -4,13 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import {
-  createClient,
-  getLensConfig,
-  isLensUserConfigured,
-  isClickHouseError,
-} from "@/lib/clickhouse";
+import { getSession , getSessionLensConfig } from "@/lib/auth";
+import { createClient, isLensUserConfigured, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { escapeSqlString } from "@/lib/clickhouse/utils";
 import { getPartsQuery } from "@/lib/clickhouse/queries/tables";
@@ -106,7 +101,7 @@ export async function GET(
       );
     }
 
-    const lensConfig = getLensConfig();
+    const lensConfig = await getSessionLensConfig();
     if (!lensConfig) {
       return NextResponse.json({
         success: false,
@@ -120,13 +115,14 @@ export async function GET(
     }
 
     const client = createClient(lensConfig);
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, lensConfig.clusterId);
 
     const safeDatabase = escapeSqlString(database);
     const safeTable = escapeSqlString(table);
 
-    // Cache key includes database and table for proper isolation
-    const cacheKey = `tables:parts:${database}:${table}`;
+    const cacheScope = lensConfig.clusterId ?? "legacy";
+    // Cache key includes database, table, and cluster for proper isolation
+    const cacheKey = `tables:parts:${cacheScope}:${database}:${table}`;
 
     const data = await getOrSet(
       tablesCache,

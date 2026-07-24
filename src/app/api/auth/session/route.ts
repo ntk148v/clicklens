@@ -14,6 +14,7 @@ export interface SessionResponse {
     username: string;
     host?: string;
     database?: string;
+    clusterId?: string;
   };
   csrfToken?: string;
 }
@@ -37,6 +38,7 @@ export async function GET(): Promise<NextResponse<SessionResponse>> {
       username: session.user.username,
       host: session.user.host,
       database: session.user.database,
+      clusterId: session.user.clusterId,
     },
     csrfToken,
   });

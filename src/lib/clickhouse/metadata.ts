@@ -4,7 +4,7 @@
  */
 
 import { createClient } from "./client";
-import { getLensConfig, isLensUserConfigured } from "./config";
+import type { ClickHouseConfig } from "./config";
 import { getClusterName } from "./cluster";
 import { quoteIdentifier } from "./utils";
 
@@ -30,21 +30,14 @@ ${onCluster}
 export const SAVED_QUERIES_SCHEMA = getSavedQueriesSchema();
 
 /**
- * Ensure the metadata database and tables exist
- * This uses the Lens User (privileged) to create the structure
+ * Ensure the metadata database and tables exist.
+ * Accepts an already-resolved Lens config from the session.
  */
-export async function ensureMetadataInfrastructure() {
-  if (!isLensUserConfigured()) {
-    throw new Error("Lens user must be configured to manage metadata");
-  }
-
-  const config = getLensConfig();
-  if (!config) return;
-
+export async function ensureMetadataInfrastructure(config: ClickHouseConfig): Promise<boolean> {
   const client = createClient(config);
 
   try {
-    const clusterName = await getClusterName(client);
+    const clusterName = await getClusterName(client, config.clusterId);
     const onCluster = clusterName
       ? ` ON CLUSTER ${quoteIdentifier(clusterName)}`
       : "";

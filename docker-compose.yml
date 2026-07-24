@@ -14,7 +14,11 @@ services:
       - ./.env.local:/app/.env.local
     environment:
       - NODE_ENV=production
-      - DISABLE_SECURE_COOKIES=false
+      - DISABLE_SECURE_COOKIES=true
+      - SESSION_SECRET=compose-secret-do-not-use-in-prod-32chars
+      - REDIS_URL=redis://redis:6379
+      # Multi-cluster: expose both CH nodes as selectable clusters
+      - CLICKHOUSE_CLUSTERS=[{"id":"ch1","label":"ClickHouse 01","host":"192.168.5.1","port":8123,"lensUser":"default","lensPassword":"password"},{"id":"ch2","label":"ClickHouse 02","host":"192.168.5.2","port":8123,"lensUser":"default","lensPassword":"password"}]
     restart: unless-stopped
 
   clickhouse-01:

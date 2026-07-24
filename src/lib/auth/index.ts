@@ -55,7 +55,8 @@ export async function isAuthenticated(): Promise<boolean> {
 
 /**
  * Get ClickHouse config from session (for end-user queries)
- * Combines server connection (from env) with user credentials (from session)
+ * Combines cluster connection (from CLICKHOUSE_CLUSTERS or legacy env) with user credentials (from session)
+ * Sessions without a pinned clusterId are rejected (needs re-login).
  */
 export async function getSessionClickHouseConfig(): Promise<ClickHouseConfig | null> {
   const session = await getSession();
@@ -65,7 +66,28 @@ export async function getSessionClickHouseConfig(): Promise<ClickHouseConfig | n
     return null;
   }
 
-  return getUserConfig(session.user);
+  if (!session.user.clusterId) {
+    return null;
+  }
+
+  return getUserConfig(session.user.clusterId, session.user);
+}
+
+/**
+ * Get lens user config for the same cluster as the current session.
+ * Used by API routes that need service-user operations tied to the user's cluster.
+ * Sessions without a pinned clusterId are rejected (needs re-login).
+ */
+export async function getSessionLensConfig(): Promise<ClickHouseConfig | null> {
+  const session = await getSession();
+  if (!session.isLoggedIn || !session.user) {
+    return null;
+  }
+  if (!session.user.clusterId) {
+    return null;
+  }
+  const { getLensConfig } = await import("@/lib/clickhouse");
+  return getLensConfig(session.user.clusterId);
 }
 
 /**
@@ -89,7 +111,14 @@ export async function requireAuth(): Promise<
     );
   }
 
-  const config = getUserConfig(session.user);
+  if (!session.user.clusterId) {
+    return NextResponse.json(
+      { success: false as const, error: "Server configuration error" },
+      { status: 500 },
+    );
+  }
+
+  const config = getUserConfig(session.user.clusterId, session.user);
   if (!config) {
     return NextResponse.json(
       { success: false as const, error: "Server configuration error" },
