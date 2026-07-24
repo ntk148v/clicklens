@@ -9,7 +9,6 @@ export type { ClickHouseConfig } from "./config";
 export * from "./types";
 export type { ClusterDefinition } from "./config";
 export {
-  getDefaultConfig,
   getLensConfig,
   getUserConfig,
   buildConnectionUrl,

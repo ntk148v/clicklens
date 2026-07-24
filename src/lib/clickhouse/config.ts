@@ -2,12 +2,10 @@
  * ClickHouse client configuration
  *
  * Environment Variables:
- * - CLICKHOUSE_HOST: ClickHouse server hostname
- * - CLICKHOUSE_PORT: ClickHouse HTTP port (default: 8123, or 8443 for HTTPS)
- * - CLICKHOUSE_SECURE: "true" or "false" (default: "false") - use HTTPS
- * - CLICKHOUSE_VERIFY: "true" or "false" (default: "true") - verify SSL certificate
- * - LENS_USER: Service user for metadata queries
- * - LENS_PASSWORD: Service user password
+ * - CLICKHOUSE_CLUSTERS: JSON array of cluster definitions (canonical)
+ * - CLICKHOUSE_HOST, CLICKHOUSE_PORT, CLICKHOUSE_SECURE, CLICKHOUSE_VERIFY:
+ *   Legacy single-cluster env vars (DEPRECATED — use CLICKHOUSE_CLUSTERS instead)
+ * - LENS_USER, LENS_PASSWORD: Legacy service user credentials (DEPRECATED)
  *
  * Note: ClickLens uses ClickHouse HTTP interface (ports 8123/8443).
  * The native TCP protocol (ports 9000/9440) is NOT supported.
@@ -40,6 +38,22 @@ export interface ClickHouseConfig {
   settings?: Record<string, unknown>;
   /** Cluster ID this config belongs to (for cache key isolation) */
   clusterId?: string;
+}
+
+/**
+ * Deprecation warning for legacy CLICKHOUSE_HOST/LENS_USER env vars.
+ * Printed once per process, contains no secrets.
+ */
+const LEGACY_DEPRECATION_MESSAGE =
+  "CLICKHOUSE_HOST, CLICKHOUSE_PORT, CLICKHOUSE_SECURE, CLICKHOUSE_VERIFY, " +
+  "LENS_USER, and LENS_PASSWORD are deprecated. Migrate to CLICKHOUSE_CLUSTERS " +
+  "before the next major release.";
+
+let legacyDeprecationWarned = false;
+
+/** @internal Reset deprecation warning flag for testing */
+export function $$resetDeprecationWarning(): void {
+  legacyDeprecationWarned = false;
 }
 
 /**
@@ -121,24 +135,53 @@ export function parseClusterRegistry(): Map<string, ClusterDefinition> {
 }
 
 /**
- * Get public-safe list of configured clusters (id + label only).
- * Includes the legacy "default" cluster when CLICKHOUSE_HOST is set,
- * unless CLICKHOUSE_CLUSTERS explicitly defines a "default" entry.
+ * Build the effective cluster registry.
+ *
+ * - If CLICKHOUSE_CLUSTERS is set to a non-empty value, use it exclusively.
+ * - If CLICKHOUSE_CLUSTERS is an explicit empty array "[]", no clusters.
+ * - If CLICKHOUSE_CLUSTERS is absent and legacy vars are complete,
+ *   synthesize one "default" entry and emit a deprecation warning once.
+ * - Otherwise, return empty.
  */
-export function getConfiguredClusters(): { id: string; label: string }[] {
-  const registry = parseClusterRegistry();
-  const hasLegacy = !!process.env.CLICKHOUSE_HOST && !!process.env.LENS_USER;
+function getEffectiveClusterRegistry(): Map<string, ClusterDefinition> {
+  const raw = process.env.CLICKHOUSE_CLUSTERS;
+  // Registry is explicitly set (including empty array)
+  if (raw !== undefined && raw !== null && raw.trim() !== "") {
+    return parseClusterRegistry();
+  }
+  // Registry absent or blank — try legacy fallback
+  const host = process.env.CLICKHOUSE_HOST;
+  const lensUser = process.env.LENS_USER;
+  if (!host || !lensUser) return new Map();
 
-  const clusters = [...registry.values()].map((c) => ({
-    id: c.id,
-    label: c.label,
-  }));
-
-  if (hasLegacy && !registry.has("default")) {
-    clusters.unshift({ id: "default", label: "default" });
+  if (!legacyDeprecationWarned) {
+    legacyDeprecationWarned = true;
+    console.warn(LEGACY_DEPRECATION_MESSAGE);
   }
 
-  return clusters;
+  const secure = process.env.CLICKHOUSE_SECURE === "true";
+  const configuredPort = Number.parseInt(process.env.CLICKHOUSE_PORT ?? "", 10);
+
+  const def: ClusterDefinition = {
+    id: "default",
+    label: "Default",
+    host,
+    port: Number.isFinite(configuredPort) ? configuredPort : secure ? 8443 : 8123,
+    secure,
+    verifySsl: process.env.CLICKHOUSE_VERIFY !== "false",
+    lensUser,
+    lensPassword: process.env.LENS_PASSWORD ?? "",
+  };
+
+  return new Map([["default", def]]);
+}
+
+/**
+ * Get public-safe list of configured clusters (id + label only).
+ */
+export function getConfiguredClusters(): { id: string; label: string }[] {
+  const registry = getEffectiveClusterRegistry();
+  return [...registry.values()].map((c) => ({ id: c.id, label: c.label }));
 }
 
 /**
@@ -153,35 +196,7 @@ export function getDefaultClusterId(): string | null {
  * Check whether a given cluster ID is configured.
  */
 export function isClusterConfigured(clusterId: string): boolean {
-  if (clusterId === "default" && !!process.env.CLICKHOUSE_HOST) return true;
-  return parseClusterRegistry().has(clusterId);
-}
-
-/**
- * Get server connection config from environment
- */
-function getServerConnection(): Omit<
-  ClickHouseConfig,
-  "username" | "password" | "database"
-> | null {
-  const host = process.env.CLICKHOUSE_HOST;
-
-  if (!host) {
-    return null;
-  }
-
-  const secure = process.env.CLICKHOUSE_SECURE === "true";
-  const verifySsl = process.env.CLICKHOUSE_VERIFY !== "false"; // Default to true
-
-  // Default ports for HTTP interface
-  const defaultPort = secure ? 8443 : 8123;
-
-  return {
-    host,
-    port: parseInt(process.env.CLICKHOUSE_PORT || String(defaultPort), 10),
-    secure,
-    verifySsl,
-  };
+  return getEffectiveClusterRegistry().has(clusterId);
 }
 
 /**
@@ -196,55 +211,29 @@ export function buildConnectionUrl(
 
 /**
  * Get lens user config for metadata queries.
- * Resolves registered cluster IDs (including "default") from CLICKHOUSE_CLUSTERS first.
- * Falls back to legacy CLICKHOUSE_HOST / LENS_USER env vars when no ID or unknown ID.
- *
- * Lens user has read access to system.* tables
+ * Requires a clusterId — resolves from the effective cluster registry.
  */
-export function getLensConfig(clusterId?: string): ClickHouseConfig | null {
-  // Try registry first for any clusterId (including "default")
-  if (clusterId) {
-    const registry = parseClusterRegistry();
-    const def = registry.get(clusterId);
-    if (def) {
-      return {
-        host: def.host,
-        port: def.port,
-        secure: def.secure,
-        verifySsl: def.verifySsl,
-        username: def.lensUser,
-        password: def.lensPassword,
-        database: "default",
-        clusterId: def.id,
-      };
-    }
-    // Unknown registry ID — try legacy as fallback
-  }
-
-  // Fallback to legacy env
-  const server = getServerConnection();
-  const lensUser = process.env.LENS_USER;
-
-  if (!server || !lensUser) {
-    return null;
-  }
+export function getLensConfig(clusterId: string): ClickHouseConfig | null {
+  const registry = getEffectiveClusterRegistry();
+  const def = registry.get(clusterId);
+  if (!def) return null;
 
   return {
-    ...server,
-    username: lensUser,
-    password: process.env.LENS_PASSWORD || "",
+    host: def.host,
+    port: def.port,
+    secure: def.secure,
+    verifySsl: def.verifySsl,
+    username: def.lensUser,
+    password: def.lensPassword,
     database: "default",
+    clusterId: def.id,
   };
 }
 
 /**
- * Overload signatures for getUserConfig
+ * Get user config by combining a cluster definition with session credentials.
+ * Requires a clusterId — resolves from the effective cluster registry.
  */
-export function getUserConfig(credentials: {
-  username: string;
-  password: string;
-  database?: string;
-}): ClickHouseConfig | null;
 export function getUserConfig(
   clusterId: string,
   credentials: {
@@ -252,73 +241,21 @@ export function getUserConfig(
     password: string;
     database?: string;
   },
-): ClickHouseConfig | null;
-
-/**
- * Get user config by combining a cluster definition with session credentials.
- *
- * Two call signatures:
- * - `getUserConfig(clusterId, credentials)` — cluster-aware path
- * - `getUserConfig(credentials)` — legacy path using CLICKHOUSE_HOST env var
- */
-export function getUserConfig(
-  clusterIdOrCredentials:
-    | string
-    | { username: string; password: string; database?: string },
-  credentials?: { username: string; password: string; database?: string },
 ): ClickHouseConfig | null {
-  // Cluster-aware path — try registry first even for "default"
-  if (typeof clusterIdOrCredentials === "string") {
-    const clusterId = clusterIdOrCredentials;
-    const creds = credentials!;
-    if (clusterId) {
-      const registry = parseClusterRegistry();
-      const def = registry.get(clusterId);
-      if (def) {
-        return {
-          host: def.host,
-          port: def.port,
-          secure: def.secure,
-          verifySsl: def.verifySsl,
-          username: creds.username,
-          password: creds.password,
-          database: creds.database || "default",
-          clusterId: def.id,
-        };
-      }
-      // Unknown registry ID or "default" without registry entry — fall through
-    }
-  }
-
-  // Legacy path
-  const server = getServerConnection();
-  const creds = credentials ??
-    (clusterIdOrCredentials as {
-      username: string;
-      password: string;
-      database?: string;
-    });
-
-  if (!server) {
-    return null;
-  }
+  const registry = getEffectiveClusterRegistry();
+  const def = registry.get(clusterId);
+  if (!def) return null;
 
   return {
-    ...server,
-    username: creds.username,
-    password: creds.password,
-    database: creds.database || "default",
-    clusterId: typeof clusterIdOrCredentials === "string" && clusterIdOrCredentials !== "default"
-      ? clusterIdOrCredentials
-      : undefined,
+    host: def.host,
+    port: def.port,
+    secure: def.secure,
+    verifySsl: def.verifySsl,
+    username: credentials.username,
+    password: credentials.password,
+    database: credentials.database || "default",
+    clusterId: def.id,
   };
-}
-
-/**
- * Get default configuration (legacy, for backward compatibility)
- */
-export function getDefaultConfig(): ClickHouseConfig | null {
-  return getLensConfig();
 }
 
 /**
@@ -335,8 +272,8 @@ export function buildAuthHeaders(
 }
 
 /**
- * Check if lens user is configured
+ * Check if lens user is configured (any cluster exists in the effective registry).
  */
 export function isLensUserConfigured(): boolean {
-  return (!!process.env.CLICKHOUSE_HOST && !!process.env.LENS_USER) || !!process.env.CLICKHOUSE_CLUSTERS;
+  return getEffectiveClusterRegistry().size > 0;
 }
