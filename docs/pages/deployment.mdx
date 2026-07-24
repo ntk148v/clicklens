@@ -40,6 +40,14 @@ These legacy environment variables still work when `CLICKHOUSE_CLUSTERS` is not 
 
 If both `CLICKHOUSE_CLUSTERS` and legacy vars are set, the registry takes precedence.
 
+### 1.4. Migration from Legacy Env Vars
+
+If you're upgrading from the legacy `CLICKHOUSE_HOST`/`LENS_USER` config:
+
+1. Create a `CLICKHOUSE_CLUSTERS` JSON array with one entry for your cluster (see §2.4 sample)
+2. Remove the legacy vars from your env (optional — they still work, just deprecated with a `console.warn`)
+3. Restart — login, queries, monitoring all work identically
+
 <Callout type="info">
   **Sub-path (`CLICKLENS_BASE_PATH`)** is a **build-time** setting. Set it in
   the same environment you use for `next build`, your Docker `docker build`, or
