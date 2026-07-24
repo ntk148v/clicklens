@@ -16,7 +16,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG APP_VERSION
 # Provide a dummy SESSION_SECRET for build (actual secret is provided at runtime)
 ENV SESSION_SECRET="build-time-placeholder-secret-32chars"
-RUN NEXT_PUBLIC_APP_VERSION="${APP_VERSION#v}" bun run build
+RUN test -n "$APP_VERSION" && \
+    APP_VERSION="${APP_VERSION#v}" && \
+    if [ "${#APP_VERSION}" -eq 40 ] && printf '%s' "$APP_VERSION" | grep -Eq '^[0-9a-f]+$'; then \
+      APP_VERSION="$(printf '%s' "$APP_VERSION" | cut -c1-7)"; \
+    fi && \
+    NEXT_PUBLIC_APP_VERSION="$APP_VERSION" bun run build
 
 # ---- Final Image ----
 FROM oven/bun:1.3.6-slim AS runner

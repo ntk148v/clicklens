@@ -26,6 +26,9 @@ on:
       image-tag:
         type: string
         description: "Custom Docker image tag override"
+      app-version:
+        type: string
+        description: "Version baked into the Docker image"
 
     outputs:
       tags:
@@ -246,7 +249,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ github.ref_name }}
+            APP_VERSION=${{ inputs.app-version }}
           # Multi-layered cache strategy: registry (primary) + GitHub Actions (fallback)
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache

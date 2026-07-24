@@ -240,6 +240,15 @@ const navigation = [
 ];
 
 // Resource navigation items
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "";
+const gitCommit = process.env.NEXT_PUBLIC_GIT_COMMIT;
+const gitTag = process.env.NEXT_PUBLIC_GIT_TAG;
+const isCommitVersion = /^[a-f0-9]{7}$/i.test(appVersion);
+const versionLabel = isCommitVersion ? appVersion : gitTag || `v${appVersion}`;
+const versionHref = gitCommit || isCommitVersion
+  ? `https://github.com/ntk148v/clicklens/commit/${gitCommit || appVersion}`
+  : `https://github.com/ntk148v/clicklens/releases/tag/${versionLabel}`;
+
 const resourcesItems = [
   {
     name: "Documentation",
@@ -256,12 +265,8 @@ const resourcesItems = [
     external: true,
   },
   {
-    name: process.env.NEXT_PUBLIC_GIT_COMMIT
-      ? `${process.env.NEXT_PUBLIC_GIT_TAG || "v" + process.env.NEXT_PUBLIC_APP_VERSION} (${process.env.NEXT_PUBLIC_GIT_COMMIT})`
-      : "v" + process.env.NEXT_PUBLIC_APP_VERSION,
-    href: process.env.NEXT_PUBLIC_GIT_COMMIT
-      ? `https://github.com/ntk148v/clicklens/commit/${process.env.NEXT_PUBLIC_GIT_COMMIT}`
-      : `https://github.com/ntk148v/clicklens/releases/tag/v${process.env.NEXT_PUBLIC_APP_VERSION}`,
+    name: gitCommit ? `${versionLabel} (${gitCommit})` : versionLabel,
+    href: versionHref,
     icon: ScrollText,
     description: "View version",
     requiresPermission: "canViewVersion" as const,

@@ -51,6 +51,7 @@ jobs:
     uses: ./.github/workflows/base.yml
     with:
       job-type: docker
+      app-version: ${{ github.sha }}
       clickhouse-versions: '["25.12"]'
       platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
       push-image: ${{ github.event_name != 'pull_request' }}
