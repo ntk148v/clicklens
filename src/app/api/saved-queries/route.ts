@@ -38,12 +38,16 @@ export async function GET() {
 
   try {
     const config = await getSessionLensConfig();
-    const client = createClient(config!); // Checked by isLensUserConfigured
+    if (!config) {
+      return apiError(503, "INTERNAL_ERROR", "Metadata storage not configured", "Saved queries feature is not configured");
+    }
+
+    const client = createClient(config);
 
     // Ensure table exists (idempotent, fast enough to check or cache)
     // For now we just run it, assuming it's cheap IF NOT EXISTS
     // Or we could try-catch the select and create if missing
-    await ensureMetadataInfrastructure();
+    await ensureMetadataInfrastructure(config);
 
     const safeUsername = escapeSqlString(session.user.username);
     const result = await client.query<SavedQuery>(`
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     const client = createClient(config);
-    await ensureMetadataInfrastructure();
+    await ensureMetadataInfrastructure(config);
 
     const id = generateUUID();
     const safeSql = escapeSqlString(sql);

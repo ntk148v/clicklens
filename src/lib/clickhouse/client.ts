@@ -4,7 +4,7 @@
  * Clients are cached by (host, port, username, database) to enable HTTP keep-alive reuse.
  */
 
-import { type ClickHouseConfig, getLensConfig } from "./config";
+import { type ClickHouseConfig } from "./config";
 import {
   type ClickHouseClient,
   type ClickHouseQueryResult,
@@ -96,14 +96,8 @@ function evictStaleClients(): void {
  * Create or retrieve a cached ClickHouse client.
  * Clients with the same (host, port, username, database, settings) reuse HTTP connections.
  */
-export function createClient(config?: ClickHouseConfig): ClickHouseClient {
-  const resolvedConfig = config ?? getLensConfig();
-
-  if (!resolvedConfig) {
-    throw new Error(
-      "ClickHouse configuration not provided and CLICKHOUSE_HOST/LENS_USER environment variables are not set"
-    );
-  }
+export function createClient(config: ClickHouseConfig): ClickHouseClient {
+  const resolvedConfig = config;
 
   const key = buildCacheKey(resolvedConfig);
   const cached = clientCache.get(key);

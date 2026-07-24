@@ -21,7 +21,6 @@ import {
   isLensUserConfigured,
   isClusterConfigured,
   getDefaultClusterId,
-  type ClickHouseConfig,
 } from "@/lib/clickhouse";
 import https from "https";
 
@@ -74,7 +73,7 @@ export async function POST(
         {
           success: false,
           error:
-            "Server not configured. Set CLICKHOUSE_HOST + LENS_USER or CLICKHOUSE_CLUSTERS.",
+            "Server not configured. Set CLICKHOUSE_CLUSTERS.",
         },
         { status: 500 },
       );
@@ -117,18 +116,10 @@ export async function POST(
     }
 
     // Get config with user credentials
-    let config: ClickHouseConfig | null;
-    if (clusterId && clusterId !== "default") {
-      config = getUserConfig(clusterId, {
-        username: body.username,
-        password: body.password || "",
-      });
-    } else {
-      config = getUserConfig({
-        username: body.username,
-        password: body.password || "",
-      });
-    }
+    const config = getUserConfig(clusterId, {
+      username: body.username,
+      password: body.password || "",
+    });
 
     if (!config) {
       return NextResponse.json(
@@ -193,7 +184,7 @@ export async function POST(
     const sessionId = createSession({
       username: body.username,
       password: body.password || "",
-      host: config.host || process.env.CLICKHOUSE_HOST,
+      host: config.host,
       database: config.database || "default",
       clusterId,
     });

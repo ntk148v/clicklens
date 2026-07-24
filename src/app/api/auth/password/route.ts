@@ -72,14 +72,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Verify Verification: Connect as the user to prove they know the current password
-    // We cannot blindly trust session.user.password because sessions might persist after external password changes (edge case),
-    // and crucially we must verify the provided `currentPassword` is actually good.
-    const userUserConfig = session.user.clusterId
-      ? getUserConfig(session.user.clusterId, {
-          username: session.user.username,
-          password: currentPassword,
-        })
-      : getUserConfig({ username: session.user.username, password: currentPassword });
+    const clusterId = session.user.clusterId;
+    if (!clusterId) {
+      return NextResponse.json(
+        { success: false, error: "Session missing cluster configuration" },
+        { status: 500 },
+      );
+    }
+
+    const userUserConfig = getUserConfig(clusterId, {
+      username: session.user.username,
+      password: currentPassword,
+    });
 
     if (!userUserConfig) {
       return NextResponse.json(
