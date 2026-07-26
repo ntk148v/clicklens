@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: "${APP_VERSION:-0.0.8}"
     image: kiennt26/clicklens:latest
     container_name: clicklens
     networks:
