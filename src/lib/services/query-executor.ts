@@ -5,7 +5,12 @@
  */
 
 import { ClickHouseConfig, createClient } from "@/lib/clickhouse";
-import { validateReadOnlySql } from "@/lib/sql/parser";
+import {
+  isSelectStatement,
+  paginate,
+  parseSql,
+  validateReadOnlySql,
+} from "@/lib/sql/parser";
 import { getQueryCache } from "@/lib/cache/query-cache";
 
 export interface QueryExecutorOptions {
@@ -51,19 +56,13 @@ export function prepareQuery(options: QueryExecutorOptions): QueryExecutorResult
     throw new Error(`Timeout exceeds maximum allowed (${MAX_QUERY_TIMEOUT_MS}ms)`);
   }
 
-  let querySql = sql;
+  const parsed = parseSql(sql)
+  const statement =
+    parsed.ok && parsed.statements.length === 1 ? parsed.statements[0] : null
 
-  if (typeof page === "number") {
-    const actualPageSize = pageSize ?? 1000;
-    const offset = page * actualPageSize;
-    const cleanSql = querySql.trim().replace(/;$/, "");
-
-    const isPaginatedQuery =
-      /^(?:\/\*[\s\S]*?\*\/|--.*?\n|\s)*(?:WITH|SELECT)\b/i.test(cleanSql);
-
-    if (isPaginatedQuery) {
-      querySql = `SELECT * FROM (${cleanSql}) LIMIT ${actualPageSize} OFFSET ${offset}`;
-    }
+  let querySql = sql
+  if (statement && typeof page === "number") {
+    querySql = paginate(statement, sql, page, pageSize ?? 1000)
   }
 
   const clickhouseSettings: Record<string, unknown> = {
@@ -86,7 +85,7 @@ export function prepareQuery(options: QueryExecutorOptions): QueryExecutorResult
     : undefined;
 
   let cacheKey: string | null = null;
-  const useCache = cache && /^\s*SELECT\b/i.test(querySql);
+  const useCache = cache && statement !== null && isSelectStatement(statement);
 
   if (useCache) {
     const queryCache = getQueryCache();

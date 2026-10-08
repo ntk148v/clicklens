@@ -176,4 +176,25 @@ describe("Query API Route (Streaming)", () => {
     expect(res.status).toBe(400)
     expect(json.error.type).toBe("SYNTAX_ERROR")
   })
+
+  it("should paginate a query that ends with a line comment", async () => {
+    mockQueryStream.mockResolvedValue({
+      stream: () => mockStreamGenerator([]),
+    })
+
+    const res = await POST(
+      createRequest({
+        sql: "SELECT * FROM test -- note",
+        page: 1,
+        pageSize: 10,
+        cache: false,
+      }),
+    )
+    await consumeStreamChunks(res)
+
+    const sentSql = mockQueryStream.mock.calls[0][0] as string
+    expect(sentSql).toBe(
+      "SELECT * FROM (\nSELECT * FROM test\n) LIMIT 10 OFFSET 10",
+    )
+  })
 });

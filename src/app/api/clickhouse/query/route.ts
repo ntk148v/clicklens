@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
 import { formatQueryError } from "@/lib/errors";
-import { validateReadOnlySql } from "@/lib/sql/parser";
+import {
+  isSelectStatement,
+  paginate,
+  validateReadOnlySql,
+} from "@/lib/sql/parser";
 import { checkRateLimit } from "@/lib/cache/rate-limit";
 import { getClientIdentifier } from "@/lib/auth/rate-limit";
 import { requireCsrf } from "@/lib/auth/csrf";
@@ -93,16 +97,12 @@ export async function POST(request: NextRequest) {
 
     let querySql = reqBody.sql;
     if (typeof reqBody.page === "number") {
-      const pageSize = reqBody.pageSize ?? 1000;
-      const offset = reqBody.page * pageSize;
-      const cleanSql = querySql.trim().replace(/;$/, "");
-
-      const isPaginatedQuery =
-        /^(?:\/\*[\s\S]*?\*\/|--.*?\n|\s)*(?:WITH|SELECT)\b/i.test(cleanSql);
-
-      if (isPaginatedQuery) {
-        querySql = `SELECT * FROM (${cleanSql}) LIMIT ${pageSize} OFFSET ${offset}`;
-      }
+      querySql = paginate(
+        statement,
+        reqBody.sql,
+        reqBody.page,
+        reqBody.pageSize ?? 1000,
+      );
     }
 
     const clickhouseSettings: Record<string, unknown> = {
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       ? `${QUERY_ID_PREFIX}${config.username}-${reqBody.query_id}`
       : undefined;
 
-    if (cacheEnabled && /^\s*SELECT\b/i.test(querySql)) {
+    if (cacheEnabled && isSelectStatement(statement)) {
       const cacheKey = queryCache.generateSqlKey(querySql, reqBody.database, config.clusterId);
       const cachedResult = queryCache.getCachedQuery(cacheKey);
       
