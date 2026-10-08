@@ -310,24 +310,6 @@ export class DiscoverQueryBuilder {
   }
 
   /**
-   * Validate SQL filter for dangerous operations
-   */
-  static validateFilter(filter: string): { valid: boolean; error?: string } {
-    const DANGEROUS_KEYWORDS =
-      /\b(DROP|DELETE|ALTER|GRANT|REVOKE|TRUNCATE|INSERT|UPDATE|CREATE|ATTACH|DETACH|RENAME|KILL|SYSTEM)\b/i;
-    const DANGEROUS_PATTERNS = /;\s*\S/;
-
-    if (DANGEROUS_KEYWORDS.test(filter) || DANGEROUS_PATTERNS.test(filter)) {
-      return {
-        valid: false,
-        error: "Invalid filter: contains disallowed keywords",
-      };
-    }
-
-    return { valid: true };
-  }
-
-  /**
    * Build query to get distinct values for a column with counts
    * Used for faceted exploration in the field sidebar
    */

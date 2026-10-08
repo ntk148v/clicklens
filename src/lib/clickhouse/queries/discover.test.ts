@@ -265,17 +265,6 @@ describe("DiscoverQueryBuilder", () => {
     expect(result.countQuery).toContain("`event_time` <=");
   });
 
-  test("validateFilter rejects dangerous keywords", () => {
-    const result = DiscoverQueryBuilder.validateFilter("DROP TABLE users");
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain("disallowed keywords");
-  });
-
-  test("validateFilter accepts safe filters", () => {
-    const result = DiscoverQueryBuilder.validateFilter("status = 'error'");
-    expect(result.valid).toBe(true);
-  });
-
   test("getFieldValuesQuery builds correct query", () => {
     const query = DiscoverQueryBuilder.getFieldValuesQuery(
       "mydb.mytable",

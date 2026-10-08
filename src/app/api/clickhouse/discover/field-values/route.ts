@@ -4,6 +4,7 @@ import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getTableEngine } from "@/lib/clickhouse/schema";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
+import { validateFilter } from "@/lib/sql/parser";
 import { getFieldValuesQuery } from "@/lib/clickhouse/queries/discover";
 
 const MAX_VALUES = 10;
@@ -74,17 +75,14 @@ export async function GET(request: Request) {
       }
     }
 
-    if (filter?.trim()) {
-      const DANGEROUS_KEYWORDS =
-        /\b(DROP|DELETE|ALTER|GRANT|REVOKE|TRUNCATE|INSERT|UPDATE|CREATE|ATTACH|DETACH|RENAME|KILL|SYSTEM)\b/i;
-      if (DANGEROUS_KEYWORDS.test(filter)) {
-        return NextResponse.json(
-          { success: false, error: "Invalid filter" },
-          { status: 400 },
-        );
-      }
-      whereConds.push(`(${filter})`);
+    const filterValidation = validateFilter(filter ?? "");
+    if (!filterValidation.ok) {
+      return NextResponse.json(
+        { success: false, error: `Invalid filter: ${filterValidation.reason}` },
+        { status: 400 },
+      );
     }
+    if (filterValidation.sql) whereConds.push(`(${filterValidation.sql})`);
 
     const whereClause = whereConds.length
       ? `WHERE ${whereConds.join(" AND ")}`
