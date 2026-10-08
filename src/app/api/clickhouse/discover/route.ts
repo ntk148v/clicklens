@@ -11,7 +11,7 @@ import { fetchChunks } from "@/lib/clickhouse/stream";
 import { executeExactCount } from "@/lib/clickhouse/exact-count";
 import { executeApproxCount } from "@/lib/clickhouse/approx-count";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
-import { validateFilter } from "@/lib/clickhouse/sql-validator";
+import { validateFilter } from "@/lib/sql/parser";
 import { getGlobalRateLimiter } from "@/lib/rate-limiter";
 import { getQueryCache } from "@/lib/cache/query-cache";
 
@@ -125,6 +125,15 @@ export async function GET(request: Request) {
     const offset = parseInt(searchParams.get("offset") || "0", 10) || 0;
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";
+
+    const filterValidation = validateFilter(filter)
+    if (!filterValidation.ok) {
+      return NextResponse.json(
+        { success: false, error: `Invalid filter: ${filterValidation.reason}` },
+        { status: 400 },
+      );
+    }
+    const safeFilter = filterValidation.sql
     const minTime = searchParams.get("minTime");
     const maxTime = searchParams.get("maxTime");
     const columnsParam = searchParams.get("columns");
@@ -172,7 +181,9 @@ export async function GET(request: Request) {
         const dataRes = await client.query(typeQuery);
         const data = dataRes.data as { type: string }[];
         if (data.length) columnType = data[0].type;
-      } catch {}
+      } catch {
+        // ignore: column type lookup is best-effort; histogram falls back to a default
+      }
 
       const isDateOnly = columnType === "Date" || columnType === "Date32";
       let histogramQuery = "";
@@ -190,7 +201,7 @@ export async function GET(request: Request) {
           `${quotedTimeCol} <= toDateTime64(${maxTimeNum / 1000}, 3)`,
         );
       }
-      if (filter) whereConds.push(`(${filter})`);
+      if (safeFilter) whereConds.push(`(${safeFilter})`);
 
       const whereClause = whereConds.length
         ? `WHERE ${whereConds.join(" AND ")}`
@@ -296,25 +307,14 @@ export async function GET(request: Request) {
     // 1. Build Base WHERE (Filter + Smart Search)
     const baseWhere: string[] = [];
 
-    if (filter && filter.trim()) {
-      // Use comprehensive SQL validation to prevent injection attacks
-      const validationResult = validateFilter(filter);
-      if (!validationResult.valid) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Invalid filter: ${validationResult.error}`,
-          },
-          { status: 400 },
-        );
-      }
-      baseWhere.push(`(${filter})`);
-    }
+    if (safeFilter) baseWhere.push(`(${safeFilter})`);
 
     const searchTerm = searchParams.get("search");
     if (searchTerm) {
       const colsQuery = `SELECT name, type FROM system.columns WHERE database = '${safeDbStr}' AND table = '${safeTableStr}'`;
       const colsRes = await client.query(colsQuery);
+      // SAFETY: query() returns a generic data array; ColumnDefinition matches
+      // the shape returned by system.columns for the columns we request.
       const tableCols = colsRes.data as unknown as ColumnDefinition[];
 
       const smartCond = buildSmartSearchCondition(tableCols, searchTerm);
@@ -421,13 +421,6 @@ export async function GET(request: Request) {
       `;
 
       // Run count query in parallel (use exact count with caching when requested)
-      let countQuery = `SELECT count() as cnt FROM ${tableSource}`;
-      if (baseWhere.length > 0) countQuery += ` WHERE ${baseWhere.join(" AND ")}`;
-      if (groupByClause) {
-        // If we group, the total hits is the number of distinct groups.
-        countQuery = `SELECT count() as cnt FROM (SELECT 1 FROM ${tableSource} ${baseWhere.length > 0 ? `WHERE ${baseWhere.join(" AND ")}` : ""} ${groupByClause})`;
-      }
-
       let countPromise: Promise<{ count: number; isApproximate: boolean; accuracy?: number }>;
       if (useExactCount) {
         countPromise = executeExactCount(client, {

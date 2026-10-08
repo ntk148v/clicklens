@@ -205,4 +205,28 @@ describe("Discover API Route", () => {
     expect(dataQueryArg).toContain("hasToken");
     expect(dataQueryArg).toContain("error");
   });
+
+  it("should reject an invalid filter in histogram mode before any query runs", async () => {
+    const filter = encodeURIComponent("1=1) OR (1=1");
+    const req = createRequest(
+      `http://localhost/api/clickhouse/discover?database=db&table=t&mode=histogram&timeColumn=ts&filter=${filter}`,
+    );
+    const res = await GET(req);
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("should send the regenerated filter, not the raw text", async () => {
+    const filter = encodeURIComponent("level = 'error' -- hide the rest");
+    const req = createRequest(
+      `http://localhost/api/clickhouse/discover?database=db&table=t&filter=${filter}`,
+    );
+    const res = await GET(req);
+    await consumeStream(res);
+
+    const sentSql = mockQuery.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(sentSql).toContain("(level = 'error')");
+    expect(sentSql).not.toContain("hide the rest");
+  });
 });
