@@ -153,8 +153,8 @@ export function useSqlExecution(
       const trimmedSql = sql.trim();
       if (!trimmedSql) return;
 
-      const { splitSqlStatements } = await import("@/lib/sql");
-      const statements = splitSqlStatements(trimmedSql);
+      const { splitStatements } = await import("@/lib/sql/parser");
+      const statements = splitStatements(trimmedSql).map((s) => s.sql);
 
       if (statements.length === 0) return;
 

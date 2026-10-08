@@ -140,9 +140,8 @@ export function useSqlExplain(
       const sql = tab.sql.trim();
       if (!sql) return;
 
-      const { splitSqlStatements } = await import("@/lib/sql");
-      const statements = splitSqlStatements(sql);
-      const statement = statements[0];
+      const { splitStatements } = await import("@/lib/sql/parser");
+      const statement = splitStatements(sql)[0]?.sql;
 
       if (!statement) return;
 

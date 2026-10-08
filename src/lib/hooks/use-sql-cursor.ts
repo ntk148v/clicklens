@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import { fetchApi } from "@/lib/api/client";
 import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
-import { findStatementAtPosition } from "@/lib/sql";
 import type { QueryTab, QueryHistoryEntry } from "@/lib/store/tabs";
 import { generateUUID } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
@@ -128,7 +127,8 @@ export function useSqlCursor({
     const sql = tab.sql.trim();
     if (!sql) return;
 
-    const statement = findStatementAtPosition(tab.sql, cursorPosition);
+    const { statementAt } = await import("@/lib/sql/parser");
+    const statement = statementAt(tab.sql, cursorPosition)?.sql;
 
     if (!statement) return;
 
