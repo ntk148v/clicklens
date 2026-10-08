@@ -1,11 +1,21 @@
 import { describe, expect, test } from 'bun:test'
+import { formatNode, parse } from '@clickhouse/parser'
 import { parseSql } from './parse'
-import { paginate } from './rewrite'
+import { injectTimeRange, paginate, toExplain } from './rewrite'
 
 function only(sql: string) {
   const result = parseSql(sql)
   if (!result.ok) throw new Error(result.error.message)
   return result.statements[0]
+}
+
+function whereOf(sql: string): string {
+  const statement = parse(sql)[0]
+  if (statement.type !== 'SelectWithUnionQuery') throw new Error('not a SELECT')
+  const select = statement.selects[0]
+  if (select.type !== 'SelectQuery' || !select.where)
+    throw new Error('no WHERE')
+  return formatNode(select.where).replace(/\s+/g, ' ')
 }
 
 const page = (sql: string) => paginate(only(sql), sql, 2, 10)
@@ -52,6 +62,70 @@ describe('sql/parser/rewrite', () => {
     test('does not wrap statements that are not SELECT', () => {
       expect(page('SHOW TABLES')).toBe('SHOW TABLES')
       expect(page('EXPLAIN SELECT 1')).toBe('EXPLAIN SELECT 1')
+    })
+  })
+
+  describe('toExplain', () => {
+    test('adds EXPLAIN to a query', () => {
+      expect(toExplain('SELECT 1', 'PLAN')).toBe('EXPLAIN PLAN SELECT 1')
+    })
+
+    test('replaces an existing EXPLAIN and keeps the query', () => {
+      expect(toExplain('EXPLAIN SELECT 1', 'PLAN')).toBe(
+        'EXPLAIN PLAN SELECT 1',
+      )
+      expect(toExplain('EXPLAIN PIPELINE SELECT 1', 'AST')).toBe(
+        'EXPLAIN AST SELECT 1',
+      )
+      expect(
+        toExplain('-- note\nEXPLAIN SYNTAX SELECT a FROM t', 'PLAN'),
+      ).toBe('EXPLAIN PLAN SELECT a FROM t')
+    })
+
+    test('keeps text that does not parse, so the server reports the error', () => {
+      expect(toExplain('SELECT (', 'PLAN')).toBe('EXPLAIN PLAN SELECT (')
+    })
+  })
+
+  describe('injectTimeRange', () => {
+    const condition = 'ts > 1'
+
+    test('adds a WHERE clause', () => {
+      const result = injectTimeRange('SELECT a FROM t ORDER BY a', condition)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(whereOf(result.sql)).toBe('ts > 1')
+        expect(result.sql).toContain('ORDER BY a')
+      }
+    })
+
+    test('adds the condition to an existing WHERE and keeps precedence', () => {
+      const result = injectTimeRange(
+        'SELECT a FROM t WHERE (x = 1) OR (y = 2)',
+        condition,
+      )
+      expect(result.ok).toBe(true)
+      if (result.ok)
+        expect(whereOf(result.sql)).toBe('(x = 1 OR y = 2) AND ts > 1')
+    })
+
+    test('does not change a WHERE inside a CTE or subquery', () => {
+      const result = injectTimeRange(
+        'WITH c AS (SELECT a FROM u WHERE b ORDER BY a) SELECT * FROM c',
+        condition,
+      )
+      expect(result.ok).toBe(true)
+      if (result.ok) expect(whereOf(result.sql)).toBe('ts > 1')
+    })
+
+    test('rejects text that it cannot change safely', () => {
+      expect(injectTimeRange('SELECT 1; SELECT 2', condition).ok).toBe(false)
+      expect(
+        injectTimeRange('SELECT 1 UNION ALL SELECT 2', condition).ok,
+      ).toBe(false)
+      expect(injectTimeRange('SELECT now()', condition).ok).toBe(false)
+      expect(injectTimeRange('SHOW TABLES', condition).ok).toBe(false)
+      expect(injectTimeRange('SELECT (', condition).ok).toBe(false)
     })
   })
 })

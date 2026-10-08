@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTabsStore, initializeTabs } from "@/lib/store/tabs";
 import { useSqlBrowserStore } from "@/lib/store/sql-browser";
 import { useAuth } from "@/components/auth";
+import { quoteIdentifier } from "@/lib/clickhouse/utils";
 import { QueryCancellationManager } from "@/lib/clickhouse/cancellation";
 import { useSqlExecution } from "./use-sql-execution";
 import { useSqlPagination } from "./use-sql-pagination";
@@ -51,7 +52,11 @@ export interface SqlPageActions {
   handleCursorChange: (position: number) => void;
   handleExecuteAtCursor: () => Promise<void>;
   handleExplain: (type: ExplainType) => Promise<void>;
-  handleApplyTimeRange: (start: Date, end: Date, columnName: string) => void;
+  handleApplyTimeRange: (
+    start: Date,
+    end: Date,
+    columnName: string
+  ) => Promise<void>;
   handleHistorySelect: (sql: string) => void;
   clearHistory: () => void;
 }
@@ -173,7 +178,7 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
   );
 
   const handleApplyTimeRange = useCallback(
-    (start: Date, end: Date, columnName: string) => {
+    async (start: Date, end: Date, columnName: string) => {
       const tab = getActiveQueryTab();
       if (!tab || tab.isRunning) return;
 
@@ -185,48 +190,24 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
       };
 
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const startStr = formatSqlDate(start);
-      const endStr = formatSqlDate(end);
-
       const safeColumn = columnName.trim() || "event_time";
-      const timeClause = `${safeColumn} BETWEEN toDateTime('${startStr}', '${timezone}') AND toDateTime('${endStr}', '${timezone}')`;
+      const timeClause = `${quoteIdentifier(safeColumn)} BETWEEN toDateTime('${formatSqlDate(start)}', '${timezone}') AND toDateTime('${formatSqlDate(end)}', '${timezone}')`;
 
-      const currentSql = tab.sql;
-
-      const trailingSemiRegex = /;\s*$/;
-      const hasTrailingSemi = trailingSemiRegex.test(currentSql);
-      const sqlBody = currentSql.replace(trailingSemiRegex, "");
-
-      const clausesRegex =
-        /\b(GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|SETTINGS|FORMAT|WINDOW)\b/i;
-      const match = clausesRegex.exec(sqlBody);
-
-      let insertIndex = sqlBody.length;
-      if (match) {
-        insertIndex = match.index;
+      const { injectTimeRange } = await import("@/lib/sql/parser");
+      const result = injectTimeRange(tab.sql, timeClause);
+      if (!result.ok) {
+        toast({
+          title: "Cannot insert time range",
+          description: result.reason,
+          variant: "destructive",
+        });
+        return;
       }
 
-      const textBefore = sqlBody.slice(0, insertIndex);
-      const hasWhere = /\bWHERE\b/i.test(textBefore);
-
-      const prefix = hasWhere ? " AND " : " WHERE ";
-
-      const preppedPrefix =
-        (textBefore.endsWith(" ") ? "" : " ") + prefix.trim() + " ";
-
-      const newSql =
-        textBefore +
-        preppedPrefix +
-        timeClause +
-        " " +
-        sqlBody.slice(insertIndex) +
-        (hasTrailingSemi ? ";" : "");
-
-      updateTab(tab.id, { sql: newSql });
-
+      updateTab(tab.id, { sql: result.sql });
       toast({
         title: "Time range inserted",
-        description: `Using column '${safeColumn}'. Applied correctly to query structure.`,
+        description: `Using column '${safeColumn}'.`,
       });
     },
     [getActiveQueryTab, updateTab]

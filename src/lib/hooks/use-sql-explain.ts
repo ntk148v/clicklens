@@ -140,7 +140,7 @@ export function useSqlExplain(
       const sql = tab.sql.trim();
       if (!sql) return;
 
-      const { splitStatements } = await import("@/lib/sql/parser");
+      const { splitStatements, toExplain } = await import("@/lib/sql/parser");
       const statement = splitStatements(sql)[0]?.sql;
 
       if (!statement) return;
@@ -155,10 +155,7 @@ export function useSqlExplain(
       setIsExplaining(true);
 
       try {
-        let query = "";
-
-        const cleanStatement = statement.replace(/^EXPLAIN\s+(\w+\s+)?/i, "");
-        query = `EXPLAIN ${type} ${cleanStatement}`;
+        const query = toExplain(statement, type);
 
         const response = await fetchApi("/api/clickhouse/query", {
           method: "POST",
