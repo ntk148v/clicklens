@@ -284,6 +284,9 @@ export function useSqlExecution(
                       meta: currentMeta,
                       rows: currentData.length,
                       statistics: currentStatistics,
+                    // SAFETY: progress events omit rows_before_limit and
+                    // memory statistics, so the partial object matches
+                    // QueryResult structurally for the fields we set.
                     } as unknown as QueryResult,
                   });
                 } else if (event.type === "done") {

@@ -150,4 +150,30 @@ describe("Query API Route (Streaming)", () => {
     expect(dataLines.length).toBe(1);
     expect(JSON.parse(dataLines[0]).data.length).toBe(1);
   });
+
+  it("should reject a write statement with 403", async () => {
+    const res = await POST(createRequest({ sql: "DROP TABLE t" }))
+    const json = await res.json()
+
+    expect(res.status).toBe(403)
+    expect(json.error.type).toBe("FORBIDDEN_STATEMENT")
+    expect(mockQueryStream).not.toHaveBeenCalled()
+  })
+
+  it("should reject multiple statements with 400", async () => {
+    const res = await POST(createRequest({ sql: "SELECT 1; DROP TABLE t" }))
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.error.type).toBe("MULTIPLE_STATEMENTS")
+    expect(mockQueryStream).not.toHaveBeenCalled()
+  })
+
+  it("should reject a syntax error with 400", async () => {
+    const res = await POST(createRequest({ sql: "SELECT (" }))
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.error.type).toBe("SYNTAX_ERROR")
+  })
 });

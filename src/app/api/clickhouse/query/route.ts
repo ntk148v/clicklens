@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClickHouseConfig, checkPermission } from "@/lib/auth";
 import { createClient } from "@/lib/clickhouse";
 import { formatQueryError } from "@/lib/errors";
-import { validateSqlStatement } from "@/lib/sql/validator";
+import { validateReadOnlySql } from "@/lib/sql/parser";
 import { checkRateLimit } from "@/lib/cache/rate-limit";
 import { getClientIdentifier } from "@/lib/auth/rate-limit";
 import { requireCsrf } from "@/lib/auth/csrf";
@@ -70,21 +70,23 @@ export async function POST(request: NextRequest) {
 
     const client = createClient({ ...config, settings });
 
-    const sqlValidation = validateSqlStatement(reqBody.sql);
-    if (!sqlValidation.valid) {
+    const sqlValidation = validateReadOnlySql(reqBody.sql);
+    if (!sqlValidation.ok) {
+      const status = sqlValidation.code === "FORBIDDEN_STATEMENT" ? 403 : 400
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: 403,
+            code: status,
             message: sqlValidation.reason,
-            type: "FORBIDDEN_STATEMENT",
+            type: sqlValidation.code,
             userMessage: sqlValidation.reason,
           },
         },
-        { status: 403 },
+        { status },
       );
     }
+    const { statement } = sqlValidation;
 
     const queryCache = getQueryCache();
     const cacheEnabled = reqBody.cache !== false;
@@ -173,6 +175,8 @@ export async function POST(request: NextRequest) {
     });
 
     const stream = (
+      // SAFETY: queryStream returns an object with a product-level stream()
+      // method that the published ClickHouse type does not expose.
       resultSet as unknown as { stream: () => AsyncIterable<unknown> }
     ).stream();
     let rowsRead = 0;

@@ -5,7 +5,7 @@
  */
 
 import { ClickHouseConfig, createClient } from "@/lib/clickhouse";
-import { validateSqlStatement } from "@/lib/sql/validator";
+import { validateReadOnlySql } from "@/lib/sql/parser";
 import { getQueryCache } from "@/lib/cache/query-cache";
 
 export interface QueryExecutorOptions {
@@ -104,7 +104,8 @@ export function prepareQuery(options: QueryExecutorOptions): QueryExecutorResult
 }
 
 export function validateQuery(sql: string): { valid: boolean; reason?: string } {
-  return validateSqlStatement(sql);
+  const result = validateReadOnlySql(sql)
+  return result.ok ? { valid: true } : { valid: false, reason: result.reason }
 }
 
 export interface CachedQueryData {
