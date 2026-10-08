@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
+import * as clickhouseParser from '@clickhouse/parser'
 import { parseSql } from './parse'
 import { validateFilter } from './filter'
 
@@ -67,5 +68,18 @@ describe('sql/parser/filter', () => {
 
   test('rejects forbidden scalar functions', () => {
     expect(rejected("file('x') = ''")).toBe(true)
+  })
+
+  test('fails closed when the post-parse walk throws', () => {
+    const spy = spyOn(clickhouseParser, 'findNodes').mockImplementation(() => {
+      throw new RangeError('Maximum call stack size exceeded')
+    })
+    try {
+      const result = validateFilter("level = 'Error'")
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.reason).toContain('could not be validated')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

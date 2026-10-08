@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
+import * as clickhouseParser from '@clickhouse/parser'
 import { validateReadOnlySql } from './classify'
 
 const code = (sql: string) => {
@@ -72,5 +73,18 @@ describe('sql/parser/classify', () => {
   test('returns the parsed statement', () => {
     const result = validateReadOnlySql('SELECT 1')
     expect(result.ok && result.statement.type).toBe('SelectWithUnionQuery')
+  })
+
+  test('fails closed when the post-parse walk throws', () => {
+    const spy = spyOn(clickhouseParser, 'findNodes').mockImplementation(() => {
+      throw new RangeError('Maximum call stack size exceeded')
+    })
+    try {
+      const result = validateReadOnlySql('SELECT 1')
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.code).toBe('FORBIDDEN_STATEMENT')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

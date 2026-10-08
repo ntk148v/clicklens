@@ -126,14 +126,14 @@ export async function GET(request: Request) {
     const mode = searchParams.get("mode") || "data";
     const filter = searchParams.get("filter") || "";
 
-    const filterValidation = validateFilter(filter)
+    const filterValidation = validateFilter(filter);
     if (!filterValidation.ok) {
       return NextResponse.json(
         { success: false, error: `Invalid filter: ${filterValidation.reason}` },
         { status: 400 },
       );
     }
-    const safeFilter = filterValidation.sql
+    const safeFilter = filterValidation.sql;
     const minTime = searchParams.get("minTime");
     const maxTime = searchParams.get("maxTime");
     const columnsParam = searchParams.get("columns");

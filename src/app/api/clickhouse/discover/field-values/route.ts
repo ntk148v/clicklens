@@ -4,8 +4,8 @@ import { createClient, isClickHouseError } from "@/lib/clickhouse";
 import { getClusterName } from "@/lib/clickhouse/cluster";
 import { getTableEngine } from "@/lib/clickhouse/schema";
 import { quoteIdentifier, escapeSqlString } from "@/lib/clickhouse/utils";
-import { validateFilter } from "@/lib/sql/parser";
 import { getFieldValuesQuery } from "@/lib/clickhouse/queries/discover";
+import { validateFilter } from "@/lib/sql/parser";
 
 const MAX_VALUES = 10;
 const QUERY_TIMEOUT_MS = 15_000;

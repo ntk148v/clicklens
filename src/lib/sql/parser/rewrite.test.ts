@@ -119,13 +119,32 @@ describe('sql/parser/rewrite', () => {
     })
 
     test('rejects text that it cannot change safely', () => {
-      expect(injectTimeRange('SELECT 1; SELECT 2', condition).ok).toBe(false)
-      expect(
-        injectTimeRange('SELECT 1 UNION ALL SELECT 2', condition).ok,
-      ).toBe(false)
-      expect(injectTimeRange('SELECT now()', condition).ok).toBe(false)
-      expect(injectTimeRange('SHOW TABLES', condition).ok).toBe(false)
-      expect(injectTimeRange('SELECT (', condition).ok).toBe(false)
+      const reason = (sql: string, cond = condition) => {
+        const result = injectTimeRange(sql, cond)
+        expect(result.ok).toBe(false)
+        return result.ok ? '' : result.reason
+      }
+      expect(reason('SELECT 1; SELECT 2')).toContain('exactly one statement')
+      expect(reason('SELECT 1 UNION ALL SELECT 2')).toContain('single SELECT')
+      expect(reason('SELECT now()')).toContain('FROM clause')
+      expect(reason('SHOW TABLES')).toContain('single SELECT')
+      expect(reason('SELECT (')).toContain('Cannot parse the query')
+    })
+
+    test('rejects an invalid condition', () => {
+      const result = injectTimeRange('SELECT a FROM t', 'ts >')
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.reason).toContain('Invalid time range')
+    })
+
+    test('joins a plain AND chain with the condition', () => {
+      const result = injectTimeRange(
+        'SELECT a FROM t WHERE x = 1 AND y = 2',
+        condition,
+      )
+      expect(result.ok).toBe(true)
+      if (result.ok)
+        expect(whereOf(result.sql)).toBe('(x = 1 AND y = 2) AND ts > 1')
     })
   })
 })

@@ -45,6 +45,19 @@ function isReadOnlyType(type: string): boolean {
 }
 
 export function validateReadOnlySql(sql: string): ReadOnlyValidation {
+  try {
+    return validateReadOnlySqlUnsafe(sql)
+  } catch {
+    // Fail closed: a walker error (e.g. stack overflow) must never allow a query.
+    return {
+      ok: false,
+      code: 'FORBIDDEN_STATEMENT',
+      reason: 'Statement could not be validated.',
+    }
+  }
+}
+
+function validateReadOnlySqlUnsafe(sql: string): ReadOnlyValidation {
   const result = parseSql(sql)
   if (!result.ok) {
     const { line, column, message } = result.error

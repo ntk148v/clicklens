@@ -39,6 +39,15 @@ function stripComments(node: unknown): void {
  * validated AST. Send `sql` to ClickHouse, never the raw filter.
  */
 export function validateFilter(filter: string): FilterValidation {
+  try {
+    return validateFilterUnsafe(filter)
+  } catch {
+    // Fail closed: a walker error (e.g. stack overflow) must never allow a filter.
+    return { ok: false, reason: 'Filter could not be validated' }
+  }
+}
+
+function validateFilterUnsafe(filter: string): FilterValidation {
   const trimmed = filter.trim()
   if (!trimmed) return { ok: true, sql: '' }
 

@@ -88,7 +88,9 @@ export function injectTimeRange(sql: string, condition: string): RewriteResult {
     return { ok: false, reason: 'Invalid time range condition' }
 
   select.where = select.where
-    ? ({
+    ? // SAFETY: the object has every field the AST printer reads for an
+      // operator call (type, name, arguments, is_operator).
+      ({
         type: 'Function',
         name: 'and',
         arguments: [select.where, conditionSelect.where],

@@ -193,8 +193,19 @@ export function useSqlPage(): SqlPageState & SqlPageActions {
       const safeColumn = columnName.trim() || "event_time";
       const timeClause = `${quoteIdentifier(safeColumn)} BETWEEN toDateTime('${formatSqlDate(start)}', '${timezone}') AND toDateTime('${formatSqlDate(end)}', '${timezone}')`;
 
-      const { injectTimeRange } = await import("@/lib/sql/parser");
-      const result = injectTimeRange(tab.sql, timeClause);
+      let result;
+      try {
+        const { injectTimeRange } = await import("@/lib/sql/parser");
+        result = injectTimeRange(tab.sql, timeClause);
+      } catch (error) {
+        toast({
+          title: "Cannot insert time range",
+          description:
+            error instanceof Error ? error.message : "Unexpected error",
+          variant: "destructive",
+        });
+        return;
+      }
       if (!result.ok) {
         toast({
           title: "Cannot insert time range",
