@@ -6,6 +6,7 @@
       "name": "clicklens",
       "dependencies": {
         "@clickhouse/client": "^1.15.0",
+        "@clickhouse/parser": "0.3.0",
         "@codemirror/autocomplete": "^6.20.0",
         "@codemirror/commands": "^6.10.1",
         "@codemirror/lang-sql": "^6.10.0",
@@ -128,6 +129,8 @@
     "@clickhouse/client": ["@clickhouse/client@1.15.0", "", { "dependencies": { "@clickhouse/client-common": "1.15.0" } }, "sha512-QmW+p4c/r0oa3X6Un6lcBs4GZtJEQUdvf//x8GeqM5ru6m4oIUg3WwvermP3HE31kpEGoFOQfKbMN5ooR5gvNw=="],
 
     "@clickhouse/client-common": ["@clickhouse/client-common@1.15.0", "", {}, "sha512-/1BXaNNsBzH2w5ALWiH6M9zS+cJwlM9uMnMj9e8ETwvDjJzO+nIYlyxzp8Prc+9pEDZ5iAilZ4F8c0YVCzzNaA=="],
+
+    "@clickhouse/parser": ["@clickhouse/parser@0.3.0", "", { "dependencies": { "zod": "^4.3.6" } }, "sha512-VoUfcKzKalCNUY92iYkLYGzNg5FrVID7iSFnqDjV4DYvu8X4mJl1z5486zl+RBqsmYZ+L7koPrNiv1bQ0hrxGQ=="],
 
     "@codemirror/autocomplete": ["@codemirror/autocomplete@6.20.0", "", { "dependencies": { "@codemirror/language": "^6.0.0", "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.17.0", "@lezer/common": "^1.0.0" } }, "sha512-bOwvTOIJcG5FVo5gUUupiwYh8MioPLQ4UcqbcRf7UQ98X90tCa9E1kZ3Z7tqwpZxYyOvh1YTYbmZE9RTfTp5hg=="],
 
@@ -1432,6 +1435,8 @@
     "@babel/core/json5": ["json5@2.2.3", "", { "bin": { "json5": "lib/cli.js" } }, "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="],
 
     "@babel/helper-compilation-targets/lru-cache": ["lru-cache@5.1.1", "", { "dependencies": { "yallist": "^3.0.2" } }, "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="],
+
+    "@clickhouse/parser/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
